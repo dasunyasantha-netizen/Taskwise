@@ -336,10 +336,10 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
                     </div>
                     {/* Show payload details if meaningful */}
                     {log.payload?.reason && (
-                      <div className="text-xs text-tw-text-secondary mt-0.5 italic">"{String(log.payload.reason)}"</div>
+                      <div className="text-xs text-tw-text-secondary mt-0.5 italic">"{log.payload.reason as string}"</div>
                     )}
                     {log.payload?.title && log.event === 'TASK_CREATED' && (
-                      <div className="text-xs text-tw-text-secondary mt-0.5">"{String(log.payload.title)}"</div>
+                      <div className="text-xs text-tw-text-secondary mt-0.5">"{log.payload.title as string}"</div>
                     )}
                     <div className="text-xs text-tw-text-secondary mt-0.5">{new Date(log.createdAt).toLocaleString()}</div>
                   </div>
