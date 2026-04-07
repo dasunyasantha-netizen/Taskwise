@@ -1,0 +1,324 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// IDENTITY & WORKSPACE
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Director {
+  id          String     @id @default(uuid())
+  email       String     @unique
+  password    String
+  name        String
+  avatarUrl   String?
+  workspaceId String?    @unique
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id])
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  projectsCreated   Project[]
+  tasksCreated      Task[]         @relation("TaskCreatedByDirector")
+  auditLogs         AuditLog[]     @relation("AuditActorDirector")
+  notifications     Notification[] @relation("NotifRecipientDirector")
+  comments          TaskComment[]  @relation("CommentAuthorDirector")
+}
+
+model Workspace {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  director Director?
+  layers   Layer[]
+  projects Project[]
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HIERARCHY
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Layer {
+  id          String     @id @default(uuid())
+  workspaceId String
+  workspace   Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  number      Int        // 1, 2, or 3
+  name        String
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  departments Department[]
+
+  @@unique([workspaceId, number])
+  @@index([workspaceId])
+}
+
+model Department {
+  id          String      @id @default(uuid())
+  layerId     String
+  layer       Layer       @relation(fields: [layerId], references: [id], onDelete: Cascade)
+  workspaceId String
+  name        String
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  deletedAt   DateTime?
+
+  personnel       Personnel[]
+  groups          Group[]
+  taskAssignments TaskAssignment[]
+
+  @@index([layerId])
+  @@index([workspaceId])
+}
+
+model Personnel {
+  id           String     @id @default(uuid())
+  workspaceId  String
+  departmentId String
+  department   Department @relation(fields: [departmentId], references: [id])
+  email        String
+  password     String
+  name         String
+  phone        String?
+  avatarUrl    String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  deletedAt    DateTime?
+
+  groupMemberships GroupMember[]
+  taskAssignments  TaskAssignment[]
+  tasksCreated     Task[]         @relation("TaskCreatedByPersonnel")
+  auditLogs        AuditLog[]     @relation("AuditActorPersonnel")
+  notifications    Notification[] @relation("NotifRecipientPersonnel")
+  comments         TaskComment[]  @relation("CommentAuthorPersonnel")
+
+  @@unique([workspaceId, email])
+  @@index([workspaceId])
+  @@index([departmentId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GROUPS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Group {
+  id           String     @id @default(uuid())
+  workspaceId  String
+  departmentId String
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  name         String
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  deletedAt    DateTime?
+
+  members         GroupMember[]
+  taskAssignments TaskAssignment[]
+
+  @@index([workspaceId])
+  @@index([departmentId])
+}
+
+model GroupMember {
+  id          String    @id @default(uuid())
+  groupId     String
+  group       Group     @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  personnelId String
+  personnel   Personnel @relation(fields: [personnelId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+
+  @@unique([groupId, personnelId])
+  @@index([personnelId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PROJECTS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Project {
+  id          String    @id @default(uuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  directorId  String
+  director    Director  @relation(fields: [directorId], references: [id])
+  name        String
+  description String?
+  color       String    @default("#0073ea")
+  status      String    @default("active") // active | archived
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  tasks Task[]
+
+  @@index([workspaceId])
+  @@index([directorId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TASKS  (self-referencing for subtask tree)
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Status state machine:
+// PENDING → ASSIGNED → IN_PROGRESS → SUBMITTED → APPROVED
+//                           ↓
+//                        RETURNED  (assignee returns with reason)
+//                        REJECTED  (authority rejects; assignee can reopen → IN_PROGRESS)
+// Any → CANCELLED (Director only, soft-delete)
+
+model Task {
+  id          String   @id @default(uuid())
+  workspaceId String
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  // Self-reference for subtask tree. parentTaskId=null means top-level (Director only).
+  parentTaskId String?
+  parent       Task?   @relation("TaskSubtasks", fields: [parentTaskId], references: [id])
+  subtasks     Task[]  @relation("TaskSubtasks")
+
+  title       String
+  description String?
+  priority    String  @default("MEDIUM") // CRITICAL | HIGH | MEDIUM | LOW
+  status      String  @default("PENDING")
+  // PENDING | ASSIGNED | IN_PROGRESS | SUBMITTED | APPROVED | RETURNED | REJECTED | CANCELLED
+
+  deadline         DateTime?
+  deadlineSetById  String?   // Director.id or Personnel.id
+  deadlineSetByType String?  // "director" | "personnel"
+
+  // Creator (top-level = Director; subtask = Personnel or Director)
+  createdByDirectorId  String?
+  createdByDirector    Director?  @relation("TaskCreatedByDirector", fields: [createdByDirectorId], references: [id])
+  createdByPersonnelId String?
+  createdByPersonnel   Personnel? @relation("TaskCreatedByPersonnel", fields: [createdByPersonnelId], references: [id])
+
+  // Approval: who must approve when SUBMITTED
+  approvalById   String?
+  approvalByType String? // "director" | "personnel"
+
+  returnReason String?
+  returnedAt   DateTime?
+  cancelledAt  DateTime?
+  cancelReason String?
+  deletedAt    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  assignments TaskAssignment[]
+  comments    TaskComment[]
+  auditLogs   AuditLog[]
+  notifications Notification[]
+
+  @@index([workspaceId])
+  @@index([projectId])
+  @@index([parentTaskId])
+  @@index([status])
+  @@index([deadline])
+}
+
+// Polymorphic assignment: exactly one of departmentId / groupId / personnelId is set
+model TaskAssignment {
+  id           String      @id @default(uuid())
+  taskId       String
+  task         Task        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id])
+  groupId      String?
+  group        Group?      @relation(fields: [groupId], references: [id])
+  personnelId  String?
+  personnel    Personnel?  @relation(fields: [personnelId], references: [id])
+  assignedAt   DateTime    @default(now())
+
+  @@index([taskId])
+  @@index([personnelId])
+  @@index([groupId])
+  @@index([departmentId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// COMMENTS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model TaskComment {
+  id                String     @id @default(uuid())
+  taskId            String
+  task              Task       @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  authorPersonnelId String?
+  authorPersonnel   Personnel? @relation("CommentAuthorPersonnel", fields: [authorPersonnelId], references: [id])
+  authorDirectorId  String?
+  authorDirector    Director?  @relation("CommentAuthorDirector", fields: [authorDirectorId], references: [id])
+  authorType        String     // "director" | "personnel"
+  content           String
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+  deletedAt         DateTime?
+
+  @@index([taskId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AUDIT LOG
+// ─────────────────────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id               String     @id @default(uuid())
+  workspaceId      String
+  taskId           String?
+  task             Task?      @relation(fields: [taskId], references: [id])
+  event            String
+  // Events: TASK_CREATED | TASK_ASSIGNED | TASK_UPDATED | TASK_STARTED |
+  //         TASK_SUBMITTED | TASK_APPROVED | TASK_REJECTED | TASK_RETURNED |
+  //         TASK_REASSIGNED | TASK_CANCELLED | TASK_DELETED |
+  //         SUBTASK_CREATED | COMMENT_ADDED | DEADLINE_CHANGED |
+  //         PERSONNEL_MOVED | PROJECT_CREATED
+  actorDirectorId  String?
+  actorDirector    Director?  @relation("AuditActorDirector", fields: [actorDirectorId], references: [id])
+  actorPersonnelId String?
+  actorPersonnel   Personnel? @relation("AuditActorPersonnel", fields: [actorPersonnelId], references: [id])
+  actorType        String     // "director" | "personnel"
+  payload          Json?
+  createdAt        DateTime   @default(now())
+
+  @@index([workspaceId, createdAt])
+  @@index([taskId, createdAt])
+  @@index([actorPersonnelId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NOTIFICATIONS  (in-app only)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Notification {
+  id                   String     @id @default(uuid())
+  workspaceId          String
+  recipientDirectorId  String?
+  recipientDirector    Director?  @relation("NotifRecipientDirector", fields: [recipientDirectorId], references: [id], onDelete: Cascade)
+  recipientPersonnelId String?
+  recipientPersonnel   Personnel? @relation("NotifRecipientPersonnel", fields: [recipientPersonnelId], references: [id], onDelete: Cascade)
+  recipientType        String     // "director" | "personnel"
+  type                 String
+  // task_assigned | task_returned | task_submitted_for_approval |
+  // task_approved | task_rejected | task_deadline_warning |
+  // subtask_created | comment_added | personnel_moved
+  title     String
+  message   String
+  taskId    String?
+  task      Task?    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  payload   Json?
+  isRead    Boolean  @default(false)
+  readAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([recipientPersonnelId, isRead, createdAt])
+  @@index([recipientDirectorId, isRead, createdAt])
+  @@index([taskId])
+  @@index([workspaceId])
+}
