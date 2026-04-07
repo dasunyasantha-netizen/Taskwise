@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import type { AuthUser, ViewMode, Project, Task } from '../types'
+import type { AuthUser, ViewMode, Project, Task, AuditLog } from '../types'
 import { projectApi, taskApi, auditApi } from '../services/apiService'
 import NotificationsMenu from './NotificationsMenu'
 import HierarchyPanel from './HierarchyPanel'

@@ -120,6 +120,8 @@ export interface Task {
   deadline?: string
   deadlineSetById?: string
   deadlineSetByType?: ActorType
+  approvalById?: string
+  approvalByType?: string
   returnReason?: string
   returnedAt?: string
   cancelledAt?: string
