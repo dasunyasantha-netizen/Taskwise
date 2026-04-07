@@ -13,8 +13,10 @@ const TASK_INCLUDE = {
   _count: { select: { subtasks: true, comments: true } }
 }
 
-async function writeAudit(workspaceId: string, event: string, actorType: 'director' | 'personnel', actorId: string, taskId?: string, payload?: object) {
-  await prisma.auditLog.create({
+type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
+
+async function writeAudit(db: TxClient | typeof prisma, workspaceId: string, event: string, actorType: 'director' | 'personnel', actorId: string, taskId?: string, payload?: object) {
+  await db.auditLog.create({
     data: {
       workspaceId,
       event,
@@ -27,8 +29,8 @@ async function writeAudit(workspaceId: string, event: string, actorType: 'direct
   })
 }
 
-async function notifyActor(workspaceId: string, recipientType: 'director' | 'personnel', recipientId: string, type: string, title: string, message: string, taskId?: string) {
-  await prisma.notification.create({
+async function notifyActor(db: TxClient | typeof prisma, workspaceId: string, recipientType: 'director' | 'personnel', recipientId: string, type: string, title: string, message: string, taskId?: string) {
+  await db.notification.create({
     data: {
       workspaceId,
       recipientType,
@@ -105,7 +107,7 @@ export async function createTask(req: Request, res: Response): Promise<void> {
           approvalByType: actorType,
         }
       })
-      await writeAudit(workspaceId, parentTaskId ? 'SUBTASK_CREATED' : 'TASK_CREATED', actorType, actorId, t.id, { title })
+      await writeAudit(tx, workspaceId, parentTaskId ? 'SUBTASK_CREATED' : 'TASK_CREATED', actorType, actorId, t.id, { title })
       return t
     })
     res.status(201).json(task)
@@ -140,7 +142,7 @@ export async function updateTask(req: Request, res: Response): Promise<void> {
           deadlineSetByType: deadline ? actorType : task.deadlineSetByType || undefined,
         }
       })
-      await writeAudit(workspaceId, 'TASK_UPDATED', actorType, actorId, t.id, req.body)
+      await writeAudit(tx, workspaceId, 'TASK_UPDATED', actorType, actorId, t.id, req.body)
       return t
     })
     res.json(updated)
@@ -161,10 +163,9 @@ export async function assignTask(req: Request, res: Response): Promise<void> {
     await prisma.$transaction(async tx => {
       await tx.taskAssignment.create({ data: { taskId: task.id, personnelId, groupId, departmentId } })
       await tx.task.update({ where: { id: task.id }, data: { status: 'ASSIGNED' } })
-      await writeAudit(workspaceId, 'TASK_ASSIGNED', actorType, actorId, task.id, { personnelId, groupId, departmentId })
-      // Notify the assignee
+      await writeAudit(tx, workspaceId, 'TASK_ASSIGNED', actorType, actorId, task.id, { personnelId, groupId, departmentId })
       if (personnelId) {
-        await notifyActor(workspaceId, 'personnel', personnelId, 'task_assigned', 'New task assigned', `You have been assigned: "${task.title}"`, task.id)
+        await notifyActor(tx, workspaceId, 'personnel', personnelId, 'task_assigned', 'New task assigned', `You have been assigned: "${task.title}"`, task.id)
       }
     })
     res.json({ success: true })
@@ -180,7 +181,7 @@ export async function startTask(req: Request, res: Response): Promise<void> {
     if (task.status !== 'ASSIGNED') { res.status(400).json({ error: 'Task must be in ASSIGNED status' }); return }
     await prisma.$transaction(async tx => {
       await tx.task.update({ where: { id: task.id }, data: { status: 'IN_PROGRESS' } })
-      await writeAudit(workspaceId, 'TASK_STARTED', actorType, actorId, task.id)
+      await writeAudit(tx, workspaceId, 'TASK_STARTED', actorType, actorId, task.id)
     })
     res.json({ success: true })
   } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
@@ -199,15 +200,14 @@ export async function submitTask(req: Request, res: Response): Promise<void> {
       where: { parentTaskId: task.id, deletedAt: null, status: { not: 'APPROVED' }, cancelledAt: null }
     })
     if (blocking.length > 0) {
-      res.status(400).json({ error: 'All subtasks must be APPROVED before submitting', blockingSubtasks: blocking.map(t => ({ id: t.id, title: t.title, status: t.status }) ) }); return
+      res.status(400).json({ error: 'All subtasks must be APPROVED before submitting', blockingSubtasks: blocking.map(t => ({ id: t.id, title: t.title, status: t.status })) }); return
     }
 
     await prisma.$transaction(async tx => {
       await tx.task.update({ where: { id: task.id }, data: { status: 'SUBMITTED' } })
-      await writeAudit(workspaceId, 'TASK_SUBMITTED', actorType, actorId, task.id)
-      // Notify approving authority
+      await writeAudit(tx, workspaceId, 'TASK_SUBMITTED', actorType, actorId, task.id)
       if (task.approvalById && task.approvalByType) {
-        await notifyActor(workspaceId, task.approvalByType as 'director' | 'personnel', task.approvalById, 'task_submitted_for_approval', 'Task ready for approval', `"${task.title}" has been submitted for your approval.`, task.id)
+        await notifyActor(tx, workspaceId, task.approvalByType as 'director' | 'personnel', task.approvalById, 'task_submitted_for_approval', 'Task ready for approval', `"${task.title}" has been submitted for your approval.`, task.id)
       }
     })
     res.json({ success: true })
@@ -225,9 +225,9 @@ export async function returnTask(req: Request, res: Response): Promise<void> {
     if (task.status !== 'IN_PROGRESS') { res.status(400).json({ error: 'Task must be IN_PROGRESS to return' }); return }
     await prisma.$transaction(async tx => {
       await tx.task.update({ where: { id: task.id }, data: { status: 'RETURNED', returnReason: reason, returnedAt: new Date() } })
-      await writeAudit(workspaceId, 'TASK_RETURNED', actorType, actorId, task.id, { reason })
+      await writeAudit(tx, workspaceId, 'TASK_RETURNED', actorType, actorId, task.id, { reason })
       if (task.approvalById && task.approvalByType) {
-        await notifyActor(workspaceId, task.approvalByType as 'director' | 'personnel', task.approvalById, 'task_returned', 'Task returned', `"${task.title}" was returned: ${reason}`, task.id)
+        await notifyActor(tx, workspaceId, task.approvalByType as 'director' | 'personnel', task.approvalById, 'task_returned', 'Task returned', `"${task.title}" was returned: ${reason}`, task.id)
       }
     })
     res.json({ success: true })
@@ -246,7 +246,7 @@ export async function approveTask(req: Request, res: Response): Promise<void> {
     }
     await prisma.$transaction(async tx => {
       await tx.task.update({ where: { id: task.id }, data: { status: 'APPROVED' } })
-      await writeAudit(workspaceId, 'TASK_APPROVED', actorType, actorId, task.id)
+      await writeAudit(tx, workspaceId, 'TASK_APPROVED', actorType, actorId, task.id)
     })
     res.json({ success: true })
   } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
@@ -265,7 +265,7 @@ export async function rejectTask(req: Request, res: Response): Promise<void> {
     }
     await prisma.$transaction(async tx => {
       await tx.task.update({ where: { id: task.id }, data: { status: 'REJECTED', returnReason: reason } })
-      await writeAudit(workspaceId, 'TASK_REJECTED', actorType, actorId, task.id, { reason })
+      await writeAudit(tx, workspaceId, 'TASK_REJECTED', actorType, actorId, task.id, { reason })
     })
     res.json({ success: true })
   } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
@@ -280,7 +280,7 @@ export async function reopenTask(req: Request, res: Response): Promise<void> {
     if (task.status !== 'REJECTED') { res.status(400).json({ error: 'Task must be REJECTED to reopen' }); return }
     await prisma.$transaction(async tx => {
       await tx.task.update({ where: { id: task.id }, data: { status: 'IN_PROGRESS', returnReason: null } })
-      await writeAudit(workspaceId, 'TASK_UPDATED', actorType, actorId, task.id, { action: 'reopened' })
+      await writeAudit(tx, workspaceId, 'TASK_UPDATED', actorType, actorId, task.id, { action: 'reopened' })
     })
     res.json({ success: true })
   } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
@@ -296,7 +296,7 @@ export async function cancelTask(req: Request, res: Response): Promise<void> {
     if (!task) { res.status(404).json({ error: 'Task not found' }); return }
     await prisma.$transaction(async tx => {
       await tx.task.update({ where: { id: task.id }, data: { status: 'CANCELLED', cancelledAt: new Date(), cancelReason: reason } })
-      await writeAudit(workspaceId, 'TASK_CANCELLED', actorType, actorId, task.id, { reason })
+      await writeAudit(tx, workspaceId, 'TASK_CANCELLED', actorType, actorId, task.id, { reason })
     })
     res.json({ success: true })
   } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
@@ -311,7 +311,7 @@ export async function deleteTask(req: Request, res: Response): Promise<void> {
     if (!task) { res.status(404).json({ error: 'Task not found' }); return }
     await prisma.$transaction(async tx => {
       await tx.task.update({ where: { id: task.id }, data: { deletedAt: new Date() } })
-      await writeAudit(workspaceId, 'TASK_DELETED', actorType, actorId, task.id)
+      await writeAudit(tx, workspaceId, 'TASK_DELETED', actorType, actorId, task.id)
     })
     res.json({ success: true })
   } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
@@ -358,7 +358,7 @@ export async function addComment(req: Request, res: Response): Promise<void> {
           authorPersonnelId: actorType === 'personnel' ? actorId : undefined,
         }
       })
-      await writeAudit(workspaceId, 'COMMENT_ADDED', actorType, actorId, task.id, { commentId: c.id })
+      await writeAudit(tx, workspaceId, 'COMMENT_ADDED', actorType, actorId, task.id, { commentId: c.id })
       return c
     })
     res.status(201).json(comment)
