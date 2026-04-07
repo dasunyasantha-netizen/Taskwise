@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import type { Task, TaskComment, AuditLog, Layer, Personnel, Group } from '../types'
 import { taskApi } from '../services/apiService'
 import DatePicker from './DatePicker'
+import Select from './Select'
 
 interface Props {
   task: Task
@@ -288,29 +289,27 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
               <h3 className="font-semibold text-tw-text">Assign Task</h3>
             </div>
             <div className="px-5 py-4 space-y-3">
-              <select className="input" value={assignTarget.type} onChange={e => setAssignTarget({ type: e.target.value, id: '' })}>
-                <option value="">Assign type...</option>
-                <option value="personnel">Person</option>
-                <option value="group">Group</option>
-                <option value="department">Department</option>
-              </select>
+              <Select
+                value={assignTarget.type}
+                onChange={val => setAssignTarget({ type: val, id: '' })}
+                placeholder="Assign type..."
+                options={[
+                  { value: 'personnel', label: 'Person' },
+                  { value: 'group', label: 'Group' },
+                  { value: 'department', label: 'Department' },
+                ]}
+              />
               {assignTarget.type === 'personnel' && (
-                <select className="input" value={assignTarget.id} onChange={e => setAssignTarget(a => ({ ...a, id: e.target.value }))}>
-                  <option value="">Select person...</option>
-                  {personnel.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
+                <Select value={assignTarget.id} onChange={val => setAssignTarget(a => ({ ...a, id: val }))}
+                  placeholder="Select person..." options={personnel.map(p => ({ value: p.id, label: p.name }))} />
               )}
               {assignTarget.type === 'group' && (
-                <select className="input" value={assignTarget.id} onChange={e => setAssignTarget(a => ({ ...a, id: e.target.value }))}>
-                  <option value="">Select group...</option>
-                  {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-                </select>
+                <Select value={assignTarget.id} onChange={val => setAssignTarget(a => ({ ...a, id: val }))}
+                  placeholder="Select group..." options={groups.map(g => ({ value: g.id, label: g.name }))} />
               )}
               {assignTarget.type === 'department' && (
-                <select className="input" value={assignTarget.id} onChange={e => setAssignTarget(a => ({ ...a, id: e.target.value }))}>
-                  <option value="">Select department...</option>
-                  {allDepts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                </select>
+                <Select value={assignTarget.id} onChange={val => setAssignTarget(a => ({ ...a, id: val }))}
+                  placeholder="Select department..." options={allDepts.map(d => ({ value: d.id, label: d.name }))} />
               )}
               <div className="flex gap-2 justify-end">
                 <button onClick={() => setShowAssignModal(false)} className="btn-secondary">Cancel</button>
@@ -339,12 +338,13 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
               <input className="input" placeholder="Subtask title" value={subtaskForm.title} onChange={e => setSubtaskForm(f => ({ ...f, title: e.target.value }))} />
               <textarea className="input resize-none" rows={2} placeholder="Description..." value={subtaskForm.description} onChange={e => setSubtaskForm(f => ({ ...f, description: e.target.value }))} />
               <div className="grid grid-cols-2 gap-3">
-                <select className="input" value={subtaskForm.priority} onChange={e => setSubtaskForm(f => ({ ...f, priority: e.target.value }))}>
-                  <option value="LOW">Low</option>
-                  <option value="MEDIUM">Medium</option>
-                  <option value="HIGH">High</option>
-                  <option value="CRITICAL">Critical</option>
-                </select>
+                <Select value={subtaskForm.priority} onChange={val => setSubtaskForm(f => ({ ...f, priority: val }))}
+                  options={[
+                    { value: 'LOW', label: 'Low' },
+                    { value: 'MEDIUM', label: 'Medium' },
+                    { value: 'HIGH', label: 'High' },
+                    { value: 'CRITICAL', label: 'Critical' },
+                  ]} />
                 <DatePicker value={subtaskForm.deadline} onChange={val => setSubtaskForm(f => ({ ...f, deadline: val }))} />
               </div>
               <div className="flex gap-2 justify-end">

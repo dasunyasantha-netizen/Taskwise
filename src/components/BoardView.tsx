@@ -4,6 +4,7 @@ import { taskApi, workspaceApi } from '../services/apiService'
 import TaskCard from './TaskCard'
 import TaskDetailPanel from './TaskDetailPanel'
 import DatePicker from './DatePicker'
+import Select, { SelectOption } from './Select'
 
 interface Props {
   project: Project
@@ -160,12 +161,16 @@ export default function BoardView({ project, isDirector, actorId }: Props) {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-tw-text mb-1">Priority</label>
-                  <select className="input" value={form.priority} onChange={e => setForm(f => ({ ...f, priority: e.target.value }))}>
-                    <option value="LOW">Low</option>
-                    <option value="MEDIUM">Medium</option>
-                    <option value="HIGH">High</option>
-                    <option value="CRITICAL">Critical</option>
-                  </select>
+                  <Select
+                    value={form.priority}
+                    onChange={val => setForm(f => ({ ...f, priority: val }))}
+                    options={[
+                      { value: 'LOW', label: 'Low' },
+                      { value: 'MEDIUM', label: 'Medium' },
+                      { value: 'HIGH', label: 'High' },
+                      { value: 'CRITICAL', label: 'Critical' },
+                    ]}
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-tw-text mb-1">Deadline</label>
@@ -177,29 +182,39 @@ export default function BoardView({ project, isDirector, actorId }: Props) {
               <div>
                 <label className="block text-sm font-medium text-tw-text mb-1">Assign to (optional)</label>
                 <div className="grid grid-cols-2 gap-2">
-                  <select className="input" value={assignTarget.type} onChange={e => setAssignTarget({ type: e.target.value as 'personnel' | 'group' | 'department' | '', id: '' })}>
-                    <option value="">Assign type...</option>
-                    <option value="personnel">Person</option>
-                    <option value="group">Group</option>
-                    <option value="department">Department</option>
-                  </select>
+                  <Select
+                    value={assignTarget.type}
+                    onChange={val => setAssignTarget({ type: val as 'personnel' | 'group' | 'department' | '', id: '' })}
+                    placeholder="Assign type..."
+                    options={[
+                      { value: 'personnel', label: 'Person' },
+                      { value: 'group', label: 'Group' },
+                      { value: 'department', label: 'Department' },
+                    ]}
+                  />
                   {assignTarget.type === 'personnel' && (
-                    <select className="input" value={assignTarget.id} onChange={e => setAssignTarget(a => ({ ...a, id: e.target.value }))}>
-                      <option value="">Select person...</option>
-                      {personnel.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                    </select>
+                    <Select
+                      value={assignTarget.id}
+                      onChange={val => setAssignTarget(a => ({ ...a, id: val }))}
+                      placeholder="Select person..."
+                      options={personnel.map(p => ({ value: p.id, label: p.name }))}
+                    />
                   )}
                   {assignTarget.type === 'group' && (
-                    <select className="input" value={assignTarget.id} onChange={e => setAssignTarget(a => ({ ...a, id: e.target.value }))}>
-                      <option value="">Select group...</option>
-                      {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-                    </select>
+                    <Select
+                      value={assignTarget.id}
+                      onChange={val => setAssignTarget(a => ({ ...a, id: val }))}
+                      placeholder="Select group..."
+                      options={groups.map(g => ({ value: g.id, label: g.name }))}
+                    />
                   )}
                   {assignTarget.type === 'department' && (
-                    <select className="input" value={assignTarget.id} onChange={e => setAssignTarget(a => ({ ...a, id: e.target.value }))}>
-                      <option value="">Select department...</option>
-                      {allDepts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                    </select>
+                    <Select
+                      value={assignTarget.id}
+                      onChange={val => setAssignTarget(a => ({ ...a, id: val }))}
+                      placeholder="Select department..."
+                      options={allDepts.map(d => ({ value: d.id, label: d.name }))}
+                    />
                   )}
                 </div>
               </div>

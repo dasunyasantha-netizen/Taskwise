@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import type { Layer, Department, Personnel, Group } from '../types'
 import { workspaceApi } from '../services/apiService'
+import Select from './Select'
 
 export default function HierarchyPanel() {
   const [layers, setLayers] = useState<Layer[]>([])
@@ -259,11 +260,12 @@ export default function HierarchyPanel() {
                   ))}
                 </div>
                 {deptPersonnel.length > 0 && (
-                  <select onChange={e => { if (e.target.value) { addGroupMember(g.id, e.target.value); e.target.value = '' } }}
-                    className="input text-xs py-1.5">
-                    <option value="">+ Add member from {dept?.name}...</option>
-                    {deptPersonnel.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                  </select>
+                  <Select
+                    value=""
+                    onChange={val => { if (val) addGroupMember(g.id, val) }}
+                    placeholder={`+ Add member from ${dept?.name}...`}
+                    options={deptPersonnel.map(p => ({ value: p.id, label: p.name }))}
+                  />
                 )}
               </div>
             )
@@ -277,10 +279,12 @@ export default function HierarchyPanel() {
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-tw-text mb-1">Layer</label>
-              <select className="input" value={deptForm.layerId} onChange={e => setDeptForm(f => ({ ...f, layerId: e.target.value }))}>
-                <option value="">Select layer...</option>
-                {layers.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-              </select>
+              <Select
+                value={deptForm.layerId}
+                onChange={val => setDeptForm(f => ({ ...f, layerId: val }))}
+                placeholder="Select layer..."
+                options={layers.map(l => ({ value: l.id, label: l.name }))}
+              />
             </div>
             <div>
               <label className="block text-sm font-medium text-tw-text mb-1">Department Name</label>
@@ -316,14 +320,12 @@ export default function HierarchyPanel() {
             </div>
             <div>
               <label className="block text-sm font-medium text-tw-text mb-1">Department</label>
-              <select className="input" value={personnelForm.departmentId} onChange={e => setPersonnelForm(f => ({ ...f, departmentId: e.target.value }))}>
-                <option value="">Select department...</option>
-                {layers.map(l => (
-                  <optgroup key={l.id} label={l.name}>
-                    {(l.departments || []).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                  </optgroup>
-                ))}
-              </select>
+              <Select
+                value={personnelForm.departmentId}
+                onChange={val => setPersonnelForm(f => ({ ...f, departmentId: val }))}
+                placeholder="Select department..."
+                options={layers.flatMap(l => (l.departments || []).map(d => ({ value: d.id, label: d.name, group: l.name })))}
+              />
             </div>
             <div className="flex gap-2 justify-end">
               <button onClick={() => setShowPersonnelModal(false)} className="btn-secondary">Cancel</button>
@@ -339,14 +341,12 @@ export default function HierarchyPanel() {
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-tw-text mb-1">Department</label>
-              <select className="input" value={groupForm.departmentId} onChange={e => setGroupForm(f => ({ ...f, departmentId: e.target.value }))}>
-                <option value="">Select department...</option>
-                {layers.map(l => (
-                  <optgroup key={l.id} label={l.name}>
-                    {(l.departments || []).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                  </optgroup>
-                ))}
-              </select>
+              <Select
+                value={groupForm.departmentId}
+                onChange={val => setGroupForm(f => ({ ...f, departmentId: val }))}
+                placeholder="Select department..."
+                options={layers.flatMap(l => (l.departments || []).map(d => ({ value: d.id, label: d.name, group: l.name })))}
+              />
             </div>
             <div>
               <label className="block text-sm font-medium text-tw-text mb-1">Group Name</label>
@@ -365,16 +365,16 @@ export default function HierarchyPanel() {
         <Modal title={`Move ${movingPersonnel.name}`} onClose={() => { setShowMoveModal(false); setMovingPersonnel(null) }}>
           <div className="space-y-4">
             <p className="text-sm text-tw-text-secondary">Select a new department for this person.</p>
-            <select className="input" value={moveTarget} onChange={e => setMoveTarget(e.target.value)}>
-              <option value="">Select department...</option>
-              {layers.map(l => (
-                <optgroup key={l.id} label={l.name}>
-                  {(l.departments || []).filter(d => d.id !== movingPersonnel.departmentId).map(d => (
-                    <option key={d.id} value={d.id}>{d.name}</option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
+            <Select
+              value={moveTarget}
+              onChange={val => setMoveTarget(val)}
+              placeholder="Select department..."
+              options={layers.flatMap(l =>
+                (l.departments || [])
+                  .filter(d => d.id !== movingPersonnel.departmentId)
+                  .map(d => ({ value: d.id, label: d.name, group: l.name }))
+              )}
+            />
             <div className="flex gap-2 justify-end">
               <button onClick={() => { setShowMoveModal(false); setMovingPersonnel(null) }} className="btn-secondary">Cancel</button>
               <button onClick={movePersonnel} disabled={saving || !moveTarget} className="btn-primary">{saving ? 'Moving...' : 'Move'}</button>
