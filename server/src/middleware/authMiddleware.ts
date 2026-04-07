@@ -5,6 +5,8 @@ export interface AuthPayload {
   actorId: string
   actorType: 'director' | 'personnel'
   workspaceId: string
+  layerNumber?: number  // Personnel only: which layer they belong to (1, 2, or 3)
+  departmentId?: string // Personnel only: their department
 }
 
 declare global {

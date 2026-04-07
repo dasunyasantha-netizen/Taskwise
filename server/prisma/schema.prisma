@@ -203,6 +203,11 @@ model Task {
   approvalById   String?
   approvalByType String? // "director" | "personnel"
 
+  // Accountability: who actually acted on this task (tracks real individual for group/dept tasks)
+  // Set on start, submit, return — always the person who clicked the button
+  actedById   String?
+  actedByType String? // "director" | "personnel"
+
   returnReason String?
   returnedAt   DateTime?
   cancelledAt  DateTime?

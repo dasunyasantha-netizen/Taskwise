@@ -146,9 +146,16 @@ export async function deletePersonnel(req: Request, res: Response): Promise<void
 export async function getPersonnelQueue(req: Request, res: Response): Promise<void> {
   try {
     const { id } = req.params
+    const { actorId, actorType, workspaceId } = req.user!
+
+    // Personnel can only view their own queue; Directors can view anyone's
+    if (actorType === 'personnel' && actorId !== id) {
+      res.status(403).json({ error: 'You can only view your own task queue' }); return
+    }
+
     const tasks = await prisma.task.findMany({
       where: {
-        workspaceId: req.user!.workspaceId,
+        workspaceId,
         deletedAt: null,
         assignments: { some: { personnelId: id } },
         status: { notIn: ['APPROVED', 'CANCELLED'] }

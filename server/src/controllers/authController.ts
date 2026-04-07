@@ -3,9 +3,9 @@ import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import prisma from '../prisma'
 
-function signToken(actorId: string, actorType: 'director' | 'personnel', workspaceId: string) {
+function signToken(actorId: string, actorType: 'director' | 'personnel', workspaceId: string, extra?: { layerNumber?: number; departmentId?: string }) {
   return jwt.sign(
-    { actorId, actorType, workspaceId },
+    { actorId, actorType, workspaceId, ...extra },
     process.env.JWT_SECRET!,
     { expiresIn: '7d' }
   )
@@ -82,16 +82,29 @@ export async function personnelLogin(req: Request, res: Response): Promise<void>
       return
     }
     const personnel = await prisma.personnel.findFirst({
-      where: { email, workspaceId, deletedAt: null }
+      where: { email, workspaceId, deletedAt: null },
+      include: { department: { include: { layer: true } } }
     })
     if (!personnel || !(await bcrypt.compare(password, personnel.password))) {
       res.status(401).json({ error: 'Invalid credentials' })
       return
     }
-    const token = signToken(personnel.id, 'personnel', personnel.workspaceId)
+    const layerNumber = personnel.department.layer.number
+    const token = signToken(personnel.id, 'personnel', personnel.workspaceId, {
+      layerNumber,
+      departmentId: personnel.departmentId,
+    })
     res.json({
       token,
-      user: { actorId: personnel.id, actorType: 'personnel', workspaceId: personnel.workspaceId, name: personnel.name, email: personnel.email }
+      user: {
+        actorId: personnel.id,
+        actorType: 'personnel',
+        workspaceId: personnel.workspaceId,
+        name: personnel.name,
+        email: personnel.email,
+        layerNumber,
+        departmentId: personnel.departmentId,
+      }
     })
   } catch (err) {
     console.error(err)

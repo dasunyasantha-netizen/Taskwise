@@ -1,5 +1,6 @@
 import { Request, Response } from 'express'
 import prisma from '../prisma'
+import { buildTaskVisibilityFilter } from '../helpers/visibility'
 
 const TASK_INCLUDE = {
   project: true,
@@ -47,14 +48,28 @@ async function notifyActor(db: TxClient | typeof prisma, workspaceId: string, re
 // GET /api/tasks
 export async function listTasks(req: Request, res: Response): Promise<void> {
   try {
+    const { actorId, actorType, workspaceId, layerNumber, departmentId } = req.user!
     const { projectId, status, parentTaskId, overdue } = req.query as Record<string, string>
-    const where: Record<string, unknown> = { workspaceId: req.user!.workspaceId, deletedAt: null }
-    if (projectId) where.projectId = projectId
-    if (status)    where.status    = status
-    if (parentTaskId === 'null') where.parentTaskId = null
-    else if (parentTaskId)       where.parentTaskId = parentTaskId
-    if (overdue === 'true') where.deadline = { lt: new Date() }
-    const tasks = await prisma.task.findMany({ where, include: TASK_INCLUDE, orderBy: [{ deadline: 'asc' }, { createdAt: 'desc' }] })
+
+    const baseWhere: Record<string, unknown> = { workspaceId, deletedAt: null }
+    if (projectId) baseWhere.projectId = projectId
+    if (status)    baseWhere.status    = status
+    if (parentTaskId === 'null') baseWhere.parentTaskId = null
+    else if (parentTaskId)       baseWhere.parentTaskId = parentTaskId
+    if (overdue === 'true') baseWhere.deadline = { lt: new Date() }
+
+    // Apply visibility filter for personnel
+    const visibilityFilter = await buildTaskVisibilityFilter(actorType, actorId, workspaceId, layerNumber, departmentId)
+
+    const where = Object.keys(visibilityFilter).length > 0
+      ? { AND: [baseWhere, visibilityFilter] }
+      : baseWhere
+
+    const tasks = await prisma.task.findMany({
+      where,
+      include: TASK_INCLUDE,
+      orderBy: [{ deadline: 'asc' }, { createdAt: 'desc' }]
+    })
     res.json(tasks)
   } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
 }
@@ -62,12 +77,71 @@ export async function listTasks(req: Request, res: Response): Promise<void> {
 // GET /api/tasks/:id
 export async function getTask(req: Request, res: Response): Promise<void> {
   try {
+    const { actorId, actorType, workspaceId, layerNumber, departmentId } = req.user!
+
     const task = await prisma.task.findFirst({
-      where: { id: req.params.id, workspaceId: req.user!.workspaceId },
+      where: { id: req.params.id, workspaceId },
       include: { ...TASK_INCLUDE, subtasks: { include: TASK_INCLUDE }, parent: true }
     })
     if (!task) { res.status(404).json({ error: 'Task not found' }); return }
+
+    // Verify personnel can see this task
+    if (actorType === 'personnel') {
+      const visibilityFilter = await buildTaskVisibilityFilter(actorType, actorId, workspaceId, layerNumber, departmentId)
+      const allowed = await prisma.task.findFirst({
+        where: { id: req.params.id, workspaceId, AND: [visibilityFilter] }
+      })
+      if (!allowed) { res.status(403).json({ error: 'Access denied' }); return }
+    }
+
     res.json(task)
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
+}
+
+// GET /api/tasks/:id/subtasks  (supports ?recursive=true for full tree via PostgreSQL CTE)
+export async function getSubtasks(req: Request, res: Response): Promise<void> {
+  try {
+    const { actorId, actorType, workspaceId, layerNumber, departmentId } = req.user!
+
+    if (req.query.recursive === 'true') {
+      // Use PostgreSQL recursive CTE to fetch the full subtask tree in one query
+      const rows = await prisma.$queryRaw<Array<{ id: string }>>`
+        WITH RECURSIVE subtree AS (
+          SELECT id FROM "Task"
+          WHERE "parentTaskId" = ${req.params.id}
+            AND "workspaceId" = ${workspaceId}
+            AND "deletedAt" IS NULL
+          UNION ALL
+          SELECT t.id FROM "Task" t
+          INNER JOIN subtree s ON t."parentTaskId" = s.id
+          WHERE t."workspaceId" = ${workspaceId}
+            AND t."deletedAt" IS NULL
+        )
+        SELECT id FROM subtree
+      `
+      const ids = rows.map(r => r.id)
+      if (ids.length === 0) { res.json([]); return }
+
+      const visibilityFilter = actorType === 'personnel'
+        ? await buildTaskVisibilityFilter(actorType, actorId, workspaceId, layerNumber, departmentId)
+        : {}
+
+      const where: Record<string, unknown> = { id: { in: ids }, workspaceId, deletedAt: null }
+      const subtasks = await prisma.task.findMany({
+        where: Object.keys(visibilityFilter).length > 0 ? { AND: [where, visibilityFilter] } : where,
+        include: TASK_INCLUDE,
+        orderBy: { createdAt: 'asc' }
+      })
+      res.json(subtasks)
+    } else {
+      // Direct children only
+      const subtasks = await prisma.task.findMany({
+        where: { parentTaskId: req.params.id, workspaceId, deletedAt: null },
+        include: TASK_INCLUDE,
+        orderBy: { createdAt: 'asc' }
+      })
+      res.json(subtasks)
+    }
   } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
 }
 
@@ -83,7 +157,7 @@ export async function createTask(req: Request, res: Response): Promise<void> {
       res.status(403).json({ error: 'Only Directors can create top-level tasks' }); return
     }
 
-    // If subtask, verify parent exists and actor has access
+    // If subtask, verify parent exists
     if (parentTaskId) {
       const parent = await prisma.task.findFirst({ where: { id: parentTaskId, workspaceId, deletedAt: null } })
       if (!parent) { res.status(404).json({ error: 'Parent task not found' }); return }
@@ -180,8 +254,15 @@ export async function startTask(req: Request, res: Response): Promise<void> {
     if (!task) { res.status(404).json({ error: 'Task not found' }); return }
     if (task.status !== 'ASSIGNED') { res.status(400).json({ error: 'Task must be in ASSIGNED status' }); return }
     await prisma.$transaction(async tx => {
-      await tx.task.update({ where: { id: task.id }, data: { status: 'IN_PROGRESS' } })
-      await writeAudit(tx, workspaceId, 'TASK_STARTED', actorType, actorId, task.id)
+      await tx.task.update({
+        where: { id: task.id },
+        data: {
+          status: 'IN_PROGRESS',
+          actedById: actorId,
+          actedByType: actorType,
+        }
+      })
+      await writeAudit(tx, workspaceId, 'TASK_STARTED', actorType, actorId, task.id, { actedBy: actorId })
     })
     res.json({ success: true })
   } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
@@ -195,17 +276,42 @@ export async function submitTask(req: Request, res: Response): Promise<void> {
     if (!task) { res.status(404).json({ error: 'Task not found' }); return }
     if (task.status !== 'IN_PROGRESS') { res.status(400).json({ error: 'Task must be IN_PROGRESS to submit' }); return }
 
-    // Check all subtasks are approved
-    const blocking = await prisma.task.findMany({
-      where: { parentTaskId: task.id, deletedAt: null, status: { not: 'APPROVED' }, cancelledAt: null }
-    })
-    if (blocking.length > 0) {
-      res.status(400).json({ error: 'All subtasks must be APPROVED before submitting', blockingSubtasks: blocking.map(t => ({ id: t.id, title: t.title, status: t.status })) }); return
+    // Check ALL subtasks at all levels are approved (recursive CTE)
+    const deepSubtasks = await prisma.$queryRaw<Array<{ id: string; status: string; title: string }>>`
+      WITH RECURSIVE subtree AS (
+        SELECT id, status, title FROM "Task"
+        WHERE "parentTaskId" = ${task.id}
+          AND "workspaceId" = ${workspaceId}
+          AND "deletedAt" IS NULL
+          AND "cancelledAt" IS NULL
+        UNION ALL
+        SELECT t.id, t.status, t.title FROM "Task" t
+        INNER JOIN subtree s ON t."parentTaskId" = s.id
+        WHERE t."workspaceId" = ${workspaceId}
+          AND t."deletedAt" IS NULL
+          AND t."cancelledAt" IS NULL
+      )
+      SELECT id, status, title FROM subtree WHERE status != 'APPROVED'
+    `
+
+    if (deepSubtasks.length > 0) {
+      res.status(400).json({
+        error: 'All subtasks at all levels must be APPROVED before submitting',
+        blockingSubtasks: deepSubtasks.map(t => ({ id: t.id, title: t.title, status: t.status }))
+      })
+      return
     }
 
     await prisma.$transaction(async tx => {
-      await tx.task.update({ where: { id: task.id }, data: { status: 'SUBMITTED' } })
-      await writeAudit(tx, workspaceId, 'TASK_SUBMITTED', actorType, actorId, task.id)
+      await tx.task.update({
+        where: { id: task.id },
+        data: {
+          status: 'SUBMITTED',
+          actedById: actorId,
+          actedByType: actorType,
+        }
+      })
+      await writeAudit(tx, workspaceId, 'TASK_SUBMITTED', actorType, actorId, task.id, { actedBy: actorId })
       if (task.approvalById && task.approvalByType) {
         await notifyActor(tx, workspaceId, task.approvalByType as 'director' | 'personnel', task.approvalById, 'task_submitted_for_approval', 'Task ready for approval', `"${task.title}" has been submitted for your approval.`, task.id)
       }
@@ -224,8 +330,17 @@ export async function returnTask(req: Request, res: Response): Promise<void> {
     if (!task) { res.status(404).json({ error: 'Task not found' }); return }
     if (task.status !== 'IN_PROGRESS') { res.status(400).json({ error: 'Task must be IN_PROGRESS to return' }); return }
     await prisma.$transaction(async tx => {
-      await tx.task.update({ where: { id: task.id }, data: { status: 'RETURNED', returnReason: reason, returnedAt: new Date() } })
-      await writeAudit(tx, workspaceId, 'TASK_RETURNED', actorType, actorId, task.id, { reason })
+      await tx.task.update({
+        where: { id: task.id },
+        data: {
+          status: 'RETURNED',
+          returnReason: reason,
+          returnedAt: new Date(),
+          actedById: actorId,
+          actedByType: actorType,
+        }
+      })
+      await writeAudit(tx, workspaceId, 'TASK_RETURNED', actorType, actorId, task.id, { reason, actedBy: actorId })
       if (task.approvalById && task.approvalByType) {
         await notifyActor(tx, workspaceId, task.approvalByType as 'director' | 'personnel', task.approvalById, 'task_returned', 'Task returned', `"${task.title}" was returned: ${reason}`, task.id)
       }
@@ -247,6 +362,38 @@ export async function approveTask(req: Request, res: Response): Promise<void> {
     await prisma.$transaction(async tx => {
       await tx.task.update({ where: { id: task.id }, data: { status: 'APPROVED' } })
       await writeAudit(tx, workspaceId, 'TASK_APPROVED', actorType, actorId, task.id)
+
+      // If this task has a parent, notify the parent's assignee that one subtask is now approved
+      if (task.parentTaskId) {
+        const parent = await tx.task.findUnique({ where: { id: task.parentTaskId } })
+        if (parent?.approvalById && parent?.approvalByType) {
+          // Check if all sibling subtasks are now approved
+          const stillBlocking = await prisma.$queryRaw<Array<{ id: string }>>`
+            WITH RECURSIVE subtree AS (
+              SELECT id, status FROM "Task"
+              WHERE "parentTaskId" = ${parent.id}
+                AND "workspaceId" = ${workspaceId}
+                AND "deletedAt" IS NULL
+                AND "cancelledAt" IS NULL
+              UNION ALL
+              SELECT t.id, t.status FROM "Task" t
+              INNER JOIN subtree s ON t."parentTaskId" = s.id
+              WHERE t."workspaceId" = ${workspaceId}
+                AND t."deletedAt" IS NULL
+                AND t."cancelledAt" IS NULL
+            )
+            SELECT id FROM subtree WHERE status != 'APPROVED'
+          `
+          if (stillBlocking.length === 0) {
+            // All subtasks done — notify parent task's acted-by person or creator
+            const notifyId = parent.actedById || parent.createdByPersonnelId || parent.createdByDirectorId
+            const notifyType = parent.actedByType || (parent.createdByPersonnelId ? 'personnel' : 'director')
+            if (notifyId) {
+              await notifyActor(tx, workspaceId, notifyType as 'director' | 'personnel', notifyId, 'subtask_all_approved', 'All subtasks approved', `All subtasks of "${parent.title}" are now approved. You can submit it for approval.`, parent.id)
+            }
+          }
+        }
+      }
     })
     res.json({ success: true })
   } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
@@ -266,6 +413,10 @@ export async function rejectTask(req: Request, res: Response): Promise<void> {
     await prisma.$transaction(async tx => {
       await tx.task.update({ where: { id: task.id }, data: { status: 'REJECTED', returnReason: reason } })
       await writeAudit(tx, workspaceId, 'TASK_REJECTED', actorType, actorId, task.id, { reason })
+      // Notify the person who actually submitted it
+      if (task.actedById && task.actedByType && task.actedById !== actorId) {
+        await notifyActor(tx, workspaceId, task.actedByType as 'director' | 'personnel', task.actedById, 'task_rejected', 'Task rejected', `"${task.title}" was rejected${reason ? ': ' + reason : ''}.`, task.id)
+      }
     })
     res.json({ success: true })
   } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
@@ -279,7 +430,15 @@ export async function reopenTask(req: Request, res: Response): Promise<void> {
     if (!task) { res.status(404).json({ error: 'Task not found' }); return }
     if (task.status !== 'REJECTED') { res.status(400).json({ error: 'Task must be REJECTED to reopen' }); return }
     await prisma.$transaction(async tx => {
-      await tx.task.update({ where: { id: task.id }, data: { status: 'IN_PROGRESS', returnReason: null } })
+      await tx.task.update({
+        where: { id: task.id },
+        data: {
+          status: 'IN_PROGRESS',
+          returnReason: null,
+          actedById: actorId,
+          actedByType: actorType,
+        }
+      })
       await writeAudit(tx, workspaceId, 'TASK_UPDATED', actorType, actorId, task.id, { action: 'reopened' })
     })
     res.json({ success: true })
@@ -314,18 +473,6 @@ export async function deleteTask(req: Request, res: Response): Promise<void> {
       await writeAudit(tx, workspaceId, 'TASK_DELETED', actorType, actorId, task.id)
     })
     res.json({ success: true })
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
-}
-
-// GET /api/tasks/:id/subtasks
-export async function getSubtasks(req: Request, res: Response): Promise<void> {
-  try {
-    const subtasks = await prisma.task.findMany({
-      where: { parentTaskId: req.params.id, workspaceId: req.user!.workspaceId, deletedAt: null },
-      include: TASK_INCLUDE,
-      orderBy: { createdAt: 'asc' }
-    })
-    res.json(subtasks)
   } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
 }
 
@@ -370,6 +517,10 @@ export async function getTaskHistory(req: Request, res: Response): Promise<void>
   try {
     const logs = await prisma.auditLog.findMany({
       where: { taskId: req.params.id, workspaceId: req.user!.workspaceId },
+      include: {
+        actorDirector:  { select: { id: true, name: true } },
+        actorPersonnel: { select: { id: true, name: true } },
+      },
       orderBy: { createdAt: 'asc' }
     })
     res.json(logs)
