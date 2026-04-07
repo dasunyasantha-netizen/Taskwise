@@ -1,0 +1,401 @@
+import React, { useState, useEffect } from 'react'
+import type { Layer, Department, Personnel, Group } from '../types'
+import { workspaceApi } from '../services/apiService'
+
+export default function HierarchyPanel() {
+  const [layers, setLayers] = useState<Layer[]>([])
+  const [loading, setLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState<'structure' | 'personnel' | 'groups'>('structure')
+
+  // Modals
+  const [showDeptModal, setShowDeptModal] = useState(false)
+  const [showPersonnelModal, setShowPersonnelModal] = useState(false)
+  const [showGroupModal, setShowGroupModal] = useState(false)
+  const [showMoveModal, setShowMoveModal] = useState(false)
+
+  const [deptForm, setDeptForm] = useState({ name: '', layerId: '' })
+  const [personnelForm, setPersonnelForm] = useState({ name: '', email: '', password: '', departmentId: '', phone: '' })
+  const [groupForm, setGroupForm] = useState({ name: '', departmentId: '' })
+  const [movingPersonnel, setMovingPersonnel] = useState<Personnel | null>(null)
+  const [moveTarget, setMoveTarget] = useState('')
+
+  const [allPersonnel, setAllPersonnel] = useState<Personnel[]>([])
+  const [allGroups, setAllGroups] = useState<Group[]>([])
+  const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const load = async () => {
+    setLoading(true)
+    try {
+      const [l, p, g] = await Promise.all([
+        workspaceApi.getLayers() as Promise<Layer[]>,
+        workspaceApi.getPersonnel() as Promise<Personnel[]>,
+        workspaceApi.getGroups() as Promise<Group[]>,
+      ])
+      setLayers(l)
+      setAllPersonnel(p)
+      setAllGroups(g)
+    } catch { setError('Failed to load workspace data') }
+    setLoading(false)
+  }
+
+  useEffect(() => { load() }, [])
+
+  const allDepts = layers.flatMap(l => l.departments || [])
+
+  // ── Department ──────────────────────────────────────────
+  const createDept = async () => {
+    if (!deptForm.name || !deptForm.layerId) return
+    setSaving(true)
+    try {
+      await workspaceApi.createDepartment(deptForm)
+      setShowDeptModal(false); setDeptForm({ name: '', layerId: '' }); await load()
+    } catch (e: unknown) { setError(e instanceof Error ? e.message : 'Error') }
+    setSaving(false)
+  }
+
+  const deleteDept = async (id: string) => {
+    if (!confirm('Delete this department? All personnel will be unassigned.')) return
+    await workspaceApi.deleteDepartment(id); await load()
+  }
+
+  // ── Personnel ────────────────────────────────────────────
+  const createPersonnel = async () => {
+    if (!personnelForm.name || !personnelForm.email || !personnelForm.password || !personnelForm.departmentId) return
+    setSaving(true)
+    try {
+      await workspaceApi.createPersonnel(personnelForm)
+      setShowPersonnelModal(false); setPersonnelForm({ name: '', email: '', password: '', departmentId: '', phone: '' }); await load()
+    } catch (e: unknown) { setError(e instanceof Error ? e.message : 'Error') }
+    setSaving(false)
+  }
+
+  const deletePersonnel = async (id: string) => {
+    if (!confirm('Remove this personnel member?')) return
+    await workspaceApi.deletePersonnel(id); await load()
+  }
+
+  const movePersonnel = async () => {
+    if (!movingPersonnel || !moveTarget) return
+    setSaving(true)
+    try {
+      await workspaceApi.movePersonnel(movingPersonnel.id, { departmentId: moveTarget })
+      setShowMoveModal(false); setMovingPersonnel(null); setMoveTarget(''); await load()
+    } catch (e: unknown) { setError(e instanceof Error ? e.message : 'Error') }
+    setSaving(false)
+  }
+
+  // ── Groups ───────────────────────────────────────────────
+  const createGroup = async () => {
+    if (!groupForm.name || !groupForm.departmentId) return
+    setSaving(true)
+    try {
+      await workspaceApi.createGroup(groupForm)
+      setShowGroupModal(false); setGroupForm({ name: '', departmentId: '' }); await load()
+    } catch (e: unknown) { setError(e instanceof Error ? e.message : 'Error') }
+    setSaving(false)
+  }
+
+  const removeGroupMember = async (groupId: string, pid: string) => {
+    await workspaceApi.removeGroupMember(groupId, pid); await load()
+  }
+
+  const addGroupMember = async (groupId: string, personnelId: string) => {
+    try {
+      await workspaceApi.addGroupMember(groupId, { personnelId }); await load()
+    } catch (e: unknown) { setError(e instanceof Error ? e.message : 'Error') }
+  }
+
+  if (loading) return <div className="p-8 text-tw-text-secondary text-sm">Loading hierarchy...</div>
+
+  const layerColors = ['bg-blue-500', 'bg-indigo-500', 'bg-purple-500']
+
+  return (
+    <div className="p-6">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-xl font-bold text-tw-text">Team Hierarchy</h1>
+          <p className="text-sm text-tw-text-secondary mt-0.5">Manage layers, departments, personnel and groups</p>
+        </div>
+        <div className="flex gap-2">
+          <button onClick={() => setShowDeptModal(true)} className="btn-secondary text-xs">+ Department</button>
+          <button onClick={() => setShowPersonnelModal(true)} className="btn-secondary text-xs">+ Personnel</button>
+          <button onClick={() => setShowGroupModal(true)} className="btn-secondary text-xs">+ Group</button>
+        </div>
+      </div>
+
+      {error && <div className="mb-4 bg-red-50 border border-red-200 text-tw-danger text-sm px-3 py-2 rounded-lg">{error}<button className="ml-2 underline" onClick={() => setError('')}>dismiss</button></div>}
+
+      {/* Tabs */}
+      <div className="flex gap-1 bg-tw-hover rounded-lg p-1 mb-6 w-fit">
+        {(['structure', 'personnel', 'groups'] as const).map(tab => (
+          <button key={tab} onClick={() => setActiveTab(tab)}
+            className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors capitalize ${activeTab === tab ? 'bg-white text-tw-primary shadow-card' : 'text-tw-text-secondary hover:text-tw-text'}`}>
+            {tab}
+          </button>
+        ))}
+      </div>
+
+      {/* STRUCTURE TAB */}
+      {activeTab === 'structure' && (
+        <div className="space-y-4">
+          {layers.map((layer, idx) => (
+            <div key={layer.id} className="card overflow-hidden">
+              <div className={`px-4 py-3 flex items-center gap-3 ${layerColors[idx]} bg-opacity-10 border-b border-tw-border`}>
+                <div className={`w-6 h-6 rounded-full ${layerColors[idx]} flex items-center justify-center text-white text-xs font-bold`}>{layer.number}</div>
+                <div>
+                  <div className="font-semibold text-tw-text text-sm">{layer.name}</div>
+                  <div className="text-xs text-tw-text-secondary">{(layer.departments || []).length} departments</div>
+                </div>
+              </div>
+              {(layer.departments || []).length === 0 ? (
+                <div className="px-4 py-4 text-sm text-tw-text-secondary italic">No departments in this layer yet.</div>
+              ) : (
+                <div className="divide-y divide-tw-border">
+                  {(layer.departments || []).map(dept => {
+                    const deptPersonnel = allPersonnel.filter(p => p.departmentId === dept.id)
+                    return (
+                      <div key={dept.id} className="px-4 py-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-tw-primary" />
+                            <span className="font-medium text-sm text-tw-text">{dept.name}</span>
+                            <span className="badge badge-gray">{deptPersonnel.length} people</span>
+                          </div>
+                          <button onClick={() => deleteDept(dept.id)} className="text-xs text-tw-text-secondary hover:text-tw-danger transition-colors">Delete</button>
+                        </div>
+                        {deptPersonnel.length > 0 && (
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {deptPersonnel.map(p => (
+                              <div key={p.id} className="flex items-center gap-1.5 bg-tw-hover px-2.5 py-1 rounded-full">
+                                <div className="w-5 h-5 rounded-full bg-tw-primary flex items-center justify-center text-white text-xs font-bold">
+                                  {p.name.charAt(0).toUpperCase()}
+                                </div>
+                                <span className="text-xs text-tw-text">{p.name}</span>
+                                <button onClick={() => { setMovingPersonnel(p); setShowMoveModal(true) }} className="text-xs text-tw-text-secondary hover:text-tw-primary ml-1" title="Move">⇄</button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* PERSONNEL TAB */}
+      {activeTab === 'personnel' && (
+        <div className="card overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-tw-hover">
+              <tr>
+                {['Name', 'Email', 'Department', 'Layer', 'Actions'].map(h => (
+                  <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-tw-text-secondary uppercase tracking-wide">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-tw-border">
+              {allPersonnel.length === 0 ? (
+                <tr><td colSpan={5} className="px-4 py-8 text-center text-tw-text-secondary text-sm">No personnel yet. Add some using the button above.</td></tr>
+              ) : allPersonnel.map(p => {
+                const dept = allDepts.find(d => d.id === p.departmentId)
+                const layer = layers.find(l => l.id === dept?.layerId)
+                return (
+                  <tr key={p.id} className="hover:bg-tw-hover transition-colors">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-full bg-tw-primary flex items-center justify-center text-white text-xs font-bold">{p.name.charAt(0)}</div>
+                        <span className="font-medium text-tw-text">{p.name}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-tw-text-secondary">{p.email}</td>
+                    <td className="px-4 py-3"><span className="badge badge-primary">{dept?.name || '—'}</span></td>
+                    <td className="px-4 py-3 text-tw-text-secondary text-xs">{layer?.name || '—'}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex gap-2">
+                        <button onClick={() => { setMovingPersonnel(p); setShowMoveModal(true) }} className="text-xs text-tw-primary hover:underline">Move</button>
+                        <button onClick={() => deletePersonnel(p.id)} className="text-xs text-tw-danger hover:underline">Remove</button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* GROUPS TAB */}
+      {activeTab === 'groups' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {allGroups.length === 0 ? (
+            <div className="col-span-3 card p-8 text-center text-tw-text-secondary text-sm">No groups yet. Create one using the button above.</div>
+          ) : allGroups.map(g => {
+            const dept = allDepts.find(d => d.id === g.departmentId)
+            const members = g.members || []
+            const deptPersonnel = allPersonnel.filter(p => p.departmentId === g.departmentId && !members.find(m => m.personnelId === p.id))
+            return (
+              <div key={g.id} className="card p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <div className="font-semibold text-tw-text text-sm">{g.name}</div>
+                    <div className="text-xs text-tw-text-secondary">{dept?.name}</div>
+                  </div>
+                  <span className="badge badge-gray">{members.length} members</span>
+                </div>
+                <div className="space-y-1.5 mb-3">
+                  {members.map(m => (
+                    <div key={m.id} className="flex items-center justify-between bg-tw-hover px-2.5 py-1.5 rounded-lg">
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-5 h-5 rounded-full bg-tw-primary flex items-center justify-center text-white text-xs font-bold">{m.personnel?.name?.charAt(0) || '?'}</div>
+                        <span className="text-xs text-tw-text">{m.personnel?.name}</span>
+                      </div>
+                      <button onClick={() => removeGroupMember(g.id, m.personnelId)} className="text-xs text-tw-danger hover:underline">✕</button>
+                    </div>
+                  ))}
+                </div>
+                {deptPersonnel.length > 0 && (
+                  <select onChange={e => { if (e.target.value) { addGroupMember(g.id, e.target.value); e.target.value = '' } }}
+                    className="input text-xs py-1.5">
+                    <option value="">+ Add member from {dept?.name}...</option>
+                    {deptPersonnel.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* MODAL: Create Department */}
+      {showDeptModal && (
+        <Modal title="Create Department" onClose={() => setShowDeptModal(false)}>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-tw-text mb-1">Layer</label>
+              <select className="input" value={deptForm.layerId} onChange={e => setDeptForm(f => ({ ...f, layerId: e.target.value }))}>
+                <option value="">Select layer...</option>
+                {layers.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-tw-text mb-1">Department Name</label>
+              <input className="input" placeholder="e.g. Engineering" value={deptForm.name} onChange={e => setDeptForm(f => ({ ...f, name: e.target.value }))} />
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setShowDeptModal(false)} className="btn-secondary">Cancel</button>
+              <button onClick={createDept} disabled={saving} className="btn-primary">{saving ? 'Creating...' : 'Create'}</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* MODAL: Create Personnel */}
+      {showPersonnelModal && (
+        <Modal title="Add Personnel" onClose={() => setShowPersonnelModal(false)}>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-tw-text mb-1">Full Name</label>
+              <input className="input" placeholder="John Smith" value={personnelForm.name} onChange={e => setPersonnelForm(f => ({ ...f, name: e.target.value }))} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-tw-text mb-1">Email</label>
+              <input className="input" type="email" placeholder="john@example.com" value={personnelForm.email} onChange={e => setPersonnelForm(f => ({ ...f, email: e.target.value }))} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-tw-text mb-1">Password</label>
+              <input className="input" type="password" placeholder="Temporary password" value={personnelForm.password} onChange={e => setPersonnelForm(f => ({ ...f, password: e.target.value }))} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-tw-text mb-1">Phone (optional)</label>
+              <input className="input" placeholder="+94 77 000 0000" value={personnelForm.phone} onChange={e => setPersonnelForm(f => ({ ...f, phone: e.target.value }))} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-tw-text mb-1">Department</label>
+              <select className="input" value={personnelForm.departmentId} onChange={e => setPersonnelForm(f => ({ ...f, departmentId: e.target.value }))}>
+                <option value="">Select department...</option>
+                {layers.map(l => (
+                  <optgroup key={l.id} label={l.name}>
+                    {(l.departments || []).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                  </optgroup>
+                ))}
+              </select>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setShowPersonnelModal(false)} className="btn-secondary">Cancel</button>
+              <button onClick={createPersonnel} disabled={saving} className="btn-primary">{saving ? 'Adding...' : 'Add Personnel'}</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* MODAL: Create Group */}
+      {showGroupModal && (
+        <Modal title="Create Group" onClose={() => setShowGroupModal(false)}>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-tw-text mb-1">Department</label>
+              <select className="input" value={groupForm.departmentId} onChange={e => setGroupForm(f => ({ ...f, departmentId: e.target.value }))}>
+                <option value="">Select department...</option>
+                {layers.map(l => (
+                  <optgroup key={l.id} label={l.name}>
+                    {(l.departments || []).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                  </optgroup>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-tw-text mb-1">Group Name</label>
+              <input className="input" placeholder="e.g. Frontend Team" value={groupForm.name} onChange={e => setGroupForm(f => ({ ...f, name: e.target.value }))} />
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setShowGroupModal(false)} className="btn-secondary">Cancel</button>
+              <button onClick={createGroup} disabled={saving} className="btn-primary">{saving ? 'Creating...' : 'Create'}</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* MODAL: Move Personnel */}
+      {showMoveModal && movingPersonnel && (
+        <Modal title={`Move ${movingPersonnel.name}`} onClose={() => { setShowMoveModal(false); setMovingPersonnel(null) }}>
+          <div className="space-y-4">
+            <p className="text-sm text-tw-text-secondary">Select a new department for this person.</p>
+            <select className="input" value={moveTarget} onChange={e => setMoveTarget(e.target.value)}>
+              <option value="">Select department...</option>
+              {layers.map(l => (
+                <optgroup key={l.id} label={l.name}>
+                  {(l.departments || []).filter(d => d.id !== movingPersonnel.departmentId).map(d => (
+                    <option key={d.id} value={d.id}>{d.name}</option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => { setShowMoveModal(false); setMovingPersonnel(null) }} className="btn-secondary">Cancel</button>
+              <button onClick={movePersonnel} disabled={saving || !moveTarget} className="btn-primary">{saving ? 'Moving...' : 'Move'}</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+    </div>
+  )
+}
+
+function Modal({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-panel w-full max-w-md">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-tw-border">
+          <h3 className="font-semibold text-tw-text">{title}</h3>
+          <button onClick={onClose} className="text-tw-text-secondary hover:text-tw-text text-xl leading-none">×</button>
+        </div>
+        <div className="px-5 py-4">{children}</div>
+      </div>
+    </div>
+  )
+}
