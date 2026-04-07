@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import type { Task, TaskComment, AuditLog, Layer, Personnel, Group } from '../types'
 import { taskApi } from '../services/apiService'
+import DatePicker from './DatePicker'
 
 interface Props {
   task: Task
@@ -344,7 +345,7 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
                   <option value="HIGH">High</option>
                   <option value="CRITICAL">Critical</option>
                 </select>
-                <input className="input" type="date" value={subtaskForm.deadline} onChange={e => setSubtaskForm(f => ({ ...f, deadline: e.target.value }))} />
+                <DatePicker value={subtaskForm.deadline} onChange={val => setSubtaskForm(f => ({ ...f, deadline: val }))} />
               </div>
               <div className="flex gap-2 justify-end">
                 <button onClick={() => setShowSubtaskModal(false)} className="btn-secondary">Cancel</button>

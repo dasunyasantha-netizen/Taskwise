@@ -3,6 +3,7 @@ import type { Task, Project, Layer, Personnel, Group } from '../types'
 import { taskApi, workspaceApi } from '../services/apiService'
 import TaskCard from './TaskCard'
 import TaskDetailPanel from './TaskDetailPanel'
+import DatePicker from './DatePicker'
 
 interface Props {
   project: Project
@@ -168,7 +169,7 @@ export default function BoardView({ project, isDirector, actorId }: Props) {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-tw-text mb-1">Deadline</label>
-                  <input className="input" type="date" value={form.deadline} onChange={e => setForm(f => ({ ...f, deadline: e.target.value }))} />
+                  <DatePicker value={form.deadline} onChange={val => setForm(f => ({ ...f, deadline: val }))} />
                 </div>
               </div>
 
