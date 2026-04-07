@@ -14,6 +14,20 @@ const TASK_INCLUDE = {
   _count: { select: { subtasks: true, comments: true } }
 }
 
+// Resolves actedByName from actedById+actedByType and flattens it onto the task
+async function resolveActedByName(task: Record<string, unknown>): Promise<Record<string, unknown>> {
+  if (!task.actedById || !task.actedByType) return task
+  try {
+    if (task.actedByType === 'director') {
+      const d = await prisma.director.findUnique({ where: { id: task.actedById as string }, select: { name: true } })
+      return { ...task, actedByName: d?.name }
+    } else {
+      const p = await prisma.personnel.findUnique({ where: { id: task.actedById as string }, select: { name: true } })
+      return { ...task, actedByName: p?.name }
+    }
+  } catch { return task }
+}
+
 type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 
 async function writeAudit(db: TxClient | typeof prisma, workspaceId: string, event: string, actorType: 'director' | 'personnel', actorId: string, taskId?: string, payload?: object) {
@@ -94,7 +108,8 @@ export async function getTask(req: Request, res: Response): Promise<void> {
       if (!allowed) { res.status(403).json({ error: 'Access denied' }); return }
     }
 
-    res.json(task)
+    const enriched = await resolveActedByName(task as unknown as Record<string, unknown>)
+    res.json(enriched)
   } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
 }
 
@@ -277,19 +292,20 @@ export async function submitTask(req: Request, res: Response): Promise<void> {
     if (task.status !== 'IN_PROGRESS') { res.status(400).json({ error: 'Task must be IN_PROGRESS to submit' }); return }
 
     // Check ALL subtasks at all levels are approved (recursive CTE)
+    // CANCELLED and BLOCKED tasks are excluded — cancelled are skipped, blocked are flagged
     const deepSubtasks = await prisma.$queryRaw<Array<{ id: string; status: string; title: string }>>`
       WITH RECURSIVE subtree AS (
         SELECT id, status, title FROM "Task"
         WHERE "parentTaskId" = ${task.id}
           AND "workspaceId" = ${workspaceId}
           AND "deletedAt" IS NULL
-          AND "cancelledAt" IS NULL
+          AND status != 'CANCELLED'
         UNION ALL
         SELECT t.id, t.status, t.title FROM "Task" t
         INNER JOIN subtree s ON t."parentTaskId" = s.id
         WHERE t."workspaceId" = ${workspaceId}
           AND t."deletedAt" IS NULL
-          AND t."cancelledAt" IS NULL
+          AND t.status != 'CANCELLED'
       )
       SELECT id, status, title FROM subtree WHERE status != 'APPROVED'
     `
@@ -315,6 +331,42 @@ export async function submitTask(req: Request, res: Response): Promise<void> {
       if (task.approvalById && task.approvalByType) {
         await notifyActor(tx, workspaceId, task.approvalByType as 'director' | 'personnel', task.approvalById, 'task_submitted_for_approval', 'Task ready for approval', `"${task.title}" has been submitted for your approval.`, task.id)
       }
+    })
+    res.json({ success: true })
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
+}
+
+// POST /api/tasks/:id/block  (IN_PROGRESS → BLOCKED)
+export async function blockTask(req: Request, res: Response): Promise<void> {
+  try {
+    const { actorId, actorType, workspaceId } = req.user!
+    const { reason } = req.body
+    if (!reason) { res.status(400).json({ error: 'reason required' }); return }
+    const task = await prisma.task.findFirst({ where: { id: req.params.id, workspaceId, deletedAt: null } })
+    if (!task) { res.status(404).json({ error: 'Task not found' }); return }
+    if (task.status !== 'IN_PROGRESS') { res.status(400).json({ error: 'Task must be IN_PROGRESS to block' }); return }
+    await prisma.$transaction(async tx => {
+      await tx.task.update({ where: { id: task.id }, data: { status: 'BLOCKED', returnReason: reason } })
+      await writeAudit(tx, workspaceId, 'TASK_BLOCKED', actorType, actorId, task.id, { reason })
+      // Notify approval authority that the task is blocked
+      if (task.approvalById && task.approvalByType) {
+        await notifyActor(tx, workspaceId, task.approvalByType as 'director' | 'personnel', task.approvalById, 'task_returned', 'Task blocked', `"${task.title}" is blocked: ${reason}`, task.id)
+      }
+    })
+    res.json({ success: true })
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
+}
+
+// POST /api/tasks/:id/unblock  (BLOCKED → IN_PROGRESS)
+export async function unblockTask(req: Request, res: Response): Promise<void> {
+  try {
+    const { actorId, actorType, workspaceId } = req.user!
+    const task = await prisma.task.findFirst({ where: { id: req.params.id, workspaceId, deletedAt: null } })
+    if (!task) { res.status(404).json({ error: 'Task not found' }); return }
+    if (task.status !== 'BLOCKED') { res.status(400).json({ error: 'Task must be BLOCKED to unblock' }); return }
+    await prisma.$transaction(async tx => {
+      await tx.task.update({ where: { id: task.id }, data: { status: 'IN_PROGRESS', returnReason: null } })
+      await writeAudit(tx, workspaceId, 'TASK_UNBLOCKED', actorType, actorId, task.id)
     })
     res.json({ success: true })
   } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
@@ -481,9 +533,18 @@ export async function getComments(req: Request, res: Response): Promise<void> {
   try {
     const comments = await prisma.taskComment.findMany({
       where: { taskId: req.params.id, deletedAt: null },
+      include: {
+        authorDirector:  { select: { id: true, name: true } },
+        authorPersonnel: { select: { id: true, name: true } },
+      },
       orderBy: { createdAt: 'asc' }
     })
-    res.json(comments)
+    // Flatten authorName for the frontend
+    const result = comments.map(c => ({
+      ...c,
+      authorName: c.authorDirector?.name || c.authorPersonnel?.name || null,
+    }))
+    res.json(result)
   } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
 }
 

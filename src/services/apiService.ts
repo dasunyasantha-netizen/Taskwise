@@ -45,6 +45,8 @@ export const authApi = {
   directorRegister: (data: { email: string; password: string; name: string }) =>
     api.post<{ token: string; user: unknown }>('/auth/director/register', data),
   me: () => api.get<unknown>('/auth/me'),
+  changePassword: (currentPassword: string, newPassword: string) =>
+    api.post('/auth/change-password', { currentPassword, newPassword }),
 }
 
 // ─── Workspace ───────────────────────────────────────────────────────────────
@@ -88,6 +90,8 @@ export const taskApi = {
   assign:     (id: string, data: unknown) => api.post(`/tasks/${id}/assign`, data),
   start:      (id: string)      => api.post(`/tasks/${id}/start`),
   submit:     (id: string)      => api.post(`/tasks/${id}/submit`),
+  block:      (id: string, reason: string) => api.post(`/tasks/${id}/block`, { reason }),
+  unblock:    (id: string)                 => api.post(`/tasks/${id}/unblock`),
   return:     (id: string, reason: string) => api.post(`/tasks/${id}/return`, { reason }),
   approve:    (id: string)      => api.post(`/tasks/${id}/approve`),
   reject:     (id: string, reason: string) => api.post(`/tasks/${id}/reject`, { reason }),

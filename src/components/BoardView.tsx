@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import type { Task, Project, Layer, Personnel, Group } from '../types'
 import { taskApi, workspaceApi } from '../services/apiService'
 import TaskCard from './TaskCard'
@@ -16,10 +16,21 @@ const COLUMNS = [
   { status: 'PENDING',     label: 'Pending',     color: 'bg-gray-400' },
   { status: 'ASSIGNED',    label: 'Assigned',    color: 'bg-blue-400' },
   { status: 'IN_PROGRESS', label: 'In Progress', color: 'bg-yellow-400' },
+  { status: 'BLOCKED',     label: 'Blocked',     color: 'bg-orange-500' },
   { status: 'SUBMITTED',   label: 'Submitted',   color: 'bg-purple-400' },
   { status: 'APPROVED',    label: 'Approved',    color: 'bg-green-400' },
   { status: 'RETURNED',    label: 'Returned',    color: 'bg-red-400' },
 ]
+
+// Status transitions allowed via drag-and-drop (only logical moves)
+const DRAG_TRANSITIONS: Record<string, string[]> = {
+  PENDING:     ['ASSIGNED'],
+  ASSIGNED:    ['IN_PROGRESS'],
+  IN_PROGRESS: ['BLOCKED', 'SUBMITTED'],
+  BLOCKED:     ['IN_PROGRESS'],
+  RETURNED:    ['IN_PROGRESS'],
+  REJECTED:    ['IN_PROGRESS'],
+}
 
 export default function BoardView({ project, isDirector, actorId }: Props) {
   const [tasks, setTasks] = useState<Task[]>([])
@@ -29,6 +40,11 @@ export default function BoardView({ project, isDirector, actorId }: Props) {
   const [layers, setLayers] = useState<Layer[]>([])
   const [personnel, setPersonnel] = useState<Personnel[]>([])
   const [groups, setGroups] = useState<Group[]>([])
+
+  // Drag state
+  const [draggingId, setDraggingId] = useState<string | null>(null)
+  const [dragOverCol, setDragOverCol] = useState<string | null>(null)
+  const dragTaskRef = useRef<Task | null>(null)
 
   // Create form
   const [form, setForm] = useState({ title: '', description: '', priority: 'MEDIUM', deadline: '' })
@@ -47,13 +63,13 @@ export default function BoardView({ project, isDirector, actorId }: Props) {
 
   useEffect(() => {
     loadTasks()
-    if (isDirector) {
-      Promise.all([
-        workspaceApi.getLayers() as Promise<Layer[]>,
-        workspaceApi.getPersonnel() as Promise<Personnel[]>,
-        workspaceApi.getGroups() as Promise<Group[]>,
-      ]).then(([l, p, g]) => { setLayers(l); setPersonnel(p); setGroups(g) })
-    }
+    // Load workspace data for assignment dropdowns (directors + personnel for subtask creation)
+    Promise.all([
+      workspaceApi.getLayers() as Promise<Layer[]>,
+      workspaceApi.getPersonnel() as Promise<Personnel[]>,
+      workspaceApi.getGroups() as Promise<Group[]>,
+    ]).then(([l, p, g]) => { setLayers(l); setPersonnel(p); setGroups(g) })
+      .catch(() => { /* workspace data is best-effort */ })
   }, [project.id])
 
   const allDepts = layers.flatMap(l => l.departments || [])
@@ -63,7 +79,6 @@ export default function BoardView({ project, isDirector, actorId }: Props) {
     setSaving(true)
     try {
       const created = await taskApi.create({ ...form, projectId: project.id, deadline: form.deadline || undefined }) as Task
-      // Assign immediately if target selected
       if (assignTarget.type && assignTarget.id) {
         await taskApi.assign(created.id, { [`${assignTarget.type}Id`]: assignTarget.id })
       }
@@ -73,6 +88,56 @@ export default function BoardView({ project, isDirector, actorId }: Props) {
       await loadTasks()
     } catch (e: unknown) { setError(e instanceof Error ? e.message : 'Error') }
     setSaving(false)
+  }
+
+  // ── Drag-and-drop handlers ──────────────────────────────────────────────────
+  const handleDragStart = (task: Task) => {
+    setDraggingId(task.id)
+    dragTaskRef.current = task
+  }
+
+  const handleDragEnd = () => {
+    setDraggingId(null)
+    setDragOverCol(null)
+    dragTaskRef.current = null
+  }
+
+  const canDropInto = (targetStatus: string): boolean => {
+    const task = dragTaskRef.current
+    if (!task) return false
+    const allowed = DRAG_TRANSITIONS[task.status] || []
+    return allowed.includes(targetStatus)
+  }
+
+  const handleDrop = async (targetStatus: string) => {
+    const task = dragTaskRef.current
+    if (!task || !canDropInto(targetStatus)) {
+      handleDragEnd()
+      return
+    }
+    handleDragEnd()
+
+    // Optimistic update
+    setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: targetStatus as Task['status'] } : t))
+
+    try {
+      if (targetStatus === 'IN_PROGRESS' && task.status === 'ASSIGNED') {
+        await taskApi.start(task.id)
+      } else if (targetStatus === 'BLOCKED' && task.status === 'IN_PROGRESS') {
+        await taskApi.block(task.id, 'Blocked via board drag')
+      } else if (targetStatus === 'IN_PROGRESS' && task.status === 'BLOCKED') {
+        await taskApi.unblock(task.id)
+      } else if (targetStatus === 'IN_PROGRESS' && task.status === 'RETURNED') {
+        await taskApi.reopen(task.id)
+      } else if (targetStatus === 'IN_PROGRESS' && task.status === 'REJECTED') {
+        await taskApi.reopen(task.id)
+      }
+      await loadTasks()
+    } catch (e: unknown) {
+      // Revert optimistic update on error
+      setError(e instanceof Error ? e.message : 'Action failed')
+      await loadTasks()
+    }
   }
 
   const columnTasks = (status: string) => tasks.filter(t => t.status === status)
@@ -93,33 +158,53 @@ export default function BoardView({ project, isDirector, actorId }: Props) {
         )}
       </div>
 
-      {error && <div className="mb-4 bg-red-50 border border-red-200 text-tw-danger text-sm px-3 py-2 rounded-lg">{error}</div>}
+      {error && (
+        <div className="mb-4 bg-red-50 border border-red-200 text-tw-danger text-sm px-3 py-2 rounded-lg flex items-center justify-between">
+          {error}
+          <button onClick={() => setError('')} className="text-tw-danger font-bold ml-2">×</button>
+        </div>
+      )}
 
       {/* Kanban Board */}
       <div className="flex gap-4 overflow-x-auto pb-4 flex-1">
-        {COLUMNS.map(col => (
-          <div key={col.status} className="flex-shrink-0 w-64">
-            {/* Column header */}
-            <div className="flex items-center gap-2 mb-3">
-              <div className={`w-2.5 h-2.5 rounded-full ${col.color}`} />
-              <span className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide">{col.label}</span>
-              <span className="ml-auto bg-tw-hover text-tw-text-secondary text-xs rounded-full px-1.5 py-0.5 font-medium">
-                {columnTasks(col.status).length}
-              </span>
+        {COLUMNS.map(col => {
+          const isDropTarget = dragOverCol === col.status && canDropInto(col.status)
+          return (
+            <div key={col.status} className="flex-shrink-0 w-64"
+              onDragOver={e => { e.preventDefault(); setDragOverCol(col.status) }}
+              onDragLeave={() => setDragOverCol(null)}
+              onDrop={() => handleDrop(col.status)}
+            >
+              {/* Column header */}
+              <div className="flex items-center gap-2 mb-3">
+                <div className={`w-2.5 h-2.5 rounded-full ${col.color}`} />
+                <span className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide">{col.label}</span>
+                <span className="ml-auto bg-tw-hover text-tw-text-secondary text-xs rounded-full px-1.5 py-0.5 font-medium">
+                  {columnTasks(col.status).length}
+                </span>
+              </div>
+              {/* Cards */}
+              <div className={`space-y-0 min-h-12 rounded-xl transition-colors ${isDropTarget ? 'bg-blue-50 ring-2 ring-tw-primary ring-opacity-40' : ''}`}>
+                {columnTasks(col.status).map(task => (
+                  <div
+                    key={task.id}
+                    draggable
+                    onDragStart={() => handleDragStart(task)}
+                    onDragEnd={handleDragEnd}
+                    className={`transition-opacity ${draggingId === task.id ? 'opacity-40' : 'opacity-100'}`}
+                  >
+                    <TaskCard task={task} onClick={t => setSelectedTask(t)} />
+                  </div>
+                ))}
+                {columnTasks(col.status).length === 0 && (
+                  <div className={`border-2 border-dashed rounded-xl h-16 flex items-center justify-center transition-colors ${isDropTarget ? 'border-tw-primary' : 'border-tw-border'}`}>
+                    <span className="text-xs text-tw-text-secondary">{isDropTarget ? 'Drop here' : 'No tasks'}</span>
+                  </div>
+                )}
+              </div>
             </div>
-            {/* Cards */}
-            <div className="space-y-0 min-h-12">
-              {columnTasks(col.status).map(task => (
-                <TaskCard key={task.id} task={task} onClick={t => setSelectedTask(t)} />
-              ))}
-              {columnTasks(col.status).length === 0 && (
-                <div className="border-2 border-dashed border-tw-border rounded-xl h-16 flex items-center justify-center">
-                  <span className="text-xs text-tw-text-secondary">No tasks</span>
-                </div>
-              )}
-            </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
 
       {/* Task Detail Panel */}
@@ -134,7 +219,6 @@ export default function BoardView({ project, isDirector, actorId }: Props) {
           onClose={() => setSelectedTask(null)}
           onRefresh={async () => {
             await loadTasks()
-            // Refresh the selected task
             const updated = await taskApi.get(selectedTask.id) as Task
             setSelectedTask(updated)
           }}
@@ -178,46 +262,36 @@ export default function BoardView({ project, isDirector, actorId }: Props) {
                 </div>
               </div>
 
-              {/* Assignment */}
-              <div>
-                <label className="block text-sm font-medium text-tw-text mb-1">Assign to (optional)</label>
-                <div className="grid grid-cols-2 gap-2">
-                  <Select
-                    value={assignTarget.type}
-                    onChange={val => setAssignTarget({ type: val as 'personnel' | 'group' | 'department' | '', id: '' })}
-                    placeholder="Assign type..."
-                    options={[
-                      { value: 'personnel', label: 'Person' },
-                      { value: 'group', label: 'Group' },
-                      { value: 'department', label: 'Department' },
-                    ]}
-                  />
-                  {assignTarget.type === 'personnel' && (
+              {/* Assignment — only for directors */}
+              {isDirector && (
+                <div>
+                  <label className="block text-sm font-medium text-tw-text mb-1">Assign to (optional)</label>
+                  <div className="grid grid-cols-2 gap-2">
                     <Select
-                      value={assignTarget.id}
-                      onChange={val => setAssignTarget(a => ({ ...a, id: val }))}
-                      placeholder="Select person..."
-                      options={personnel.map(p => ({ value: p.id, label: p.name }))}
+                      value={assignTarget.type}
+                      onChange={val => setAssignTarget({ type: val as 'personnel' | 'group' | 'department' | '', id: '' })}
+                      placeholder="Assign type..."
+                      options={[
+                        { value: 'personnel', label: 'Person' },
+                        { value: 'group', label: 'Group' },
+                        { value: 'department', label: 'Department' },
+                      ]}
                     />
-                  )}
-                  {assignTarget.type === 'group' && (
-                    <Select
-                      value={assignTarget.id}
-                      onChange={val => setAssignTarget(a => ({ ...a, id: val }))}
-                      placeholder="Select group..."
-                      options={groups.map(g => ({ value: g.id, label: g.name }))}
-                    />
-                  )}
-                  {assignTarget.type === 'department' && (
-                    <Select
-                      value={assignTarget.id}
-                      onChange={val => setAssignTarget(a => ({ ...a, id: val }))}
-                      placeholder="Select department..."
-                      options={allDepts.map(d => ({ value: d.id, label: d.name }))}
-                    />
-                  )}
+                    {assignTarget.type === 'personnel' && (
+                      <Select value={assignTarget.id} onChange={val => setAssignTarget(a => ({ ...a, id: val }))}
+                        placeholder="Select person..." options={personnel.map(p => ({ value: p.id, label: p.name }))} />
+                    )}
+                    {assignTarget.type === 'group' && (
+                      <Select value={assignTarget.id} onChange={val => setAssignTarget(a => ({ ...a, id: val }))}
+                        placeholder="Select group..." options={groups.map(g => ({ value: g.id, label: g.name }))} />
+                    )}
+                    {assignTarget.type === 'department' && (
+                      <Select value={assignTarget.id} onChange={val => setAssignTarget(a => ({ ...a, id: val }))}
+                        placeholder="Select department..." options={allDepts.map(d => ({ value: d.id, label: d.name }))} />
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div className="flex gap-2 justify-end pt-1">
                 <button onClick={() => setShowCreateModal(false)} className="btn-secondary">Cancel</button>

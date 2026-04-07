@@ -112,6 +112,38 @@ export async function personnelLogin(req: Request, res: Response): Promise<void>
   }
 }
 
+// POST /api/auth/change-password
+export async function changePassword(req: Request, res: Response): Promise<void> {
+  try {
+    const { actorId, actorType } = req.user!
+    const { currentPassword, newPassword } = req.body
+    if (!currentPassword || !newPassword) {
+      res.status(400).json({ error: 'currentPassword and newPassword are required' }); return
+    }
+    if (newPassword.length < 8) {
+      res.status(400).json({ error: 'New password must be at least 8 characters' }); return
+    }
+
+    if (actorType === 'director') {
+      const director = await prisma.director.findUnique({ where: { id: actorId } })
+      if (!director || !(await bcrypt.compare(currentPassword, director.password))) {
+        res.status(401).json({ error: 'Current password is incorrect' }); return
+      }
+      await prisma.director.update({ where: { id: actorId }, data: { password: await bcrypt.hash(newPassword, 12) } })
+    } else {
+      const personnel = await prisma.personnel.findUnique({ where: { id: actorId } })
+      if (!personnel || !(await bcrypt.compare(currentPassword, personnel.password))) {
+        res.status(401).json({ error: 'Current password is incorrect' }); return
+      }
+      await prisma.personnel.update({ where: { id: actorId }, data: { password: await bcrypt.hash(newPassword, 12) } })
+    }
+    res.json({ success: true })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+}
+
 // GET /api/auth/me
 export async function getMe(req: Request, res: Response): Promise<void> {
   try {

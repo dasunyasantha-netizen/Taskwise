@@ -20,8 +20,27 @@ const priorityColors: Record<string, string> = {
 }
 const statusColors: Record<string, string> = {
   PENDING: 'badge-gray', ASSIGNED: 'badge-primary', IN_PROGRESS: 'badge-warning',
+  BLOCKED: 'bg-orange-100 text-orange-700 border border-orange-200',
   SUBMITTED: 'badge-purple', APPROVED: 'badge-success', RETURNED: 'badge-danger',
   REJECTED: 'badge-danger', CANCELLED: 'badge-gray',
+}
+
+const eventLabels: Record<string, string> = {
+  TASK_CREATED:    'Task created',
+  TASK_ASSIGNED:   'Task assigned',
+  TASK_UPDATED:    'Task updated',
+  TASK_STARTED:    'Work started',
+  TASK_SUBMITTED:  'Submitted for approval',
+  TASK_APPROVED:   'Task approved',
+  TASK_REJECTED:   'Task rejected',
+  TASK_RETURNED:   'Task returned',
+  TASK_BLOCKED:    'Task blocked',
+  TASK_UNBLOCKED:  'Task unblocked',
+  TASK_CANCELLED:  'Task cancelled',
+  TASK_DELETED:    'Task deleted',
+  SUBTASK_CREATED: 'Subtask created',
+  COMMENT_ADDED:   'Comment added',
+  DEADLINE_CHANGED:'Deadline changed',
 }
 
 export default function TaskDetailPanel({ task, isDirector, actorId, layers, personnel, groups, onClose, onRefresh }: Props) {
@@ -31,38 +50,54 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
   const [subtasks, setSubtasks] = useState<Task[]>([])
   const [newComment, setNewComment] = useState('')
   const [reason, setReason] = useState('')
-  const [showReasonModal, setShowReasonModal] = useState<'return' | 'reject' | 'cancel' | null>(null)
+  const [showReasonModal, setShowReasonModal] = useState<'return' | 'reject' | 'cancel' | 'block' | null>(null)
   const [showAssignModal, setShowAssignModal] = useState(false)
   const [showSubtaskModal, setShowSubtaskModal] = useState(false)
   const [assignTarget, setAssignTarget] = useState<{ type: string; id: string }>({ type: '', id: '' })
   const [subtaskForm, setSubtaskForm] = useState({ title: '', description: '', priority: 'MEDIUM', deadline: '' })
   const [loading, setLoading] = useState(false)
   const [actionLoading, setActionLoading] = useState(false)
+  const [actionError, setActionError] = useState('')
 
   const allDepts = layers.flatMap(l => l.departments || [])
 
   useEffect(() => {
     if (tab === 'comments') loadComments()
-    if (tab === 'history') loadHistory()
+    if (tab === 'history')  loadHistory()
     if (tab === 'subtasks') loadSubtasks()
   }, [tab, task.id])
 
-  const loadComments = async () => { setComments(await taskApi.comments(task.id) as TaskComment[]) }
-  const loadHistory  = async () => { setHistory(await taskApi.history(task.id) as AuditLog[]) }
-  const loadSubtasks = async () => { setSubtasks(await taskApi.subtasks(task.id) as Task[]) }
+  // Reset tab when task changes
+  useEffect(() => { setTab('details'); setActionError('') }, [task.id])
+
+  const loadComments = async () => {
+    try { setComments(await taskApi.comments(task.id) as TaskComment[]) }
+    catch { /* non-critical */ }
+  }
+  const loadHistory  = async () => {
+    try { setHistory(await taskApi.history(task.id) as AuditLog[]) }
+    catch { /* non-critical */ }
+  }
+  const loadSubtasks = async () => {
+    try { setSubtasks(await taskApi.subtasks(task.id) as Task[]) }
+    catch { /* non-critical */ }
+  }
 
   const doAction = async (action: () => Promise<unknown>) => {
     setActionLoading(true)
+    setActionError('')
     try { await action(); await onRefresh() }
-    catch (e: unknown) { alert(e instanceof Error ? e.message : 'Error') }
+    catch (e: unknown) { setActionError(e instanceof Error ? e.message : 'Action failed') }
     setActionLoading(false)
   }
 
   const submitComment = async () => {
     if (!newComment.trim()) return
-    await taskApi.addComment(task.id, newComment)
-    setNewComment('')
-    await loadComments()
+    try {
+      await taskApi.addComment(task.id, newComment)
+      setNewComment('')
+      await loadComments()
+    } catch (e: unknown) { setActionError(e instanceof Error ? e.message : 'Failed to send comment') }
   }
 
   const createSubtask = async () => {
@@ -75,24 +110,28 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
       setTab('subtasks')
       await loadSubtasks()
       await onRefresh()
-    } catch (e: unknown) { alert(e instanceof Error ? e.message : 'Error') }
+    } catch (e: unknown) { setActionError(e instanceof Error ? e.message : 'Failed to create subtask') }
     setLoading(false)
   }
 
+  // Action permissions
   const canStart   = task.status === 'ASSIGNED'
   const canSubmit  = task.status === 'IN_PROGRESS'
+  const canBlock   = task.status === 'IN_PROGRESS'
+  const canUnblock = task.status === 'BLOCKED'
   const canReturn  = task.status === 'IN_PROGRESS'
   const canApprove = task.status === 'SUBMITTED' && task.approvalById === actorId
   const canReject  = task.status === 'SUBMITTED' && task.approvalById === actorId
   const canReopen  = task.status === 'REJECTED'
   const canCancel  = isDirector && !['APPROVED', 'CANCELLED'].includes(task.status)
-  const canAssign  = isDirector && ['PENDING', 'RETURNED'].includes(task.status)
+  const canAssign  = isDirector && ['PENDING', 'RETURNED', 'BLOCKED'].includes(task.status)
   const canSubtask = ['IN_PROGRESS', 'ASSIGNED'].includes(task.status)
 
   return (
     <div className="fixed inset-0 z-40 flex justify-end">
       <div className="absolute inset-0 bg-black bg-opacity-30" onClick={onClose} />
       <div className="relative w-full max-w-xl bg-white shadow-panel flex flex-col h-full overflow-hidden">
+
         {/* Header */}
         <div className="px-5 py-4 border-b border-tw-border">
           <div className="flex items-start justify-between gap-3">
@@ -101,16 +140,27 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
                 <span className={`badge ${statusColors[task.status]}`}>{task.status.replace('_', ' ')}</span>
                 <span className={`badge ${priorityColors[task.priority]}`}>{task.priority}</span>
                 {task.project && <span className="text-xs text-tw-text-secondary">📋 {task.project.name}</span>}
+                {task.parentTaskId && <span className="text-xs text-tw-text-secondary bg-tw-hover px-1.5 py-0.5 rounded">Subtask</span>}
               </div>
               <h2 className="font-bold text-tw-text text-base leading-snug">{task.title}</h2>
             </div>
             <button onClick={onClose} className="text-tw-text-secondary hover:text-tw-text text-2xl leading-none mt-0.5">×</button>
           </div>
 
+          {/* Action error */}
+          {actionError && (
+            <div className="mt-2 text-xs text-tw-danger bg-red-50 border border-red-200 rounded-lg px-3 py-2 flex items-center justify-between">
+              {actionError}
+              <button onClick={() => setActionError('')} className="ml-2 font-bold">×</button>
+            </div>
+          )}
+
           {/* Action buttons */}
           <div className="flex flex-wrap gap-2 mt-3">
             {canStart   && <button disabled={actionLoading} onClick={() => doAction(() => taskApi.start(task.id))} className="btn-primary text-xs py-1.5">▶ Start</button>}
             {canSubmit  && <button disabled={actionLoading} onClick={() => doAction(() => taskApi.submit(task.id))} className="btn-primary text-xs py-1.5">✓ Submit for Approval</button>}
+            {canBlock   && <button disabled={actionLoading} onClick={() => setShowReasonModal('block')} className="text-xs py-1.5 px-3 rounded-lg border border-orange-300 text-orange-700 bg-orange-50 hover:bg-orange-100 font-semibold transition-colors">⊘ Mark Blocked</button>}
+            {canUnblock && <button disabled={actionLoading} onClick={() => doAction(() => taskApi.unblock(task.id))} className="btn-secondary text-xs py-1.5">↺ Unblock</button>}
             {canReturn  && <button disabled={actionLoading} onClick={() => setShowReasonModal('return')} className="btn-secondary text-xs py-1.5">↩ Return</button>}
             {canApprove && <button disabled={actionLoading} onClick={() => doAction(() => taskApi.approve(task.id))} className="bg-tw-success hover:opacity-90 text-white font-semibold px-3 py-1.5 rounded-lg text-xs transition-opacity">✓ Approve</button>}
             {canReject  && <button disabled={actionLoading} onClick={() => setShowReasonModal('reject')} className="btn-danger text-xs py-1.5">✕ Reject</button>}
@@ -126,7 +176,8 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
           {(['details', 'subtasks', 'comments', 'history'] as const).map(t => (
             <button key={t} onClick={() => setTab(t)}
               className={`py-2.5 px-3 text-xs font-medium border-b-2 transition-colors capitalize ${tab === t ? 'border-tw-primary text-tw-primary' : 'border-transparent text-tw-text-secondary hover:text-tw-text'}`}>
-              {t}
+              {t}{t === 'subtasks' && task._count?.subtasks ? ` (${task._count.subtasks})` : ''}
+              {t === 'comments' && task._count?.comments ? ` (${task._count.comments})` : ''}
             </button>
           ))}
         </div>
@@ -140,23 +191,38 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
               {task.description && (
                 <div>
                   <div className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">Description</div>
-                  <p className="text-sm text-tw-text leading-relaxed">{task.description}</p>
+                  <p className="text-sm text-tw-text leading-relaxed whitespace-pre-wrap">{task.description}</p>
                 </div>
               )}
+
               {task.assignments?.length > 0 && (
                 <div>
                   <div className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-2">Assigned To</div>
-                  {task.assignments.map(a => (
-                    <div key={a.id} className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-full bg-tw-primary flex items-center justify-center text-white text-xs font-bold">
-                        {(a.personnel?.name || a.group?.name || a.department?.name || '?').charAt(0)}
+                  <div className="space-y-1.5">
+                    {task.assignments.map(a => (
+                      <div key={a.id} className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-full bg-tw-primary flex items-center justify-center text-white text-xs font-bold">
+                          {(a.personnel?.name || a.group?.name || a.department?.name || '?').charAt(0)}
+                        </div>
+                        <span className="text-sm text-tw-text">{a.personnel?.name || a.group?.name || a.department?.name}</span>
+                        <span className="text-xs text-tw-text-secondary">{a.personnel ? 'Person' : a.group ? 'Group' : 'Dept'}</span>
                       </div>
-                      <span className="text-sm text-tw-text">{a.personnel?.name || a.group?.name || a.department?.name}</span>
-                      <span className="text-xs text-tw-text-secondary">{a.personnel ? 'Person' : a.group ? 'Group' : 'Department'}</span>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               )}
+
+              {/* Accountability — who actually acted on this task */}
+              {task.actedById && (
+                <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
+                  <div className="text-xs font-semibold text-tw-primary mb-1">Last actioned by</div>
+                  <p className="text-sm text-tw-text">
+                    {task.actedByName || `${task.actedByType === 'director' ? 'Director' : 'Personnel'} (ID: ${task.actedById.slice(0, 8)}…)`}
+                    <span className="text-xs text-tw-text-secondary ml-1">— individual who started/submitted/returned this task</span>
+                  </p>
+                </div>
+              )}
+
               {task.deadline && (
                 <div>
                   <div className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">Deadline</div>
@@ -165,16 +231,20 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
                   </span>
                 </div>
               )}
-              {task.returnReason && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                  <div className="text-xs font-semibold text-tw-danger mb-1">Return / Rejection Reason</div>
-                  <p className="text-sm text-tw-text">{task.returnReason}</p>
+
+              {(task.returnReason || task.cancelReason) && (
+                <div className={`rounded-lg p-3 ${task.status === 'BLOCKED' ? 'bg-orange-50 border border-orange-200' : 'bg-red-50 border border-red-200'}`}>
+                  <div className={`text-xs font-semibold mb-1 ${task.status === 'BLOCKED' ? 'text-orange-700' : 'text-tw-danger'}`}>
+                    {task.status === 'BLOCKED' ? 'Blocked reason' : 'Return / Rejection reason'}
+                  </div>
+                  <p className="text-sm text-tw-text">{task.returnReason || task.cancelReason}</p>
                 </div>
               )}
+
               {task.parentTaskId && (
                 <div>
-                  <div className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">Parent Task</div>
-                  <span className="badge badge-gray">Subtask</span>
+                  <div className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">Hierarchy</div>
+                  <span className="badge badge-gray">Part of a parent task</span>
                 </div>
               )}
             </div>
@@ -188,13 +258,21 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
               ) : (
                 <div className="space-y-2">
                   {subtasks.map(s => (
-                    <div key={s.id} className="card p-3 flex items-center justify-between">
-                      <div>
-                        <div className="text-sm font-medium text-tw-text">{s.title}</div>
-                        <div className="flex items-center gap-2 mt-1">
+                    <div key={s.id} className="card p-3 flex items-center justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-tw-text truncate">{s.title}</div>
+                        <div className="flex items-center gap-2 mt-1 flex-wrap">
                           <span className={`badge ${statusColors[s.status]} text-xs`}>{s.status.replace('_', ' ')}</span>
+                          <span className={`badge ${priorityColors[s.priority]} text-xs`}>{s.priority}</span>
                           {s.deadline && <span className="text-xs text-tw-text-secondary">{new Date(s.deadline).toLocaleDateString()}</span>}
+                          {s._count?.subtasks ? <span className="text-xs text-tw-text-secondary">+{s._count.subtasks} sub</span> : null}
                         </div>
+                        {/* Accountability on subtask */}
+                        {s.actedById && (
+                          <div className="text-xs text-tw-text-secondary mt-1">
+                            Actioned by: {s.actedByName || (s.actedByType === 'director' ? 'Director' : 'Personnel')}
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -211,11 +289,14 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
                 {comments.map(c => (
                   <div key={c.id} className="flex gap-2">
                     <div className="w-7 h-7 rounded-full bg-tw-primary flex items-center justify-center text-white text-xs font-bold flex-shrink-0 mt-0.5">
-                      {(c.authorType === 'director' ? 'D' : 'P')}
+                      {c.authorName ? c.authorName.charAt(0).toUpperCase() : (c.authorType === 'director' ? 'D' : 'P')}
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-0.5">
-                        <span className="text-xs font-semibold text-tw-text">{c.authorType === 'director' ? 'Director' : 'Personnel'}</span>
+                        <span className="text-xs font-semibold text-tw-text">
+                          {c.authorName || (c.authorType === 'director' ? 'Director' : 'Personnel')}
+                        </span>
+                        <span className="text-xs text-tw-text-secondary capitalize">{c.authorType}</span>
                         <span className="text-xs text-tw-text-secondary">{new Date(c.createdAt).toLocaleString()}</span>
                       </div>
                       <div className="bg-tw-hover rounded-lg px-3 py-2 text-sm text-tw-text">{c.content}</div>
@@ -224,8 +305,9 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
                 ))}
               </div>
               <div className="flex gap-2 mt-auto">
-                <input className="input flex-1 text-sm" placeholder="Write a comment..." value={newComment} onChange={e => setNewComment(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && submitComment()} />
+                <input className="input flex-1 text-sm" placeholder="Write a comment..." value={newComment}
+                  onChange={e => setNewComment(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && !e.shiftKey && submitComment()} />
                 <button onClick={submitComment} disabled={!newComment.trim()} className="btn-primary text-sm px-3">Send</button>
               </div>
             </div>
@@ -233,16 +315,32 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
 
           {/* HISTORY */}
           {tab === 'history' && (
-            <div className="space-y-2">
+            <div className="space-y-1">
               {history.length === 0 && <div className="text-center py-8 text-tw-text-secondary text-sm">No history yet.</div>}
               {history.map(log => (
-                <div key={log.id} className="flex items-start gap-3 py-2 border-b border-tw-border last:border-0">
-                  <div className="w-2 h-2 rounded-full bg-tw-primary mt-1.5 flex-shrink-0" />
+                <div key={log.id} className="flex items-start gap-3 py-2.5 border-b border-tw-border last:border-0">
+                  <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${
+                    log.event.includes('APPROVED') ? 'bg-tw-success' :
+                    log.event.includes('REJECTED') || log.event.includes('CANCELLED') ? 'bg-tw-danger' :
+                    log.event.includes('BLOCKED') ? 'bg-orange-500' :
+                    'bg-tw-primary'
+                  }`} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs font-semibold text-tw-text">{log.event.replace(/_/g, ' ')}</span>
-                      <span className="text-xs text-tw-text-secondary capitalize">{log.actorType}</span>
+                      <span className="text-xs font-semibold text-tw-text">
+                        {eventLabels[log.event] || log.event.replace(/_/g, ' ')}
+                      </span>
+                      <span className="text-xs text-tw-primary font-medium">
+                        {log.actorName || `${log.actorType === 'director' ? 'Director' : 'Personnel'}`}
+                      </span>
                     </div>
+                    {/* Show payload details if meaningful */}
+                    {log.payload?.reason && (
+                      <div className="text-xs text-tw-text-secondary mt-0.5 italic">"{String(log.payload.reason)}"</div>
+                    )}
+                    {log.payload?.title && log.event === 'TASK_CREATED' && (
+                      <div className="text-xs text-tw-text-secondary mt-0.5">"{String(log.payload.title)}"</div>
+                    )}
                     <div className="text-xs text-tw-text-secondary mt-0.5">{new Date(log.createdAt).toLocaleString()}</div>
                   </div>
                 </div>
@@ -252,26 +350,35 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
         </div>
       </div>
 
-      {/* Reason Modal (Return / Reject / Cancel) */}
+      {/* Reason Modal (Return / Reject / Cancel / Block) */}
       {showReasonModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-panel w-full max-w-sm">
             <div className="px-5 py-4 border-b border-tw-border">
-              <h3 className="font-semibold text-tw-text capitalize">{showReasonModal} Task</h3>
+              <h3 className="font-semibold text-tw-text capitalize">
+                {showReasonModal === 'block' ? 'Mark as Blocked' : `${showReasonModal} Task`}
+              </h3>
+              {showReasonModal === 'block' && (
+                <p className="text-xs text-tw-text-secondary mt-1">Describe what is blocking this task (e.g. waiting on another team, missing information).</p>
+              )}
             </div>
             <div className="px-5 py-4 space-y-3">
               <textarea className="input resize-none" rows={3}
-                placeholder={`Reason for ${showReasonModal}...`}
+                placeholder={showReasonModal === 'block' ? 'What is blocking this task?' : `Reason for ${showReasonModal}...`}
                 value={reason} onChange={e => setReason(e.target.value)} />
               <div className="flex gap-2 justify-end">
                 <button onClick={() => { setShowReasonModal(null); setReason('') }} className="btn-secondary">Cancel</button>
-                <button disabled={!reason.trim() || actionLoading} className="btn-danger"
+                <button disabled={!reason.trim() || actionLoading}
+                  className={showReasonModal === 'block' ? 'text-xs py-1.5 px-3 rounded-lg border border-orange-300 text-orange-700 bg-orange-50 hover:bg-orange-100 font-semibold' : 'btn-danger'}
                   onClick={() => {
-                    const action = showReasonModal === 'return' ? () => taskApi.return(task.id, reason)
-                      : showReasonModal === 'reject' ? () => taskApi.reject(task.id, reason)
-                      : () => taskApi.cancel(task.id, reason)
+                    const action =
+                      showReasonModal === 'return' ? () => taskApi.return(task.id, reason) :
+                      showReasonModal === 'reject' ? () => taskApi.reject(task.id, reason) :
+                      showReasonModal === 'block'  ? () => taskApi.block(task.id, reason) :
+                      () => taskApi.cancel(task.id, reason)
                     doAction(action)
-                    setShowReasonModal(null); setReason('')
+                    setShowReasonModal(null)
+                    setReason('')
                   }}>
                   Confirm
                 </button>
@@ -289,16 +396,13 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
               <h3 className="font-semibold text-tw-text">Assign Task</h3>
             </div>
             <div className="px-5 py-4 space-y-3">
-              <Select
-                value={assignTarget.type}
-                onChange={val => setAssignTarget({ type: val, id: '' })}
+              <Select value={assignTarget.type} onChange={val => setAssignTarget({ type: val, id: '' })}
                 placeholder="Assign type..."
                 options={[
                   { value: 'personnel', label: 'Person' },
                   { value: 'group', label: 'Group' },
                   { value: 'department', label: 'Department' },
-                ]}
-              />
+                ]} />
               {assignTarget.type === 'personnel' && (
                 <Select value={assignTarget.id} onChange={val => setAssignTarget(a => ({ ...a, id: val }))}
                   placeholder="Select person..." options={personnel.map(p => ({ value: p.id, label: p.name }))} />
@@ -335,8 +439,10 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
               <p className="text-xs text-tw-text-secondary mt-0.5">Under: {task.title}</p>
             </div>
             <div className="px-5 py-4 space-y-3">
-              <input className="input" placeholder="Subtask title" value={subtaskForm.title} onChange={e => setSubtaskForm(f => ({ ...f, title: e.target.value }))} />
-              <textarea className="input resize-none" rows={2} placeholder="Description..." value={subtaskForm.description} onChange={e => setSubtaskForm(f => ({ ...f, description: e.target.value }))} />
+              <input className="input" placeholder="Subtask title" value={subtaskForm.title}
+                onChange={e => setSubtaskForm(f => ({ ...f, title: e.target.value }))} />
+              <textarea className="input resize-none" rows={2} placeholder="Description..."
+                value={subtaskForm.description} onChange={e => setSubtaskForm(f => ({ ...f, description: e.target.value }))} />
               <div className="grid grid-cols-2 gap-3">
                 <Select value={subtaskForm.priority} onChange={val => setSubtaskForm(f => ({ ...f, priority: val }))}
                   options={[
@@ -349,7 +455,9 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
               </div>
               <div className="flex gap-2 justify-end">
                 <button onClick={() => setShowSubtaskModal(false)} className="btn-secondary">Cancel</button>
-                <button onClick={createSubtask} disabled={loading || !subtaskForm.title} className="btn-primary">{loading ? 'Creating...' : 'Create Subtask'}</button>
+                <button onClick={createSubtask} disabled={loading || !subtaskForm.title} className="btn-primary">
+                  {loading ? 'Creating...' : 'Create Subtask'}
+                </button>
               </div>
             </div>
           </div>

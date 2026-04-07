@@ -85,6 +85,7 @@ export type TaskStatus =
   | 'PENDING'
   | 'ASSIGNED'
   | 'IN_PROGRESS'
+  | 'BLOCKED'
   | 'SUBMITTED'
   | 'APPROVED'
   | 'RETURNED'
@@ -122,6 +123,9 @@ export interface Task {
   deadlineSetByType?: ActorType
   approvalById?: string
   approvalByType?: string
+  actedById?: string
+  actedByType?: ActorType
+  actedByName?: string
   returnReason?: string
   returnedAt?: string
   cancelledAt?: string
@@ -154,6 +158,7 @@ export type NotificationType =
   | 'task_rejected'
   | 'task_deadline_warning'
   | 'subtask_created'
+  | 'subtask_all_approved'
   | 'comment_added'
   | 'personnel_moved'
 

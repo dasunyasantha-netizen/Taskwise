@@ -21,10 +21,21 @@ export async function listNotifications(req: Request, res: Response): Promise<vo
 // POST /api/notifications/:id/read
 export async function markRead(req: Request, res: Response): Promise<void> {
   try {
-    await prisma.notification.updateMany({
-      where: { id: req.params.id },
+    const { actorId, actorType, workspaceId } = req.user!
+    // Only mark read if the notification actually belongs to this actor
+    const ownerFilter = actorType === 'director'
+      ? { recipientDirectorId: actorId }
+      : { recipientPersonnelId: actorId }
+
+    const result = await prisma.notification.updateMany({
+      where: { id: req.params.id, workspaceId, ...ownerFilter, isRead: false },
       data: { isRead: true, readAt: new Date() }
     })
+    if (result.count === 0) {
+      // Either already read or doesn't belong to this user — return 200 silently (idempotent)
+      res.json({ success: true })
+      return
+    }
     res.json({ success: true })
   } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
 }

@@ -101,9 +101,14 @@ export async function createPersonnel(req: Request, res: Response): Promise<void
 }
 
 // PUT /api/workspace/personnel/:id
+// Directors can update anyone; personnel can only update their own profile
 export async function updatePersonnel(req: Request, res: Response): Promise<void> {
   try {
-    const person = await prisma.personnel.findFirst({ where: { id: req.params.id, workspaceId: req.user!.workspaceId, deletedAt: null } })
+    const { actorId, actorType, workspaceId } = req.user!
+    if (actorType === 'personnel' && actorId !== req.params.id) {
+      res.status(403).json({ error: 'You can only update your own profile' }); return
+    }
+    const person = await prisma.personnel.findFirst({ where: { id: req.params.id, workspaceId, deletedAt: null } })
     if (!person) { res.status(404).json({ error: 'Personnel not found' }); return }
     const { name, phone, avatarUrl } = req.body
     const updated = await prisma.personnel.update({ where: { id: req.params.id }, data: { name, phone, avatarUrl } })

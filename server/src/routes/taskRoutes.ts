@@ -2,7 +2,8 @@ import { Router } from 'express'
 import { authenticateToken } from '../middleware/authMiddleware'
 import {
   listTasks, getTask, createTask, updateTask, deleteTask,
-  assignTask, startTask, submitTask, returnTask, approveTask, rejectTask, reopenTask, cancelTask,
+  assignTask, startTask, submitTask, blockTask, unblockTask,
+  returnTask, approveTask, rejectTask, reopenTask, cancelTask,
   getSubtasks, getComments, addComment, getTaskHistory,
 } from '../controllers/taskController'
 
@@ -18,6 +19,8 @@ router.delete('/:id',             deleteTask)
 router.post('/:id/assign',        assignTask)
 router.post('/:id/start',         startTask)
 router.post('/:id/submit',        submitTask)
+router.post('/:id/block',         blockTask)
+router.post('/:id/unblock',       unblockTask)
 router.post('/:id/return',        returnTask)
 router.post('/:id/approve',       approveTask)
 router.post('/:id/reject',        rejectTask)

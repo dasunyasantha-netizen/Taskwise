@@ -187,7 +187,8 @@ model Task {
   description String?
   priority    String  @default("MEDIUM") // CRITICAL | HIGH | MEDIUM | LOW
   status      String  @default("PENDING")
-  // PENDING | ASSIGNED | IN_PROGRESS | SUBMITTED | APPROVED | RETURNED | REJECTED | CANCELLED
+  // PENDING | ASSIGNED | IN_PROGRESS | BLOCKED | SUBMITTED | APPROVED | RETURNED | REJECTED | CANCELLED
+  // BLOCKED: assignee is waiting on information or another team; unblocks back to IN_PROGRESS
 
   deadline         DateTime?
   deadlineSetById  String?   // Director.id or Personnel.id
