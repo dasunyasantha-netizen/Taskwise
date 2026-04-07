@@ -182,7 +182,7 @@ export interface AuditLog {
   event: string
   actorType: ActorType
   actorName?: string
-  payload?: Record<string, unknown>
+  payload?: { reason?: string; title?: string; action?: string; [key: string]: string | undefined }
   createdAt: string
 }
 
