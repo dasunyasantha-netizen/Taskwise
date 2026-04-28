@@ -120,42 +120,46 @@ function ExpandedRow({ task, colSpan, actorId, departmentId, onOpen, onSubtaskCl
         <div className="px-6 py-5 space-y-5">
 
           {/* ── Task meta row ── */}
-          <div className="flex flex-wrap gap-6 text-sm">
+          <div className="text-sm space-y-3">
             {task.description && (
-              <div className="w-full">
-                <div className="font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">Description</div>
+              <div>
+                <div className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">Description</div>
                 <p className="text-sm text-tw-text leading-relaxed whitespace-pre-wrap">{task.description}</p>
               </div>
             )}
-            {task.assignments?.length > 0 && (
-              <div>
-                <div className="font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">Assigned To</div>
-                {task.assignments.map(a => (
-                  <div key={a.id} className="flex items-center gap-1.5 text-tw-text">
-                    <div className="w-5 h-5 rounded-full bg-tw-primary flex items-center justify-center text-white font-bold text-xs">
-                      {(a.personnel?.name || a.department?.name || '?').charAt(0)}
-                    </div>
-                    {a.personnel?.name || a.department?.name || a.group?.name}
-                    <span className="text-tw-text-secondary ml-1">{a.personnel ? '(person)' : a.department ? '(dept)' : '(group)'}</span>
+            <div className="grid grid-cols-[auto_auto_auto_1fr] gap-x-8 gap-y-2 items-start">
+              {task.assignments?.length > 0 && (
+                <div>
+                  <div className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1.5">Assigned To</div>
+                  <div className="space-y-1">
+                    {task.assignments.map(a => (
+                      <div key={a.id} className="flex items-center gap-1.5 text-tw-text">
+                        <div className="w-5 h-5 rounded-full bg-tw-primary flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
+                          {(a.personnel?.name || a.department?.name || '?').charAt(0)}
+                        </div>
+                        <span>{a.personnel?.name || a.department?.name || a.group?.name}</span>
+                        <span className="text-tw-text-secondary text-xs">{a.personnel ? '(person)' : a.department ? '(dept)' : '(group)'}</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            )}
-            {task.deadline && (
-              <div>
-                <div className="font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">Deadline</div>
-                <span className="text-tw-text">{new Date(task.deadline).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
-              </div>
-            )}
-            {task.actedById && (
-              <div>
-                <div className="font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">Accepted By</div>
-                <span className="text-tw-text">{task.actedByName || task.actedByType}</span>
-              </div>
-            )}
+                </div>
+              )}
+              {task.deadline && (
+                <div>
+                  <div className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1.5">Deadline</div>
+                  <span className="text-tw-text">{new Date(task.deadline).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+                </div>
+              )}
+              {task.actedById && (
+                <div>
+                  <div className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1.5">Accepted By</div>
+                  <span className="text-tw-text">{task.actedByName || task.actedByType}</span>
+                </div>
+              )}
+            </div>
             {(task.returnReason || task.cancelReason) && (
-              <div className="w-full bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-                <div className="font-semibold text-tw-danger uppercase tracking-wide mb-0.5">
+              <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                <div className="text-xs font-semibold text-tw-danger uppercase tracking-wide mb-0.5">
                   {task.status === 'BLOCKED' ? 'Blocked Reason' : 'Return / Rejection Reason'}
                 </div>
                 <span className="text-tw-danger italic">{task.returnReason || task.cancelReason}</span>
