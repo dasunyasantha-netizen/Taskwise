@@ -20,11 +20,12 @@ const priorityColors: Record<string, string> = {
   CRITICAL: 'badge-danger', HIGH: 'badge-warning', MEDIUM: 'badge-primary', LOW: 'badge-gray',
 }
 const statusColors: Record<string, string> = {
-  PENDING: 'badge-gray', ASSIGNED: 'badge-primary', IN_PROGRESS: 'badge-warning',
+  PENDING: 'badge-gray', ASSIGNED: 'badge-gray', IN_PROGRESS: 'badge-warning',
   BLOCKED:   'bg-orange-100 text-orange-700 border border-orange-200',
   SUBMITTED: 'badge-purple', APPROVED: 'badge-success',
   RETURNED:  'badge-danger',  REJECTED: 'badge-danger', CANCELLED: 'badge-gray',
 }
+const displayStatus = (s: string) => s === 'ASSIGNED' ? 'PENDING' : s.replace('_', ' ')
 const eventLabels: Record<string, string> = {
   TASK_CREATED:    'Task created',    TASK_ASSIGNED:   'Task assigned',
   TASK_ACCEPTED:   'Task accepted',   TASK_REASSIGNED: 'Task reassigned',
@@ -102,7 +103,19 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, person
     if (tab === 'history')  loadHistory()
   }, [tab, task.id])
 
-  useEffect(() => { setTab('details'); setActionError('') }, [task.id])
+  useEffect(() => {
+    setTab('details')
+    setActionError('')
+    // Auto-transition to IN_PROGRESS when personnel opens an ASSIGNED task or self-assigns an unassigned subtask
+    if (task.status === 'ASSIGNED' && isMyTask) {
+      taskApi.accept(task.id).then(() => onRefresh()).catch(() => {})
+    } else if (canSelfAssign) {
+      taskApi.assign(task.id, { personnelId: actorId })
+        .then(() => taskApi.accept(task.id))
+        .then(() => onRefresh())
+        .catch(() => {})
+    }
+  }, [task.id])
 
   const loadSubtasks = async () => {
     try { setSubtasks(await taskApi.subtasks(task.id) as Task[]) } catch { /* no-op */ }
@@ -183,8 +196,12 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, person
       return
     }
     doAction(async () => {
-      if (canSelfAssign) await taskApi.assign(task.id, { personnelId: actorId })
-      if (['PENDING', 'ASSIGNED'].includes(task.status)) await taskApi.accept(task.id)
+      if (canSelfAssign) {
+        await taskApi.assign(task.id, { personnelId: actorId })
+        await taskApi.accept(task.id)
+      } else if (['PENDING', 'ASSIGNED'].includes(task.status)) {
+        await taskApi.accept(task.id)
+      }
       await taskApi.submit(task.id)
     })
   }
@@ -266,7 +283,7 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, person
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
               <div className="flex flex-wrap items-center gap-2 mb-2">
-                <span className={`badge ${statusColors[task.status]}`}>{task.status.replace('_', ' ')}</span>
+                <span className={`badge ${statusColors[task.status]}`}>{displayStatus(task.status)}</span>
                 <span className={`badge ${priorityColors[task.priority]}`}>{task.priority}</span>
                 {task.project && <span className="text-xs text-tw-text-secondary">📋 {task.project.name}</span>}
                 {isOverdue && <span className="text-xs text-tw-danger font-semibold">⚠ OVERDUE</span>}
@@ -314,10 +331,10 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, person
 
           {/* ── Primary action buttons ─────────────────────────────────── */}
           <div className="flex flex-wrap gap-2 mt-4">
-            {canAccept && (
+            {canAccept && !canSelfAssign && (
               <button disabled={loading} onClick={handleAccept}
                 className="btn-primary text-sm py-2 px-4 flex items-center gap-1.5">
-                {canSelfAssign ? '✓ Take Task' : '✓ Accept Task'}
+                ✓ Accept Task
               </button>
             )}
             {canSubmit && (
@@ -472,7 +489,7 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, person
               )}
 
               {/* Dept-pending notice */}
-              {canAccept && (
+              {canAccept && !canSelfAssign && (
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3">
                   <p className="text-sm text-yellow-800 font-medium">
                     This task is assigned to your department. Accept it to take personal ownership and start working.
@@ -584,7 +601,7 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, person
                             {s.description && <div className="text-xs text-tw-text-secondary mt-0.5 truncate">{s.description}</div>}
                           </div>
                           <div className="flex items-center gap-2 flex-shrink-0">
-                            <span className={`badge ${statusColors[s.status]} text-xs`}>{s.status.replace('_', ' ')}</span>
+                            <span className={`badge ${statusColors[s.status]} text-xs`}>{displayStatus(s.status)}</span>
                             {clickable && <svg className="w-3.5 h-3.5 text-tw-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/></svg>}
                           </div>
                         </div>
@@ -727,7 +744,7 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, person
                 {blockingList.map(s => (
                   <li key={s.id} className="text-xs text-tw-text-secondary flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-tw-warning flex-shrink-0" />
-                    {s.title} — <span className="text-tw-warning font-medium">{s.status.replace('_', ' ')}</span>
+                    {s.title} — <span className="text-tw-warning font-medium">{displayStatus(s.status)}</span>
                   </li>
                 ))}
               </ul>

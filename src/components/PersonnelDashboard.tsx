@@ -19,19 +19,20 @@ const priorityBar:  Record<string, string> = {
   CRITICAL: 'bg-red-500', HIGH: 'bg-orange-400', MEDIUM: 'bg-yellow-400', LOW: 'bg-gray-300',
 }
 const statusBadge: Record<string, string> = {
-  ASSIGNED:    'badge-primary',
   IN_PROGRESS: 'badge-warning',
   BLOCKED:     'bg-orange-100 text-orange-700 border border-orange-200',
   SUBMITTED:   'badge-purple',
   RETURNED:    'badge-danger',
   REJECTED:    'badge-danger',
 }
+const displayStatus = (status: string) =>
+  status === 'ASSIGNED' ? 'PENDING' : status.replace('_', ' ')
 const priorityBadge: Record<string, string> = {
   CRITICAL: 'badge-danger', HIGH: 'badge-warning', MEDIUM: 'badge-primary', LOW: 'badge-gray',
 }
 const subtaskStatusDot: Record<string, string> = {
   PENDING:     'bg-gray-400',
-  ASSIGNED:    'bg-blue-500',
+  ASSIGNED:    'bg-gray-400',
   IN_PROGRESS: 'bg-yellow-500',
   BLOCKED:     'bg-orange-500',
   SUBMITTED:   'bg-purple-500',
@@ -201,7 +202,7 @@ function ExpandedRow({ task, colSpan, actorId, departmentId, onOpen, onSubtaskCl
                           </td>
                           <td className="px-3 py-2 font-medium text-tw-text max-w-xs truncate">{s.title}</td>
                           <td className="px-3 py-2 whitespace-nowrap">
-                            <span className={`badge text-xs ${statusBadge[s.status] || 'badge-gray'}`}>{s.status.replace('_', ' ')}</span>
+                            <span className={`badge text-xs ${statusBadge[s.status] || 'badge-gray'}`}>{displayStatus(s.status)}</span>
                           </td>
                           <td className="px-3 py-2 whitespace-nowrap">
                             <span className={`badge text-xs ${priorityBadge[s.priority]}`}>{s.priority}</span>
@@ -567,7 +568,7 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
                               {/* Status */}
                               <td className="px-4 py-3.5 whitespace-nowrap">
                                 <span className={`badge ${statusBadge[t.status] || 'badge-gray'}`}>
-                                  {t.status.replace('_', ' ')}
+                                  {displayStatus(t.status)}
                                 </span>
                               </td>
 
