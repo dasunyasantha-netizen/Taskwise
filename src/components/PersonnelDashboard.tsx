@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import type { AuthUser, ViewMode, Task, Project, Personnel } from '../types'
+import type { AuthUser, ViewMode, Task, Project, Personnel, TaskProgressLog } from '../types'
 import { taskApi, projectApi, workspaceApi } from '../services/apiService'
 import NotificationsMenu from './NotificationsMenu'
 import PersonnelTaskModal from './PersonnelTaskModal'
@@ -51,16 +51,51 @@ function daysLeftLabel(deadline?: string) {
 }
 
 // ── Expanded row component (loads subtasks on mount) ──────────────────────────
-function ExpandedRow({ task, colSpan, onOpen, onSubtaskClick }: { task: Task; colSpan: number; onOpen: () => void; onSubtaskClick: (t: Task) => void }) {
-  const [subtasks, setSubtasks] = useState<Task[]>([])
-  const [loadingS, setLoadingS] = useState(true)
+function ExpandedRow({ task, colSpan, actorId, onOpen, onSubtaskClick, onRefresh }: {
+  task: Task; colSpan: number; actorId: string
+  onOpen: () => void; onSubtaskClick: (t: Task) => void; onRefresh: () => void
+}) {
+  const [subtasks, setSubtasks]           = useState<Task[]>([])
+  const [loadingS, setLoadingS]           = useState(true)
+  const [progressLogs, setProgressLogs]   = useState<TaskProgressLog[]>([])
+  const [progressNote, setProgressNote]   = useState('')
+  const [progressLoading, setProgressLoading] = useState(false)
+  const [completeLoading, setCompleteLoading] = useState(false)
+
+  const isMyTask = task.assignments?.some(a => a.personnelId === actorId)
+  const canSubmit = isMyTask && task.status === 'IN_PROGRESS'
+  const canAddLog = isMyTask && !['APPROVED', 'CANCELLED'].includes(task.status)
 
   useEffect(() => {
     taskApi.subtasks(task.id)
       .then(s => setSubtasks(s as Task[]))
       .catch(() => {})
       .finally(() => setLoadingS(false))
+    taskApi.progressLogs(task.id)
+      .then(l => setProgressLogs(l as TaskProgressLog[]))
+      .catch(() => {})
   }, [task.id])
+
+  const handleAddLog = async () => {
+    if (!progressNote.trim()) return
+    setProgressLoading(true)
+    try {
+      await taskApi.addProgressLog(task.id, progressNote)
+      setProgressNote('')
+      const logs = await taskApi.progressLogs(task.id) as TaskProgressLog[]
+      setProgressLogs(logs)
+    } catch { /* no-op */ }
+    setProgressLoading(false)
+  }
+
+  const handleComplete = async () => {
+    setCompleteLoading(true)
+    try {
+      await taskApi.submit(task.id)
+      onRefresh()
+    } catch { /* no-op */ }
+    setCompleteLoading(false)
+  }
 
   return (
     <tr className="bg-blue-50 border-b border-tw-border">
@@ -176,8 +211,73 @@ function ExpandedRow({ task, colSpan, onOpen, onSubtaskClick }: { task: Task; co
             )}
           </div>
 
-          {/* ── Open modal button ── */}
-          <div className="pt-2 border-t border-blue-200 flex justify-end">
+          {/* ── Progress log ── */}
+          <div>
+            <div className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-2">
+              Progress Updates {progressLogs.length > 0 ? `(${progressLogs.length})` : ''}
+            </div>
+
+            {canAddLog && (
+              <div className="flex gap-2 mb-3">
+                <input
+                  className="input flex-1 text-xs py-1.5"
+                  placeholder="What did you work on today?"
+                  value={progressNote}
+                  onChange={e => setProgressNote(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleAddLog()}
+                />
+                <button
+                  disabled={!progressNote.trim() || progressLoading}
+                  onClick={e => { e.stopPropagation(); handleAddLog() }}
+                  className="btn-secondary text-xs py-1.5 px-3 disabled:opacity-50 flex-shrink-0">
+                  {progressLoading ? '…' : 'Submit'}
+                </button>
+              </div>
+            )}
+
+            {progressLogs.length > 0 && (
+              <div className="bg-white border border-tw-border rounded-lg overflow-hidden mb-2">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-tw-hover border-b border-tw-border">
+                      <th className="text-left px-3 py-2 font-semibold text-tw-text-secondary uppercase tracking-wide w-24">Date</th>
+                      <th className="text-left px-3 py-2 font-semibold text-tw-text-secondary uppercase tracking-wide w-16">Time</th>
+                      <th className="text-left px-3 py-2 font-semibold text-tw-text-secondary uppercase tracking-wide">Update</th>
+                      <th className="text-left px-3 py-2 font-semibold text-tw-text-secondary uppercase tracking-wide w-28">By</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-tw-border">
+                    {progressLogs.map(log => {
+                      const d = new Date(log.logDate)
+                      return (
+                        <tr key={log.id} className="hover:bg-tw-hover">
+                          <td className="px-3 py-2 text-tw-text-secondary whitespace-nowrap">
+                            {d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          </td>
+                          <td className="px-3 py-2 text-tw-text-secondary whitespace-nowrap">
+                            {d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                          </td>
+                          <td className="px-3 py-2 text-tw-text">{log.note}</td>
+                          <td className="px-3 py-2 text-tw-text-secondary whitespace-nowrap">{log.authorName}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* ── Open modal button + Complete ── */}
+          <div className="pt-2 border-t border-blue-200 flex items-center justify-between gap-3">
+            {canSubmit ? (
+              <button
+                disabled={completeLoading}
+                onClick={e => { e.stopPropagation(); handleComplete() }}
+                className="text-xs py-1.5 px-4 rounded-lg bg-tw-success text-white font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity">
+                {completeLoading ? '…' : '✓ Complete'}
+              </button>
+            ) : <div />}
             <button onClick={e => { e.stopPropagation(); onOpen() }} className="btn-primary text-xs py-1.5 px-4">
               Open Task →
             </button>
@@ -451,11 +551,13 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
                               <ExpandedRow
                                 task={t}
                                 colSpan={COL_COUNT}
+                                actorId={user.actorId}
                                 onOpen={() => { setTaskStack([]); setSelectedTask(t) }}
                                 onSubtaskClick={async s => {
                                   setTaskStack(prev => t ? [...prev, t] : prev)
                                   try { setSelectedTask(await taskApi.get(s.id) as Task) } catch { setSelectedTask(s) }
                                 }}
+                                onRefresh={load}
                               />
                             )}
                           </React.Fragment>
