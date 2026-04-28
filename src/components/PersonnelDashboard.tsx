@@ -51,8 +51,8 @@ function daysLeftLabel(deadline?: string) {
 }
 
 // ── Expanded row component (loads subtasks on mount) ──────────────────────────
-function ExpandedRow({ task, colSpan, actorId, onOpen, onSubtaskClick, onRefresh }: {
-  task: Task; colSpan: number; actorId: string
+function ExpandedRow({ task, colSpan, actorId, departmentId, onOpen, onSubtaskClick, onRefresh }: {
+  task: Task; colSpan: number; actorId: string; departmentId?: string
   onOpen: () => void; onSubtaskClick: (t: Task) => void; onRefresh: () => void
 }) {
   const [subtasks, setSubtasks]           = useState<Task[]>([])
@@ -60,12 +60,17 @@ function ExpandedRow({ task, colSpan, actorId, onOpen, onSubtaskClick, onRefresh
   const [progressLogs, setProgressLogs]   = useState<TaskProgressLog[]>([])
   const [progressNote, setProgressNote]   = useState('')
   const [progressLoading, setProgressLoading] = useState(false)
-  const [completeLoading, setCompleteLoading] = useState(false)
+  const [actionLoading, setActionLoading] = useState(false)
+  const [actionError, setActionError]     = useState('')
+  const [showReturn, setShowReturn]       = useState(false)
+  const [returnReason, setReturnReason]   = useState('')
 
-  const isMyTask = task.assignments?.some(a => a.personnelId === actorId)
-  const isDeptPending = task.assignments?.some(a => a.departmentId) && !task.assignments?.some(a => a.personnelId)
-  const canComplete = isMyTask && ['ASSIGNED', 'IN_PROGRESS'].includes(task.status)
-  const canAddLog = (isMyTask || isDeptPending) && !['APPROVED', 'CANCELLED'].includes(task.status)
+  const isMyTask     = task.assignments?.some(a => a.personnelId === actorId)
+  const isDeptPending = task.assignments?.some(a => a.departmentId === departmentId) && !task.assignments?.some(a => a.personnelId)
+  const canAccept    = isDeptPending && task.status === 'ASSIGNED'
+  const canComplete  = isMyTask && ['ASSIGNED', 'IN_PROGRESS'].includes(task.status)
+  const canReturn    = (isMyTask || isDeptPending) && ['ASSIGNED', 'IN_PROGRESS'].includes(task.status)
+  const canAddLog    = (isMyTask || isDeptPending) && !['APPROVED', 'CANCELLED'].includes(task.status)
 
   useEffect(() => {
     taskApi.subtasks(task.id)
@@ -77,26 +82,35 @@ function ExpandedRow({ task, colSpan, actorId, onOpen, onSubtaskClick, onRefresh
       .catch(() => {})
   }, [task.id])
 
+  const doAction = async (fn: () => Promise<unknown>) => {
+    setActionLoading(true)
+    setActionError('')
+    try { await fn(); onRefresh() }
+    catch (e: unknown) { setActionError(e instanceof Error ? e.message : 'Action failed') }
+    setActionLoading(false)
+  }
+
   const handleAddLog = async () => {
     if (!progressNote.trim()) return
     setProgressLoading(true)
     try {
       await taskApi.addProgressLog(task.id, progressNote)
       setProgressNote('')
-      const logs = await taskApi.progressLogs(task.id) as TaskProgressLog[]
-      setProgressLogs(logs)
+      setProgressLogs(await taskApi.progressLogs(task.id) as TaskProgressLog[])
     } catch { /* no-op */ }
     setProgressLoading(false)
   }
 
-  const handleComplete = async () => {
-    setCompleteLoading(true)
-    try {
-      if (task.status === 'ASSIGNED') await taskApi.accept(task.id)
-      await taskApi.submit(task.id)
-      onRefresh()
-    } catch { /* no-op */ }
-    setCompleteLoading(false)
+  const handleAccept   = () => doAction(() => taskApi.accept(task.id))
+  const handleComplete = () => doAction(async () => {
+    if (task.status === 'ASSIGNED') await taskApi.accept(task.id)
+    await taskApi.submit(task.id)
+  })
+  const handleReturn = () => {
+    if (!returnReason.trim()) return
+    doAction(() => taskApi.return(task.id, returnReason))
+    setShowReturn(false)
+    setReturnReason('')
   }
 
   return (
@@ -276,20 +290,62 @@ function ExpandedRow({ task, colSpan, actorId, onOpen, onSubtaskClick, onRefresh
             )}
           </div>
 
-          {/* ── Open modal button + Complete ── */}
-          <div className="pt-2 border-t border-blue-200 flex items-center justify-between gap-3">
-            {canComplete ? (
-              <button
-                disabled={completeLoading}
-                onClick={e => { e.stopPropagation(); handleComplete() }}
-                className="text-sm py-2 px-5 rounded-lg bg-tw-success text-white font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity">
-                {completeLoading ? '…' : '✓ Complete'}
-              </button>
-            ) : <div />}
-            <button onClick={e => { e.stopPropagation(); onOpen() }} className="btn-primary text-xs py-1.5 px-4">
+          {/* ── Action bar ── */}
+          {actionError && (
+            <div className="text-sm text-tw-danger bg-tw-danger-light border border-tw-danger/30 rounded-lg px-3 py-2 flex items-center justify-between">
+              {actionError}
+              <button onClick={() => setActionError('')} className="ml-2 font-bold">×</button>
+            </div>
+          )}
+          <div className="pt-2 border-t border-blue-200 flex flex-wrap items-center gap-2 justify-between">
+            <div className="flex flex-wrap gap-2">
+              {canAccept && (
+                <button disabled={actionLoading} onClick={e => { e.stopPropagation(); handleAccept() }}
+                  className="text-sm py-2 px-4 rounded-lg bg-tw-primary text-white font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity">
+                  ✓ Accept Task
+                </button>
+              )}
+              {canComplete && (
+                <button disabled={actionLoading} onClick={e => { e.stopPropagation(); handleComplete() }}
+                  className="text-sm py-2 px-4 rounded-lg bg-tw-success text-white font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity">
+                  {actionLoading ? '…' : '✓ Complete'}
+                </button>
+              )}
+              {canReturn && (
+                <button disabled={actionLoading} onClick={e => { e.stopPropagation(); setShowReturn(true) }}
+                  className="text-sm py-2 px-4 rounded-lg border border-tw-danger text-tw-danger bg-white hover:bg-tw-danger-light font-semibold disabled:opacity-50 transition-colors">
+                  ↩ Return
+                </button>
+              )}
+            </div>
+            <button onClick={e => { e.stopPropagation(); onOpen() }} className="btn-secondary text-sm py-2 px-4">
               Open Task →
             </button>
           </div>
+
+          {/* ── Return reason modal ── */}
+          {showReturn && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={e => e.stopPropagation()}>
+              <div className="bg-white rounded-xl shadow-panel w-full max-w-sm">
+                <div className="px-5 py-4 border-b border-tw-border">
+                  <h3 className="font-semibold text-tw-text">Return Task</h3>
+                  <p className="text-xs text-tw-text-secondary mt-0.5">Reason for returning this task.</p>
+                </div>
+                <div className="px-5 py-4 space-y-3">
+                  <textarea className="input resize-none" rows={3} autoFocus
+                    placeholder="Reason for returning…"
+                    value={returnReason} onChange={e => setReturnReason(e.target.value)} />
+                  <div className="flex gap-2 justify-end">
+                    <button onClick={() => { setShowReturn(false); setReturnReason('') }} className="btn-secondary">Cancel</button>
+                    <button disabled={!returnReason.trim() || actionLoading} onClick={handleReturn}
+                      className="px-4 py-2 rounded-lg bg-tw-danger text-white text-sm font-semibold hover:opacity-90 disabled:opacity-50">
+                      Return Task
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </td>
     </tr>
@@ -561,6 +617,7 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
                                 task={t}
                                 colSpan={COL_COUNT}
                                 actorId={user.actorId}
+                                departmentId={user.departmentId}
                                 onOpen={() => { setTaskStack([]); setSelectedTask(t) }}
                                 onSubtaskClick={async s => {
                                   setTaskStack(prev => t ? [...prev, t] : prev)
