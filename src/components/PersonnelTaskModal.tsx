@@ -36,7 +36,7 @@ const eventLabels: Record<string, string> = {
   SUBTASK_CREATED: 'Subtask created', COMMENT_ADDED:   'Comment added',
 }
 
-type TabKey = 'details' | 'progress' | 'subtasks' | 'comments' | 'history'
+type TabKey = 'details' | 'updates' | 'subtasks' | 'history'
 
 export default function PersonnelTaskModal({ task, actorId, departmentId, personnel, parentTask, onBack, onSubtaskOpen, onClose, onRefresh }: Props) {
   const [tab, setTab]           = useState<TabKey>('details')
@@ -98,9 +98,8 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, person
   // ── Data loading ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (tab === 'subtasks') loadSubtasks()
-    if (tab === 'comments') loadComments()
+    if (tab === 'updates')  loadProgressLogs()
     if (tab === 'history')  loadHistory()
-    if (tab === 'progress') loadProgressLogs()
   }, [tab, task.id])
 
   useEffect(() => { setTab('details'); setActionError('') }, [task.id])
@@ -362,14 +361,13 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, person
 
         {/* ── Tabs ─────────────────────────────────────────────────────── */}
         <div className="flex border-b border-tw-border px-6">
-          {(['details', 'progress', 'subtasks', 'comments', 'history'] as TabKey[]).map(t => (
+          {(['details', 'updates', 'subtasks', 'history'] as TabKey[]).map(t => (
             <button key={t} onClick={() => setTab(t)}
               className={`py-2.5 px-3 text-xs font-medium border-b-2 transition-colors capitalize
                 ${tab === t ? 'border-tw-primary text-tw-primary' : 'border-transparent text-tw-text-secondary hover:text-tw-text'}`}>
               {t}
               {t === 'subtasks' && task._count?.subtasks ? ` (${task._count.subtasks})` : ''}
-              {t === 'comments' && task._count?.comments ? ` (${task._count.comments})` : ''}
-              {t === 'progress' && progressLogs.length > 0 ? ` (${progressLogs.length})` : ''}
+              {t === 'updates' && progressLogs.length > 0 ? ` (${progressLogs.length})` : ''}
             </button>
           ))}
         </div>
@@ -478,8 +476,8 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, person
             </div>
           )}
 
-          {/* PROGRESS */}
-          {tab === 'progress' && (
+          {/* UPDATES */}
+          {tab === 'updates' && (
             <div className="space-y-4">
               {/* Add update row */}
               {isMyTask && !['APPROVED', 'CANCELLED'].includes(task.status) && (
@@ -598,38 +596,6 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, person
                   })}
                 </div>
               )}
-            </div>
-          )}
-
-          {/* COMMENTS */}
-          {tab === 'comments' && (
-            <div className="flex flex-col h-full min-h-[300px]">
-              <div className="flex-1 space-y-3 mb-4">
-                {comments.length === 0 && (
-                  <div className="text-center py-10 text-tw-text-secondary text-sm">No comments yet.</div>
-                )}
-                {comments.map(c => (
-                  <div key={c.id} className="flex gap-2.5">
-                    <div className="w-7 h-7 rounded-full bg-tw-primary flex items-center justify-center text-white text-xs font-bold flex-shrink-0 mt-0.5">
-                      {(c.authorName || '?').charAt(0).toUpperCase()}
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <span className="text-xs font-semibold text-tw-text">{c.authorName || c.authorType}</span>
-                        <span className="text-xs text-tw-text-secondary capitalize">{c.authorType}</span>
-                        <span className="text-xs text-tw-text-secondary">{new Date(c.createdAt).toLocaleString()}</span>
-                      </div>
-                      <div className="bg-tw-hover rounded-lg px-3 py-2 text-sm text-tw-text">{c.content}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="flex gap-2">
-                <input className="input flex-1 text-sm" placeholder="Write a comment…" value={newComment}
-                  onChange={e => setNewComment(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleComment()} />
-                <button onClick={handleComment} disabled={!newComment.trim()} className="btn-primary text-sm px-4">Send</button>
-              </div>
             </div>
           )}
 
