@@ -432,6 +432,31 @@ export async function submitTask(req: Request, res: Response): Promise<void> {
       return
     }
 
+    // ── Resolve approval chain ────────────────────────────────────────────────
+    // For personnel submitting a subtask: route to their direct supervisor.
+    // Walk up the supervisor chain until we find someone, or fall back to Director.
+    let newApprovalById   = task.approvalById
+    let newApprovalByType = task.approvalByType
+
+    if (actorType === 'personnel') {
+      // Find this person's supervisor chain
+      const actor = await prisma.personnel.findUnique({
+        where: { id: actorId },
+        select: { supervisorId: true }
+      })
+      if (actor?.supervisorId) {
+        newApprovalById   = actor.supervisorId
+        newApprovalByType = 'personnel'
+      } else {
+        // No supervisor set — escalate to Director
+        const director = await prisma.director.findFirst({ where: { workspaceId } })
+        if (director) {
+          newApprovalById   = director.id
+          newApprovalByType = 'director'
+        }
+      }
+    }
+
     await prisma.$transaction(async tx => {
       await tx.task.update({
         where: { id: task.id },
@@ -439,11 +464,13 @@ export async function submitTask(req: Request, res: Response): Promise<void> {
           status: 'SUBMITTED',
           actedById: actorId,
           actedByType: actorType,
+          approvalById:   newApprovalById,
+          approvalByType: newApprovalByType,
         }
       })
       await writeAudit(tx, workspaceId, 'TASK_SUBMITTED', actorType, actorId, task.id, { actedBy: actorId })
-      if (task.approvalById && task.approvalByType) {
-        await notifyActor(tx, workspaceId, task.approvalByType as 'director' | 'personnel', task.approvalById, 'task_submitted_for_approval', 'Task ready for approval', `"${task.title}" has been submitted for your approval.`, task.id)
+      if (newApprovalById && newApprovalByType) {
+        await notifyActor(tx, workspaceId, newApprovalByType as 'director' | 'personnel', newApprovalById, 'task_submitted_for_approval', 'Task ready for approval', `"${task.title}" has been submitted for your approval.`, task.id)
       }
     })
     res.json({ success: true })

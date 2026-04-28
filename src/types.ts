@@ -55,6 +55,8 @@ export interface Personnel {
   nic?: string
   name: string
   avatarUrl?: string
+  supervisorId?: string | null
+  supervisor?: { id: string; name: string } | null
   deletedAt: string | null
   createdAt: string
 }
@@ -222,6 +224,7 @@ export type ViewMode =
   | 'hierarchy_manager'
   | 'approval_queue'
   | 'personnel_queue'
+  | 'personnel_approval_queue'
   | 'audit_log'
   | 'overdue'
   | 'settings'

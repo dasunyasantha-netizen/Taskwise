@@ -21,6 +21,8 @@ export default function HierarchyPanel() {
   const [groupForm, setGroupForm] = useState({ name: '', departmentId: '' })
   const [movingPersonnel, setMovingPersonnel] = useState<Personnel | null>(null)
   const [moveTarget, setMoveTarget] = useState('')
+  const [settingSupervisorFor, setSettingSupervisorFor] = useState<Personnel | null>(null)
+  const [supervisorTarget, setSupervisorTarget] = useState('')
 
   const [allPersonnel, setAllPersonnel] = useState<Personnel[]>([])
   const [allGroups, setAllGroups] = useState<Group[]>([])
@@ -100,6 +102,16 @@ export default function HierarchyPanel() {
     try {
       await workspaceApi.movePersonnel(movingPersonnel.id, { departmentId: moveTarget })
       setShowMoveModal(false); setMovingPersonnel(null); setMoveTarget(''); await load()
+    } catch (e: unknown) { setError(e instanceof Error ? e.message : 'Error') }
+    setSaving(false)
+  }
+
+  const saveSupervisor = async () => {
+    if (!settingSupervisorFor) return
+    setSaving(true)
+    try {
+      await workspaceApi.setSupervisor(settingSupervisorFor.id, supervisorTarget || null)
+      setSettingSupervisorFor(null); setSupervisorTarget(''); await load()
     } catch (e: unknown) { setError(e instanceof Error ? e.message : 'Error') }
     setSaving(false)
   }
@@ -226,20 +238,26 @@ export default function HierarchyPanel() {
       {/* PERSONNEL TAB */}
       {activeTab === 'personnel' && (
         <div className="card overflow-hidden">
+          <div className="px-4 py-3 bg-tw-hover border-b border-tw-border">
+            <p className="text-xs text-tw-text-secondary">
+              Set each person's <strong>direct supervisor</strong> so submitted tasks route up the approval chain automatically.
+            </p>
+          </div>
           <table className="w-full text-sm">
-            <thead className="bg-tw-hover">
-              <tr>
-                {['Name', 'Phone', 'Department', 'Layer', 'Actions'].map(h => (
-                  <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-tw-text-secondary uppercase tracking-wide">{h}</th>
+            <thead>
+              <tr className="bg-[#f0f4ff] border-b-2 border-tw-primary/20">
+                {['Name', 'Phone', 'Department', 'Layer', 'Supervisor', 'Actions'].map(h => (
+                  <th key={h} className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-tw-border">
               {allPersonnel.length === 0 ? (
-                <tr><td colSpan={5} className="px-4 py-8 text-center text-tw-text-secondary text-sm">No personnel yet. Add some using the button above.</td></tr>
+                <tr><td colSpan={6} className="px-4 py-8 text-center text-tw-text-secondary text-sm">No personnel yet. Add some using the button above.</td></tr>
               ) : allPersonnel.map(p => {
                 const dept = allDepts.find(d => d.id === p.departmentId)
                 const layer = layers.find(l => l.id === dept?.layerId)
+                const supervisor = allPersonnel.find(s => s.id === p.supervisorId)
                 return (
                   <tr key={p.id} className="hover:bg-tw-hover transition-colors">
                     <td className="px-4 py-3">
@@ -252,7 +270,16 @@ export default function HierarchyPanel() {
                     <td className="px-4 py-3"><span className="badge badge-primary">{dept?.name || '—'}</span></td>
                     <td className="px-4 py-3 text-tw-text-secondary text-xs">{layer?.name || '—'}</td>
                     <td className="px-4 py-3">
+                      {supervisor
+                        ? <span className="inline-flex items-center gap-1 text-xs text-tw-text">
+                            <div className="w-5 h-5 rounded-full bg-tw-indigo flex items-center justify-center text-white text-xs font-bold flex-shrink-0">{supervisor.name.charAt(0)}</div>
+                            {supervisor.name}
+                          </span>
+                        : <span className="text-xs text-tw-text-secondary italic">Not set</span>}
+                    </td>
+                    <td className="px-4 py-3">
                       <div className="flex gap-2">
+                        <button onClick={() => { setSettingSupervisorFor(p); setSupervisorTarget(p.supervisorId || '') }} className="text-xs text-tw-indigo hover:underline">Supervisor</button>
                         <button onClick={() => { setMovingPersonnel(p); setShowMoveModal(true) }} className="text-xs text-tw-primary hover:underline">Move</button>
                         <button onClick={() => deletePersonnel(p.id)} className="text-xs text-tw-danger hover:underline">Remove</button>
                       </div>
@@ -396,6 +423,46 @@ export default function HierarchyPanel() {
             <div className="flex gap-2 justify-end">
               <button onClick={() => setShowGroupModal(false)} className="btn-secondary">Cancel</button>
               <button onClick={createGroup} disabled={saving} className="btn-primary">{saving ? 'Creating...' : 'Create'}</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* MODAL: Set Supervisor */}
+      {settingSupervisorFor && (
+        <Modal title={`Set Supervisor — ${settingSupervisorFor.name}`} onClose={() => { setSettingSupervisorFor(null); setSupervisorTarget('') }}>
+          <div className="space-y-4">
+            <p className="text-sm text-tw-text-secondary">
+              Select the person who directly supervises <strong>{settingSupervisorFor.name}</strong>.
+              When they submit a task, it will go to this person for approval.
+            </p>
+            <Select
+              value={supervisorTarget}
+              onChange={val => setSupervisorTarget(val)}
+              placeholder="Select supervisor…"
+              options={allPersonnel
+                .filter(p => p.id !== settingSupervisorFor.id && !p.deletedAt)
+                .map(p => {
+                  const dept = allDepts.find(d => d.id === p.departmentId)
+                  const layer = layers.find(l => l.id === dept?.layerId)
+                  return { value: p.id, label: `${p.name}`, group: `${layer?.name} — ${dept?.name}` }
+                })}
+            />
+            {supervisorTarget && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-700">
+                Tasks submitted by <strong>{settingSupervisorFor.name}</strong> will route to <strong>{allPersonnel.find(p => p.id === supervisorTarget)?.name}</strong> for approval.
+              </div>
+            )}
+            <div className="flex gap-2 justify-end">
+              {settingSupervisorFor.supervisorId && (
+                <button onClick={() => { setSupervisorTarget(''); saveSupervisor() }} disabled={saving} className="btn-secondary text-xs text-tw-danger border-tw-danger">
+                  Clear Supervisor
+                </button>
+              )}
+              <button onClick={() => { setSettingSupervisorFor(null); setSupervisorTarget('') }} className="btn-secondary">Cancel</button>
+              <button onClick={saveSupervisor} disabled={saving || !supervisorTarget} className="btn-primary">
+                {saving ? 'Saving…' : 'Set Supervisor'}
+              </button>
             </div>
           </div>
         </Modal>

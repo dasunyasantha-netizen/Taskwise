@@ -62,6 +62,7 @@ export const workspaceApi = {
   getPersonnel:      (params?: string) => api.get(`/workspace/personnel${params ? '?' + params : ''}`),
   createPersonnel:   (data: unknown) => api.post('/workspace/personnel', data),
   updatePersonnel:   (id: string, data: unknown) => api.put(`/workspace/personnel/${id}`, data),
+  setSupervisor:     (id: string, supervisorId: string | null) => api.put(`/workspace/personnel/${id}`, { supervisorId }),
   movePersonnel:     (id: string, data: unknown) => api.put(`/workspace/personnel/${id}/move`, data),
   deletePersonnel:   (id: string)    => api.delete(`/workspace/personnel/${id}`),
   getPersonnelQueue: (id: string)    => api.get(`/workspace/personnel/${id}/queue`),

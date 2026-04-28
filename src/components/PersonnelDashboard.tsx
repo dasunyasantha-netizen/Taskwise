@@ -371,6 +371,84 @@ function ExpandedRow({ task, colSpan, actorId, departmentId, onOpen, onSubtaskCl
   )
 }
 
+// ── Personnel Approval Row ────────────────────────────────────────────────────
+function PersonnelApprovalRow({ task, onRefresh, onOpen }: { task: Task; onRefresh: () => void; onOpen: () => void }) {
+  const [loading, setLoading]       = useState(false)
+  const [error, setError]           = useState('')
+  const [showReject, setShowReject] = useState(false)
+  const [rejectReason, setRejectReason] = useState('')
+
+  const doAction = async (fn: () => Promise<unknown>) => {
+    setLoading(true); setError('')
+    try { await fn(); onRefresh() }
+    catch (e: unknown) { setError(e instanceof Error ? e.message : 'Action failed') }
+    setLoading(false)
+  }
+
+  const submittedBy = task.actedByName || (task.actedByType === 'director' ? 'Director' : 'Personnel')
+
+  return (
+    <>
+      <tr className="hover:bg-[#f8f9ff] transition-colors">
+        <td className="pl-3 pr-0 py-3.5">
+          <div className={`w-1.5 h-9 rounded-full ${priorityBar[task.priority]}`} />
+        </td>
+        <td className="px-4 py-3.5">
+          <div className="font-semibold text-tw-text text-sm">{task.title}</div>
+          {task.description && <div className="text-xs text-tw-text-secondary mt-0.5 truncate max-w-xs">{task.description}</div>}
+        </td>
+        <td className="px-4 py-3.5 text-sm text-tw-text-secondary">{task.project?.name || '—'}</td>
+        <td className="px-4 py-3.5 text-sm text-tw-text-secondary">{submittedBy}</td>
+        <td className="px-4 py-3.5">
+          <span className={`badge ${priorityBadge[task.priority]}`}>{task.priority}</span>
+        </td>
+        <td className="px-4 py-3.5 text-sm text-tw-text-secondary">
+          {task.deadline ? new Date(task.deadline).toLocaleDateString() : '—'}
+        </td>
+        <td className="px-4 py-3.5">
+          <div className="flex items-center gap-2">
+            <button disabled={loading} onClick={() => doAction(() => taskApi.approve(task.id))}
+              className="px-3 py-1.5 rounded-lg bg-tw-success text-white text-xs font-semibold hover:opacity-90 disabled:opacity-50">
+              ✓ Approve
+            </button>
+            <button disabled={loading} onClick={() => setShowReject(true)}
+              className="px-3 py-1.5 rounded-lg border border-tw-danger text-tw-danger bg-white hover:bg-red-50 text-xs font-semibold disabled:opacity-50">
+              ↩ Reject
+            </button>
+            <button onClick={onOpen} className="px-3 py-1.5 rounded-lg border border-tw-border text-tw-text-secondary text-xs hover:bg-tw-hover">
+              View →
+            </button>
+          </div>
+          {error && <div className="text-xs text-tw-danger mt-1">{error}</div>}
+        </td>
+      </tr>
+      {showReject && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-panel w-full max-w-sm">
+            <div className="px-5 py-4 border-b border-tw-border">
+              <h3 className="font-semibold text-tw-text">Reject / Send Back</h3>
+              <p className="text-xs text-tw-text-secondary mt-0.5">Provide feedback so the assignee knows what to fix.</p>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <textarea className="input resize-none" rows={3} autoFocus
+                placeholder="Reason for rejecting…"
+                value={rejectReason} onChange={e => setRejectReason(e.target.value)} />
+              <div className="flex gap-2 justify-end">
+                <button onClick={() => { setShowReject(false); setRejectReason('') }} className="btn-secondary">Cancel</button>
+                <button disabled={!rejectReason.trim() || loading}
+                  onClick={() => { doAction(() => taskApi.reject(task.id, rejectReason)); setShowReject(false); setRejectReason('') }}
+                  className="px-4 py-2 rounded-lg bg-tw-danger text-white text-sm font-semibold hover:opacity-90 disabled:opacity-50">
+                  Reject
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
 // ── Main dashboard ────────────────────────────────────────────────────────────
 export default function PersonnelDashboard({ user, currentView, setView, onLogout, onUserUpdate }: Props) {
   const [queue, setQueue]               = useState<Task[]>([])
@@ -393,12 +471,19 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
       ])
       const myTasks = tasks.filter(t => {
         if (['APPROVED', 'CANCELLED'].includes(t.status)) return false
-        if (t.parentTaskId) return false  // subtasks only appear inside their parent modal
+        if (t.parentTaskId) return false
         const directlyAssigned = t.assignments?.some(a => a.personnelId === user.actorId)
         const deptAssigned     = t.assignments?.some(a => a.departmentId === user.departmentId && !t.assignments?.some(p => p.personnelId))
         return directlyAssigned || deptAssigned
       })
+      // Tasks awaiting this person's approval as a supervisor
+      const pendingApproval = tasks.filter(t =>
+        t.status === 'SUBMITTED' &&
+        t.approvalById === user.actorId &&
+        t.approvalByType === 'personnel'
+      )
       setQueue(myTasks)
+      setApprovalTasks(pendingApproval)
       setProjects(projs)
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Failed to load tasks')
@@ -413,10 +498,13 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
       .catch(() => {})
   }, [])
 
+  const [approvalTasks, setApprovalTasks] = useState<Task[]>([])
+
   const navItems = [
-    { label: 'My Queue',   view: 'personnel_queue' as ViewMode, icon: '📋' },
-    { label: 'Board View', view: 'project_board'   as ViewMode, icon: '⊞' },
-    { label: 'My Profile', view: 'profile'         as ViewMode, icon: '👤' },
+    { label: 'My Queue',       view: 'personnel_queue'          as ViewMode, icon: '📋' },
+    { label: 'Approval Queue', view: 'personnel_approval_queue' as ViewMode, icon: '✅', badge: approvalTasks.length },
+    { label: 'Board View',     view: 'project_board'            as ViewMode, icon: '⊞' },
+    { label: 'My Profile',     view: 'profile'                  as ViewMode, icon: '👤' },
   ]
 
   const initials = user.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
@@ -649,6 +737,44 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
                           </React.Fragment>
                         )
                       })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── APPROVAL QUEUE ────────────────────────────────────────── */}
+          {currentView === 'personnel_approval_queue' && (
+            <div className="p-6">
+              <h1 className="text-2xl font-bold text-tw-text mb-1">Approval Queue</h1>
+              <p className="text-sm text-tw-text-secondary mb-6">
+                {approvalTasks.length} task{approvalTasks.length !== 1 ? 's' : ''} submitted to you for approval
+              </p>
+              {approvalTasks.length === 0 ? (
+                <div className="card p-12 text-center">
+                  <div className="text-4xl mb-3">🎉</div>
+                  <p className="text-tw-text font-semibold">All clear!</p>
+                  <p className="text-tw-text-secondary text-sm mt-1">No tasks awaiting your approval.</p>
+                </div>
+              ) : (
+                <div className="card overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-[#f0f4ff] border-b-2 border-tw-primary/20">
+                        <th className="w-px px-3 py-3"></th>
+                        <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider">Task</th>
+                        <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider">Project</th>
+                        <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider">Submitted By</th>
+                        <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider">Priority</th>
+                        <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider">Deadline</th>
+                        <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-tw-border">
+                      {approvalTasks.map(t => (
+                        <PersonnelApprovalRow key={t.id} task={t} onRefresh={load} onOpen={() => { setTaskStack([]); setSelectedTask(t) }} />
+                      ))}
                     </tbody>
                   </table>
                 </div>

@@ -207,8 +207,12 @@ export async function updatePersonnel(req: Request, res: Response): Promise<void
     }
     const person = await prisma.personnel.findFirst({ where: { id: req.params.id, workspaceId, deletedAt: null } })
     if (!person) { res.status(404).json({ error: 'Personnel not found' }); return }
-    const { name, phone, nic, email } = req.body
-    const updated = await prisma.personnel.update({ where: { id: req.params.id }, data: { name, phone, nic, email } })
+    const { name, phone, nic, email, supervisorId } = req.body
+    // Only directors can set supervisorId
+    const supervisorUpdate = actorType === 'director' && supervisorId !== undefined
+      ? { supervisorId: supervisorId || null }
+      : {}
+    const updated = await prisma.personnel.update({ where: { id: req.params.id }, data: { name, phone, nic, email, ...supervisorUpdate } })
     const { password: _p, ...safe } = updated
     res.json(safe)
   } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
