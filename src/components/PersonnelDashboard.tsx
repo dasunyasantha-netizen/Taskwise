@@ -137,17 +137,17 @@ function ExpandedRow({ task, colSpan, actorId, departmentId, onOpen, onSubtaskCl
                 <p className="text-sm text-tw-text leading-relaxed whitespace-pre-wrap">{task.description}</p>
               </div>
             )}
-            <div className="grid grid-cols-[auto_auto_auto_1fr] gap-x-8 gap-y-2 items-start">
+            <div className="flex flex-wrap gap-x-10 gap-y-3 items-start">
               {task.assignments?.length > 0 && (
                 <div>
                   <div className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1.5">Assigned To</div>
-                  <div className="space-y-1">
+                  <div className="flex flex-wrap gap-x-4 gap-y-1">
                     {task.assignments.map(a => (
                       <div key={a.id} className="flex items-center gap-1.5 text-tw-text">
                         <div className="w-5 h-5 rounded-full bg-tw-primary flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
                           {(a.personnel?.name || a.department?.name || '?').charAt(0)}
                         </div>
-                        <span>{a.personnel?.name || a.department?.name || a.group?.name}</span>
+                        <span className="text-sm">{a.personnel?.name || a.department?.name || a.group?.name}</span>
                         <span className="text-tw-text-secondary text-xs">{a.personnel ? '(person)' : a.department ? '(dept)' : '(group)'}</span>
                       </div>
                     ))}
@@ -157,13 +157,13 @@ function ExpandedRow({ task, colSpan, actorId, departmentId, onOpen, onSubtaskCl
               {task.deadline && (
                 <div>
                   <div className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1.5">Deadline</div>
-                  <span className="text-tw-text">{new Date(task.deadline).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+                  <span className="text-sm text-tw-text">{new Date(task.deadline).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
                 </div>
               )}
               {task.actedById && (
                 <div>
                   <div className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1.5">Accepted By</div>
-                  <span className="text-tw-text">{task.actedByName || task.actedByType}</span>
+                  <span className="text-sm text-tw-text">{task.actedByName || task.actedByType}</span>
                 </div>
               )}
             </div>
