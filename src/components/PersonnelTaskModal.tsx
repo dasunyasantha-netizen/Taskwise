@@ -81,17 +81,18 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, person
   // Am I the person who created this subtask (the approvalById = creator)?
   const isCreator = task.approvalById === actorId && task.approvalByType === 'personnel'
 
-  const canAccept   = isDeptPending && task.status === 'ASSIGNED'
-  // Assignee actions — only the personally assigned person
+  // Subtask with no assignment yet — personnel can self-assign to take ownership
+  const isUnassigned = task.status === 'PENDING' && !task.assignments?.some(a => a.personnelId || a.departmentId)
+  const canSelfAssign = isUnassigned && !!actorId
+
+  const canAccept   = (isDeptPending && task.status === 'ASSIGNED') || canSelfAssign
   const canReturn   = (isDeptPending || isMyTask) && ['ASSIGNED', 'IN_PROGRESS'].includes(task.status)
   const canBlock    = isMyTask && task.status === 'IN_PROGRESS'
   const canUnblock  = isMyTask && task.status === 'BLOCKED'
   const canReopen   = isMyTask && task.status === 'REJECTED'
-  const canSubmit   = isMyTask && ['ASSIGNED', 'IN_PROGRESS'].includes(task.status)
-  const canEdit = isCreator && !['APPROVED', 'CANCELLED'].includes(task.status)
-  // Reassign: either the assignee or the creator can redirect the work
+  const canSubmit   = (isMyTask || canSelfAssign) && ['PENDING', 'ASSIGNED', 'IN_PROGRESS'].includes(task.status)
+  const canEdit     = isCreator && !['APPROVED', 'CANCELLED'].includes(task.status)
   const canReassign = (isMyTask || isCreator) && ['PENDING', 'ASSIGNED', 'IN_PROGRESS'].includes(task.status)
-  // Subtask creation and viewing: the creator manages the work breakdown
   const canSubtask  = (isMyTask || isCreator) && ['ASSIGNED', 'IN_PROGRESS'].includes(task.status)
 
   // ── Data loading ──────────────────────────────────────────────────────────
@@ -141,7 +142,10 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, person
   }
 
   // ── Accept ────────────────────────────────────────────────────────────────
-  const handleAccept = () => doAction(() => taskApi.accept(task.id))
+  const handleAccept = () => doAction(async () => {
+    if (canSelfAssign) await taskApi.assign(task.id, { personnelId: actorId })
+    await taskApi.accept(task.id)
+  })
 
   // ── Return ────────────────────────────────────────────────────────────────
   const handleReturn = () => {
@@ -179,7 +183,8 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, person
       return
     }
     doAction(async () => {
-      if (task.status === 'ASSIGNED') await taskApi.accept(task.id)
+      if (canSelfAssign) await taskApi.assign(task.id, { personnelId: actorId })
+      if (['PENDING', 'ASSIGNED'].includes(task.status)) await taskApi.accept(task.id)
       await taskApi.submit(task.id)
     })
   }
@@ -312,7 +317,7 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, person
             {canAccept && (
               <button disabled={loading} onClick={handleAccept}
                 className="btn-primary text-sm py-2 px-4 flex items-center gap-1.5">
-                ✓ Accept Task
+                {canSelfAssign ? '✓ Take Task' : '✓ Accept Task'}
               </button>
             )}
             {canSubmit && (
