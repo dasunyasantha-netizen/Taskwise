@@ -26,10 +26,11 @@ model Director {
   updatedAt   DateTime   @updatedAt
 
   projectsCreated   Project[]
-  tasksCreated      Task[]         @relation("TaskCreatedByDirector")
-  auditLogs         AuditLog[]     @relation("AuditActorDirector")
-  notifications     Notification[] @relation("NotifRecipientDirector")
-  comments          TaskComment[]  @relation("CommentAuthorDirector")
+  tasksCreated      Task[]           @relation("TaskCreatedByDirector")
+  auditLogs         AuditLog[]       @relation("AuditActorDirector")
+  notifications     Notification[]   @relation("NotifRecipientDirector")
+  comments          TaskComment[]    @relation("CommentAuthorDirector")
+  progressLogs      TaskProgressLog[] @relation("ProgressLogDirector")
 }
 
 model Workspace {
@@ -100,10 +101,11 @@ model Personnel {
 
   groupMemberships GroupMember[]
   taskAssignments  TaskAssignment[]
-  tasksCreated     Task[]         @relation("TaskCreatedByPersonnel")
-  auditLogs        AuditLog[]     @relation("AuditActorPersonnel")
-  notifications    Notification[] @relation("NotifRecipientPersonnel")
-  comments         TaskComment[]  @relation("CommentAuthorPersonnel")
+  tasksCreated     Task[]           @relation("TaskCreatedByPersonnel")
+  auditLogs        AuditLog[]       @relation("AuditActorPersonnel")
+  notifications    Notification[]   @relation("NotifRecipientPersonnel")
+  comments         TaskComment[]    @relation("CommentAuthorPersonnel")
+  progressLogs     TaskProgressLog[] @relation("ProgressLogAuthor")
   @@index([workspaceId])
   @@index([departmentId])
 }
@@ -222,10 +224,11 @@ model Task {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  assignments TaskAssignment[]
-  comments    TaskComment[]
-  auditLogs   AuditLog[]
+  assignments   TaskAssignment[]
+  comments      TaskComment[]
+  auditLogs     AuditLog[]
   notifications Notification[]
+  progressLogs  TaskProgressLog[]
 
   @@index([workspaceId])
   @@index([projectId])
@@ -300,6 +303,28 @@ model AuditLog {
   @@index([workspaceId, createdAt])
   @@index([taskId, createdAt])
   @@index([actorPersonnelId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PROGRESS LOGS  (manual daily updates per task/subtask)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model TaskProgressLog {
+  id          String     @id @default(uuid())
+  taskId      String
+  task        Task       @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  workspaceId String
+  authorPersonnelId String?
+  authorPersonnel   Personnel? @relation("ProgressLogAuthor", fields: [authorPersonnelId], references: [id])
+  authorDirectorId  String?
+  authorDirector    Director?  @relation("ProgressLogDirector", fields: [authorDirectorId], references: [id])
+  authorType  String     // "director" | "personnel"
+  note        String
+  logDate     DateTime   @default(now())
+  createdAt   DateTime   @default(now())
+
+  @@index([taskId, logDate])
+  @@index([workspaceId])
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

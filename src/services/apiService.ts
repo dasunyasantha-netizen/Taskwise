@@ -101,11 +101,13 @@ export const taskApi = {
   reject:     (id: string, reason: string) => api.post(`/tasks/${id}/reject`, { reason }),
   reopen:     (id: string)      => api.post(`/tasks/${id}/reopen`),
   cancel:     (id: string, reason: string) => api.post(`/tasks/${id}/cancel`, { reason }),
-  subtasks:   (id: string, recursive?: boolean) =>
+  subtasks:       (id: string, recursive?: boolean) =>
     api.get(`/tasks/${id}/subtasks${recursive ? '?recursive=true' : ''}`),
-  comments:   (id: string)      => api.get(`/tasks/${id}/comments`),
-  addComment: (id: string, content: string) => api.post(`/tasks/${id}/comments`, { content }),
-  history:    (id: string)      => api.get(`/tasks/${id}/history`),
+  comments:       (id: string)      => api.get(`/tasks/${id}/comments`),
+  addComment:     (id: string, content: string) => api.post(`/tasks/${id}/comments`, { content }),
+  history:        (id: string)      => api.get(`/tasks/${id}/history`),
+  progressLogs:   (id: string)      => api.get(`/tasks/${id}/progress-logs`),
+  addProgressLog: (id: string, note: string) => api.post(`/tasks/${id}/progress-logs`, { note }),
 }
 
 // ─── Notifications ───────────────────────────────────────────────────────────

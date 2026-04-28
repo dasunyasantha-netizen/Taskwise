@@ -5,6 +5,7 @@ import {
   assignTask, acceptTask, reassignTask, startTask, submitTask, blockTask, unblockTask,
   returnTask, approveTask, rejectTask, reopenTask, cancelTask,
   getSubtasks, getComments, addComment, getTaskHistory,
+  getProgressLogs, addProgressLog,
 } from '../controllers/taskController'
 
 const router = Router()
@@ -29,9 +30,11 @@ router.post('/:id/reject',        rejectTask)
 router.post('/:id/reopen',        reopenTask)
 router.post('/:id/cancel',        cancelTask)
 
-router.get('/:id/subtasks',       getSubtasks)
-router.get('/:id/comments',       getComments)
-router.post('/:id/comments',      addComment)
-router.get('/:id/history',        getTaskHistory)
+router.get('/:id/subtasks',        getSubtasks)
+router.get('/:id/comments',        getComments)
+router.post('/:id/comments',       addComment)
+router.get('/:id/history',         getTaskHistory)
+router.get('/:id/progress-logs',   getProgressLogs)
+router.post('/:id/progress-logs',  addProgressLog)
 
 export default router

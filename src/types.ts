@@ -159,6 +159,21 @@ export interface TaskComment {
   createdAt: string
 }
 
+// ─── Progress Logs ───────────────────────────────────────────────────────────
+
+export interface TaskProgressLog {
+  id: string
+  taskId: string
+  workspaceId: string
+  authorPersonnelId?: string
+  authorDirectorId?: string
+  authorType: ActorType
+  authorName?: string
+  note: string
+  logDate: string
+  createdAt: string
+}
+
 // ─── Notifications ───────────────────────────────────────────────────────────
 
 export type NotificationType =

@@ -690,3 +690,44 @@ export async function getTaskHistory(req: Request, res: Response): Promise<void>
     res.json(logs)
   } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
 }
+
+// GET /api/tasks/:id/progress-logs
+export async function getProgressLogs(req: Request, res: Response): Promise<void> {
+  try {
+    const logs = await prisma.taskProgressLog.findMany({
+      where: { taskId: req.params.id, workspaceId: req.user!.workspaceId },
+      include: {
+        authorPersonnel: { select: { id: true, name: true } },
+        authorDirector:  { select: { id: true, name: true } },
+      },
+      orderBy: { logDate: 'asc' }
+    })
+    const enriched = logs.map(l => ({
+      ...l,
+      authorName: l.authorPersonnel?.name || l.authorDirector?.name || l.authorType,
+    }))
+    res.json(enriched)
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
+}
+
+// POST /api/tasks/:id/progress-logs
+export async function addProgressLog(req: Request, res: Response): Promise<void> {
+  try {
+    const { note } = req.body as { note: string }
+    if (!note?.trim()) { res.status(400).json({ error: 'Note is required' }); return }
+    const { actorId, actorType, workspaceId } = req.user!
+    const task = await prisma.task.findFirst({ where: { id: req.params.id, workspaceId, deletedAt: null } })
+    if (!task) { res.status(404).json({ error: 'Task not found' }); return }
+    const log = await prisma.taskProgressLog.create({
+      data: {
+        taskId: task.id,
+        workspaceId,
+        note: note.trim(),
+        authorType: actorType,
+        authorPersonnelId: actorType === 'personnel' ? actorId : undefined,
+        authorDirectorId:  actorType === 'director'  ? actorId : undefined,
+      }
+    })
+    res.status(201).json(log)
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
+}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import type { Task, TaskComment, AuditLog, Personnel } from '../types'
+import type { Task, TaskComment, AuditLog, Personnel, TaskProgressLog } from '../types'
 import { taskApi } from '../services/apiService'
 import DatePicker from './DatePicker'
 import Select from './Select'
@@ -36,13 +36,16 @@ const eventLabels: Record<string, string> = {
   SUBTASK_CREATED: 'Subtask created', COMMENT_ADDED:   'Comment added',
 }
 
-type TabKey = 'details' | 'subtasks' | 'comments' | 'history'
+type TabKey = 'details' | 'progress' | 'subtasks' | 'comments' | 'history'
 
 export default function PersonnelTaskModal({ task, actorId, departmentId, personnel, parentTask, onBack, onSubtaskOpen, onClose, onRefresh }: Props) {
-  const [tab, setTab]         = useState<TabKey>('details')
+  const [tab, setTab]           = useState<TabKey>('details')
   const [subtasks, setSubtasks] = useState<Task[]>([])
   const [comments, setComments] = useState<TaskComment[]>([])
   const [history,  setHistory]  = useState<AuditLog[]>([])
+  const [progressLogs, setProgressLogs] = useState<TaskProgressLog[]>([])
+  const [progressNote, setProgressNote] = useState('')
+  const [progressLoading, setProgressLoading] = useState(false)
 
   // ── Edit mode
   const [editMode, setEditMode] = useState(false)
@@ -97,6 +100,7 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, person
     if (tab === 'subtasks') loadSubtasks()
     if (tab === 'comments') loadComments()
     if (tab === 'history')  loadHistory()
+    if (tab === 'progress') loadProgressLogs()
   }, [tab, task.id])
 
   useEffect(() => { setTab('details'); setActionError('') }, [task.id])
@@ -109,6 +113,20 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, person
   }
   const loadHistory = async () => {
     try { setHistory(await taskApi.history(task.id) as AuditLog[]) } catch { /* no-op */ }
+  }
+  const loadProgressLogs = async () => {
+    try { setProgressLogs(await taskApi.progressLogs(task.id) as TaskProgressLog[]) } catch { /* no-op */ }
+  }
+
+  const handleAddProgressLog = async () => {
+    if (!progressNote.trim()) return
+    setProgressLoading(true)
+    try {
+      await taskApi.addProgressLog(task.id, progressNote)
+      setProgressNote('')
+      await loadProgressLogs()
+    } catch (e: unknown) { setActionError(e instanceof Error ? e.message : 'Failed to save update') }
+    setProgressLoading(false)
   }
 
   const doAction = async (fn: () => Promise<unknown>, afterClose = false) => {
@@ -299,8 +317,8 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, person
             )}
             {canSubmit && (
               <button disabled={loading} onClick={handleSubmitAttempt}
-                className="btn-primary text-sm py-2 px-4 flex items-center gap-1.5">
-                ↑ Mark Complete
+                className="text-sm py-2 px-4 rounded-lg bg-tw-success text-white font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity flex items-center gap-1.5">
+                ✓ Complete
               </button>
             )}
             {canSubtask && (
@@ -344,13 +362,14 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, person
 
         {/* ── Tabs ─────────────────────────────────────────────────────── */}
         <div className="flex border-b border-tw-border px-6">
-          {(['details', 'subtasks', 'comments', 'history'] as TabKey[]).map(t => (
+          {(['details', 'progress', 'subtasks', 'comments', 'history'] as TabKey[]).map(t => (
             <button key={t} onClick={() => setTab(t)}
               className={`py-2.5 px-3 text-xs font-medium border-b-2 transition-colors capitalize
                 ${tab === t ? 'border-tw-primary text-tw-primary' : 'border-transparent text-tw-text-secondary hover:text-tw-text'}`}>
               {t}
               {t === 'subtasks' && task._count?.subtasks ? ` (${task._count.subtasks})` : ''}
               {t === 'comments' && task._count?.comments ? ` (${task._count.comments})` : ''}
+              {t === 'progress' && progressLogs.length > 0 ? ` (${progressLogs.length})` : ''}
             </button>
           ))}
         </div>
@@ -454,6 +473,80 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, person
                   <p className="text-sm text-yellow-800 font-medium">
                     This task is assigned to your department. Accept it to take personal ownership and start working.
                   </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* PROGRESS */}
+          {tab === 'progress' && (
+            <div className="space-y-4">
+              {/* Add update row */}
+              {isMyTask && !['APPROVED', 'CANCELLED'].includes(task.status) && (
+                <div className="flex gap-2 items-start">
+                  <textarea
+                    className="input flex-1 resize-none text-sm"
+                    rows={2}
+                    placeholder="What did you work on today?"
+                    value={progressNote}
+                    onChange={e => setProgressNote(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter' && e.ctrlKey) handleAddProgressLog() }}
+                  />
+                  <button
+                    onClick={handleAddProgressLog}
+                    disabled={!progressNote.trim() || progressLoading}
+                    className="btn-primary text-sm px-4 py-2 disabled:opacity-50 flex-shrink-0">
+                    {progressLoading ? '…' : 'Submit'}
+                  </button>
+                </div>
+              )}
+
+              {/* Progress log table */}
+              {progressLogs.length === 0 ? (
+                <div className="text-center py-10 text-tw-text-secondary text-sm">
+                  No updates logged yet.
+                </div>
+              ) : (
+                <div className="border border-tw-border rounded-xl overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-tw-hover border-b border-tw-border">
+                        <th className="px-4 py-2.5 text-left text-xs font-semibold text-tw-text-secondary uppercase tracking-wide w-24">Date</th>
+                        <th className="px-4 py-2.5 text-left text-xs font-semibold text-tw-text-secondary uppercase tracking-wide w-20">Time</th>
+                        <th className="px-4 py-2.5 text-left text-xs font-semibold text-tw-text-secondary uppercase tracking-wide">Update</th>
+                        <th className="px-4 py-2.5 text-left text-xs font-semibold text-tw-text-secondary uppercase tracking-wide w-28">By</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-tw-border">
+                      {progressLogs.map(log => {
+                        const d = new Date(log.logDate)
+                        return (
+                          <tr key={log.id} className="hover:bg-tw-hover transition-colors">
+                            <td className="px-4 py-3 text-xs text-tw-text-secondary whitespace-nowrap">
+                              {d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            </td>
+                            <td className="px-4 py-3 text-xs text-tw-text-secondary whitespace-nowrap">
+                              {d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-tw-text leading-relaxed whitespace-pre-wrap">{log.note}</td>
+                            <td className="px-4 py-3 text-xs text-tw-text-secondary whitespace-nowrap">{log.authorName}</td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Complete button at bottom of progress tab */}
+              {canSubmit && (
+                <div className="pt-2 border-t border-tw-border">
+                  <button
+                    disabled={loading}
+                    onClick={handleSubmitAttempt}
+                    className="w-full py-2.5 rounded-lg bg-tw-success text-white font-semibold text-sm hover:opacity-90 disabled:opacity-50 transition-opacity flex items-center justify-center gap-2">
+                    ✓ Mark as Complete
+                  </button>
                 </div>
               )}
             </div>
