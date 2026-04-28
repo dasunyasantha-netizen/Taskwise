@@ -374,6 +374,7 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
       ])
       const myTasks = tasks.filter(t => {
         if (['APPROVED', 'CANCELLED'].includes(t.status)) return false
+        if (t.parentTaskId) return false  // subtasks only appear inside their parent modal
         const directlyAssigned = t.assignments?.some(a => a.personnelId === user.actorId)
         const deptAssigned     = t.assignments?.some(a => a.departmentId === user.departmentId && !t.assignments?.some(p => p.personnelId))
         return directlyAssigned || deptAssigned
