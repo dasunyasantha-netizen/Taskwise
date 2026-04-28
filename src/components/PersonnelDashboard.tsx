@@ -125,188 +125,157 @@ function ExpandedRow({ task, colSpan, actorId, departmentId, onOpen, onSubtaskCl
   }
 
   return (
-    <tr className="border-b-2 border-tw-primary/20" style={{ background: 'linear-gradient(to right, #eef3ff, #f8f9ff)' }}>
+    <tr className="border-b-2 border-tw-primary/20" style={{ background: 'linear-gradient(135deg, #f0f4ff 0%, #f8f9ff 100%)' }}>
       <td colSpan={colSpan} className="px-0 py-0">
-        <div className="px-6 py-5 space-y-5">
+        <div className="px-6 py-5 space-y-4">
 
-          {/* ── Task meta row ── */}
-          <div className="text-sm space-y-3">
-            {task.description && (
-              <div>
-                <div className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">Description</div>
+          {/* ── Task info strip ── */}
+          <div className="grid grid-cols-[1fr_auto] gap-4 items-start">
+            {/* Left: description + assignees */}
+            <div className="space-y-3 min-w-0">
+              {task.description && (
                 <p className="text-sm text-tw-text leading-relaxed whitespace-pre-wrap">{task.description}</p>
-              </div>
-            )}
-            <div className="flex items-start justify-between gap-6">
-              {/* Left: assignees */}
+              )}
               {task.assignments?.length > 0 && (
-                <div>
-                  <div className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1.5">Assigned To</div>
-                  <div className="flex flex-wrap gap-x-4 gap-y-1">
-                    {task.assignments.map(a => (
-                      <div key={a.id} className="flex items-center gap-1.5 text-tw-text">
-                        <div className="w-5 h-5 rounded-full bg-tw-primary flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
-                          {(a.personnel?.name || a.department?.name || '?').charAt(0)}
-                        </div>
-                        <span className="text-sm">{a.personnel?.name || a.department?.name || a.group?.name}</span>
-                        <span className="text-tw-text-secondary text-xs">{a.personnel ? '(person)' : a.department ? '(dept)' : '(group)'}</span>
+                <div className="flex flex-wrap gap-2">
+                  {task.assignments.map(a => (
+                    <div key={a.id} className="flex items-center gap-1.5 bg-white border border-tw-border rounded-full px-2.5 py-1">
+                      <div className="w-4 h-4 rounded-full bg-tw-primary flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
+                        {(a.personnel?.name || a.department?.name || '?').charAt(0)}
                       </div>
-                    ))}
-                  </div>
+                      <span className="text-xs font-medium text-tw-text">{a.personnel?.name || a.department?.name || a.group?.name}</span>
+                      <span className="text-tw-text-secondary text-xs">{a.personnel ? '· person' : a.department ? '· dept' : '· group'}</span>
+                    </div>
+                  ))}
                 </div>
               )}
-              {/* Right: deadline + accepted by */}
-              <div className="flex gap-8 flex-shrink-0">
-                {task.deadline && (
-                  <div className="text-right">
-                    <div className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1.5">Deadline</div>
-                    <span className="text-sm text-tw-text">{new Date(task.deadline).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
-                  </div>
-                )}
-                {task.actedById && (
-                  <div className="text-right">
-                    <div className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1.5">Accepted By</div>
-                    <span className="text-sm text-tw-text">{task.actedByName || task.actedByType}</span>
-                  </div>
-                )}
-              </div>
             </div>
-            {(task.returnReason || task.cancelReason) && (
-              <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-                <div className="text-xs font-semibold text-tw-danger uppercase tracking-wide mb-0.5">
-                  {task.status === 'BLOCKED' ? 'Blocked Reason' : 'Return / Rejection Reason'}
+            {/* Right: deadline + accepted by chips */}
+            <div className="flex gap-4 flex-shrink-0">
+              {task.deadline && (
+                <div className="text-right">
+                  <div className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">Deadline</div>
+                  <span className="text-xs font-medium text-tw-text bg-white border border-tw-border rounded-lg px-2.5 py-1 inline-block">
+                    {new Date(task.deadline).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                  </span>
                 </div>
-                <span className="text-tw-danger italic">{task.returnReason || task.cancelReason}</span>
-              </div>
-            )}
+              )}
+              {task.actedById && (
+                <div className="text-right">
+                  <div className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">Accepted By</div>
+                  <span className="text-xs font-medium text-tw-text bg-white border border-tw-border rounded-lg px-2.5 py-1 inline-block">
+                    {task.actedByName || task.actedByType}
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* ── Subtasks table ── */}
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="w-3 h-3 rounded bg-tw-indigo inline-block" />
-              <span className="text-xs font-bold text-tw-indigo uppercase tracking-wider">
-                Subtasks {subtasks.length > 0 ? `(${subtasks.length})` : ''}
+          {(task.returnReason || task.cancelReason) && (
+            <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm">
+              <span className="font-semibold text-tw-danger">
+                {task.status === 'BLOCKED' ? 'Blocked: ' : 'Returned: '}
               </span>
+              <span className="text-tw-danger italic">{task.returnReason || task.cancelReason}</span>
             </div>
-            {loadingS ? (
-              <div className="text-xs text-tw-text-secondary py-2">Loading…</div>
-            ) : subtasks.length === 0 ? (
-              <div className="text-xs text-tw-text-secondary italic py-2">No subtasks yet.</div>
-            ) : (
-              <div className="bg-white border border-tw-indigo/20 rounded-lg overflow-hidden shadow-sm">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-tw-indigo-light border-b border-tw-indigo/20">
-                      <th className="w-px px-2 py-2.5"></th>
-                      <th className="text-left px-3 py-2.5 font-bold text-tw-indigo uppercase tracking-wider text-xs">Subtask</th>
-                      <th className="text-left px-3 py-2.5 font-bold text-tw-indigo uppercase tracking-wider text-xs">Status</th>
-                      <th className="text-left px-3 py-2.5 font-bold text-tw-indigo uppercase tracking-wider text-xs">Priority</th>
-                      <th className="text-left px-3 py-2.5 font-bold text-tw-indigo uppercase tracking-wider text-xs">Assigned To</th>
-                      <th className="text-left px-3 py-2.5 font-bold text-tw-indigo uppercase tracking-wider text-xs">Deadline</th>
-                      <th className="text-left px-3 py-2.5 font-bold text-tw-indigo uppercase tracking-wider text-xs">Days Left</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-tw-border">
-                    {subtasks.map(s => {
-                      const assignee = s.assignments?.[0]
-                      const assigneeName = assignee?.personnel?.name || assignee?.department?.name || assignee?.group?.name || '—'
-                      const dl = s.deadline ? Math.ceil((new Date(s.deadline).setHours(0,0,0,0) - new Date().setHours(0,0,0,0)) / 86400000) : null
-                      const isOverdue = dl !== null && dl < 0
-                      return (
-                        <tr key={s.id} onClick={e => { e.stopPropagation(); onSubtaskClick(s) }} className="hover:bg-blue-100 cursor-pointer transition-colors">
-                          <td className="pl-2 pr-0 py-2">
-                            <div className={`w-2 h-2 rounded-full ${subtaskStatusDot[s.status] || 'bg-gray-400'}`} />
-                          </td>
-                          <td className="px-3 py-2 font-medium text-tw-text max-w-xs truncate">{s.title}</td>
-                          <td className="px-3 py-2 whitespace-nowrap">
+          )}
+
+          {/* ── Two-column layout: subtasks + progress ── */}
+          <div className="grid grid-cols-2 gap-4">
+
+            {/* Left: Subtasks */}
+            <div className="bg-white border border-tw-indigo/20 rounded-xl overflow-hidden shadow-sm">
+              <div className="flex items-center gap-2 px-4 py-2.5 bg-tw-indigo-light border-b border-tw-indigo/20">
+                <span className="w-2.5 h-2.5 rounded-sm bg-tw-indigo inline-block" />
+                <span className="text-xs font-bold text-tw-indigo uppercase tracking-wider">
+                  Subtasks{subtasks.length > 0 ? ` (${subtasks.length})` : ''}
+                </span>
+              </div>
+              {loadingS ? (
+                <div className="px-4 py-4 text-xs text-tw-text-secondary">Loading…</div>
+              ) : subtasks.length === 0 ? (
+                <div className="px-4 py-4 text-xs text-tw-text-secondary italic">No subtasks yet.</div>
+              ) : (
+                <div className="divide-y divide-tw-border">
+                  {subtasks.map(s => {
+                    const assignee = s.assignments?.[0]
+                    const assigneeName = assignee?.personnel?.name || assignee?.department?.name || assignee?.group?.name || '—'
+                    const dl = s.deadline ? Math.ceil((new Date(s.deadline).setHours(0,0,0,0) - new Date().setHours(0,0,0,0)) / 86400000) : null
+                    const isOverdue = dl !== null && dl < 0
+                    return (
+                      <div key={s.id}
+                        onClick={e => { e.stopPropagation(); onSubtaskClick(s) }}
+                        className="flex items-center gap-3 px-4 py-2.5 hover:bg-blue-50 cursor-pointer transition-colors">
+                        <div className={`w-2 h-2 rounded-full flex-shrink-0 ${subtaskStatusDot[s.status] || 'bg-gray-400'}`} />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium text-tw-text truncate">{s.title}</div>
+                          <div className="flex items-center gap-2 mt-0.5">
                             <span className={`badge text-xs ${statusBadge[s.status] || 'badge-gray'}`}>{displayStatus(s.status)}</span>
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap">
-                            <span className={`badge text-xs ${priorityBadge[s.priority]}`}>{s.priority}</span>
-                          </td>
-                          <td className="px-3 py-2 text-tw-text-secondary whitespace-nowrap">{assigneeName}</td>
-                          <td className="px-3 py-2 whitespace-nowrap">
-                            {s.deadline
-                              ? <span className={isOverdue ? 'text-tw-danger font-semibold' : 'text-tw-text-secondary'}>
-                                  {new Date(s.deadline).toLocaleDateString()}
-                                </span>
-                              : <span className="text-tw-text-secondary">—</span>}
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap">
-                            {dl === null ? <span className="text-tw-text-secondary">—</span>
-                              : dl < 0  ? <span className="inline-flex text-xs font-semibold text-white bg-tw-danger rounded-full px-2 py-0.5">{Math.abs(dl)}d overdue</span>
-                              : dl === 0 ? <span className="inline-flex text-xs font-semibold text-orange-800 bg-orange-100 border border-orange-300 rounded-full px-2 py-0.5">Due today</span>
-                              : dl <= 3  ? <span className="inline-flex text-xs font-semibold text-orange-700 bg-orange-50 border border-orange-200 rounded-full px-2 py-0.5">{dl}d left</span>
-                              : <span className="text-tw-text-secondary">{dl}d left</span>}
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-
-          {/* ── Progress log ── */}
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="w-3 h-3 rounded bg-tw-success inline-block" />
-              <span className="text-xs font-bold text-tw-success uppercase tracking-wider">
-                Progress Updates {progressLogs.length > 0 ? `(${progressLogs.length})` : ''}
-              </span>
+                            <span className="text-xs text-tw-text-secondary truncate">→ {assigneeName}</span>
+                          </div>
+                        </div>
+                        <div className="flex-shrink-0 text-right">
+                          {dl === null ? null
+                            : dl < 0  ? <span className="text-xs font-semibold text-tw-danger">{Math.abs(dl)}d over</span>
+                            : dl === 0 ? <span className="text-xs font-semibold text-orange-600">Today</span>
+                            : dl <= 3  ? <span className="text-xs font-semibold text-orange-500">{dl}d left</span>
+                            : <span className="text-xs text-tw-text-secondary">{dl}d</span>}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
 
-            {canAddLog && (
-              <div className="flex gap-2 mb-3">
-                <input
-                  className="input flex-1 text-sm py-2"
-                  placeholder="What did you work on today?"
-                  value={progressNote}
-                  onChange={e => setProgressNote(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleAddLog()}
-                />
-                <button
-                  disabled={!progressNote.trim() || progressLoading}
-                  onClick={e => { e.stopPropagation(); handleAddLog() }}
-                  className="text-sm py-2 px-4 rounded-lg bg-tw-success text-white font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity flex-shrink-0">
-                  {progressLoading ? '…' : 'Submit'}
-                </button>
+            {/* Right: Progress updates */}
+            <div className="bg-white border border-tw-success/25 rounded-xl overflow-hidden shadow-sm flex flex-col">
+              <div className="flex items-center gap-2 px-4 py-2.5 bg-tw-success-light border-b border-tw-success/20">
+                <span className="w-2.5 h-2.5 rounded-sm bg-tw-success inline-block" />
+                <span className="text-xs font-bold text-green-700 uppercase tracking-wider">
+                  Progress Updates{progressLogs.length > 0 ? ` (${progressLogs.length})` : ''}
+                </span>
               </div>
-            )}
 
-            {progressLogs.length > 0 && (
-              <div className="bg-white border border-tw-success/30 rounded-lg overflow-hidden mb-2 shadow-sm">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-tw-success-light border-b border-tw-success/20">
-                      <th className="text-left px-3 py-2.5 font-bold text-green-700 uppercase tracking-wider text-xs w-28">Date</th>
-                      <th className="text-left px-3 py-2.5 font-bold text-green-700 uppercase tracking-wider text-xs w-20">Time</th>
-                      <th className="text-left px-3 py-2.5 font-bold text-green-700 uppercase tracking-wider text-xs">Update</th>
-                      <th className="text-left px-3 py-2.5 font-bold text-green-700 uppercase tracking-wider text-xs w-32">By</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-tw-border">
-                    {progressLogs.map(log => {
-                      const d = new Date(log.logDate)
-                      return (
-                        <tr key={log.id} className="hover:bg-tw-hover">
-                          <td className="px-3 py-2 text-tw-text-secondary whitespace-nowrap">
-                            {d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                          </td>
-                          <td className="px-3 py-2 text-tw-text-secondary whitespace-nowrap">
-                            {d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
-                          </td>
-                          <td className="px-3 py-2 text-tw-text">{log.note}</td>
-                          <td className="px-3 py-2 text-tw-text-secondary whitespace-nowrap">{log.authorName}</td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
+              {canAddLog && (
+                <div className="flex gap-2 px-3 py-2.5 border-b border-tw-border">
+                  <input
+                    className="input flex-1 text-sm py-1.5"
+                    placeholder="What did you work on today?"
+                    value={progressNote}
+                    onChange={e => setProgressNote(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleAddLog()}
+                  />
+                  <button
+                    disabled={!progressNote.trim() || progressLoading}
+                    onClick={e => { e.stopPropagation(); handleAddLog() }}
+                    className="text-sm py-1.5 px-3 rounded-lg bg-tw-success text-white font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity flex-shrink-0">
+                    {progressLoading ? '…' : 'Add'}
+                  </button>
+                </div>
+              )}
+
+              {progressLogs.length === 0 ? (
+                <div className="px-4 py-4 text-xs text-tw-text-secondary italic">No updates logged yet.</div>
+              ) : (
+                <div className="divide-y divide-tw-border overflow-y-auto max-h-48">
+                  {progressLogs.map(log => {
+                    const d = new Date(log.logDate)
+                    return (
+                      <div key={log.id} className="px-4 py-2.5 hover:bg-tw-hover transition-colors">
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                          <span className="text-xs text-tw-text-secondary whitespace-nowrap">
+                            {d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · {d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                          <span className="text-xs text-tw-text-secondary font-medium whitespace-nowrap">{log.authorName}</span>
+                        </div>
+                        <p className="text-sm text-tw-text break-words leading-relaxed">{log.note}</p>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* ── Action bar ── */}
@@ -316,7 +285,7 @@ function ExpandedRow({ task, colSpan, actorId, departmentId, onOpen, onSubtaskCl
               <button onClick={() => setActionError('')} className="ml-2 font-bold">×</button>
             </div>
           )}
-          <div className="pt-2 border-t border-blue-200 flex flex-wrap items-center gap-2 justify-between">
+          <div className="flex flex-wrap items-center gap-2 justify-between">
             <div className="flex flex-wrap gap-2">
               {canAccept && (
                 <button disabled={actionLoading} onClick={e => { e.stopPropagation(); handleAccept() }}
