@@ -88,8 +88,7 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, person
   const canUnblock  = isMyTask && task.status === 'BLOCKED'
   const canReopen   = isMyTask && task.status === 'REJECTED'
   const canSubmit   = isMyTask && task.status === 'IN_PROGRESS'
-  // Edit task details: assignee or creator can edit title/description/deadline
-  const canEdit = (isMyTask || isCreator) && !['APPROVED', 'CANCELLED'].includes(task.status)
+  const canEdit = isCreator && !['APPROVED', 'CANCELLED'].includes(task.status)
   // Reassign: either the assignee or the creator can redirect the work
   const canReassign = (isMyTask || isCreator) && ['PENDING', 'ASSIGNED', 'IN_PROGRESS'].includes(task.status)
   // Subtask creation and viewing: the creator manages the work breakdown
