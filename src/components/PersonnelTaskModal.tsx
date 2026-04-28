@@ -87,7 +87,7 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, person
   const canBlock    = isMyTask && task.status === 'IN_PROGRESS'
   const canUnblock  = isMyTask && task.status === 'BLOCKED'
   const canReopen   = isMyTask && task.status === 'REJECTED'
-  const canSubmit   = isMyTask && task.status === 'IN_PROGRESS'
+  const canSubmit   = isMyTask && ['ASSIGNED', 'IN_PROGRESS'].includes(task.status)
   const canEdit = isCreator && !['APPROVED', 'CANCELLED'].includes(task.status)
   // Reassign: either the assignee or the creator can redirect the work
   const canReassign = (isMyTask || isCreator) && ['PENDING', 'ASSIGNED', 'IN_PROGRESS'].includes(task.status)
@@ -171,7 +171,6 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, person
 
   // ── Submit (with subtask pre-check) ──────────────────────────────────────
   const handleSubmitAttempt = async () => {
-    // Quick client-side check — if tab loaded subtasks, check there
     const loaded = subtasks
     const blocking = loaded.filter(s => !['APPROVED', 'CANCELLED'].includes(s.status))
     if (blocking.length > 0) {
@@ -179,7 +178,10 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, person
       setShowSubmitConfirm(true)
       return
     }
-    doAction(() => taskApi.submit(task.id))
+    doAction(async () => {
+      if (task.status === 'ASSIGNED') await taskApi.accept(task.id)
+      await taskApi.submit(task.id)
+    })
   }
 
   // ── Create subtask ────────────────────────────────────────────────────────

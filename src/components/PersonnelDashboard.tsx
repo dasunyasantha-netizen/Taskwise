@@ -63,8 +63,9 @@ function ExpandedRow({ task, colSpan, actorId, onOpen, onSubtaskClick, onRefresh
   const [completeLoading, setCompleteLoading] = useState(false)
 
   const isMyTask = task.assignments?.some(a => a.personnelId === actorId)
-  const canSubmit = isMyTask && task.status === 'IN_PROGRESS'
-  const canAddLog = isMyTask && !['APPROVED', 'CANCELLED'].includes(task.status)
+  const isDeptPending = task.assignments?.some(a => a.departmentId) && !task.assignments?.some(a => a.personnelId)
+  const canComplete = isMyTask && ['ASSIGNED', 'IN_PROGRESS'].includes(task.status)
+  const canAddLog = (isMyTask || isDeptPending) && !['APPROVED', 'CANCELLED'].includes(task.status)
 
   useEffect(() => {
     taskApi.subtasks(task.id)
@@ -91,6 +92,7 @@ function ExpandedRow({ task, colSpan, actorId, onOpen, onSubtaskClick, onRefresh
   const handleComplete = async () => {
     setCompleteLoading(true)
     try {
+      if (task.status === 'ASSIGNED') await taskApi.accept(task.id)
       await taskApi.submit(task.id)
       onRefresh()
     } catch { /* no-op */ }
@@ -276,11 +278,11 @@ function ExpandedRow({ task, colSpan, actorId, onOpen, onSubtaskClick, onRefresh
 
           {/* ── Open modal button + Complete ── */}
           <div className="pt-2 border-t border-blue-200 flex items-center justify-between gap-3">
-            {canSubmit ? (
+            {canComplete ? (
               <button
                 disabled={completeLoading}
                 onClick={e => { e.stopPropagation(); handleComplete() }}
-                className="text-xs py-1.5 px-4 rounded-lg bg-tw-success text-white font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity">
+                className="text-sm py-2 px-5 rounded-lg bg-tw-success text-white font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity">
                 {completeLoading ? '…' : '✓ Complete'}
               </button>
             ) : <div />}
