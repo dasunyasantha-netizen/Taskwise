@@ -405,8 +405,8 @@ export async function submitTask(req: Request, res: Response): Promise<void> {
     if (!task) { res.status(404).json({ error: 'Task not found' }); return }
     if (task.status !== 'IN_PROGRESS') { res.status(400).json({ error: 'Task must be IN_PROGRESS to submit' }); return }
 
-    // Check ALL subtasks at all levels are approved (recursive CTE)
-    // CANCELLED and BLOCKED tasks are excluded — cancelled are skipped, blocked are flagged
+    // Check all subtasks are at least SUBMITTED or APPROVED (not still in progress/pending)
+    // CANCELLED subtasks are excluded. SUBMITTED is allowed — they are pending approval.
     const deepSubtasks = await prisma.$queryRaw<Array<{ id: string; status: string; title: string }>>`
       WITH RECURSIVE subtree AS (
         SELECT id, status, title FROM "Task"
@@ -421,12 +421,12 @@ export async function submitTask(req: Request, res: Response): Promise<void> {
           AND t."deletedAt" IS NULL
           AND t.status != 'CANCELLED'
       )
-      SELECT id, status, title FROM subtree WHERE status != 'APPROVED'
+      SELECT id, status, title FROM subtree WHERE status NOT IN ('APPROVED', 'SUBMITTED')
     `
 
     if (deepSubtasks.length > 0) {
       res.status(400).json({
-        error: 'All subtasks at all levels must be APPROVED before submitting',
+        error: 'All subtasks must be completed (submitted or approved) before submitting this task',
         blockingSubtasks: deepSubtasks.map(t => ({ id: t.id, title: t.title, status: t.status }))
       })
       return

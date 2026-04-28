@@ -189,7 +189,7 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, person
   // ── Submit (with subtask pre-check) ──────────────────────────────────────
   const handleSubmitAttempt = async () => {
     const loaded = subtasks
-    const blocking = loaded.filter(s => !['APPROVED', 'CANCELLED'].includes(s.status))
+    const blocking = loaded.filter(s => !['APPROVED', 'SUBMITTED', 'CANCELLED'].includes(s.status))
     if (blocking.length > 0) {
       setBlockingList(blocking.map(s => ({ id: s.id, title: s.title, status: s.status })))
       setShowSubmitConfirm(true)
@@ -748,7 +748,7 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, person
                   </li>
                 ))}
               </ul>
-              <p className="text-xs text-tw-text-secondary">All subtasks must be approved before marking this task complete. The server will also enforce this.</p>
+              <p className="text-xs text-tw-text-secondary">All subtasks must be completed (submitted or approved) before marking this task complete.</p>
               <div className="flex gap-2 justify-end">
                 <button onClick={() => setShowSubmitConfirm(false)} className="btn-secondary">Go Back</button>
                 <button disabled={loading} onClick={() => { setShowSubmitConfirm(false); doAction(() => taskApi.submit(task.id)) }}
