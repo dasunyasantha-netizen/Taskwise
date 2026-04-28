@@ -278,23 +278,34 @@ export async function acceptTask(req: Request, res: Response): Promise<void> {
     if (!task) { res.status(404).json({ error: 'Task not found' }); return }
     if (task.status !== 'ASSIGNED') { res.status(400).json({ error: 'Task is no longer available to accept' }); return }
 
-    // Verify this person's department has an assignment on this task
-    const deptAssignment = task.assignments.find(a => a.departmentId === departmentId)
-    if (!deptAssignment) { res.status(403).json({ error: 'This task is not assigned to your department' }); return }
+    // Case 1: directly assigned to this personnel
+    const personalAssignment = task.assignments.find(a => a.personnelId === actorId)
+    // Case 2: assigned to this personnel's department (no personal assignment yet)
+    const deptAssignment = !personalAssignment
+      ? task.assignments.find(a => a.departmentId === departmentId)
+      : null
 
-    // Check nobody has already accepted it (no personal assignment yet)
-    const alreadyAccepted = task.assignments.some(a => a.personnelId)
-    if (alreadyAccepted) { res.status(409).json({ error: 'This task has already been accepted by someone else' }); return }
+    if (!personalAssignment && !deptAssignment) {
+      res.status(403).json({ error: 'This task is not assigned to you or your department' }); return
+    }
+    if (!personalAssignment) {
+      // dept path: check nobody else has already accepted
+      const alreadyAccepted = task.assignments.some(a => a.personnelId)
+      if (alreadyAccepted) { res.status(409).json({ error: 'This task has already been accepted by someone else' }); return }
+    }
 
     await prisma.$transaction(async tx => {
-      await tx.taskAssignment.delete({ where: { id: deptAssignment.id } })
-      await tx.taskAssignment.create({ data: { taskId: task.id, personnelId: actorId } })
+      if (deptAssignment) {
+        // Replace dept assignment with personal assignment
+        await tx.taskAssignment.delete({ where: { id: deptAssignment.id } })
+        await tx.taskAssignment.create({ data: { taskId: task.id, personnelId: actorId } })
+      }
+      // If already personally assigned, just update status
       await tx.task.update({
         where: { id: task.id },
         data: { status: 'IN_PROGRESS', actedById: actorId, actedByType: 'personnel' }
       })
       await writeAudit(tx, workspaceId, 'TASK_ACCEPTED', 'personnel', actorId, task.id, { acceptedBy: actorId })
-      // Notify approval authority that someone accepted
       if (task.approvalById && task.approvalByType) {
         await notifyActor(tx, workspaceId, task.approvalByType as 'director' | 'personnel', task.approvalById, 'task_assigned',
           'Task accepted', `Your task "${task.title}" has been accepted.`, task.id)
