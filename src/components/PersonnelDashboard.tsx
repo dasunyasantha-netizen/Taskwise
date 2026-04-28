@@ -454,6 +454,7 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
   const [queue, setQueue]               = useState<Task[]>([])
   const [projects, setProjects]         = useState<Project[]>([])
   const [personnel, setPersonnel]       = useState<Personnel[]>([])
+  const [mySupervisorId, setMySupervisorId] = useState<string | null | undefined>(undefined)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [taskStack, setTaskStack]       = useState<Task[]>([])  // navigation history for back button
   const [expandedId, setExpandedId]     = useState<string | null>(null)
@@ -494,7 +495,12 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
   useEffect(() => {
     load()
     workspaceApi.getPersonnel()
-      .then(p => setPersonnel(p as Personnel[]))
+      .then(p => {
+        const list = p as Personnel[]
+        setPersonnel(list)
+        const me = list.find(p => p.id === user.actorId)
+        setMySupervisorId(me?.supervisorId ?? null)
+      })
       .catch(() => {})
   }, [])
 
@@ -822,6 +828,8 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
           task={selectedTask}
           actorId={user.actorId}
           departmentId={user.departmentId}
+          mySupervisorId={mySupervisorId}
+          onSupervisorSet={id => setMySupervisorId(id)}
           personnel={personnel}
           parentTask={taskStack.length > 0 ? taskStack[taskStack.length - 1] : undefined}
           onBack={taskStack.length > 0 ? async () => {

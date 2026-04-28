@@ -208,13 +208,56 @@ export async function updatePersonnel(req: Request, res: Response): Promise<void
     const person = await prisma.personnel.findFirst({ where: { id: req.params.id, workspaceId, deletedAt: null } })
     if (!person) { res.status(404).json({ error: 'Personnel not found' }); return }
     const { name, phone, nic, email, supervisorId } = req.body
-    // Only directors can set supervisorId
-    const supervisorUpdate = actorType === 'director' && supervisorId !== undefined
+    // Directors can set any supervisorId; personnel can set their own supervisorId (for approval chain setup)
+    const supervisorUpdate = supervisorId !== undefined
       ? { supervisorId: supervisorId || null }
       : {}
     const updated = await prisma.personnel.update({ where: { id: req.params.id }, data: { name, phone, nic, email, ...supervisorUpdate } })
     const { password: _p, ...safe } = updated
     res.json(safe)
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
+}
+
+// GET /api/workspace/personnel/above-me
+// Returns personnel one layer above the calling personnel (for supervisor selection)
+// Also includes directors if the caller is in layer 1 (top personnel layer)
+export async function getPersonnelAboveMe(req: Request, res: Response): Promise<void> {
+  try {
+    const { actorId, actorType, workspaceId } = req.user!
+    if (actorType !== 'personnel') { res.status(403).json({ error: 'Personnel only' }); return }
+
+    // Get the caller's department and layer
+    const me = await prisma.personnel.findFirst({
+      where: { id: actorId, workspaceId, deletedAt: null },
+      include: { department: { include: { layer: true } } }
+    })
+    if (!me?.department?.layer) { res.json([]); return }
+
+    const myLayerNumber = me.department.layer.number
+
+    if (myLayerNumber === 1) {
+      // Top layer — their supervisors are directors
+      const directors = await prisma.director.findMany({ where: { workspaceId }, select: { id: true, name: true, phone: true, email: true } })
+      res.json({ type: 'directors', items: directors })
+      return
+    }
+
+    // Find all departments in the layer one above
+    const aboveLayer = await prisma.layer.findFirst({
+      where: { workspaceId, number: (myLayerNumber - 1) as 1 | 2 | 3 }
+    })
+    if (!aboveLayer) { res.json({ type: 'personnel', items: [] }); return }
+
+    const aboveDepts = await prisma.department.findMany({
+      where: { layerId: aboveLayer.id, workspaceId, deletedAt: null },
+      select: { id: true }
+    })
+    const abovePersonnel = await prisma.personnel.findMany({
+      where: { workspaceId, deletedAt: null, departmentId: { in: aboveDepts.map(d => d.id) } },
+      select: { id: true, name: true, phone: true, email: true, departmentId: true, department: { select: { name: true } } },
+      orderBy: { name: 'asc' }
+    })
+    res.json({ type: 'personnel', items: abovePersonnel })
   } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
 }
 

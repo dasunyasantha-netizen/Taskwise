@@ -4,6 +4,7 @@ import {
   getWorkspace, updateWorkspace, updateProfile, getLayers, updateLayer, uploadAvatar,
   getDepartments, createDepartment, updateDepartment, deleteDepartment,
   getPersonnel, createPersonnel, updatePersonnel, movePersonnel, deletePersonnel, getPersonnelQueue,
+  getPersonnelAboveMe,
   getGroups, createGroup, updateGroup, deleteGroup, addGroupMember, removeGroupMember,
 } from '../controllers/workspaceController'
 
@@ -23,6 +24,7 @@ router.put('/departments/:id',                     requireDirector, updateDepart
 router.delete('/departments/:id',                  requireDirector, deleteDepartment)
 
 router.get('/personnel',                           getPersonnel)
+router.get('/personnel/above-me',                  getPersonnelAboveMe)
 router.post('/personnel',                          requireDirector, createPersonnel)
 router.put('/personnel/:id',                       updatePersonnel)
 router.put('/personnel/:id/move',                  requireDirector, movePersonnel)

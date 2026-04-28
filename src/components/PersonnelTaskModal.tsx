@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import type { Task, TaskComment, AuditLog, Personnel, TaskProgressLog } from '../types'
-import { taskApi } from '../services/apiService'
+import { taskApi, workspaceApi } from '../services/apiService'
 import DatePicker from './DatePicker'
 import Select from './Select'
 
@@ -8,6 +8,8 @@ interface Props {
   task: Task
   actorId: string
   departmentId?: string
+  mySupervisorId?: string | null
+  onSupervisorSet?: (supervisorId: string) => void
   personnel: Personnel[]
   parentTask?: Task
   onBack?: () => Promise<void>
@@ -39,7 +41,7 @@ const eventLabels: Record<string, string> = {
 
 type TabKey = 'details' | 'updates' | 'subtasks' | 'history'
 
-export default function PersonnelTaskModal({ task, actorId, departmentId, personnel, parentTask, onBack, onSubtaskOpen, onClose, onRefresh }: Props) {
+export default function PersonnelTaskModal({ task, actorId, departmentId, mySupervisorId, onSupervisorSet, personnel, parentTask, onBack, onSubtaskOpen, onClose, onRefresh }: Props) {
   const [tab, setTab]           = useState<TabKey>('details')
   const [subtasks, setSubtasks] = useState<Task[]>([])
   const [comments, setComments] = useState<TaskComment[]>([])
@@ -47,6 +49,15 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, person
   const [progressLogs, setProgressLogs] = useState<TaskProgressLog[]>([])
   const [progressNote, setProgressNote] = useState('')
   const [progressLoading, setProgressLoading] = useState(false)
+
+  // ── Supervisor selection state
+  type SupervisorOption = { id: string; name: string; department?: { name: string } }
+  const [showSupervisorModal, setShowSupervisorModal] = useState(false)
+  const [supervisorOptions, setSupervisorOptions]     = useState<SupervisorOption[]>([])
+  const [supervisorType, setSupervisorType]           = useState<'directors' | 'personnel'>('personnel')
+  const [selectedSupervisor, setSelectedSupervisor]   = useState('')
+  const [supervisorSaving, setSupervisorSaving]       = useState(false)
+  const [supervisorError, setSupervisorError]         = useState('')
 
   // ── Edit mode
   const [editMode, setEditMode] = useState(false)
@@ -106,6 +117,25 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, person
   useEffect(() => {
     setTab('details')
     setActionError('')
+    setSupervisorError('')
+    setSelectedSupervisor('')
+
+    // Show supervisor-selection modal if:
+    // 1. This is the user's active task (they'll work on it), OR
+    // 2. This task is in their approval queue (they need to route it up when approving)
+    // In both cases, they must set a supervisor if not yet set
+    const isInMyApprovalQueue = task.status === 'SUBMITTED' && task.approvalById === actorId && task.approvalByType === 'personnel'
+    const isActiveMine = (isMyTask || canSelfAssign) && !['APPROVED', 'CANCELLED'].includes(task.status)
+    if ((isActiveMine || isInMyApprovalQueue) && mySupervisorId === null) {
+      workspaceApi.getPersonnelAboveMe()
+        .then(result => {
+          setSupervisorOptions(result.items)
+          setSupervisorType(result.type)
+          setShowSupervisorModal(true)
+        })
+        .catch(() => {})
+    }
+
     // Auto-transition to IN_PROGRESS when personnel opens an ASSIGNED task or self-assigns an unassigned subtask
     if (task.status === 'ASSIGNED' && isMyTask) {
       taskApi.accept(task.id).then(() => onRefresh()).catch(() => {})
@@ -116,6 +146,20 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, person
         .catch(() => {})
     }
   }, [task.id])
+
+  const handleSaveSupervisor = async () => {
+    if (!selectedSupervisor) return
+    setSupervisorSaving(true)
+    setSupervisorError('')
+    try {
+      await workspaceApi.updatePersonnel(actorId, { supervisorId: selectedSupervisor })
+      onSupervisorSet?.(selectedSupervisor)
+      setShowSupervisorModal(false)
+    } catch (e: unknown) {
+      setSupervisorError(e instanceof Error ? e.message : 'Failed to save supervisor')
+    }
+    setSupervisorSaving(false)
+  }
 
   const loadSubtasks = async () => {
     try { setSubtasks(await taskApi.subtasks(task.id) as Task[]) } catch { /* no-op */ }
@@ -754,6 +798,68 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, person
                 <button disabled={loading} onClick={() => { setShowSubmitConfirm(false); doAction(() => taskApi.submit(task.id)) }}
                   className="btn-primary disabled:opacity-50">
                   Submit Anyway
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Supervisor selection modal ───────────────────────────────────── */}
+      {showSupervisorModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-[70] p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm">
+            <div className="px-5 py-4 border-b border-tw-border">
+              <h3 className="font-bold text-tw-text text-base">Select Your Supervisor</h3>
+              <p className="text-xs text-tw-text-secondary mt-1">
+                To route this task for approval, you must select your supervising officer.
+                {supervisorType === 'directors'
+                  ? ' Choose the director who oversees your work.'
+                  : ' Choose the person one level above you in the hierarchy.'}
+              </p>
+            </div>
+            <div className="px-5 py-4 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-tw-text-secondary mb-2">
+                  {supervisorType === 'directors' ? 'Director' : 'Supervising Officer'}
+                </label>
+                {supervisorOptions.length === 0 ? (
+                  <p className="text-sm text-tw-text-secondary italic">No personnel found in the level above you. Contact your director to set up the hierarchy.</p>
+                ) : (
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {supervisorOptions.map(opt => (
+                      <label key={opt.id}
+                        className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors
+                          ${selectedSupervisor === opt.id
+                            ? 'border-tw-primary bg-blue-50'
+                            : 'border-tw-border hover:border-tw-primary/50 hover:bg-tw-hover'}`}>
+                        <input type="radio" name="supervisor" value={opt.id}
+                          checked={selectedSupervisor === opt.id}
+                          onChange={() => setSelectedSupervisor(opt.id)}
+                          className="accent-tw-primary" />
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold text-tw-text">{opt.name}</div>
+                          {opt.department && (
+                            <div className="text-xs text-tw-text-secondary">{opt.department.name}</div>
+                          )}
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {supervisorError && (
+                <div className="text-xs text-tw-danger bg-red-50 border border-red-200 rounded px-3 py-2">{supervisorError}</div>
+              )}
+              <div className="flex gap-2 justify-end pt-1">
+                <button onClick={() => setShowSupervisorModal(false)} className="btn-secondary text-sm">
+                  Skip for now
+                </button>
+                <button
+                  disabled={!selectedSupervisor || supervisorSaving || supervisorOptions.length === 0}
+                  onClick={handleSaveSupervisor}
+                  className="btn-primary text-sm disabled:opacity-50">
+                  {supervisorSaving ? 'Saving…' : 'Confirm Supervisor'}
                 </button>
               </div>
             </div>

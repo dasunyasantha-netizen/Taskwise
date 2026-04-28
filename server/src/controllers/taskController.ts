@@ -552,8 +552,34 @@ export async function approveTask(req: Request, res: Response): Promise<void> {
     if (task.approvalById !== actorId || task.approvalByType !== actorType) {
       res.status(403).json({ error: 'Only the assigning authority can approve this task' }); return
     }
+
+    // If the current approver is personnel, check if they have a supervisor to route to next
+    let nextApprovalById: string | null = null
+    let nextApprovalByType: string | null = null
+    if (actorType === 'personnel') {
+      const approver = await prisma.personnel.findUnique({ where: { id: actorId }, select: { supervisorId: true } })
+      if (approver?.supervisorId) {
+        nextApprovalById = approver.supervisorId
+        nextApprovalByType = 'personnel'
+      } else {
+        // No supervisor set — route to director
+        const director = await prisma.director.findFirst({ where: { workspaceId } })
+        if (director) { nextApprovalById = director.id; nextApprovalByType = 'director' }
+      }
+    }
+
     await prisma.$transaction(async tx => {
-      await tx.task.update({ where: { id: task.id }, data: { status: 'APPROVED' } })
+      if (nextApprovalById && nextApprovalByType) {
+        // Route to next level — keep SUBMITTED but change approvalById
+        await tx.task.update({ where: { id: task.id }, data: { approvalById: nextApprovalById, approvalByType: nextApprovalByType } })
+        await writeAudit(tx, workspaceId, 'TASK_APPROVED', actorType, actorId, task.id)
+        // Notify the next approver
+        await notifyActor(tx, workspaceId, nextApprovalByType as 'director' | 'personnel', nextApprovalById, 'task_submitted_for_approval', 'Task pending your approval', `"${task.title}" has been approved by ${actorType} and is awaiting your approval.`, task.id)
+      } else {
+        // Director approving or no further chain — fully approve
+        await tx.task.update({ where: { id: task.id }, data: { status: 'APPROVED' } })
+        await writeAudit(tx, workspaceId, 'TASK_APPROVED', actorType, actorId, task.id)
+      }
       await writeAudit(tx, workspaceId, 'TASK_APPROVED', actorType, actorId, task.id)
 
       // If this task has a parent, notify the parent's assignee that one subtask is now approved
