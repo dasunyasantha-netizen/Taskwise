@@ -25,7 +25,7 @@ const statusColors: Record<string, string> = {
   SUBMITTED: 'badge-purple', APPROVED: 'badge-success',
   RETURNED:  'badge-danger',  REJECTED: 'badge-danger', CANCELLED: 'badge-gray',
 }
-const displayStatus = (s: string) => s === 'ASSIGNED' ? 'PENDING' : s.replace('_', ' ')
+const displayStatus = (s: string) => s.replace('_', ' ')
 const eventLabels: Record<string, string> = {
   TASK_CREATED:    'Task created',    TASK_ASSIGNED:   'Task assigned',
   TASK_ACCEPTED:   'Task accepted',   TASK_REASSIGNED: 'Task reassigned',

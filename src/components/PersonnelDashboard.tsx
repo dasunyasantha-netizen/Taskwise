@@ -25,8 +25,7 @@ const statusBadge: Record<string, string> = {
   RETURNED:    'badge-danger',
   REJECTED:    'badge-danger',
 }
-const displayStatus = (status: string) =>
-  status === 'ASSIGNED' ? 'PENDING' : status.replace('_', ' ')
+const displayStatus = (status: string) => status.replace('_', ' ')
 const priorityBadge: Record<string, string> = {
   CRITICAL: 'badge-danger', HIGH: 'badge-warning', MEDIUM: 'badge-primary', LOW: 'badge-gray',
 }
@@ -75,7 +74,18 @@ function ExpandedRow({ task, colSpan, actorId, departmentId, onOpen, onSubtaskCl
 
   useEffect(() => {
     taskApi.subtasks(task.id)
-      .then(s => setSubtasks(s as Task[]))
+      .then(async (s) => {
+        const list = s as Task[]
+        // Auto-accept any ASSIGNED subtask belonging to this user so it shows IN_PROGRESS
+        await Promise.all(
+          list
+            .filter(sub => sub.status === 'ASSIGNED' && sub.assignments?.some(a => a.personnelId === actorId))
+            .map(sub => taskApi.accept(sub.id).catch(() => {}))
+        )
+        // Reload so statuses reflect the accepts
+        const refreshed = await taskApi.subtasks(task.id).catch(() => list)
+        setSubtasks(refreshed as Task[])
+      })
       .catch(() => {})
       .finally(() => setLoadingS(false))
     taskApi.progressLogs(task.id)
