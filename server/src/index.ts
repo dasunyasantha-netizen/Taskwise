@@ -23,7 +23,7 @@ app.use(cors({
   credentials: true,
 }))
 
-app.use(express.json())
+app.use(express.json({ limit: '2mb' }))  // allow avatar/logo base64 payloads up to ~1.5MB
 
 // Routes
 app.use('/api/auth',          authRoutes)

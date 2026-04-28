@@ -14,7 +14,9 @@ datasource db {
 
 model Director {
   id          String     @id @default(uuid())
-  email       String     @unique
+  email       String?    @unique  // optional — phone is now the login credential
+  phone       String     @unique  // primary login username
+  nic         String?    @unique  // National Identity Card — globally unique
   password    String
   name        String
   avatarUrl   String?
@@ -31,10 +33,12 @@ model Director {
 }
 
 model Workspace {
-  id        String   @id @default(uuid())
-  name      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(uuid())
+  name        String
+  companyName String?  // branding: displayed in sidebar/login
+  companyLogo String?  // branding: base64 or URL of company logo
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   director Director?
   layers   Layer[]
@@ -83,11 +87,13 @@ model Personnel {
   workspaceId  String
   departmentId String
   department   Department @relation(fields: [departmentId], references: [id])
-  email        String
+  email        String?    // optional — phone is the login credential
+  phone        String     @unique  // globally unique — used as login across all workspaces
+  nic          String?    @unique  // globally unique — one real person across all workspaces
   password     String
   name         String
-  phone        String?
-  avatarUrl    String?
+  avatarUrl          String?
+  mustChangePassword Boolean  @default(false)
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
   deletedAt    DateTime?
@@ -98,8 +104,6 @@ model Personnel {
   auditLogs        AuditLog[]     @relation("AuditActorPersonnel")
   notifications    Notification[] @relation("NotifRecipientPersonnel")
   comments         TaskComment[]  @relation("CommentAuthorPersonnel")
-
-  @@unique([workspaceId, email])
   @@index([workspaceId])
   @@index([departmentId])
 }

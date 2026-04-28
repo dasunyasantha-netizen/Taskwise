@@ -38,11 +38,9 @@ export const api = {
 
 // ─── Auth ───────────────────────────────────────────────────────────────────
 export const authApi = {
-  directorLogin:   (email: string, password: string) =>
-    api.post<{ token: string; user: unknown }>('/auth/director/login', { email, password }),
-  personnelLogin:  (email: string, password: string) =>
-    api.post<{ token: string; user: unknown }>('/auth/personnel/login', { email, password }),
-  directorRegister: (data: { email: string; password: string; name: string }) =>
+  login: (phone: string, password: string) =>
+    api.post<{ token: string; user: unknown }>('/auth/login', { phone, password }),
+  directorRegister: (data: { phone: string; password: string; name: string; workspaceName?: string }) =>
     api.post<{ token: string; user: unknown }>('/auth/director/register', data),
   me: () => api.get<unknown>('/auth/me'),
   changePassword: (currentPassword: string, newPassword: string) =>
@@ -52,7 +50,11 @@ export const authApi = {
 // ─── Workspace ───────────────────────────────────────────────────────────────
 export const workspaceApi = {
   get:               ()              => api.get('/workspace'),
+  update:            (data: unknown) => api.put('/workspace', data),
+  updateProfile:     (data: unknown) => api.put('/workspace/profile', data),
   getLayers:         ()              => api.get('/workspace/layers'),
+  updateLayer:       (id: string, data: unknown) => api.put(`/workspace/layers/${id}`, data),
+  uploadAvatar:      (avatarDataUrl: string) => api.post('/workspace/avatar', { avatarDataUrl }),
   getDepartments:    ()              => api.get('/workspace/departments'),
   createDepartment:  (data: unknown) => api.post('/workspace/departments', data),
   updateDepartment:  (id: string, data: unknown) => api.put(`/workspace/departments/${id}`, data),
@@ -88,6 +90,8 @@ export const taskApi = {
   update:     (id: string, data: unknown) => api.put(`/tasks/${id}`, data),
   delete:     (id: string)      => api.delete(`/tasks/${id}`),
   assign:     (id: string, data: unknown) => api.post(`/tasks/${id}/assign`, data),
+  accept:     (id: string)      => api.post(`/tasks/${id}/accept`),
+  reassign:   (id: string, personnelId: string, reason: string) => api.post(`/tasks/${id}/reassign`, { personnelId, reason }),
   start:      (id: string)      => api.post(`/tasks/${id}/start`),
   submit:     (id: string)      => api.post(`/tasks/${id}/submit`),
   block:      (id: string, reason: string) => api.post(`/tasks/${id}/block`, { reason }),

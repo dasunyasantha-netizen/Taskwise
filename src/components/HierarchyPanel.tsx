@@ -15,7 +15,9 @@ export default function HierarchyPanel() {
   const [showMoveModal, setShowMoveModal] = useState(false)
 
   const [deptForm, setDeptForm] = useState({ name: '', layerId: '' })
-  const [personnelForm, setPersonnelForm] = useState({ name: '', email: '', password: '', departmentId: '', phone: '' })
+  const [personnelForm, setPersonnelForm] = useState({ name: '', phone: '', email: '', nic: '', departmentId: '' })
+  const [editingLayerId, setEditingLayerId] = useState<string | null>(null)
+  const [editingLayerName, setEditingLayerName] = useState('')
   const [groupForm, setGroupForm] = useState({ name: '', departmentId: '' })
   const [movingPersonnel, setMovingPersonnel] = useState<Personnel | null>(null)
   const [moveTarget, setMoveTarget] = useState('')
@@ -44,6 +46,22 @@ export default function HierarchyPanel() {
 
   const allDepts = layers.flatMap(l => l.departments || [])
 
+  // ── Layer rename ─────────────────────────────────────────
+  const startEditLayer = (layer: Layer) => {
+    setEditingLayerId(layer.id)
+    setEditingLayerName(layer.name)
+  }
+  const saveLayerName = async (layerId: string) => {
+    if (!editingLayerName.trim()) return
+    setSaving(true)
+    try {
+      await workspaceApi.updateLayer(layerId, { name: editingLayerName.trim() })
+      setEditingLayerId(null)
+      await load()
+    } catch (e: unknown) { setError(e instanceof Error ? e.message : 'Error') }
+    setSaving(false)
+  }
+
   // ── Department ──────────────────────────────────────────
   const createDept = async () => {
     if (!deptForm.name || !deptForm.layerId) return
@@ -62,11 +80,11 @@ export default function HierarchyPanel() {
 
   // ── Personnel ────────────────────────────────────────────
   const createPersonnel = async () => {
-    if (!personnelForm.name || !personnelForm.email || !personnelForm.password || !personnelForm.departmentId) return
+    if (!personnelForm.name || !personnelForm.phone || !personnelForm.departmentId) return
     setSaving(true)
     try {
       await workspaceApi.createPersonnel(personnelForm)
-      setShowPersonnelModal(false); setPersonnelForm({ name: '', email: '', password: '', departmentId: '', phone: '' }); await load()
+      setShowPersonnelModal(false); setPersonnelForm({ name: '', phone: '', email: '', nic: '', departmentId: '' }); await load()
     } catch (e: unknown) { setError(e instanceof Error ? e.message : 'Error') }
     setSaving(false)
   }
@@ -143,11 +161,28 @@ export default function HierarchyPanel() {
           {layers.map((layer, idx) => (
             <div key={layer.id} className="card overflow-hidden">
               <div className={`px-4 py-3 flex items-center gap-3 ${layerColors[idx]} bg-opacity-10 border-b border-tw-border`}>
-                <div className={`w-6 h-6 rounded-full ${layerColors[idx]} flex items-center justify-center text-white text-xs font-bold`}>{layer.number}</div>
-                <div>
-                  <div className="font-semibold text-tw-text text-sm">{layer.name}</div>
-                  <div className="text-xs text-tw-text-secondary">{(layer.departments || []).length} departments</div>
-                </div>
+                <div className={`w-6 h-6 rounded-full ${layerColors[idx]} flex items-center justify-center text-white text-xs font-bold flex-shrink-0`}>{layer.number}</div>
+                {editingLayerId === layer.id ? (
+                  <div className="flex items-center gap-2 flex-1">
+                    <input
+                      className="input text-sm py-1 px-2 h-auto"
+                      value={editingLayerName}
+                      onChange={e => setEditingLayerName(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') saveLayerName(layer.id); if (e.key === 'Escape') setEditingLayerId(null) }}
+                      autoFocus
+                    />
+                    <button onClick={() => saveLayerName(layer.id)} disabled={saving} className="btn-primary text-xs py-1 px-3">Save</button>
+                    <button onClick={() => setEditingLayerId(null)} className="btn-secondary text-xs py-1 px-2">✕</button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 flex-1">
+                    <div>
+                      <div className="font-semibold text-tw-text text-sm">{layer.name}</div>
+                      <div className="text-xs text-tw-text-secondary">{(layer.departments || []).length} departments</div>
+                    </div>
+                    <button onClick={() => startEditLayer(layer)} className="ml-2 text-xs text-tw-text-secondary hover:text-tw-primary" title="Rename layer">✏️</button>
+                  </div>
+                )}
               </div>
               {(layer.departments || []).length === 0 ? (
                 <div className="px-4 py-4 text-sm text-tw-text-secondary italic">No departments in this layer yet.</div>
@@ -194,7 +229,7 @@ export default function HierarchyPanel() {
           <table className="w-full text-sm">
             <thead className="bg-tw-hover">
               <tr>
-                {['Name', 'Email', 'Department', 'Layer', 'Actions'].map(h => (
+                {['Name', 'Phone', 'Department', 'Layer', 'Actions'].map(h => (
                   <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-tw-text-secondary uppercase tracking-wide">{h}</th>
                 ))}
               </tr>
@@ -213,7 +248,7 @@ export default function HierarchyPanel() {
                         <span className="font-medium text-tw-text">{p.name}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-tw-text-secondary">{p.email}</td>
+                    <td className="px-4 py-3 text-tw-text-secondary">{p.phone || p.email || '—'}</td>
                     <td className="px-4 py-3"><span className="badge badge-primary">{dept?.name || '—'}</span></td>
                     <td className="px-4 py-3 text-tw-text-secondary text-xs">{layer?.name || '—'}</td>
                     <td className="px-4 py-3">
@@ -307,25 +342,31 @@ export default function HierarchyPanel() {
               <input className="input" placeholder="John Smith" value={personnelForm.name} onChange={e => setPersonnelForm(f => ({ ...f, name: e.target.value }))} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-tw-text mb-1">Email</label>
+              <label className="block text-sm font-medium text-tw-text mb-1">Phone Number <span className="text-tw-danger">*</span></label>
+              <input className="input" type="tel" placeholder="07X XXXXXXX" value={personnelForm.phone} onChange={e => setPersonnelForm(f => ({ ...f, phone: e.target.value }))} />
+              <p className="text-xs text-tw-text-secondary mt-0.5">Used as login username. Must be unique in this workspace.</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-tw-text mb-1">Email <span className="text-tw-text-secondary font-normal">(optional)</span></label>
               <input className="input" type="email" placeholder="john@example.com" value={personnelForm.email} onChange={e => setPersonnelForm(f => ({ ...f, email: e.target.value }))} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-tw-text mb-1">Password</label>
-              <input className="input" type="password" placeholder="Temporary password" value={personnelForm.password} onChange={e => setPersonnelForm(f => ({ ...f, password: e.target.value }))} />
+              <label className="block text-sm font-medium text-tw-text mb-1">NIC <span className="text-tw-text-secondary font-normal">(optional)</span></label>
+              <input className="input" placeholder="XXXXXXXXXV" value={personnelForm.nic} onChange={e => setPersonnelForm(f => ({ ...f, nic: e.target.value }))} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-tw-text mb-1">Phone (optional)</label>
-              <input className="input" placeholder="+94 77 000 0000" value={personnelForm.phone} onChange={e => setPersonnelForm(f => ({ ...f, phone: e.target.value }))} />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-tw-text mb-1">Department</label>
+              <label className="block text-sm font-medium text-tw-text mb-1">Department <span className="text-tw-danger">*</span></label>
               <Select
                 value={personnelForm.departmentId}
                 onChange={val => setPersonnelForm(f => ({ ...f, departmentId: val }))}
                 placeholder="Select department..."
                 options={layers.flatMap(l => (l.departments || []).map(d => ({ value: d.id, label: d.name, group: l.name })))}
               />
+            </div>
+            <div className="bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+              <p className="text-xs text-blue-700">
+                <strong>Auto login:</strong> Their password will be set to the last 6 digits of their phone number. They will be asked to change it on first login.
+              </p>
             </div>
             <div className="flex gap-2 justify-end">
               <button onClick={() => setShowPersonnelModal(false)} className="btn-secondary">Cancel</button>

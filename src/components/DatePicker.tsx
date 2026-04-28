@@ -21,6 +21,7 @@ export default function DatePicker({ value, onChange, placeholder = 'Select date
   const [showYearPicker, setShowYearPicker] = useState(false)
 
   const ref = useRef<HTMLDivElement>(null)
+  const [openUpward, setOpenUpward] = useState(false)
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -29,6 +30,16 @@ export default function DatePicker({ value, onChange, placeholder = 'Select date
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [])
+
+  // Detect if there's enough space below; if not, open upward
+  const handleOpen = () => {
+    if (ref.current) {
+      const rect = ref.current.getBoundingClientRect()
+      const spaceBelow = window.innerHeight - rect.bottom
+      setOpenUpward(spaceBelow < 340)
+    }
+    setOpen(o => !o)
+  }
 
   // When value changes externally, sync view
   useEffect(() => {
@@ -80,7 +91,7 @@ export default function DatePicker({ value, onChange, placeholder = 'Select date
       {/* Trigger */}
       <button
         type="button"
-        onClick={() => setOpen(o => !o)}
+        onClick={handleOpen}
         className="w-full flex items-center justify-between border border-tw-border rounded-lg px-3 py-2 text-sm bg-white hover:border-tw-primary focus:outline-none focus:ring-2 focus:ring-tw-primary transition-colors"
       >
         <div className="flex items-center gap-2 min-w-0">
@@ -105,7 +116,7 @@ export default function DatePicker({ value, onChange, placeholder = 'Select date
 
       {/* Dropdown */}
       {open && (
-        <div className="absolute z-50 mt-1 bg-white border border-tw-border rounded-xl shadow-panel w-72 overflow-hidden">
+        <div className={`absolute z-50 bg-white border border-tw-border rounded-xl shadow-panel w-72 overflow-hidden ${openUpward ? 'bottom-full mb-1' : 'top-full mt-1'}`}>
 
           {/* Month / Year nav */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-tw-border">

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import type { AuthUser, ViewMode } from './types'
 import Auth from './components/Auth'
+import ForcePasswordChange from './components/ForcePasswordChange'
 import DirectorDashboard from './components/DirectorDashboard'
 import PersonnelDashboard from './components/PersonnelDashboard'
 
@@ -19,7 +20,10 @@ export default function App() {
       try {
         const parsed = JSON.parse(userData) as AuthUser
         setUser(parsed)
-        setView(parsed.actorType === 'director' ? 'director_dashboard' : 'personnel_queue')
+        // mustChangePassword users stay gated — don't navigate to dashboard
+        if (!parsed.mustChangePassword) {
+          setView(parsed.actorType === 'director' ? 'director_dashboard' : 'personnel_queue')
+        }
       } catch {
         localStorage.removeItem(TOKEN_KEY)
         localStorage.removeItem(USER_KEY)
@@ -32,7 +36,21 @@ export default function App() {
     localStorage.setItem(TOKEN_KEY, token)
     localStorage.setItem(USER_KEY, JSON.stringify(userData))
     setUser(userData)
-    setView(userData.actorType === 'director' ? 'director_dashboard' : 'personnel_queue')
+    // Gate on mustChangePassword before allowing into the app
+    if (!userData.mustChangePassword) {
+      setView(userData.actorType === 'director' ? 'director_dashboard' : 'personnel_queue')
+    }
+  }
+
+  const handlePasswordChanged = () => {
+    // Clear the flag and enter the app
+    setUser(prev => {
+      if (!prev) return prev
+      const next = { ...prev, mustChangePassword: false }
+      localStorage.setItem(USER_KEY, JSON.stringify(next))
+      return next
+    })
+    setView('personnel_queue')
   }
 
   const handleLogout = () => {
@@ -40,6 +58,15 @@ export default function App() {
     localStorage.removeItem(USER_KEY)
     setUser(null)
     setView('login')
+  }
+
+  const handleUserUpdate = (updated: Partial<AuthUser>) => {
+    setUser(prev => {
+      if (!prev) return prev
+      const next = { ...prev, ...updated }
+      localStorage.setItem(USER_KEY, JSON.stringify(next))
+      return next
+    })
   }
 
   if (loading) {
@@ -54,6 +81,17 @@ export default function App() {
     return <Auth onLogin={handleLogin} />
   }
 
+  // First login gate — must change password before entering the app
+  if (user.mustChangePassword) {
+    return (
+      <ForcePasswordChange
+        user={user}
+        onPasswordChanged={handlePasswordChanged}
+        onLogout={handleLogout}
+      />
+    )
+  }
+
   if (user.actorType === 'director') {
     return (
       <DirectorDashboard
@@ -61,6 +99,7 @@ export default function App() {
         currentView={view}
         setView={setView}
         onLogout={handleLogout}
+        onUserUpdate={handleUserUpdate}
       />
     )
   }
@@ -71,6 +110,7 @@ export default function App() {
       currentView={view}
       setView={setView}
       onLogout={handleLogout}
+      onUserUpdate={handleUserUpdate}
     />
   )
 }

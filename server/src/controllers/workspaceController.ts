@@ -13,6 +13,19 @@ export async function getWorkspace(req: Request, res: Response): Promise<void> {
   } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
 }
 
+// PUT /api/workspace  (update company branding — Director only)
+export async function updateWorkspace(req: Request, res: Response): Promise<void> {
+  try {
+    if (req.user!.actorType !== 'director') { res.status(403).json({ error: 'Director only' }); return }
+    const { companyName, companyLogo } = req.body
+    const workspace = await prisma.workspace.update({
+      where: { id: req.user!.workspaceId },
+      data: { companyName, companyLogo }
+    })
+    res.json(workspace)
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
+}
+
 // GET /api/workspace/layers
 export async function getLayers(req: Request, res: Response): Promise<void> {
   try {
@@ -22,6 +35,17 @@ export async function getLayers(req: Request, res: Response): Promise<void> {
       include: { departments: { where: { deletedAt: null }, include: { personnel: { where: { deletedAt: null } } } } }
     })
     res.json(layers)
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
+}
+
+// PUT /api/workspace/layers/:id  (rename a layer — Director only)
+export async function updateLayer(req: Request, res: Response): Promise<void> {
+  try {
+    if (req.user!.actorType !== 'director') { res.status(403).json({ error: 'Director only' }); return }
+    const layer = await prisma.layer.findFirst({ where: { id: req.params.id, workspaceId: req.user!.workspaceId } })
+    if (!layer) { res.status(404).json({ error: 'Layer not found' }); return }
+    const updated = await prisma.layer.update({ where: { id: req.params.id }, data: { name: req.body.name } })
+    res.json(updated)
   } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
 }
 
@@ -87,16 +111,89 @@ export async function getPersonnel(req: Request, res: Response): Promise<void> {
 // POST /api/workspace/personnel
 export async function createPersonnel(req: Request, res: Response): Promise<void> {
   try {
-    const { name, email, password, departmentId, phone } = req.body
-    if (!name || !email || !password || !departmentId) { res.status(400).json({ error: 'name, email, password, departmentId required' }); return }
+    const { name, phone, email, nic, departmentId } = req.body
+    if (!name || !phone || !departmentId) { res.status(400).json({ error: 'name, phone, departmentId required' }); return }
     const dept = await prisma.department.findFirst({ where: { id: departmentId, workspaceId: req.user!.workspaceId, deletedAt: null } })
     if (!dept) { res.status(404).json({ error: 'Department not found' }); return }
-    const existing = await prisma.personnel.findFirst({ where: { email, workspaceId: req.user!.workspaceId, deletedAt: null } })
-    if (existing) { res.status(409).json({ error: 'Email already in use in this workspace' }); return }
-    const hashed = await bcrypt.hash(password, 12)
-    const person = await prisma.personnel.create({ data: { name, email, password: hashed, departmentId, workspaceId: req.user!.workspaceId, phone } })
+    // Phone is globally unique — check across all workspaces
+    const existingPhone = await prisma.personnel.findUnique({ where: { phone } })
+    if (existingPhone) { res.status(409).json({ error: 'Phone number already registered' }); return }
+    const directorPhone = await prisma.director.findUnique({ where: { phone } })
+    if (directorPhone) { res.status(409).json({ error: 'Phone number already registered' }); return }
+    if (nic) {
+      // NIC is globally unique — check across all workspaces and directors
+      const nicPersonnel = await prisma.personnel.findUnique({ where: { nic } })
+      if (nicPersonnel) { res.status(409).json({ error: 'NIC already registered' }); return }
+      const nicDirector = await prisma.director.findUnique({ where: { nic } })
+      if (nicDirector) { res.status(409).json({ error: 'NIC already registered' }); return }
+    }
+    // Auto-generate password: last 6 digits of phone number
+    const tempPassword = phone.replace(/\D/g, '').slice(-6)
+    const hashed = await bcrypt.hash(tempPassword, 12)
+    const person = await prisma.personnel.create({
+      data: { name, phone, email, nic, password: hashed, departmentId, workspaceId: req.user!.workspaceId, mustChangePassword: true }
+    })
     const { password: _p, ...safe } = person
     res.status(201).json(safe)
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
+}
+
+// PUT /api/workspace/profile  — update own profile (works for both directors and personnel)
+export async function updateProfile(req: Request, res: Response): Promise<void> {
+  try {
+    const { actorId, actorType } = req.user!
+    const { name, phone, nic, email } = req.body
+    if (!name || !phone) { res.status(400).json({ error: 'name and phone are required' }); return }
+
+    // Check phone globally unique (excluding self)
+    const dirPhoneConflict = await prisma.director.findFirst({ where: { phone, NOT: actorType === 'director' ? { id: actorId } : undefined } })
+    if (dirPhoneConflict) { res.status(409).json({ error: 'Phone number already in use' }); return }
+    const perPhoneConflict = await prisma.personnel.findFirst({ where: { phone, NOT: actorType === 'personnel' ? { id: actorId } : undefined } })
+    if (perPhoneConflict) { res.status(409).json({ error: 'Phone number already in use' }); return }
+
+    // Check NIC globally unique (excluding self)
+    if (nic) {
+      const dirNicConflict = await prisma.director.findFirst({ where: { nic, NOT: actorType === 'director' ? { id: actorId } : undefined } })
+      if (dirNicConflict) { res.status(409).json({ error: 'NIC already in use' }); return }
+      const perNicConflict = await prisma.personnel.findFirst({ where: { nic, NOT: actorType === 'personnel' ? { id: actorId } : undefined } })
+      if (perNicConflict) { res.status(409).json({ error: 'NIC already in use' }); return }
+    }
+
+    if (actorType === 'director') {
+      const updated = await prisma.director.update({ where: { id: actorId }, data: { name, phone, nic: nic || null, email: email || null } })
+      const { password: _p, ...safe } = updated
+      res.json(safe)
+    } else {
+      const updated = await prisma.personnel.update({ where: { id: actorId }, data: { name, phone, nic: nic || null, email: email || null } })
+      const { password: _p, ...safe } = updated
+      res.json(safe)
+    }
+  } catch (err: unknown) {
+    const e = err as { code?: string }
+    if (e.code === 'P2002') { res.status(409).json({ error: 'Phone or NIC already in use' }); return }
+    console.error(err); res.status(500).json({ error: 'Internal server error' })
+  }
+}
+
+// POST /api/workspace/avatar  — upload profile avatar (accepts base64 data URL)
+// Used by both directors and personnel to update their own avatar
+export async function uploadAvatar(req: Request, res: Response): Promise<void> {
+  try {
+    const { actorId, actorType } = req.user!
+    const { avatarDataUrl } = req.body
+    if (!avatarDataUrl || !avatarDataUrl.startsWith('data:image/')) {
+      res.status(400).json({ error: 'avatarDataUrl must be a valid image data URL' }); return
+    }
+    // Limit: 500KB base64 ≈ ~375KB image
+    if (avatarDataUrl.length > 700_000) {
+      res.status(400).json({ error: 'Image too large. Please compress further before uploading.' }); return
+    }
+    if (actorType === 'director') {
+      await prisma.director.update({ where: { id: actorId }, data: { avatarUrl: avatarDataUrl } })
+    } else {
+      await prisma.personnel.update({ where: { id: actorId }, data: { avatarUrl: avatarDataUrl } })
+    }
+    res.json({ success: true, avatarUrl: avatarDataUrl })
   } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
 }
 
@@ -110,8 +207,8 @@ export async function updatePersonnel(req: Request, res: Response): Promise<void
     }
     const person = await prisma.personnel.findFirst({ where: { id: req.params.id, workspaceId, deletedAt: null } })
     if (!person) { res.status(404).json({ error: 'Personnel not found' }); return }
-    const { name, phone, avatarUrl } = req.body
-    const updated = await prisma.personnel.update({ where: { id: req.params.id }, data: { name, phone, avatarUrl } })
+    const { name, phone, nic, email } = req.body
+    const updated = await prisma.personnel.update({ where: { id: req.params.id }, data: { name, phone, nic, email } })
     const { password: _p, ...safe } = updated
     res.json(safe)
   } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }

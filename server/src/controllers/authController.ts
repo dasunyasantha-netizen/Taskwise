@@ -11,17 +11,114 @@ function signToken(actorId: string, actorType: 'director' | 'personnel', workspa
   )
 }
 
-// POST /api/auth/director/register
-export async function directorRegister(req: Request, res: Response): Promise<void> {
+// POST /api/auth/login  — unified phone-based login (Director first, then Personnel)
+export async function unifiedLogin(req: Request, res: Response): Promise<void> {
   try {
-    const { email, password, name, workspaceName } = req.body
-    if (!email || !password || !name) {
-      res.status(400).json({ error: 'email, password, and name are required' })
+    const { phone, password } = req.body
+    if (!phone || !password) {
+      res.status(400).json({ error: 'phone and password are required' })
       return
     }
-    const existing = await prisma.director.findUnique({ where: { email } })
+
+    // 1. Try Director
+    const director = await prisma.director.findUnique({ where: { phone } })
+    if (director) {
+      if (!(await bcrypt.compare(password, director.password))) {
+        res.status(401).json({ error: 'Invalid credentials' })
+        return
+      }
+      const token = signToken(director.id, 'director', director.workspaceId!)
+
+      // Load workspace branding
+      const workspace = director.workspaceId
+        ? await prisma.workspace.findUnique({
+            where: { id: director.workspaceId },
+            select: { companyName: true, companyLogo: true }
+          })
+        : null
+
+      res.json({
+        token,
+        user: {
+          actorId: director.id,
+          actorType: 'director',
+          workspaceId: director.workspaceId,
+          name: director.name,
+          phone: director.phone,
+          email: director.email,
+          avatarUrl: director.avatarUrl,
+          companyName: workspace?.companyName,
+          companyLogo: workspace?.companyLogo,
+        }
+      })
+      return
+    }
+
+    // 2. Try Personnel (phone globally unique)
+    const personnel = await prisma.personnel.findUnique({
+      where: { phone },
+      include: { department: { include: { layer: true } } }
+    })
+    if (personnel?.deletedAt) {
+      res.status(401).json({ error: 'Invalid credentials' })
+      return
+    }
+    if (personnel) {
+      if (!(await bcrypt.compare(password, personnel.password))) {
+        res.status(401).json({ error: 'Invalid credentials' })
+        return
+      }
+      const layerNumber = personnel.department.layer.number
+      const token = signToken(personnel.id, 'personnel', personnel.workspaceId, {
+        layerNumber,
+        departmentId: personnel.departmentId,
+      })
+
+      // Load workspace branding
+      const workspace = await prisma.workspace.findUnique({
+        where: { id: personnel.workspaceId },
+        select: { companyName: true, companyLogo: true }
+      })
+
+      res.json({
+        token,
+        mustChangePassword: personnel.mustChangePassword,
+        user: {
+          actorId: personnel.id,
+          actorType: 'personnel',
+          workspaceId: personnel.workspaceId,
+          name: personnel.name,
+          phone: personnel.phone,
+          email: personnel.email,
+          avatarUrl: personnel.avatarUrl,
+          layerNumber,
+          departmentId: personnel.departmentId,
+          companyName: workspace?.companyName,
+          companyLogo: workspace?.companyLogo,
+          mustChangePassword: personnel.mustChangePassword,
+        }
+      })
+      return
+    }
+
+    res.status(401).json({ error: 'Invalid credentials' })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+}
+
+// POST /api/auth/director/register  — Director creates their workspace (blocked in production UI)
+export async function directorRegister(req: Request, res: Response): Promise<void> {
+  try {
+    const { phone, password, name, workspaceName } = req.body
+    if (!phone || !password || !name) {
+      res.status(400).json({ error: 'phone, password, and name are required' })
+      return
+    }
+    const existing = await prisma.director.findUnique({ where: { phone } })
     if (existing) {
-      res.status(409).json({ error: 'Email already registered' })
+      res.status(409).json({ error: 'Phone already registered' })
       return
     }
     const hashed = await bcrypt.hash(password, 12)
@@ -29,7 +126,6 @@ export async function directorRegister(req: Request, res: Response): Promise<voi
       const workspace = await tx.workspace.create({
         data: { name: workspaceName || `${name}'s Workspace` }
       })
-      // Seed 3 default layers
       await tx.layer.createMany({
         data: [
           { workspaceId: workspace.id, number: 1, name: 'Layer 1' },
@@ -38,72 +134,19 @@ export async function directorRegister(req: Request, res: Response): Promise<voi
         ]
       })
       const dir = await tx.director.create({
-        data: { email, password: hashed, name, workspaceId: workspace.id }
+        data: { phone, password: hashed, name, workspaceId: workspace.id }
       })
       return dir
     })
     const token = signToken(director.id, 'director', director.workspaceId!)
     res.status(201).json({
       token,
-      user: { actorId: director.id, actorType: 'director', workspaceId: director.workspaceId, name: director.name, email: director.email }
-    })
-  } catch (err) {
-    console.error(err)
-    res.status(500).json({ error: 'Internal server error' })
-  }
-}
-
-// POST /api/auth/director/login
-export async function directorLogin(req: Request, res: Response): Promise<void> {
-  try {
-    const { email, password } = req.body
-    const director = await prisma.director.findUnique({ where: { email } })
-    if (!director || !(await bcrypt.compare(password, director.password))) {
-      res.status(401).json({ error: 'Invalid credentials' })
-      return
-    }
-    const token = signToken(director.id, 'director', director.workspaceId!)
-    res.json({
-      token,
-      user: { actorId: director.id, actorType: 'director', workspaceId: director.workspaceId, name: director.name, email: director.email }
-    })
-  } catch (err) {
-    console.error(err)
-    res.status(500).json({ error: 'Internal server error' })
-  }
-}
-
-// POST /api/auth/personnel/login
-export async function personnelLogin(req: Request, res: Response): Promise<void> {
-  try {
-    const { email, password, workspaceId } = req.body
-    if (!workspaceId) {
-      res.status(400).json({ error: 'workspaceId is required for personnel login' })
-      return
-    }
-    const personnel = await prisma.personnel.findFirst({
-      where: { email, workspaceId, deletedAt: null },
-      include: { department: { include: { layer: true } } }
-    })
-    if (!personnel || !(await bcrypt.compare(password, personnel.password))) {
-      res.status(401).json({ error: 'Invalid credentials' })
-      return
-    }
-    const layerNumber = personnel.department.layer.number
-    const token = signToken(personnel.id, 'personnel', personnel.workspaceId, {
-      layerNumber,
-      departmentId: personnel.departmentId,
-    })
-    res.json({
-      token,
       user: {
-        actorId: personnel.id,
-        actorType: 'personnel',
-        workspaceId: personnel.workspaceId,
-        name: personnel.name,
-        email: personnel.email,
-        layerNumber,
-        departmentId: personnel.departmentId,
+        actorId: director.id,
+        actorType: 'director',
+        workspaceId: director.workspaceId,
+        name: director.name,
+        phone: director.phone,
       }
     })
   } catch (err) {
@@ -135,7 +178,10 @@ export async function changePassword(req: Request, res: Response): Promise<void>
       if (!personnel || !(await bcrypt.compare(currentPassword, personnel.password))) {
         res.status(401).json({ error: 'Current password is incorrect' }); return
       }
-      await prisma.personnel.update({ where: { id: actorId }, data: { password: await bcrypt.hash(newPassword, 12) } })
+      await prisma.personnel.update({
+        where: { id: actorId },
+        data: { password: await bcrypt.hash(newPassword, 12), mustChangePassword: false }
+      })
     }
     res.json({ success: true })
   } catch (err) {
@@ -149,11 +195,29 @@ export async function getMe(req: Request, res: Response): Promise<void> {
   try {
     const { actorId, actorType, workspaceId } = req.user!
     if (actorType === 'director') {
-      const director = await prisma.director.findUnique({ where: { id: actorId }, select: { id: true, email: true, name: true, avatarUrl: true, workspaceId: true } })
-      res.json({ actorId, actorType, workspaceId, ...director })
+      const director = await prisma.director.findUnique({
+        where: { id: actorId },
+        select: { id: true, phone: true, email: true, nic: true, name: true, avatarUrl: true, workspaceId: true }
+      })
+      const workspace = workspaceId
+        ? await prisma.workspace.findUnique({
+            where: { id: workspaceId },
+            select: { companyName: true, companyLogo: true }
+          })
+        : null
+      res.json({ actorId, actorType, workspaceId, ...director, companyName: workspace?.companyName, companyLogo: workspace?.companyLogo })
     } else {
-      const personnel = await prisma.personnel.findUnique({ where: { id: actorId }, select: { id: true, email: true, name: true, avatarUrl: true, departmentId: true, workspaceId: true } })
-      res.json({ actorId, actorType, workspaceId, ...personnel })
+      const personnel = await prisma.personnel.findUnique({
+        where: { id: actorId },
+        select: { id: true, phone: true, email: true, nic: true, name: true, avatarUrl: true, departmentId: true, workspaceId: true }
+      })
+      const workspace = workspaceId
+        ? await prisma.workspace.findUnique({
+            where: { id: workspaceId },
+            select: { companyName: true, companyLogo: true }
+          })
+        : null
+      res.json({ actorId, actorType, workspaceId, ...personnel, companyName: workspace?.companyName, companyLogo: workspace?.companyLogo })
     }
   } catch (err) {
     console.error(err)

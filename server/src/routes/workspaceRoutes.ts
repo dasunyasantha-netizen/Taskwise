@@ -1,7 +1,8 @@
 import { Router } from 'express'
 import { authenticateToken, requireDirector } from '../middleware/authMiddleware'
 import {
-  getWorkspace, getLayers, getDepartments, createDepartment, updateDepartment, deleteDepartment,
+  getWorkspace, updateWorkspace, updateProfile, getLayers, updateLayer, uploadAvatar,
+  getDepartments, createDepartment, updateDepartment, deleteDepartment,
   getPersonnel, createPersonnel, updatePersonnel, movePersonnel, deletePersonnel, getPersonnelQueue,
   getGroups, createGroup, updateGroup, deleteGroup, addGroupMember, removeGroupMember,
 } from '../controllers/workspaceController'
@@ -10,7 +11,11 @@ const router = Router()
 router.use(authenticateToken)
 
 router.get('/',                                    getWorkspace)
+router.put('/',                                    requireDirector, updateWorkspace)
+router.put('/profile',                             updateProfile)
 router.get('/layers',                              getLayers)
+router.put('/layers/:id',                          requireDirector, updateLayer)
+router.post('/avatar',                             uploadAvatar)
 
 router.get('/departments',                         getDepartments)
 router.post('/departments',                        requireDirector, createDepartment)

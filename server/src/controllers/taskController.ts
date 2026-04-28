@@ -172,10 +172,13 @@ export async function createTask(req: Request, res: Response): Promise<void> {
       res.status(403).json({ error: 'Only Directors can create top-level tasks' }); return
     }
 
-    // If subtask, verify parent exists
+    // If subtask, verify parent exists and deadline constraint
     if (parentTaskId) {
       const parent = await prisma.task.findFirst({ where: { id: parentTaskId, workspaceId, deletedAt: null } })
       if (!parent) { res.status(404).json({ error: 'Parent task not found' }); return }
+      if (deadline && parent.deadline && new Date(deadline) > parent.deadline) {
+        res.status(400).json({ error: `Subtask deadline cannot be after the parent task deadline (${parent.deadline.toISOString().slice(0, 10)})` }); return
+      }
     }
 
     const task = await prisma.$transaction(async tx => {
@@ -255,6 +258,106 @@ export async function assignTask(req: Request, res: Response): Promise<void> {
       await writeAudit(tx, workspaceId, 'TASK_ASSIGNED', actorType, actorId, task.id, { personnelId, groupId, departmentId })
       if (personnelId) {
         await notifyActor(tx, workspaceId, 'personnel', personnelId, 'task_assigned', 'New task assigned', `You have been assigned: "${task.title}"`, task.id)
+      }
+    })
+    res.json({ success: true })
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
+}
+
+// POST /api/tasks/:id/accept
+// Personnel accepts a department-assigned task — removes dept assignment, creates personal assignment, moves to IN_PROGRESS
+export async function acceptTask(req: Request, res: Response): Promise<void> {
+  try {
+    const { actorId, actorType, workspaceId, departmentId } = req.user!
+    if (actorType !== 'personnel') { res.status(403).json({ error: 'Only personnel can accept tasks' }); return }
+
+    const task = await prisma.task.findFirst({
+      where: { id: req.params.id, workspaceId, deletedAt: null },
+      include: { assignments: true }
+    })
+    if (!task) { res.status(404).json({ error: 'Task not found' }); return }
+    if (task.status !== 'ASSIGNED') { res.status(400).json({ error: 'Task is no longer available to accept' }); return }
+
+    // Verify this person's department has an assignment on this task
+    const deptAssignment = task.assignments.find(a => a.departmentId === departmentId)
+    if (!deptAssignment) { res.status(403).json({ error: 'This task is not assigned to your department' }); return }
+
+    // Check nobody has already accepted it (no personal assignment yet)
+    const alreadyAccepted = task.assignments.some(a => a.personnelId)
+    if (alreadyAccepted) { res.status(409).json({ error: 'This task has already been accepted by someone else' }); return }
+
+    await prisma.$transaction(async tx => {
+      await tx.taskAssignment.delete({ where: { id: deptAssignment.id } })
+      await tx.taskAssignment.create({ data: { taskId: task.id, personnelId: actorId } })
+      await tx.task.update({
+        where: { id: task.id },
+        data: { status: 'IN_PROGRESS', actedById: actorId, actedByType: 'personnel' }
+      })
+      await writeAudit(tx, workspaceId, 'TASK_ACCEPTED', 'personnel', actorId, task.id, { acceptedBy: actorId })
+      // Notify approval authority that someone accepted
+      if (task.approvalById && task.approvalByType) {
+        await notifyActor(tx, workspaceId, task.approvalByType as 'director' | 'personnel', task.approvalById, 'task_assigned',
+          'Task accepted', `Your task "${task.title}" has been accepted.`, task.id)
+      }
+    })
+    res.json({ success: true })
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
+}
+
+// POST /api/tasks/:id/reassign
+// Personnel reassigns their personally-assigned task to another personnel (not dept/group/layer)
+export async function reassignTask(req: Request, res: Response): Promise<void> {
+  try {
+    const { actorId, actorType, workspaceId } = req.user!
+    if (actorType !== 'personnel') { res.status(403).json({ error: 'Only personnel can use this endpoint' }); return }
+
+    const { personnelId, reason } = req.body
+    if (!personnelId) { res.status(400).json({ error: 'personnelId required' }); return }
+    if (!reason)      { res.status(400).json({ error: 'reason required' }); return }
+    if (personnelId === actorId) { res.status(400).json({ error: 'Cannot reassign to yourself' }); return }
+
+    const task = await prisma.task.findFirst({
+      where: { id: req.params.id, workspaceId, deletedAt: null },
+      include: { assignments: true }
+    })
+    if (!task) { res.status(404).json({ error: 'Task not found' }); return }
+
+    // Assignee can reassign; creator (approvalById) can also reassign/assign a PENDING subtask
+    const myAssignment = task.assignments.find(a => a.personnelId === actorId)
+    const isCreator = task.approvalById === actorId && task.approvalByType === 'personnel'
+
+    if (!myAssignment && !isCreator) {
+      res.status(403).json({ error: 'You are not assigned to or the creator of this task' }); return
+    }
+    if (!['PENDING', 'ASSIGNED', 'IN_PROGRESS'].includes(task.status)) {
+      res.status(400).json({ error: 'Task cannot be reassigned in its current status' }); return
+    }
+
+    // Verify target personnel exists in same workspace
+    const targetPersonnel = await prisma.personnel.findFirst({
+      where: { id: personnelId, workspaceId, deletedAt: null }
+    })
+    if (!targetPersonnel) { res.status(404).json({ error: 'Personnel not found' }); return }
+
+    await prisma.$transaction(async tx => {
+      if (myAssignment) {
+        await tx.taskAssignment.delete({ where: { id: myAssignment.id } })
+      } else {
+        // Creator assigning a PENDING subtask — delete any existing unassigned assignment
+        await tx.taskAssignment.deleteMany({ where: { taskId: task.id } })
+      }
+      await tx.taskAssignment.create({ data: { taskId: task.id, personnelId } })
+      await tx.task.update({
+        where: { id: task.id },
+        data: { status: 'ASSIGNED', actedById: actorId, actedByType: 'personnel' }
+      })
+      await writeAudit(tx, workspaceId, 'TASK_REASSIGNED', 'personnel', actorId, task.id, { reason, reassignedTo: personnelId })
+      await notifyActor(tx, workspaceId, 'personnel', personnelId, 'task_assigned',
+        'Task assigned to you', `"${task.title}" was reassigned to you.`, task.id)
+      // Notify approval authority
+      if (task.approvalById && task.approvalByType) {
+        await notifyActor(tx, workspaceId, task.approvalByType as 'director' | 'personnel', task.approvalById, 'task_assigned',
+          'Task reassigned', `"${task.title}" was reassigned to ${targetPersonnel.name}: ${reason}`, task.id)
       }
     })
     res.json({ success: true })
@@ -380,7 +483,7 @@ export async function returnTask(req: Request, res: Response): Promise<void> {
     if (!reason) { res.status(400).json({ error: 'reason required' }); return }
     const task = await prisma.task.findFirst({ where: { id: req.params.id, workspaceId, deletedAt: null } })
     if (!task) { res.status(404).json({ error: 'Task not found' }); return }
-    if (task.status !== 'IN_PROGRESS') { res.status(400).json({ error: 'Task must be IN_PROGRESS to return' }); return }
+    if (!['ASSIGNED', 'IN_PROGRESS'].includes(task.status)) { res.status(400).json({ error: 'Task must be ASSIGNED or IN_PROGRESS to return' }); return }
     await prisma.$transaction(async tx => {
       await tx.task.update({
         where: { id: task.id },

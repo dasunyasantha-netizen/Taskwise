@@ -7,7 +7,15 @@ export interface AuthUser {
   actorType: ActorType
   workspaceId: string
   name: string
-  email: string
+  phone?: string
+  email?: string
+  nic?: string
+  avatarUrl?: string
+  layerNumber?: number
+  departmentId?: string
+  companyName?: string
+  companyLogo?: string
+  mustChangePassword?: boolean
 }
 
 // ─── Workspace & Hierarchy ───────────────────────────────────────────────────
@@ -15,6 +23,8 @@ export interface AuthUser {
 export interface Workspace {
   id: string
   name: string
+  companyName?: string
+  companyLogo?: string
   createdAt: string
 }
 
@@ -40,9 +50,10 @@ export interface Personnel {
   workspaceId: string
   departmentId: string
   department?: Department
-  email: string
+  phone: string
+  email?: string
+  nic?: string
   name: string
-  phone?: string
   avatarUrl?: string
   deletedAt: string | null
   createdAt: string
@@ -199,3 +210,4 @@ export type ViewMode =
   | 'audit_log'
   | 'overdue'
   | 'settings'
+  | 'profile'

@@ -1,44 +1,218 @@
 import React, { useState, useEffect } from 'react'
-import type { AuthUser, ViewMode, Task, Project, Layer, Personnel, Group } from '../types'
+import type { AuthUser, ViewMode, Task, Project, Personnel } from '../types'
 import { taskApi, projectApi, workspaceApi } from '../services/apiService'
 import NotificationsMenu from './NotificationsMenu'
-import TaskCard from './TaskCard'
-import TaskDetailPanel from './TaskDetailPanel'
+import PersonnelTaskModal from './PersonnelTaskModal'
 import BoardView from './BoardView'
+import ProfilePage from './ProfilePage'
 
 interface Props {
   user: AuthUser
   currentView: ViewMode
   setView: (v: ViewMode) => void
   onLogout: () => void
+  onUserUpdate: (updated: Partial<AuthUser>) => void
 }
 
-const STATUS_ORDER = ['ASSIGNED', 'IN_PROGRESS', 'BLOCKED', 'RETURNED', 'REJECTED', 'SUBMITTED']
+// ── shared lookup maps ────────────────────────────────────────────────────────
+const priorityBar:  Record<string, string> = {
+  CRITICAL: 'bg-red-500', HIGH: 'bg-orange-400', MEDIUM: 'bg-yellow-400', LOW: 'bg-gray-300',
+}
+const statusBadge: Record<string, string> = {
+  ASSIGNED:    'badge-primary',
+  IN_PROGRESS: 'badge-warning',
+  BLOCKED:     'bg-orange-100 text-orange-700 border border-orange-200',
+  SUBMITTED:   'badge-purple',
+  RETURNED:    'badge-danger',
+  REJECTED:    'badge-danger',
+}
+const priorityBadge: Record<string, string> = {
+  CRITICAL: 'badge-danger', HIGH: 'badge-warning', MEDIUM: 'badge-primary', LOW: 'badge-gray',
+}
+const subtaskStatusDot: Record<string, string> = {
+  PENDING:     'bg-gray-400',
+  ASSIGNED:    'bg-blue-500',
+  IN_PROGRESS: 'bg-yellow-500',
+  BLOCKED:     'bg-orange-500',
+  SUBMITTED:   'bg-purple-500',
+  APPROVED:    'bg-green-500',
+  RETURNED:    'bg-red-400',
+  REJECTED:    'bg-red-500',
+  CANCELLED:   'bg-gray-300',
+}
 
-export default function PersonnelDashboard({ user, currentView, setView, onLogout }: Props) {
-  const [queue, setQueue] = useState<Task[]>([])
-  const [projects, setProjects] = useState<Project[]>([])
-  const [layers, setLayers] = useState<Layer[]>([])
-  const [personnel, setPersonnel] = useState<Personnel[]>([])
-  const [groups, setGroups] = useState<Group[]>([])
+function daysLeftLabel(deadline?: string) {
+  if (!deadline) return null
+  const d = Math.ceil((new Date(deadline).setHours(0,0,0,0) - new Date().setHours(0,0,0,0)) / 86400000)
+  if (d < 0)  return <span className="inline-flex text-xs font-semibold text-white bg-tw-danger rounded-full px-2 py-0.5">{Math.abs(d)}d overdue</span>
+  if (d === 0) return <span className="inline-flex text-xs font-semibold text-orange-800 bg-orange-100 border border-orange-300 rounded-full px-2 py-0.5">Due today</span>
+  if (d <= 3)  return <span className="inline-flex text-xs font-semibold text-orange-700 bg-orange-50 border border-orange-200 rounded-full px-2 py-0.5">{d}d left</span>
+  return <span className="text-xs text-tw-text-secondary">{d}d left</span>
+}
+
+// ── Expanded row component (loads subtasks on mount) ──────────────────────────
+function ExpandedRow({ task, colSpan, onOpen, onSubtaskClick }: { task: Task; colSpan: number; onOpen: () => void; onSubtaskClick: (t: Task) => void }) {
+  const [subtasks, setSubtasks] = useState<Task[]>([])
+  const [loadingS, setLoadingS] = useState(true)
+
+  useEffect(() => {
+    taskApi.subtasks(task.id)
+      .then(s => setSubtasks(s as Task[]))
+      .catch(() => {})
+      .finally(() => setLoadingS(false))
+  }, [task.id])
+
+  return (
+    <tr className="bg-blue-50 border-b border-tw-border">
+      <td colSpan={colSpan} className="px-0 py-0">
+        <div className="px-6 py-4 space-y-4">
+
+          {/* ── Task meta row ── */}
+          <div className="flex flex-wrap gap-6 text-xs">
+            {task.description && (
+              <div className="w-full">
+                <div className="font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">Description</div>
+                <p className="text-sm text-tw-text leading-relaxed whitespace-pre-wrap">{task.description}</p>
+              </div>
+            )}
+            {task.assignments?.length > 0 && (
+              <div>
+                <div className="font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">Assigned To</div>
+                {task.assignments.map(a => (
+                  <div key={a.id} className="flex items-center gap-1.5 text-tw-text">
+                    <div className="w-5 h-5 rounded-full bg-tw-primary flex items-center justify-center text-white font-bold text-xs">
+                      {(a.personnel?.name || a.department?.name || '?').charAt(0)}
+                    </div>
+                    {a.personnel?.name || a.department?.name || a.group?.name}
+                    <span className="text-tw-text-secondary ml-1">{a.personnel ? '(person)' : a.department ? '(dept)' : '(group)'}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {task.deadline && (
+              <div>
+                <div className="font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">Deadline</div>
+                <span className="text-tw-text">{new Date(task.deadline).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+              </div>
+            )}
+            {task.actedById && (
+              <div>
+                <div className="font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">Accepted By</div>
+                <span className="text-tw-text">{task.actedByName || task.actedByType}</span>
+              </div>
+            )}
+            {(task.returnReason || task.cancelReason) && (
+              <div className="w-full bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                <div className="font-semibold text-tw-danger uppercase tracking-wide mb-0.5">
+                  {task.status === 'BLOCKED' ? 'Blocked Reason' : 'Return / Rejection Reason'}
+                </div>
+                <span className="text-tw-danger italic">{task.returnReason || task.cancelReason}</span>
+              </div>
+            )}
+          </div>
+
+          {/* ── Subtasks table ── */}
+          <div>
+            <div className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-2">
+              Subtasks {subtasks.length > 0 ? `(${subtasks.length})` : ''}
+            </div>
+            {loadingS ? (
+              <div className="text-xs text-tw-text-secondary py-2">Loading…</div>
+            ) : subtasks.length === 0 ? (
+              <div className="text-xs text-tw-text-secondary italic py-2">No subtasks yet.</div>
+            ) : (
+              <div className="bg-white border border-tw-border rounded-lg overflow-hidden">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-tw-hover border-b border-tw-border">
+                      <th className="w-px px-2 py-2"></th>
+                      <th className="text-left px-3 py-2 font-semibold text-tw-text-secondary uppercase tracking-wide">Subtask</th>
+                      <th className="text-left px-3 py-2 font-semibold text-tw-text-secondary uppercase tracking-wide">Status</th>
+                      <th className="text-left px-3 py-2 font-semibold text-tw-text-secondary uppercase tracking-wide">Priority</th>
+                      <th className="text-left px-3 py-2 font-semibold text-tw-text-secondary uppercase tracking-wide">Assigned To</th>
+                      <th className="text-left px-3 py-2 font-semibold text-tw-text-secondary uppercase tracking-wide">Deadline</th>
+                      <th className="text-left px-3 py-2 font-semibold text-tw-text-secondary uppercase tracking-wide">Days Left</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-tw-border">
+                    {subtasks.map(s => {
+                      const assignee = s.assignments?.[0]
+                      const assigneeName = assignee?.personnel?.name || assignee?.department?.name || assignee?.group?.name || '—'
+                      const dl = s.deadline ? Math.ceil((new Date(s.deadline).setHours(0,0,0,0) - new Date().setHours(0,0,0,0)) / 86400000) : null
+                      const isOverdue = dl !== null && dl < 0
+                      return (
+                        <tr key={s.id} onClick={e => { e.stopPropagation(); onSubtaskClick(s) }} className="hover:bg-blue-100 cursor-pointer transition-colors">
+                          <td className="pl-2 pr-0 py-2">
+                            <div className={`w-2 h-2 rounded-full ${subtaskStatusDot[s.status] || 'bg-gray-400'}`} />
+                          </td>
+                          <td className="px-3 py-2 font-medium text-tw-text max-w-xs truncate">{s.title}</td>
+                          <td className="px-3 py-2 whitespace-nowrap">
+                            <span className={`badge text-xs ${statusBadge[s.status] || 'badge-gray'}`}>{s.status.replace('_', ' ')}</span>
+                          </td>
+                          <td className="px-3 py-2 whitespace-nowrap">
+                            <span className={`badge text-xs ${priorityBadge[s.priority]}`}>{s.priority}</span>
+                          </td>
+                          <td className="px-3 py-2 text-tw-text-secondary whitespace-nowrap">{assigneeName}</td>
+                          <td className="px-3 py-2 whitespace-nowrap">
+                            {s.deadline
+                              ? <span className={isOverdue ? 'text-tw-danger font-semibold' : 'text-tw-text-secondary'}>
+                                  {new Date(s.deadline).toLocaleDateString()}
+                                </span>
+                              : <span className="text-tw-text-secondary">—</span>}
+                          </td>
+                          <td className="px-3 py-2 whitespace-nowrap">
+                            {dl === null ? <span className="text-tw-text-secondary">—</span>
+                              : dl < 0  ? <span className="inline-flex text-xs font-semibold text-white bg-tw-danger rounded-full px-2 py-0.5">{Math.abs(dl)}d overdue</span>
+                              : dl === 0 ? <span className="inline-flex text-xs font-semibold text-orange-800 bg-orange-100 border border-orange-300 rounded-full px-2 py-0.5">Due today</span>
+                              : dl <= 3  ? <span className="inline-flex text-xs font-semibold text-orange-700 bg-orange-50 border border-orange-200 rounded-full px-2 py-0.5">{dl}d left</span>
+                              : <span className="text-tw-text-secondary">{dl}d left</span>}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* ── Open modal button ── */}
+          <div className="pt-2 border-t border-blue-200 flex justify-end">
+            <button onClick={e => { e.stopPropagation(); onOpen() }} className="btn-primary text-xs py-1.5 px-4">
+              Open Task →
+            </button>
+          </div>
+        </div>
+      </td>
+    </tr>
+  )
+}
+
+// ── Main dashboard ────────────────────────────────────────────────────────────
+export default function PersonnelDashboard({ user, currentView, setView, onLogout, onUserUpdate }: Props) {
+  const [queue, setQueue]               = useState<Task[]>([])
+  const [projects, setProjects]         = useState<Project[]>([])
+  const [personnel, setPersonnel]       = useState<Personnel[]>([])
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
+  const [taskStack, setTaskStack]       = useState<Task[]>([])  // navigation history for back button
+  const [expandedId, setExpandedId]     = useState<string | null>(null)
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [loading, setLoading]           = useState(true)
+  const [error, setError]               = useState('')
 
   const load = async () => {
     setLoading(true)
     setError('')
     try {
-      // Fetch tasks visible to this personnel (visibility enforced server-side)
       const [tasks, projs] = await Promise.all([
         taskApi.list() as Promise<Task[]>,
         projectApi.list() as Promise<Project[]>,
       ])
-      // My queue: tasks I'm directly assigned to that are not done
       const myTasks = tasks.filter(t => {
-        const mine = t.assignments?.some(a => a.personnelId === user.actorId)
-        return mine && !['APPROVED', 'CANCELLED'].includes(t.status)
+        if (['APPROVED', 'CANCELLED'].includes(t.status)) return false
+        const directlyAssigned = t.assignments?.some(a => a.personnelId === user.actorId)
+        const deptAssigned     = t.assignments?.some(a => a.departmentId === user.departmentId && !t.assignments?.some(p => p.personnelId))
+        return directlyAssigned || deptAssigned
       })
       setQueue(myTasks)
       setProjects(projs)
@@ -48,34 +222,47 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
     setLoading(false)
   }
 
-  // Load workspace data for subtask creation and assignment in TaskDetailPanel
   useEffect(() => {
     load()
-    Promise.all([
-      workspaceApi.getLayers() as Promise<Layer[]>,
-      workspaceApi.getPersonnel() as Promise<Personnel[]>,
-      workspaceApi.getGroups() as Promise<Group[]>,
-    ]).then(([l, p, g]) => { setLayers(l); setPersonnel(p); setGroups(g) })
-      .catch(() => { /* workspace data is best-effort for personnel */ })
+    workspaceApi.getPersonnel()
+      .then(p => setPersonnel(p as Personnel[]))
+      .catch(() => {})
   }, [])
 
   const navItems = [
     { label: 'My Queue',   view: 'personnel_queue' as ViewMode, icon: '📋' },
     { label: 'Board View', view: 'project_board'   as ViewMode, icon: '⊞' },
+    { label: 'My Profile', view: 'profile'         as ViewMode, icon: '👤' },
   ]
 
-  const byStatus = (status: string) => queue.filter(t => t.status === status)
+  const initials = user.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
+  const pendingAccept = queue.filter(t =>
+    t.assignments?.some(a => a.departmentId === user.departmentId) &&
+    !t.assignments?.some(a => a.personnelId)
+  ).length
+
+  const COL_COUNT = 9   // total <th> columns including the expand chevron
 
   return (
     <div className="min-h-screen bg-tw-bg flex">
-      {/* Sidebar */}
+      {/* ── Sidebar ─────────────────────────────────────────────────────── */}
       <aside className="w-56 bg-tw-surface border-r border-tw-border flex flex-col flex-shrink-0">
-        <div className="p-4 border-b border-tw-border flex items-center gap-2">
-          <div className="w-7 h-7 bg-tw-primary rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-xs">T</span>
-          </div>
-          <span className="font-bold text-tw-text">TaskWise</span>
+        <div className="p-4 border-b border-tw-border">
+          {user.companyLogo ? (
+            <div className="flex items-center gap-2">
+              <img src={user.companyLogo} alt="Logo" className="w-7 h-7 rounded object-contain" />
+              <span className="font-bold text-tw-text text-sm truncate">{user.companyName || 'TaskWise'}</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 bg-tw-primary rounded-lg flex items-center justify-center flex-shrink-0">
+                <span className="text-white font-bold text-xs">T</span>
+              </div>
+              <span className="font-bold text-tw-text">{user.companyName || 'TaskWise'}</span>
+            </div>
+          )}
         </div>
+
         <nav className="flex-1 p-2 space-y-0.5">
           {navItems.map(item => (
             <button key={item.view} onClick={() => { setView(item.view); setSelectedProject(null) }}
@@ -88,23 +275,28 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
             </button>
           ))}
         </nav>
+
         <div className="p-3 border-t border-tw-border">
-          <div className="flex items-center gap-2 px-2 py-1.5 mb-1">
-            <div className="w-7 h-7 rounded-full bg-tw-primary flex items-center justify-center text-white text-xs font-bold">
-              {user.name.charAt(0).toUpperCase()}
-            </div>
-            <div className="min-w-0">
+          <button onClick={() => setView('profile' as ViewMode)}
+            className="flex items-center gap-2 px-2 py-1.5 mb-1 w-full rounded-lg hover:bg-tw-hover transition-colors">
+            {user.avatarUrl ? (
+              <img src={user.avatarUrl} alt="Avatar" className="w-7 h-7 rounded-full object-cover" />
+            ) : (
+              <div className="w-7 h-7 rounded-full bg-tw-primary flex items-center justify-center text-white text-xs font-bold flex-shrink-0">{initials}</div>
+            )}
+            <div className="min-w-0 text-left">
               <div className="text-xs font-semibold text-tw-text truncate">{user.name}</div>
               <div className="text-xs text-tw-text-secondary">Personnel</div>
             </div>
-          </div>
+          </button>
           <button onClick={onLogout} className="w-full text-left px-2 py-1 text-xs text-tw-text-secondary hover:text-tw-danger transition-colors rounded">
             Sign out
           </button>
+          <p className="text-center text-xs text-tw-text-secondary mt-2 opacity-60">Created by SysWise</p>
         </div>
       </aside>
 
-      {/* Main */}
+      {/* ── Main ────────────────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-w-0">
         <header className="bg-tw-surface border-b border-tw-border px-6 py-3 flex items-center justify-between">
           <span className="font-medium text-tw-text text-sm capitalize">{currentView.replace(/_/g, ' ')}</span>
@@ -119,14 +311,17 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
         </header>
 
         <main className="flex-1 overflow-auto">
-          {/* MY QUEUE */}
+          {/* ── MY QUEUE ──────────────────────────────────────────────── */}
           {currentView === 'personnel_queue' && (
             <div className="p-6">
-              <div className="flex items-center justify-between mb-1">
-                <h1 className="text-xl font-bold text-tw-text">My Task Queue</h1>
-              </div>
+              <h1 className="text-xl font-bold text-tw-text mb-1">My Task Queue</h1>
               <p className="text-sm text-tw-text-secondary mb-6">
                 {queue.length} active task{queue.length !== 1 ? 's' : ''} assigned to you
+                {pendingAccept > 0 && (
+                  <span className="ml-2 inline-flex items-center gap-1 text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5 text-xs font-medium">
+                    {pendingAccept} pending acceptance
+                  </span>
+                )}
               </p>
 
               {error && (
@@ -144,27 +339,136 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
                   <p className="text-tw-text-secondary text-sm mt-1">No tasks assigned to you right now.</p>
                 </div>
               ) : (
-                <div className="space-y-6">
-                  {STATUS_ORDER.map(status => (
-                    byStatus(status).length > 0 && (
-                      <div key={status}>
-                        <h3 className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-3">
-                          {status.replace('_', ' ')} ({byStatus(status).length})
-                        </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                          {byStatus(status).map(t => (
-                            <TaskCard key={t.id} task={t} onClick={task => setSelectedTask(task)} />
-                          ))}
-                        </div>
-                      </div>
-                    )
-                  ))}
+                <div className="card overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-tw-hover border-b border-tw-border">
+                        <th className="w-px px-3 py-2.5"></th>{/* priority bar */}
+                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-tw-text-secondary uppercase tracking-wide">Task</th>
+                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-tw-text-secondary uppercase tracking-wide">Project</th>
+                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-tw-text-secondary uppercase tracking-wide">Status</th>
+                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-tw-text-secondary uppercase tracking-wide">Priority</th>
+                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-tw-text-secondary uppercase tracking-wide">Assigned By</th>
+                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-tw-text-secondary uppercase tracking-wide">Deadline</th>
+                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-tw-text-secondary uppercase tracking-wide">Days Left</th>
+                        <th className="w-8 px-2 py-2.5"></th>{/* chevron + accept */}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {queue.map(t => {
+                        const isExpanded  = expandedId === t.id
+                        const isDeptPending =
+                          t.assignments?.some(a => a.departmentId === user.departmentId) &&
+                          !t.assignments?.some(a => a.personnelId)
+                        const isOverdue = t.deadline && new Date(t.deadline) < new Date()
+                        const assigneeName = t.assignments?.[0]
+                          ? (t.assignments[0].personnel?.name || t.assignments[0].department?.name || t.assignments[0].group?.name || '—')
+                          : '—'
+
+                        return (
+                          <React.Fragment key={t.id}>
+                            {/* ── Summary row ── */}
+                            <tr
+                              onClick={() => setExpandedId(isExpanded ? null : t.id)}
+                              className={`cursor-pointer transition-colors border-b border-tw-border
+                                ${isExpanded ? 'bg-blue-50' : 'hover:bg-tw-hover'}`}
+                            >
+                              {/* Priority bar */}
+                              <td className="pl-3 pr-0 py-3">
+                                <div className={`w-1 h-8 rounded-full ${priorityBar[t.priority]}`} />
+                              </td>
+
+                              {/* Title */}
+                              <td className="px-4 py-3 max-w-xs">
+                                <div className="font-medium text-tw-text">{t.title}</div>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                  {(t._count?.subtasks ?? 0) > 0 && (
+                                    <span className="text-xs text-tw-text-secondary">
+                                      {t._count!.subtasks} subtask{t._count!.subtasks !== 1 ? 's' : ''}
+                                    </span>
+                                  )}
+                                  {(t._count?.comments ?? 0) > 0 && (
+                                    <span className="text-xs text-tw-text-secondary">💬 {t._count!.comments}</span>
+                                  )}
+                                </div>
+                              </td>
+
+                              {/* Project */}
+                              <td className="px-4 py-3 text-xs text-tw-text-secondary whitespace-nowrap">
+                                {t.project?.name || '—'}
+                              </td>
+
+                              {/* Status */}
+                              <td className="px-4 py-3 whitespace-nowrap">
+                                <span className={`badge text-xs ${statusBadge[t.status] || 'badge-gray'}`}>
+                                  {t.status.replace('_', ' ')}
+                                </span>
+                              </td>
+
+                              {/* Priority */}
+                              <td className="px-4 py-3 whitespace-nowrap">
+                                <span className={`badge text-xs ${priorityBadge[t.priority]}`}>{t.priority}</span>
+                              </td>
+
+                              {/* Assigned by */}
+                              <td className="px-4 py-3 text-xs text-tw-text-secondary whitespace-nowrap">
+                                {assigneeName}
+                              </td>
+
+                              {/* Deadline */}
+                              <td className="px-4 py-3 text-xs whitespace-nowrap">
+                                {t.deadline
+                                  ? <span className={isOverdue ? 'text-tw-danger font-semibold' : 'text-tw-text-secondary'}>
+                                      {new Date(t.deadline).toLocaleDateString()}
+                                    </span>
+                                  : <span className="text-tw-text-secondary">—</span>}
+                              </td>
+
+                              {/* Days left */}
+                              <td className="px-4 py-3 whitespace-nowrap">
+                                {daysLeftLabel(t.deadline ?? undefined)}
+                              </td>
+
+                              {/* Chevron + accept badge */}
+                              <td className="px-3 py-3 whitespace-nowrap">
+                                <div className="flex items-center justify-end gap-2">
+                                  {isDeptPending && (
+                                    <span className="bg-amber-400 text-amber-900 text-xs font-semibold px-2 py-0.5 rounded-full">
+                                      Accept
+                                    </span>
+                                  )}
+                                  <svg
+                                    className={`w-4 h-4 text-tw-text-secondary transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+                                    fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                  </svg>
+                                </div>
+                              </td>
+                            </tr>
+
+                            {/* ── Expanded detail row ── */}
+                            {isExpanded && (
+                              <ExpandedRow
+                                task={t}
+                                colSpan={COL_COUNT}
+                                onOpen={() => { setTaskStack([]); setSelectedTask(t) }}
+                                onSubtaskClick={async s => {
+                                  setTaskStack(prev => t ? [...prev, t] : prev)
+                                  try { setSelectedTask(await taskApi.get(s.id) as Task) } catch { setSelectedTask(s) }
+                                }}
+                              />
+                            )}
+                          </React.Fragment>
+                        )
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </div>
           )}
 
-          {/* BOARD VIEW — pick project */}
+          {/* ── BOARD VIEW ────────────────────────────────────────────── */}
           {currentView === 'project_board' && !selectedProject && (
             <div className="p-6">
               <h1 className="text-xl font-bold text-tw-text mb-6">Projects</h1>
@@ -190,19 +494,32 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
           {currentView === 'project_board' && selectedProject && (
             <BoardView project={selectedProject} isDirector={false} actorId={user.actorId} />
           )}
+
+          {/* ── PROFILE ───────────────────────────────────────────────── */}
+          {currentView === 'profile' && (
+            <ProfilePage user={user} onUserUpdate={onUserUpdate} />
+          )}
         </main>
       </div>
 
-      {/* Task Detail for queue items */}
+      {/* ── Task modal ─────────────────────────────────────────────────── */}
       {selectedTask && (
-        <TaskDetailPanel
+        <PersonnelTaskModal
           task={selectedTask}
-          isDirector={false}
           actorId={user.actorId}
-          layers={layers}
+          departmentId={user.departmentId}
           personnel={personnel}
-          groups={groups}
-          onClose={() => setSelectedTask(null)}
+          parentTask={taskStack.length > 0 ? taskStack[taskStack.length - 1] : undefined}
+          onBack={taskStack.length > 0 ? async () => {
+            const parent = taskStack[taskStack.length - 1]
+            setTaskStack(prev => prev.slice(0, -1))
+            try { setSelectedTask(await taskApi.get(parent.id) as Task) } catch { setSelectedTask(parent) }
+          } : undefined}
+          onSubtaskOpen={async s => {
+            setTaskStack(prev => selectedTask ? [...prev, selectedTask] : prev)
+            try { setSelectedTask(await taskApi.get(s.id) as Task) } catch { setSelectedTask(s) }
+          }}
+          onClose={() => { setSelectedTask(null); setTaskStack([]) }}
           onRefresh={async () => {
             await load()
             try {

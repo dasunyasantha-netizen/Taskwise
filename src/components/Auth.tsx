@@ -7,20 +7,17 @@ interface Props {
 }
 
 export default function Auth({ onLogin }: Props) {
-  const [tab, setTab]           = useState<'director' | 'personnel'>('director')
-  const [email, setEmail]       = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError]       = useState('')
-  const [loading, setLoading]   = useState(false)
+  const [phone, setPhone]         = useState('')
+  const [password, setPassword]   = useState('')
+  const [error, setError]         = useState('')
+  const [loading, setLoading]     = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
     setLoading(true)
     try {
-      const res = tab === 'director'
-        ? await authApi.directorLogin(email, password)
-        : await authApi.personnelLogin(email, password)
+      const res = await authApi.login(phone, password)
       onLogin(res.token, res.user as AuthUser)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Login failed')
@@ -30,53 +27,30 @@ export default function Auth({ onLogin }: Props) {
   }
 
   return (
-    <div className="min-h-screen bg-tw-bg flex items-center justify-center">
+    <div className="min-h-screen bg-tw-bg flex flex-col items-center justify-center">
       <div className="card p-8 w-full max-w-md shadow-panel">
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 mb-2">
-            <div className="w-8 h-8 bg-tw-primary rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">T</span>
+            <div className="w-9 h-9 bg-tw-primary rounded-lg flex items-center justify-center">
+              <span className="text-white font-bold text-base">T</span>
             </div>
             <span className="text-2xl font-bold text-tw-text">TaskWise</span>
           </div>
           <p className="text-tw-text-secondary text-sm">Hierarchical Task Management</p>
         </div>
 
-        {/* Tab switcher */}
-        <div className="flex bg-tw-hover rounded-lg p-1 mb-6">
-          <button
-            className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
-              tab === 'director'
-                ? 'bg-white text-tw-primary shadow-card'
-                : 'text-tw-text-secondary hover:text-tw-text'
-            }`}
-            onClick={() => setTab('director')}
-          >
-            Director
-          </button>
-          <button
-            className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
-              tab === 'personnel'
-                ? 'bg-white text-tw-primary shadow-card'
-                : 'text-tw-text-secondary hover:text-tw-text'
-            }`}
-            onClick={() => setTab('personnel')}
-          >
-            Personnel
-          </button>
-        </div>
-
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-tw-text mb-1">Email</label>
+            <label className="block text-sm font-medium text-tw-text mb-1">Phone Number</label>
             <input
-              type="email"
+              type="tel"
               className="input"
-              placeholder="you@example.com"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
+              placeholder="07X XXXXXXX"
+              value={phone}
+              onChange={e => setPhone(e.target.value)}
               required
+              autoFocus
             />
           </div>
           <div>
@@ -102,10 +76,24 @@ export default function Auth({ onLogin }: Props) {
             disabled={loading}
             className="btn-primary w-full justify-center flex items-center gap-2 py-2.5"
           >
-            {loading ? 'Signing in…' : `Sign in as ${tab === 'director' ? 'Director' : 'Personnel'}`}
+            {loading ? 'Signing in…' : 'Sign In'}
           </button>
         </form>
+
+        {/* Contact notice for new workspace setup */}
+        <div className="mt-6 p-3 bg-tw-hover rounded-lg text-center">
+          <p className="text-tw-text-secondary text-xs">
+            New to TaskWise? Contact us to set up your workspace.
+          </p>
+          <p className="text-tw-primary font-semibold text-sm mt-0.5">0741 008 484</p>
+        </div>
       </div>
+
+      {/* SysWise branding */}
+      <p className="mt-6 text-tw-text-secondary text-xs">
+        Created by{' '}
+        <span className="font-semibold text-tw-text">SysWise</span>
+      </p>
     </div>
   )
 }
