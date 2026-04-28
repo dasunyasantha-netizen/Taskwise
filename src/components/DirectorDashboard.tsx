@@ -85,7 +85,7 @@ function ApprovalTaskRow({
       {/* ── Summary row ── */}
       <tr onClick={toggle}
         className={`cursor-pointer transition-colors border-b border-tw-border
-          ${expanded ? 'bg-purple-50' : 'hover:bg-tw-hover'}`}>
+          ${expanded ? 'bg-blue-50' : 'hover:bg-[#f8f9ff]'}`}>
         <td className="pl-3 pr-0 py-3 w-1">
           <div className={`w-1 h-8 rounded-full ${
             task.priority === 'CRITICAL' ? 'bg-red-500' :
@@ -119,7 +119,7 @@ function ApprovalTaskRow({
 
       {/* ── Expanded row ── */}
       {expanded && (
-        <tr className="bg-purple-50 border-b border-tw-border">
+        <tr className="border-b-2 border-tw-primary/20" style={{ background: 'linear-gradient(to right, #eef3ff, #f8f9ff)' }}>
           <td colSpan={7} className="px-0 py-0">
             <div className="px-6 py-5">
 
@@ -187,25 +187,28 @@ function ApprovalTaskRow({
 
               {/* ── Subtasks table ── */}
               <div>
-                <div className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-2">
-                  Subtasks {subtasks.length > 0 ? `(${subtasks.length})` : ''}
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="w-3 h-3 rounded bg-tw-indigo inline-block" />
+                  <span className="text-xs font-bold text-tw-indigo uppercase tracking-wider">
+                    Subtasks {subtasks.length > 0 ? `(${subtasks.length})` : ''}
+                  </span>
                 </div>
                 {loadingS ? (
                   <div className="text-xs text-tw-text-secondary py-1">Loading…</div>
                 ) : subtasks.length === 0 ? (
                   <div className="text-xs text-tw-text-secondary italic py-1">No subtasks.</div>
                 ) : (
-                  <div className="bg-white border border-tw-border rounded-lg overflow-hidden">
+                  <div className="bg-white border border-tw-indigo/20 rounded-lg overflow-hidden shadow-sm">
                     <table className="w-full text-xs">
                       <thead>
-                        <tr className="bg-tw-hover border-b border-tw-border">
-                          <th className="w-px px-2 py-2"></th>
-                          <th className="text-left px-3 py-2 font-semibold text-tw-text-secondary uppercase tracking-wide">Subtask</th>
-                          <th className="text-left px-3 py-2 font-semibold text-tw-text-secondary uppercase tracking-wide">Status</th>
-                          <th className="text-left px-3 py-2 font-semibold text-tw-text-secondary uppercase tracking-wide">Priority</th>
-                          <th className="text-left px-3 py-2 font-semibold text-tw-text-secondary uppercase tracking-wide">Assigned To</th>
-                          <th className="text-left px-3 py-2 font-semibold text-tw-text-secondary uppercase tracking-wide">Deadline</th>
-                          <th className="text-left px-3 py-2 font-semibold text-tw-text-secondary uppercase tracking-wide">Days Left</th>
+                        <tr className="bg-tw-indigo-light border-b border-tw-indigo/20">
+                          <th className="w-px px-2 py-2.5"></th>
+                          <th className="text-left px-3 py-2.5 font-bold text-tw-indigo uppercase tracking-wider">Subtask</th>
+                          <th className="text-left px-3 py-2.5 font-bold text-tw-indigo uppercase tracking-wider">Status</th>
+                          <th className="text-left px-3 py-2.5 font-bold text-tw-indigo uppercase tracking-wider">Priority</th>
+                          <th className="text-left px-3 py-2.5 font-bold text-tw-indigo uppercase tracking-wider">Assigned To</th>
+                          <th className="text-left px-3 py-2.5 font-bold text-tw-indigo uppercase tracking-wider">Deadline</th>
+                          <th className="text-left px-3 py-2.5 font-bold text-tw-indigo uppercase tracking-wider">Days Left</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-tw-border">
@@ -253,7 +256,7 @@ function ApprovalTaskRow({
               </div>
 
               {/* ── Action buttons ── */}
-              <div className="mt-5 pt-4 border-t border-purple-200 flex items-center justify-between gap-3">
+              <div className="mt-5 pt-4 border-t border-blue-200 flex items-center justify-between gap-3">
                 <p className="text-xs text-tw-text-secondary">
                   Review the submission above, then approve or send back with feedback.
                 </p>
@@ -319,7 +322,7 @@ function ApprovalTaskRow({
 function ApprovalQueueView({ tasks, actorId, onRefresh }: { tasks: Task[]; actorId: string; onRefresh: () => void }) {
   return (
     <div className="p-6">
-      <h1 className="text-xl font-bold text-tw-text mb-1">Approval Queue</h1>
+      <h1 className="text-2xl font-bold text-tw-text mb-1">Approval Queue</h1>
       <p className="text-sm text-tw-text-secondary mb-6">
         {tasks.length} task{tasks.length !== 1 ? 's' : ''} waiting for your review
       </p>
@@ -333,14 +336,14 @@ function ApprovalQueueView({ tasks, actorId, onRefresh }: { tasks: Task[]; actor
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-tw-hover border-b border-tw-border">
-                <th className="w-px px-3 py-2.5"></th>
-                <th className="text-left px-4 py-2.5 text-xs font-semibold text-tw-text-secondary uppercase tracking-wide">Task</th>
-                <th className="text-left px-4 py-2.5 text-xs font-semibold text-tw-text-secondary uppercase tracking-wide">Project</th>
-                <th className="text-left px-4 py-2.5 text-xs font-semibold text-tw-text-secondary uppercase tracking-wide">Submitted</th>
-                <th className="text-left px-4 py-2.5 text-xs font-semibold text-tw-text-secondary uppercase tracking-wide">Priority</th>
-                <th className="text-left px-4 py-2.5 text-xs font-semibold text-tw-text-secondary uppercase tracking-wide">Deadline</th>
-                <th className="w-8 px-2 py-2.5"></th>
+              <tr className="bg-[#f0f4ff] border-b-2 border-tw-primary/20">
+                <th className="w-px px-3 py-3"></th>
+                <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider">Task</th>
+                <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider">Project</th>
+                <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider">Submitted</th>
+                <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider">Priority</th>
+                <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider">Deadline</th>
+                <th className="w-8 px-2 py-3"></th>
               </tr>
             </thead>
             <tbody>
@@ -417,73 +420,69 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
   return (
     <div className="min-h-screen bg-tw-bg flex">
       {/* Sidebar */}
-      <aside className="w-56 bg-tw-surface border-r border-tw-border flex flex-col flex-shrink-0">
+      <aside className="w-60 bg-[#1f2d3d] flex flex-col flex-shrink-0">
         {/* Workspace branding */}
-        <div className="p-4 border-b border-tw-border">
+        <div className="px-5 py-4 border-b border-white/10">
           {user.companyLogo ? (
-            <div className="flex items-center gap-2 mb-1">
-              <img src={user.companyLogo} alt="Logo" className="w-7 h-7 rounded object-contain" />
-              <span className="font-bold text-tw-text text-sm truncate">{user.companyName || 'TaskWise'}</span>
+            <div className="flex items-center gap-2.5">
+              <img src={user.companyLogo} alt="Logo" className="w-8 h-8 rounded object-contain" />
+              <span className="font-bold text-white text-base truncate">{user.companyName || 'TaskWise'}</span>
             </div>
           ) : (
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 bg-tw-primary rounded-lg flex items-center justify-center flex-shrink-0">
-                <span className="text-white font-bold text-xs">T</span>
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 bg-tw-primary rounded-lg flex items-center justify-center flex-shrink-0">
+                <span className="text-white font-bold text-sm">T</span>
               </div>
-              <span className="font-bold text-tw-text">{user.companyName || 'TaskWise'}</span>
+              <span className="font-bold text-white text-base">{user.companyName || 'TaskWise'}</span>
             </div>
-          )}
-          {user.companyName && (
-            <p className="text-xs text-tw-text-secondary mt-0.5 ml-9">Powered by TaskWise</p>
           )}
         </div>
 
-        <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto">
+        <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
           {navItems.map(item => (
             <button key={item.view}
               onClick={() => { if (item.view === 'project_board') setSelectedProject(null); setView(item.view) }}
-              className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-between ${activeView === item.view ? 'bg-tw-primary-light text-tw-primary' : 'text-tw-text-secondary hover:bg-tw-hover hover:text-tw-text'}`}>
-              <span className="flex items-center gap-2">
-                <span className="text-base">{item.icon}</span>{item.label}
-              </span>
+              className={`w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2.5
+                ${activeView === item.view ? 'bg-tw-primary text-white shadow-sm' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}>
+              <span className="text-base flex-shrink-0">{item.icon}</span>
+              <span className="flex-1">{item.label}</span>
               {item.badge ? <span className="bg-tw-danger text-white text-xs rounded-full px-1.5 py-0.5 font-bold leading-none">{item.badge}</span> : null}
             </button>
           ))}
         </nav>
 
-        <div className="p-3 border-t border-tw-border">
+        <div className="px-3 py-3 border-t border-white/10">
           <button
             onClick={() => setView('profile' as ViewMode)}
-            className="flex items-center gap-2 px-2 py-1.5 mb-1 w-full rounded-lg hover:bg-tw-hover transition-colors"
+            className="flex items-center gap-2.5 px-2 py-2 mb-1 w-full rounded-lg hover:bg-white/10 transition-colors"
           >
             {user.avatarUrl ? (
-              <img src={user.avatarUrl} alt="Avatar" className="w-7 h-7 rounded-full object-cover" />
+              <img src={user.avatarUrl} alt="Avatar" className="w-8 h-8 rounded-full object-cover" />
             ) : (
-              <div className="w-7 h-7 rounded-full bg-tw-primary flex items-center justify-center text-white text-xs font-bold flex-shrink-0">{initials}</div>
+              <div className="w-8 h-8 rounded-full bg-tw-primary flex items-center justify-center text-white text-sm font-bold flex-shrink-0">{initials}</div>
             )}
             <div className="min-w-0 text-left">
-              <div className="text-xs font-semibold text-tw-text truncate">{user.name}</div>
-              <div className="text-xs text-tw-text-secondary">Director</div>
+              <div className="text-sm font-semibold text-white truncate">{user.name}</div>
+              <div className="text-xs text-white/50">Director</div>
             </div>
           </button>
-          <button onClick={onLogout} className="w-full text-left px-2 py-1 text-xs text-tw-text-secondary hover:text-tw-danger transition-colors rounded">Sign out</button>
-          {/* SysWise branding */}
-          <p className="text-center text-xs text-tw-text-secondary mt-2 opacity-60">Created by SysWise</p>
+          <button onClick={onLogout} className="w-full text-left px-2 py-1 text-xs text-white/40 hover:text-tw-danger transition-colors rounded">Sign out</button>
+          <p className="text-center text-xs text-white/25 mt-2">Created by SysWise</p>
         </div>
       </aside>
 
       {/* Main */}
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="bg-tw-surface border-b border-tw-border px-6 py-3 flex items-center justify-between flex-shrink-0">
-          <div className="text-sm text-tw-text-secondary">
+        <header className="bg-tw-surface border-b border-tw-border px-6 py-3.5 flex items-center justify-between flex-shrink-0">
+          <div className="text-base font-semibold text-tw-text">
             {currentView === 'project_board' && selectedProject ? (
-              <span>
-                <button onClick={() => setSelectedProject(null)} className="hover:text-tw-primary">Projects</button>
-                <span className="mx-1">/</span>
-                <span className="text-tw-text font-medium">{selectedProject.name}</span>
+              <span className="flex items-center gap-1.5 text-sm">
+                <button onClick={() => setSelectedProject(null)} className="text-tw-text-secondary hover:text-tw-primary">Projects</button>
+                <span className="text-tw-text-secondary">/</span>
+                <span className="text-tw-text font-semibold">{selectedProject.name}</span>
               </span>
             ) : (
-              <span className="font-medium text-tw-text capitalize">{currentView.replace(/_/g, ' ')}</span>
+              <span className="capitalize">{currentView.replace(/_/g, ' ')}</span>
             )}
           </div>
           <div className="flex items-center gap-3">
@@ -512,7 +511,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
           {/* DASHBOARD */}
           {currentView === 'director_dashboard' && (
             <div className="p-6">
-              <h1 className="text-xl font-bold text-tw-text mb-1">Welcome back, {user.name.split(' ')[0]}</h1>
+              <h1 className="text-2xl font-bold text-tw-text mb-1">Welcome back, {user.name.split(' ')[0]}</h1>
               <p className="text-sm text-tw-text-secondary mb-6">Here's what's happening across your workspace.</p>
 
               {statsLoading ? <div className="text-sm text-tw-text-secondary">Loading...</div> : (
@@ -613,16 +612,18 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
           {/* OVERDUE */}
           {currentView === 'overdue' && (
             <div className="p-6">
-              <h1 className="text-xl font-bold text-tw-text mb-6">Overdue Tasks</h1>
+              <h1 className="text-2xl font-bold text-tw-text mb-6">Overdue Tasks</h1>
               <div className="card overflow-hidden">
                 {overdueList.length === 0 ? (
                   <div className="p-12 text-center text-tw-text-secondary text-sm">No overdue tasks. Great work!</div>
                 ) : (
                   <table className="w-full text-sm">
-                    <thead className="bg-tw-hover">
-                      <tr>{['Task', 'Project', 'Deadline', 'Assigned To', 'Status'].map(h => (
-                        <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-tw-text-secondary uppercase tracking-wide">{h}</th>
-                      ))}</tr>
+                    <thead>
+                      <tr className="bg-[#f0f4ff] border-b-2 border-tw-primary/20">
+                        {['Task', 'Project', 'Deadline', 'Assigned To', 'Status'].map(h => (
+                          <th key={h} className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider">{h}</th>
+                        ))}
+                      </tr>
                     </thead>
                     <tbody className="divide-y divide-tw-border">
                       {overdueList.map(t => (
@@ -644,13 +645,15 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
           {/* AUDIT LOG */}
           {currentView === 'audit_log' && (
             <div className="p-6">
-              <h1 className="text-xl font-bold text-tw-text mb-6">Audit Log</h1>
+              <h1 className="text-2xl font-bold text-tw-text mb-6">Audit Log</h1>
               <div className="card overflow-hidden">
                 <table className="w-full text-sm">
-                  <thead className="bg-tw-hover">
-                    <tr>{['Event', 'Actor', 'Task', 'Date & Time'].map(h => (
-                      <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-tw-text-secondary uppercase tracking-wide">{h}</th>
-                    ))}</tr>
+                  <thead>
+                    <tr className="bg-[#f0f4ff] border-b-2 border-tw-primary/20">
+                      {['Event', 'Actor', 'Task', 'Date & Time'].map(h => (
+                        <th key={h} className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider">{h}</th>
+                      ))}
+                    </tr>
                   </thead>
                   <tbody className="divide-y divide-tw-border">
                     {(auditLogs as AuditLog[]).length === 0 && (
