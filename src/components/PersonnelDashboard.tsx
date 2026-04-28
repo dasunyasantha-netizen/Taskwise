@@ -137,7 +137,8 @@ function ExpandedRow({ task, colSpan, actorId, departmentId, onOpen, onSubtaskCl
                 <p className="text-sm text-tw-text leading-relaxed whitespace-pre-wrap">{task.description}</p>
               </div>
             )}
-            <div className="flex flex-wrap gap-x-10 gap-y-3 items-start">
+            <div className="flex items-start justify-between gap-6">
+              {/* Left: assignees */}
               {task.assignments?.length > 0 && (
                 <div>
                   <div className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1.5">Assigned To</div>
@@ -154,18 +155,21 @@ function ExpandedRow({ task, colSpan, actorId, departmentId, onOpen, onSubtaskCl
                   </div>
                 </div>
               )}
-              {task.deadline && (
-                <div>
-                  <div className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1.5">Deadline</div>
-                  <span className="text-sm text-tw-text">{new Date(task.deadline).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
-                </div>
-              )}
-              {task.actedById && (
-                <div>
-                  <div className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1.5">Accepted By</div>
-                  <span className="text-sm text-tw-text">{task.actedByName || task.actedByType}</span>
-                </div>
-              )}
+              {/* Right: deadline + accepted by */}
+              <div className="flex gap-8 flex-shrink-0">
+                {task.deadline && (
+                  <div className="text-right">
+                    <div className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1.5">Deadline</div>
+                    <span className="text-sm text-tw-text">{new Date(task.deadline).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+                  </div>
+                )}
+                {task.actedById && (
+                  <div className="text-right">
+                    <div className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1.5">Accepted By</div>
+                    <span className="text-sm text-tw-text">{task.actedByName || task.actedByType}</span>
+                  </div>
+                )}
+              </div>
             </div>
             {(task.returnReason || task.cancelReason) && (
               <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2">
