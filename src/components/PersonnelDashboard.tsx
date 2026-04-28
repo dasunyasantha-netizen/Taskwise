@@ -98,12 +98,12 @@ function ExpandedRow({ task, colSpan, actorId, onOpen, onSubtaskClick, onRefresh
   }
 
   return (
-    <tr className="bg-blue-50 border-b border-tw-border">
+    <tr className="border-b-2 border-tw-primary/20" style={{ background: 'linear-gradient(to right, #eef3ff, #f8f9ff)' }}>
       <td colSpan={colSpan} className="px-0 py-0">
-        <div className="px-6 py-4 space-y-4">
+        <div className="px-6 py-5 space-y-5">
 
           {/* ── Task meta row ── */}
-          <div className="flex flex-wrap gap-6 text-xs">
+          <div className="flex flex-wrap gap-6 text-sm">
             {task.description && (
               <div className="w-full">
                 <div className="font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">Description</div>
@@ -148,25 +148,28 @@ function ExpandedRow({ task, colSpan, actorId, onOpen, onSubtaskClick, onRefresh
 
           {/* ── Subtasks table ── */}
           <div>
-            <div className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-2">
-              Subtasks {subtasks.length > 0 ? `(${subtasks.length})` : ''}
+            <div className="flex items-center gap-2 mb-2">
+              <span className="w-3 h-3 rounded bg-tw-indigo inline-block" />
+              <span className="text-xs font-bold text-tw-indigo uppercase tracking-wider">
+                Subtasks {subtasks.length > 0 ? `(${subtasks.length})` : ''}
+              </span>
             </div>
             {loadingS ? (
               <div className="text-xs text-tw-text-secondary py-2">Loading…</div>
             ) : subtasks.length === 0 ? (
               <div className="text-xs text-tw-text-secondary italic py-2">No subtasks yet.</div>
             ) : (
-              <div className="bg-white border border-tw-border rounded-lg overflow-hidden">
-                <table className="w-full text-xs">
+              <div className="bg-white border border-tw-indigo/20 rounded-lg overflow-hidden shadow-sm">
+                <table className="w-full text-sm">
                   <thead>
-                    <tr className="bg-tw-hover border-b border-tw-border">
-                      <th className="w-px px-2 py-2"></th>
-                      <th className="text-left px-3 py-2 font-semibold text-tw-text-secondary uppercase tracking-wide">Subtask</th>
-                      <th className="text-left px-3 py-2 font-semibold text-tw-text-secondary uppercase tracking-wide">Status</th>
-                      <th className="text-left px-3 py-2 font-semibold text-tw-text-secondary uppercase tracking-wide">Priority</th>
-                      <th className="text-left px-3 py-2 font-semibold text-tw-text-secondary uppercase tracking-wide">Assigned To</th>
-                      <th className="text-left px-3 py-2 font-semibold text-tw-text-secondary uppercase tracking-wide">Deadline</th>
-                      <th className="text-left px-3 py-2 font-semibold text-tw-text-secondary uppercase tracking-wide">Days Left</th>
+                    <tr className="bg-tw-indigo-light border-b border-tw-indigo/20">
+                      <th className="w-px px-2 py-2.5"></th>
+                      <th className="text-left px-3 py-2.5 font-bold text-tw-indigo uppercase tracking-wider text-xs">Subtask</th>
+                      <th className="text-left px-3 py-2.5 font-bold text-tw-indigo uppercase tracking-wider text-xs">Status</th>
+                      <th className="text-left px-3 py-2.5 font-bold text-tw-indigo uppercase tracking-wider text-xs">Priority</th>
+                      <th className="text-left px-3 py-2.5 font-bold text-tw-indigo uppercase tracking-wider text-xs">Assigned To</th>
+                      <th className="text-left px-3 py-2.5 font-bold text-tw-indigo uppercase tracking-wider text-xs">Deadline</th>
+                      <th className="text-left px-3 py-2.5 font-bold text-tw-indigo uppercase tracking-wider text-xs">Days Left</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-tw-border">
@@ -213,14 +216,17 @@ function ExpandedRow({ task, colSpan, actorId, onOpen, onSubtaskClick, onRefresh
 
           {/* ── Progress log ── */}
           <div>
-            <div className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-2">
-              Progress Updates {progressLogs.length > 0 ? `(${progressLogs.length})` : ''}
+            <div className="flex items-center gap-2 mb-2">
+              <span className="w-3 h-3 rounded bg-tw-success inline-block" />
+              <span className="text-xs font-bold text-tw-success uppercase tracking-wider">
+                Progress Updates {progressLogs.length > 0 ? `(${progressLogs.length})` : ''}
+              </span>
             </div>
 
             {canAddLog && (
               <div className="flex gap-2 mb-3">
                 <input
-                  className="input flex-1 text-xs py-1.5"
+                  className="input flex-1 text-sm py-2"
                   placeholder="What did you work on today?"
                   value={progressNote}
                   onChange={e => setProgressNote(e.target.value)}
@@ -229,21 +235,21 @@ function ExpandedRow({ task, colSpan, actorId, onOpen, onSubtaskClick, onRefresh
                 <button
                   disabled={!progressNote.trim() || progressLoading}
                   onClick={e => { e.stopPropagation(); handleAddLog() }}
-                  className="btn-secondary text-xs py-1.5 px-3 disabled:opacity-50 flex-shrink-0">
+                  className="text-sm py-2 px-4 rounded-lg bg-tw-success text-white font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity flex-shrink-0">
                   {progressLoading ? '…' : 'Submit'}
                 </button>
               </div>
             )}
 
             {progressLogs.length > 0 && (
-              <div className="bg-white border border-tw-border rounded-lg overflow-hidden mb-2">
-                <table className="w-full text-xs">
+              <div className="bg-white border border-tw-success/30 rounded-lg overflow-hidden mb-2 shadow-sm">
+                <table className="w-full text-sm">
                   <thead>
-                    <tr className="bg-tw-hover border-b border-tw-border">
-                      <th className="text-left px-3 py-2 font-semibold text-tw-text-secondary uppercase tracking-wide w-24">Date</th>
-                      <th className="text-left px-3 py-2 font-semibold text-tw-text-secondary uppercase tracking-wide w-16">Time</th>
-                      <th className="text-left px-3 py-2 font-semibold text-tw-text-secondary uppercase tracking-wide">Update</th>
-                      <th className="text-left px-3 py-2 font-semibold text-tw-text-secondary uppercase tracking-wide w-28">By</th>
+                    <tr className="bg-tw-success-light border-b border-tw-success/20">
+                      <th className="text-left px-3 py-2.5 font-bold text-green-700 uppercase tracking-wider text-xs w-28">Date</th>
+                      <th className="text-left px-3 py-2.5 font-bold text-green-700 uppercase tracking-wider text-xs w-20">Time</th>
+                      <th className="text-left px-3 py-2.5 font-bold text-green-700 uppercase tracking-wider text-xs">Update</th>
+                      <th className="text-left px-3 py-2.5 font-bold text-green-700 uppercase tracking-wider text-xs w-32">By</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-tw-border">
@@ -346,63 +352,65 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
   return (
     <div className="min-h-screen bg-tw-bg flex">
       {/* ── Sidebar ─────────────────────────────────────────────────────── */}
-      <aside className="w-56 bg-tw-surface border-r border-tw-border flex flex-col flex-shrink-0">
-        <div className="p-4 border-b border-tw-border">
+      <aside className="w-60 bg-[#1f2d3d] flex flex-col flex-shrink-0">
+        <div className="px-5 py-4 border-b border-white/10">
           {user.companyLogo ? (
-            <div className="flex items-center gap-2">
-              <img src={user.companyLogo} alt="Logo" className="w-7 h-7 rounded object-contain" />
-              <span className="font-bold text-tw-text text-sm truncate">{user.companyName || 'TaskWise'}</span>
+            <div className="flex items-center gap-2.5">
+              <img src={user.companyLogo} alt="Logo" className="w-8 h-8 rounded object-contain" />
+              <span className="font-bold text-white text-base truncate">{user.companyName || 'TaskWise'}</span>
             </div>
           ) : (
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 bg-tw-primary rounded-lg flex items-center justify-center flex-shrink-0">
-                <span className="text-white font-bold text-xs">T</span>
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 bg-tw-primary rounded-lg flex items-center justify-center flex-shrink-0">
+                <span className="text-white font-bold text-sm">T</span>
               </div>
-              <span className="font-bold text-tw-text">{user.companyName || 'TaskWise'}</span>
+              <span className="font-bold text-white text-base">{user.companyName || 'TaskWise'}</span>
             </div>
           )}
         </div>
 
-        <nav className="flex-1 p-2 space-y-0.5">
+        <nav className="flex-1 px-3 py-3 space-y-0.5">
           {navItems.map(item => (
             <button key={item.view} onClick={() => { setView(item.view); setSelectedProject(null) }}
-              className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2
-                ${currentView === item.view ? 'bg-tw-primary-light text-tw-primary' : 'text-tw-text-secondary hover:bg-tw-hover hover:text-tw-text'}`}>
-              <span>{item.icon}</span>{item.label}
+              className={`w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2.5
+                ${currentView === item.view
+                  ? 'bg-tw-primary text-white shadow-sm'
+                  : 'text-white/70 hover:bg-white/10 hover:text-white'}`}>
+              <span className="text-base">{item.icon}</span>{item.label}
               {item.view === 'personnel_queue' && queue.length > 0 && (
-                <span className="ml-auto bg-tw-primary text-white text-xs rounded-full px-1.5 py-0.5 font-medium">{queue.length}</span>
+                <span className="ml-auto bg-tw-warning text-white text-xs rounded-full px-1.5 py-0.5 font-bold">{queue.length}</span>
               )}
             </button>
           ))}
         </nav>
 
-        <div className="p-3 border-t border-tw-border">
+        <div className="px-3 py-3 border-t border-white/10">
           <button onClick={() => setView('profile' as ViewMode)}
-            className="flex items-center gap-2 px-2 py-1.5 mb-1 w-full rounded-lg hover:bg-tw-hover transition-colors">
+            className="flex items-center gap-2.5 px-2 py-2 mb-1 w-full rounded-lg hover:bg-white/10 transition-colors">
             {user.avatarUrl ? (
-              <img src={user.avatarUrl} alt="Avatar" className="w-7 h-7 rounded-full object-cover" />
+              <img src={user.avatarUrl} alt="Avatar" className="w-8 h-8 rounded-full object-cover" />
             ) : (
-              <div className="w-7 h-7 rounded-full bg-tw-primary flex items-center justify-center text-white text-xs font-bold flex-shrink-0">{initials}</div>
+              <div className="w-8 h-8 rounded-full bg-tw-primary flex items-center justify-center text-white text-sm font-bold flex-shrink-0">{initials}</div>
             )}
             <div className="min-w-0 text-left">
-              <div className="text-xs font-semibold text-tw-text truncate">{user.name}</div>
-              <div className="text-xs text-tw-text-secondary">Personnel</div>
+              <div className="text-sm font-semibold text-white truncate">{user.name}</div>
+              <div className="text-xs text-white/50">Personnel</div>
             </div>
           </button>
-          <button onClick={onLogout} className="w-full text-left px-2 py-1 text-xs text-tw-text-secondary hover:text-tw-danger transition-colors rounded">
+          <button onClick={onLogout} className="w-full text-left px-2 py-1 text-xs text-white/40 hover:text-tw-danger transition-colors rounded">
             Sign out
           </button>
-          <p className="text-center text-xs text-tw-text-secondary mt-2 opacity-60">Created by SysWise</p>
+          <p className="text-center text-xs text-white/25 mt-2">Created by SysWise</p>
         </div>
       </aside>
 
       {/* ── Main ────────────────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="bg-tw-surface border-b border-tw-border px-6 py-3 flex items-center justify-between">
-          <span className="font-medium text-tw-text text-sm capitalize">{currentView.replace(/_/g, ' ')}</span>
+        <header className="bg-tw-surface border-b border-tw-border px-6 py-3.5 flex items-center justify-between">
+          <span className="font-semibold text-tw-text text-base capitalize">{currentView.replace(/_/g, ' ')}</span>
           <div className="flex items-center gap-3">
-            <button onClick={load} title="Refresh" className="text-tw-text-secondary hover:text-tw-text transition-colors">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <button onClick={load} title="Refresh" className="text-tw-text-secondary hover:text-tw-primary transition-colors">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
             </button>
@@ -414,12 +422,12 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
           {/* ── MY QUEUE ──────────────────────────────────────────────── */}
           {currentView === 'personnel_queue' && (
             <div className="p-6">
-              <h1 className="text-xl font-bold text-tw-text mb-1">My Task Queue</h1>
+              <h1 className="text-2xl font-bold text-tw-text mb-1">My Task Queue</h1>
               <p className="text-sm text-tw-text-secondary mb-6">
                 {queue.length} active task{queue.length !== 1 ? 's' : ''} assigned to you
                 {pendingAccept > 0 && (
-                  <span className="ml-2 inline-flex items-center gap-1 text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5 text-xs font-medium">
-                    {pendingAccept} pending acceptance
+                  <span className="ml-2 inline-flex items-center gap-1 text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5 text-xs font-semibold">
+                    ⚡ {pendingAccept} pending acceptance
                   </span>
                 )}
               </p>
@@ -442,16 +450,16 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
                 <div className="card overflow-hidden">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="bg-tw-hover border-b border-tw-border">
-                        <th className="w-px px-3 py-2.5"></th>{/* priority bar */}
-                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-tw-text-secondary uppercase tracking-wide">Task</th>
-                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-tw-text-secondary uppercase tracking-wide">Project</th>
-                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-tw-text-secondary uppercase tracking-wide">Status</th>
-                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-tw-text-secondary uppercase tracking-wide">Priority</th>
-                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-tw-text-secondary uppercase tracking-wide">Assigned By</th>
-                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-tw-text-secondary uppercase tracking-wide">Deadline</th>
-                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-tw-text-secondary uppercase tracking-wide">Days Left</th>
-                        <th className="w-8 px-2 py-2.5"></th>{/* chevron + accept */}
+                      <tr className="bg-[#f0f4ff] border-b-2 border-tw-primary/20">
+                        <th className="w-px px-3 py-3"></th>
+                        <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider">Task</th>
+                        <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider">Project</th>
+                        <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider">Status</th>
+                        <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider">Priority</th>
+                        <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider">Assigned By</th>
+                        <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider">Deadline</th>
+                        <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider">Days Left</th>
+                        <th className="w-8 px-2 py-3"></th>
                       </tr>
                     </thead>
                     <tbody>
@@ -471,74 +479,73 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
                             <tr
                               onClick={() => setExpandedId(isExpanded ? null : t.id)}
                               className={`cursor-pointer transition-colors border-b border-tw-border
-                                ${isExpanded ? 'bg-blue-50' : 'hover:bg-tw-hover'}`}
+                                ${isExpanded ? 'bg-blue-50 border-b-tw-primary/20' : 'hover:bg-[#f8f9ff]'}`}
                             >
                               {/* Priority bar */}
-                              <td className="pl-3 pr-0 py-3">
-                                <div className={`w-1 h-8 rounded-full ${priorityBar[t.priority]}`} />
+                              <td className="pl-3 pr-0 py-3.5">
+                                <div className={`w-1.5 h-9 rounded-full ${priorityBar[t.priority]}`} />
                               </td>
 
                               {/* Title */}
-                              <td className="px-4 py-3 max-w-xs">
-                                <div className="font-medium text-tw-text">{t.title}</div>
+                              <td className="px-4 py-3.5 max-w-xs">
+                                <div className="font-semibold text-tw-text text-sm">{t.title}</div>
                                 <div className="flex items-center gap-2 mt-0.5">
                                   {(t._count?.subtasks ?? 0) > 0 && (
-                                    <span className="text-xs text-tw-text-secondary">
-                                      {t._count!.subtasks} subtask{t._count!.subtasks !== 1 ? 's' : ''}
+                                    <span className="text-xs text-tw-indigo font-medium">
+                                      ⊞ {t._count!.subtasks} subtask{t._count!.subtasks !== 1 ? 's' : ''}
                                     </span>
-                                  )}
-                                  {(t._count?.comments ?? 0) > 0 && (
-                                    <span className="text-xs text-tw-text-secondary">💬 {t._count!.comments}</span>
                                   )}
                                 </div>
                               </td>
 
                               {/* Project */}
-                              <td className="px-4 py-3 text-xs text-tw-text-secondary whitespace-nowrap">
-                                {t.project?.name || '—'}
+                              <td className="px-4 py-3.5 text-sm text-tw-text-secondary whitespace-nowrap">
+                                {t.project?.name
+                                  ? <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-tw-teal inline-block" />{t.project.name}</span>
+                                  : '—'}
                               </td>
 
                               {/* Status */}
-                              <td className="px-4 py-3 whitespace-nowrap">
-                                <span className={`badge text-xs ${statusBadge[t.status] || 'badge-gray'}`}>
+                              <td className="px-4 py-3.5 whitespace-nowrap">
+                                <span className={`badge ${statusBadge[t.status] || 'badge-gray'}`}>
                                   {t.status.replace('_', ' ')}
                                 </span>
                               </td>
 
                               {/* Priority */}
-                              <td className="px-4 py-3 whitespace-nowrap">
-                                <span className={`badge text-xs ${priorityBadge[t.priority]}`}>{t.priority}</span>
+                              <td className="px-4 py-3.5 whitespace-nowrap">
+                                <span className={`badge ${priorityBadge[t.priority]}`}>{t.priority}</span>
                               </td>
 
                               {/* Assigned by */}
-                              <td className="px-4 py-3 text-xs text-tw-text-secondary whitespace-nowrap">
+                              <td className="px-4 py-3.5 text-sm text-tw-text-secondary whitespace-nowrap">
                                 {assigneeName}
                               </td>
 
                               {/* Deadline */}
-                              <td className="px-4 py-3 text-xs whitespace-nowrap">
+                              <td className="px-4 py-3.5 text-sm whitespace-nowrap">
                                 {t.deadline
                                   ? <span className={isOverdue ? 'text-tw-danger font-semibold' : 'text-tw-text-secondary'}>
-                                      {new Date(t.deadline).toLocaleDateString()}
+                                      📅 {new Date(t.deadline).toLocaleDateString()}
                                     </span>
                                   : <span className="text-tw-text-secondary">—</span>}
                               </td>
 
                               {/* Days left */}
-                              <td className="px-4 py-3 whitespace-nowrap">
+                              <td className="px-4 py-3.5 whitespace-nowrap">
                                 {daysLeftLabel(t.deadline ?? undefined)}
                               </td>
 
                               {/* Chevron + accept badge */}
-                              <td className="px-3 py-3 whitespace-nowrap">
+                              <td className="px-3 py-3.5 whitespace-nowrap">
                                 <div className="flex items-center justify-end gap-2">
                                   {isDeptPending && (
-                                    <span className="bg-amber-400 text-amber-900 text-xs font-semibold px-2 py-0.5 rounded-full">
+                                    <span className="bg-tw-warning text-white text-xs font-bold px-2 py-0.5 rounded-full">
                                       Accept
                                     </span>
                                   )}
                                   <svg
-                                    className={`w-4 h-4 text-tw-text-secondary transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+                                    className={`w-5 h-5 text-tw-primary transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
                                     fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                                   </svg>

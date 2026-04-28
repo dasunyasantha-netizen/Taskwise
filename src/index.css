@@ -3,6 +3,10 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    font-size: 15px;
+  }
+
   body {
     @apply bg-tw-bg text-tw-text font-sans;
     -webkit-font-smoothing: antialiased;
@@ -35,13 +39,15 @@
   }
 
   .badge {
-    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold;
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold;
   }
 
-  .badge-primary  { @apply badge bg-tw-primary-light text-tw-primary; }
-  .badge-success  { @apply badge bg-green-100 text-green-700; }
-  .badge-warning  { @apply badge bg-orange-100 text-orange-700; }
-  .badge-danger   { @apply badge bg-red-100 text-tw-danger; }
-  .badge-purple   { @apply badge bg-purple-100 text-purple-700; }
-  .badge-gray     { @apply badge bg-gray-100 text-gray-600; }
+  .badge-primary  { @apply bg-tw-primary-light text-tw-primary; }
+  .badge-success  { @apply bg-tw-success-light text-green-700; }
+  .badge-warning  { @apply bg-tw-warning-light text-orange-700; }
+  .badge-danger   { @apply bg-tw-danger-light text-tw-danger; }
+  .badge-purple   { @apply bg-tw-purple-light text-tw-purple; }
+  .badge-gray     { @apply bg-gray-100 text-gray-600; }
+  .badge-teal     { @apply bg-tw-teal-light text-tw-teal; }
+  .badge-indigo   { @apply bg-tw-indigo-light text-tw-indigo; }
 }
