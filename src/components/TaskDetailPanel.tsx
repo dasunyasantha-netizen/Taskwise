@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import type { Task, TaskComment, AuditLog, Layer, Personnel, Group } from '../types'
+import type { Task, TaskComment, AuditLog, Layer, Personnel, Group, TaskProgressLog } from '../types'
 import { taskApi } from '../services/apiService'
 import DatePicker from './DatePicker'
 import Select from './Select'
@@ -44,10 +44,11 @@ const eventLabels: Record<string, string> = {
 }
 
 export default function TaskDetailPanel({ task, isDirector, actorId, layers, personnel, groups, onClose, onRefresh }: Props) {
-  const [tab, setTab] = useState<'details' | 'subtasks' | 'comments' | 'history'>('details')
+  const [tab, setTab] = useState<'details' | 'subtasks' | 'updates' | 'comments' | 'history'>('details')
   const [comments, setComments] = useState<TaskComment[]>([])
   const [history, setHistory] = useState<AuditLog[]>([])
   const [subtasks, setSubtasks] = useState<Task[]>([])
+  const [progressLogs, setProgressLogs] = useState<TaskProgressLog[]>([])
   const [newComment, setNewComment] = useState('')
   const [reason, setReason] = useState('')
   const [showReasonModal, setShowReasonModal] = useState<'return' | 'reject' | 'cancel' | 'block' | null>(null)
@@ -65,6 +66,7 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
     if (tab === 'comments') loadComments()
     if (tab === 'history')  loadHistory()
     if (tab === 'subtasks') loadSubtasks()
+    if (tab === 'updates')  loadProgressLogs()
   }, [tab, task.id])
 
   // Reset tab when task changes
@@ -80,6 +82,10 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
   }
   const loadSubtasks = async () => {
     try { setSubtasks(await taskApi.subtasks(task.id) as Task[]) }
+    catch { /* non-critical */ }
+  }
+  const loadProgressLogs = async () => {
+    try { setProgressLogs(await taskApi.progressLogs(task.id) as TaskProgressLog[]) }
     catch { /* non-critical */ }
   }
 
@@ -173,11 +179,13 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
 
         {/* Tabs */}
         <div className="flex border-b border-tw-border px-5">
-          {(['details', 'subtasks', 'comments', 'history'] as const).map(t => (
+          {(['details', 'updates', 'subtasks', 'comments', 'history'] as const).map(t => (
             <button key={t} onClick={() => setTab(t)}
               className={`py-2.5 px-3 text-xs font-medium border-b-2 transition-colors capitalize ${tab === t ? 'border-tw-primary text-tw-primary' : 'border-transparent text-tw-text-secondary hover:text-tw-text'}`}>
-              {t}{t === 'subtasks' && task._count?.subtasks ? ` (${task._count.subtasks})` : ''}
+              {t === 'updates' ? 'Updates' : t}
+              {t === 'subtasks' && task._count?.subtasks ? ` (${task._count.subtasks})` : ''}
               {t === 'comments' && task._count?.comments ? ` (${task._count.comments})` : ''}
+              {t === 'updates' && progressLogs.length > 0 ? ` (${progressLogs.length})` : ''}
             </button>
           ))}
         </div>
@@ -212,14 +220,17 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
                 </div>
               )}
 
-              {/* Accountability — who actually acted on this task */}
               {task.actedById && (
                 <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
-                  <div className="text-xs font-semibold text-tw-primary mb-1">Last actioned by</div>
-                  <p className="text-sm text-tw-text">
-                    {task.actedByName || `${task.actedByType === 'director' ? 'Director' : 'Personnel'} (ID: ${task.actedById.slice(0, 8)}…)`}
-                    <span className="text-xs text-tw-text-secondary ml-1">— individual who started/submitted/returned this task</span>
-                  </p>
+                  <div className="text-xs font-semibold text-tw-primary mb-1">Accepted by</div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-full bg-tw-primary flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                      {(task.actedByName || (task.actedByType === 'director' ? 'D' : 'P')).charAt(0).toUpperCase()}
+                    </div>
+                    <span className="text-sm text-tw-text font-medium">
+                      {task.actedByName || (task.actedByType === 'director' ? 'Director' : 'Personnel')}
+                    </span>
+                  </div>
                 </div>
               )}
 
@@ -276,6 +287,37 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* UPDATES */}
+          {tab === 'updates' && (
+            <div>
+              {progressLogs.length === 0 ? (
+                <div className="text-center py-8 text-tw-text-secondary text-sm">No progress updates logged yet.</div>
+              ) : (
+                <div className="space-y-3">
+                  {progressLogs.map(log => {
+                    const d = new Date(log.logDate)
+                    return (
+                      <div key={log.id} className="bg-tw-hover rounded-xl px-4 py-3">
+                        <div className="flex items-center justify-between gap-2 mb-1.5">
+                          <div className="flex items-center gap-2">
+                            <div className="w-5 h-5 rounded-full bg-tw-primary flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                              {(log.authorName || '?').charAt(0).toUpperCase()}
+                            </div>
+                            <span className="text-xs font-semibold text-tw-text">{log.authorName || log.authorType}</span>
+                          </div>
+                          <span className="text-xs text-tw-text-secondary whitespace-nowrap">
+                            {d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} · {d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                        <p className="text-sm text-tw-text leading-relaxed break-words">{log.note}</p>
+                      </div>
+                    )
+                  })}
                 </div>
               )}
             </div>
