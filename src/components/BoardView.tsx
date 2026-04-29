@@ -149,7 +149,7 @@ export default function BoardView({ project, isDirector, actorId }: Props) {
   const dragTaskRef = useRef<Task | null>(null)
 
   const [form, setForm] = useState({ title: '', description: '', priority: 'MEDIUM', deadline: '' })
-  const [assignTarget, setAssignTarget] = useState<{ type: 'personnel' | 'group' | 'department' | ''; id: string }>({ type: '', id: '' })
+  const [assignTarget, setAssignTarget] = useState<{ type: 'personnel' | 'group' | 'department' | ''; id: string }>({ type: 'personnel', id: '' })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [showPersonPicker, setShowPersonPicker] = useState(false)
@@ -290,7 +290,7 @@ export default function BoardView({ project, isDirector, actorId }: Props) {
           <span className="badge badge-gray">{tasks.length} tasks</span>
         </div>
         {isDirector && (
-          <button onClick={() => setShowCreateModal(true)} className="btn-primary">+ New Task</button>
+          <button onClick={() => { setShowCreateModal(true); setAssignTarget({ type: 'personnel', id: '' }) }} className="btn-primary">+ New Task</button>
         )}
       </div>
 
@@ -375,25 +375,28 @@ export default function BoardView({ project, isDirector, actorId }: Props) {
       {/* Create task modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-panel w-full max-w-lg">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-tw-border">
-              <h3 className="font-semibold text-tw-text">New Task — {project.name}</h3>
+          <div className="bg-white rounded-xl shadow-panel w-full max-w-lg overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-tw-border bg-gradient-to-r from-[#f0f4ff] via-white to-[#f6f0ff]">
+              <div>
+                <h3 className="font-bold text-tw-text text-base">New Task</h3>
+                <p className="text-xs text-tw-text-secondary mt-0.5">📋 {project.name}</p>
+              </div>
               <button onClick={() => setShowCreateModal(false)} className="text-tw-text-secondary hover:text-tw-text text-xl">×</button>
             </div>
             <div className="px-5 py-4 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-tw-text mb-1">Title</label>
+                <label className="block text-sm font-semibold text-tw-text mb-1.5">Title</label>
                 <input className="input" placeholder="What needs to be done?" value={form.title}
-                  onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />
+                  onChange={e => setForm(f => ({ ...f, title: e.target.value }))} autoFocus />
               </div>
               <div>
-                <label className="block text-sm font-medium text-tw-text mb-1">Description</label>
+                <label className="block text-sm font-semibold text-tw-text mb-1.5">Description</label>
                 <textarea className="input resize-none" rows={3} placeholder="Describe the task in detail..."
                   value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-tw-text mb-1">Priority</label>
+                  <label className="block text-sm font-semibold text-tw-text mb-1.5">Priority</label>
                   <Select value={form.priority} onChange={val => setForm(f => ({ ...f, priority: val }))}
                     options={[
                       { value: 'LOW', label: 'Low' }, { value: 'MEDIUM', label: 'Medium' },
@@ -401,14 +404,14 @@ export default function BoardView({ project, isDirector, actorId }: Props) {
                     ]} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-tw-text mb-1">Deadline</label>
+                  <label className="block text-sm font-semibold text-tw-text mb-1.5">Deadline</label>
                   <DatePicker value={form.deadline} onChange={val => setForm(f => ({ ...f, deadline: val }))} />
                 </div>
               </div>
 
               {isDirector && (
-                <div>
-                  <label className="block text-sm font-medium text-tw-text mb-1">Assign to (optional)</label>
+                <div className="rounded-xl bg-[#f8f9ff] border border-[#0073ea]/15 p-3">
+                  <label className="block text-sm font-semibold text-[#0073ea] mb-2">Assign to</label>
                   <div className="grid grid-cols-2 gap-2">
                     <Select value={assignTarget.type}
                       onChange={val => setAssignTarget({ type: val as 'personnel' | 'group' | 'department' | '', id: '' })}
@@ -449,9 +452,9 @@ export default function BoardView({ project, isDirector, actorId }: Props) {
                 </div>
               )}
 
-              <div className="flex gap-2 justify-end pt-1">
-                <button onClick={() => setShowCreateModal(false)} className="btn-secondary">Cancel</button>
-                <button onClick={handleCreateClick} disabled={saving || !form.title} className="btn-primary">
+              <div className="flex gap-2 justify-end pt-1 border-t border-tw-border mt-2">
+                <button onClick={() => setShowCreateModal(false)} className="btn-secondary mt-3">Cancel</button>
+                <button onClick={handleCreateClick} disabled={saving || !form.title} className="btn-primary mt-3">
                   {saving ? 'Creating...' : 'Create Task'}
                 </button>
               </div>
