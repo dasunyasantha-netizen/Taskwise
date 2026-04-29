@@ -280,99 +280,142 @@ export default function HierarchyPanel() {
             </div>
           </div>
 
-          <div className="card overflow-hidden">
-            <div className="px-4 py-2.5 bg-gradient-to-r from-[#f0f4ff] to-[#f6f0ff] border-b border-tw-border flex items-center justify-between">
-              <p className="text-xs text-tw-text-secondary">
-                Edit personnel details, set their direct supervisor, or move them to a different department.
-              </p>
-            </div>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gradient-to-r from-[#f0f4ff] to-[#faf0ff] border-b-2 border-tw-primary/20">
-                  {['Name', 'Contact', 'Department', 'Layer', 'Supervisor', 'Actions'].map((h, i) => (
-                    <th key={h} className={`text-left px-4 py-3 text-xs font-bold uppercase tracking-wider ${
-                      i === 0 ? 'text-[#0073ea]' : i === 2 ? 'text-[#9c27b0]' : i === 4 ? 'text-[#00a693]' : 'text-tw-text-secondary'
-                    }`}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-tw-border">
-                {allPersonnel.length === 0 ? (
-                  <tr><td colSpan={6} className="px-4 py-8 text-center text-tw-text-secondary text-sm">No personnel yet. Add some using the button above.</td></tr>
-                ) : allPersonnel.map((p, idx) => {
-                  const dept = allDepts.find(d => d.id === p.departmentId)
-                  const layer = layers.find(l => l.id === dept?.layerId)
-                  const supervisor = allPersonnel.find(s => s.id === p.supervisorId)
-                  const avatarColors = ['bg-[#0073ea]', 'bg-[#9c27b0]', 'bg-[#00a693]', 'bg-[#ff7575]', 'bg-[#ff9800]', 'bg-[#4caf50]']
-                  const avatarColor = avatarColors[idx % avatarColors.length]
-                  return (
-                    <tr key={p.id} className="hover:bg-[#f8f9ff] transition-colors group">
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2.5">
-                          <div className={`w-8 h-8 rounded-full ${avatarColor} flex items-center justify-center text-white text-sm font-bold shadow-sm`}>
-                            {p.name.charAt(0).toUpperCase()}
-                          </div>
-                          <div>
-                            <div className="font-semibold text-tw-text text-sm leading-tight">{p.name}</div>
-                            {p.nic && <div className="text-xs text-tw-text-secondary">{p.nic}</div>}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="text-xs text-tw-text">{p.phone || '—'}</div>
-                        {p.email && <div className="text-xs text-tw-text-secondary">{p.email}</div>}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700 border border-purple-200">
-                          {dept?.name || '—'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-600 border border-blue-100">
-                          {layer?.name || '—'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        {supervisor
-                          ? <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-teal-50 border border-teal-200 text-xs text-teal-700">
-                              <div className="w-4 h-4 rounded-full bg-[#00a693] flex items-center justify-center text-white text-xs font-bold">{supervisor.name.charAt(0)}</div>
-                              {supervisor.name}
-                            </span>
-                          : <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 border border-amber-200 text-xs text-amber-600">
-                              <span>⚠</span> Not set
-                            </span>}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex gap-1.5">
-                          <button
-                            onClick={() => openEditModal(p)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-[#0073ea] text-white hover:bg-[#0060c0] transition-colors shadow-sm"
-                            title="Edit personnel details"
-                          >
-                            ✏️ Edit
-                          </button>
-                          <button
-                            onClick={() => { setMovingPersonnel(p); setShowMoveModal(true) }}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-[#9c27b0] text-white hover:bg-[#7b1fa2] transition-colors shadow-sm"
-                            title="Move to another department"
-                          >
-                            ⇄ Move
-                          </button>
-                          <button
-                            onClick={() => deletePersonnel(p.id)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-red-500 text-white hover:bg-red-600 transition-colors shadow-sm"
-                            title="Remove personnel"
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+          {(() => {
+            const avatarColors = ['bg-[#0073ea]', 'bg-[#9c27b0]', 'bg-[#00a693]', 'bg-[#ff7575]', 'bg-[#ff9800]', 'bg-[#4caf50]']
+            const deptHeaderColors = [
+              'from-[#e8f0ff] to-[#f0e8ff] border-[#0073ea]/20 text-[#0073ea]',
+              'from-[#f3e8ff] to-[#ffe8f0] border-[#9c27b0]/20 text-[#9c27b0]',
+              'from-[#e8fff8] to-[#e8f8ff] border-[#00a693]/20 text-[#00a693]',
+              'from-[#fff0e8] to-[#ffebe8] border-[#ff7575]/20 text-[#ff5c5c]',
+              'from-[#fff8e8] to-[#fff0e8] border-[#ff9800]/20 text-[#ff9800]',
+              'from-[#edfff0] to-[#e8fff5] border-[#4caf50]/20 text-[#4caf50]',
+            ]
+
+            if (allPersonnel.length === 0) {
+              return (
+                <div className="card px-4 py-8 text-center text-tw-text-secondary text-sm">
+                  No personnel yet. Add some using the button above.
+                </div>
+              )
+            }
+
+            // Group personnel by department, preserving layer order
+            const grouped = allDepts.map((dept, deptIdx) => {
+              const layer = layers.find(l => l.id === dept.layerId)
+              const members = allPersonnel.filter(p => p.departmentId === dept.id)
+              return { dept, layer, members, deptIdx }
+            }).filter(g => g.members.length > 0)
+
+            // Personnel with no department
+            const unassigned = allPersonnel.filter(p => !allDepts.find(d => d.id === p.departmentId))
+
+            return (
+              <div className="space-y-3">
+                {grouped.map(({ dept, layer, members, deptIdx }, groupIdx) => (
+                  <div key={dept.id} className="card overflow-hidden">
+                    {/* Department header */}
+                    <div className={`px-4 py-2.5 bg-gradient-to-r ${deptHeaderColors[deptIdx % deptHeaderColors.length]} border-b-2 flex items-center gap-3`}>
+                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-bold ${avatarColors[deptIdx % avatarColors.length]}`}>
+                        {dept.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="flex-1">
+                        <span className="font-bold text-sm">{dept.name}</span>
+                        <span className="ml-2 text-xs opacity-70">{layer?.name}</span>
+                      </div>
+                      <span className="text-xs font-semibold opacity-70">{members.length} {members.length === 1 ? 'person' : 'people'}</span>
+                    </div>
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-tw-hover border-b border-tw-border">
+                          {['Name', 'Contact', 'Layer', 'Supervisor', 'Actions'].map((h, i) => (
+                            <th key={h} className="text-left px-4 py-2 text-xs font-semibold text-tw-text-secondary uppercase tracking-wider">{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-tw-border">
+                        {members.map((p, idx) => {
+                          const supervisor = allPersonnel.find(s => s.id === p.supervisorId)
+                          const avatarColor = avatarColors[(deptIdx * 3 + idx) % avatarColors.length]
+                          return (
+                            <tr key={p.id} className="hover:bg-[#f8f9ff] transition-colors">
+                              <td className="px-4 py-3">
+                                <div className="flex items-center gap-2.5">
+                                  <div className={`w-8 h-8 rounded-full ${avatarColor} flex items-center justify-center text-white text-sm font-bold shadow-sm`}>
+                                    {p.name.charAt(0).toUpperCase()}
+                                  </div>
+                                  <div>
+                                    <div className="font-semibold text-tw-text text-sm leading-tight">{p.name}</div>
+                                    {p.nic && <div className="text-xs text-tw-text-secondary">{p.nic}</div>}
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="text-xs text-tw-text">{p.phone || '—'}</div>
+                                {p.email && <div className="text-xs text-tw-text-secondary">{p.email}</div>}
+                              </td>
+                              <td className="px-4 py-3">
+                                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-600 border border-blue-100">
+                                  {layer?.name || '—'}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3">
+                                {supervisor
+                                  ? <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-teal-50 border border-teal-200 text-xs text-teal-700">
+                                      <div className="w-4 h-4 rounded-full bg-[#00a693] flex items-center justify-center text-white text-xs font-bold">{supervisor.name.charAt(0)}</div>
+                                      {supervisor.name}
+                                    </span>
+                                  : <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 border border-amber-200 text-xs text-amber-600">
+                                      <span>⚠</span> Not set
+                                    </span>}
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="flex gap-1.5">
+                                  <button onClick={() => openEditModal(p)} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-[#0073ea] text-white hover:bg-[#0060c0] transition-colors shadow-sm" title="Edit">✏️ Edit</button>
+                                  <button onClick={() => { setMovingPersonnel(p); setShowMoveModal(true) }} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-[#9c27b0] text-white hover:bg-[#7b1fa2] transition-colors shadow-sm" title="Move">⇄ Move</button>
+                                  <button onClick={() => deletePersonnel(p.id)} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-red-500 text-white hover:bg-red-600 transition-colors shadow-sm" title="Remove">✕</button>
+                                </div>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ))}
+
+                {unassigned.length > 0 && (
+                  <div className="card overflow-hidden">
+                    <div className="px-4 py-2.5 bg-gray-50 border-b-2 border-gray-200 flex items-center gap-3">
+                      <div className="w-7 h-7 rounded-lg bg-gray-400 flex items-center justify-center text-white text-xs font-bold">?</div>
+                      <span className="font-bold text-sm text-gray-500">Unassigned</span>
+                      <span className="ml-auto text-xs text-gray-400">{unassigned.length} people</span>
+                    </div>
+                    <table className="w-full text-sm">
+                      <tbody className="divide-y divide-tw-border">
+                        {unassigned.map((p, idx) => (
+                          <tr key={p.id} className="hover:bg-[#f8f9ff] transition-colors">
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-full bg-gray-400 flex items-center justify-center text-white text-sm font-bold">{p.name.charAt(0).toUpperCase()}</div>
+                                <span className="font-semibold text-tw-text text-sm">{p.name}</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-xs text-tw-text-secondary">{p.phone || '—'}</td>
+                            <td className="px-4 py-3">
+                              <div className="flex gap-1.5">
+                                <button onClick={() => openEditModal(p)} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-[#0073ea] text-white hover:bg-[#0060c0] transition-colors shadow-sm">✏️ Edit</button>
+                                <button onClick={() => deletePersonnel(p.id)} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-red-500 text-white hover:bg-red-600 transition-colors shadow-sm">✕</button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )
+          })()}
         </div>
       )}
 
