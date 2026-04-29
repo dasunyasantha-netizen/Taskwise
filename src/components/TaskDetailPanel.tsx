@@ -44,12 +44,14 @@ const eventLabels: Record<string, string> = {
 }
 
 export default function TaskDetailPanel({ task, isDirector, actorId, layers, personnel, groups, onClose, onRefresh }: Props) {
-  const [tab, setTab] = useState<'details' | 'subtasks' | 'updates' | 'comments' | 'history'>('details')
+  const [tab, setTab] = useState<'details' | 'subtasks' | 'updates' | 'history'>('details')
   const [comments, setComments] = useState<TaskComment[]>([])
   const [history, setHistory] = useState<AuditLog[]>([])
   const [subtasks, setSubtasks] = useState<Task[]>([])
   const [progressLogs, setProgressLogs] = useState<TaskProgressLog[]>([])
   const [newComment, setNewComment] = useState('')
+  const [newUpdate, setNewUpdate] = useState('')
+  const [addingUpdate, setAddingUpdate] = useState(false)
   const [reason, setReason] = useState('')
   const [showReasonModal, setShowReasonModal] = useState<'return' | 'reject' | 'cancel' | 'block' | null>(null)
   const [showAssignModal, setShowAssignModal] = useState(false)
@@ -63,7 +65,6 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
   const allDepts = layers.flatMap(l => l.departments || [])
 
   useEffect(() => {
-    if (tab === 'comments') loadComments()
     if (tab === 'history')  loadHistory()
     if (tab === 'subtasks') loadSubtasks()
     if (tab === 'updates')  loadProgressLogs()
@@ -106,6 +107,17 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
     } catch (e: unknown) { setActionError(e instanceof Error ? e.message : 'Failed to send comment') }
   }
 
+  const submitUpdate = async () => {
+    if (!newUpdate.trim()) return
+    setAddingUpdate(true)
+    try {
+      await taskApi.addProgressLog(task.id, newUpdate.trim())
+      setNewUpdate('')
+      await loadProgressLogs()
+    } catch (e: unknown) { setActionError(e instanceof Error ? e.message : 'Failed to add update') }
+    setAddingUpdate(false)
+  }
+
   const createSubtask = async () => {
     if (!subtaskForm.title) return
     setLoading(true)
@@ -139,14 +151,14 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
       <div className="relative w-full max-w-xl bg-white shadow-panel flex flex-col h-full overflow-hidden">
 
         {/* Header */}
-        <div className="px-5 py-4 border-b border-tw-border">
+        <div className="px-5 py-4 border-b border-tw-border bg-gradient-to-r from-[#f0f4ff] via-white to-[#f6f0ff]">
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1 flex-wrap">
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
                 <span className={`badge ${statusColors[task.status]}`}>{task.status.replace('_', ' ')}</span>
                 <span className={`badge ${priorityColors[task.priority]}`}>{task.priority}</span>
-                {task.project && <span className="text-xs text-tw-text-secondary">📋 {task.project.name}</span>}
-                {task.parentTaskId && <span className="text-xs text-tw-text-secondary bg-tw-hover px-1.5 py-0.5 rounded">Subtask</span>}
+                {task.project && <span className="text-xs text-tw-text-secondary font-medium">📋 {task.project.name}</span>}
+                {task.parentTaskId && <span className="text-xs text-tw-text-secondary bg-tw-hover px-1.5 py-0.5 rounded font-medium">Subtask</span>}
               </div>
               <h2 className="font-bold text-tw-text text-base leading-snug">{task.title}</h2>
             </div>
@@ -178,14 +190,12 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-tw-border px-5">
-          {(['details', 'updates', 'subtasks', 'comments', 'history'] as const).map(t => (
+        <div className="flex border-b border-tw-border px-5 bg-white">
+          {(['details', 'updates', 'subtasks', 'history'] as const).map(t => (
             <button key={t} onClick={() => setTab(t)}
-              className={`py-2.5 px-3 text-xs font-medium border-b-2 transition-colors capitalize ${tab === t ? 'border-tw-primary text-tw-primary' : 'border-transparent text-tw-text-secondary hover:text-tw-text'}`}>
-              {t === 'updates' ? 'Updates' : t}
+              className={`py-2.5 px-3 text-sm font-medium border-b-2 transition-colors capitalize ${tab === t ? 'border-tw-primary text-tw-primary' : 'border-transparent text-tw-text-secondary hover:text-tw-text'}`}>
+              {t === 'updates' ? `Updates${progressLogs.length > 0 ? ` (${progressLogs.length})` : ''}` : t}
               {t === 'subtasks' && task._count?.subtasks ? ` (${task._count.subtasks})` : ''}
-              {t === 'comments' && task._count?.comments ? ` (${task._count.comments})` : ''}
-              {t === 'updates' && progressLogs.length > 0 ? ` (${progressLogs.length})` : ''}
             </button>
           ))}
         </div>
@@ -198,36 +208,35 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
             <div className="space-y-4">
               {task.description && (
                 <div>
-                  <div className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">Description</div>
+                  <div className="text-xs font-bold text-tw-text-secondary uppercase tracking-wide mb-1.5">Description</div>
                   <p className="text-sm text-tw-text leading-relaxed whitespace-pre-wrap">{task.description}</p>
                 </div>
               )}
 
               {task.assignments?.length > 0 && (
                 <div>
-                  <div className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-2">Assigned To</div>
-                  <div className="space-y-1.5">
+                  <div className="text-xs font-bold text-tw-text-secondary uppercase tracking-wide mb-2">Assigned To</div>
+                  <div className="flex flex-wrap gap-2">
                     {task.assignments.map(a => (
-                      <div key={a.id} className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-tw-primary flex items-center justify-center text-white text-xs font-bold">
+                      <span key={a.id} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#e8f0ff] border border-[#0073ea]/20 text-sm font-medium text-[#0073ea]">
+                        <span className="w-5 h-5 rounded-full bg-[#0073ea] flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
                           {(a.personnel?.name || a.group?.name || a.department?.name || '?').charAt(0)}
-                        </div>
-                        <span className="text-sm text-tw-text">{a.personnel?.name || a.group?.name || a.department?.name}</span>
-                        <span className="text-xs text-tw-text-secondary">{a.personnel ? 'Person' : a.group ? 'Group' : 'Dept'}</span>
-                      </div>
+                        </span>
+                        {a.personnel?.name || a.group?.name || a.department?.name}
+                      </span>
                     ))}
                   </div>
                 </div>
               )}
 
               {task.actedById && (
-                <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
-                  <div className="text-xs font-semibold text-tw-primary mb-1">Accepted by</div>
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-xl p-3">
+                  <div className="text-xs font-bold text-[#0073ea] mb-1.5">Accepted by</div>
                   <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-tw-primary flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                    <div className="w-7 h-7 rounded-full bg-[#0073ea] flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
                       {(task.actedByName || (task.actedByType === 'director' ? 'D' : 'P')).charAt(0).toUpperCase()}
                     </div>
-                    <span className="text-sm text-tw-text font-medium">
+                    <span className="text-sm text-tw-text font-semibold">
                       {task.actedByName || (task.actedByType === 'director' ? 'Director' : 'Personnel')}
                     </span>
                   </div>
@@ -235,17 +244,17 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
               )}
 
               {task.deadline && (
-                <div>
-                  <div className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">Deadline</div>
-                  <span className={`text-sm font-medium ${new Date(task.deadline) < new Date() ? 'text-tw-danger' : 'text-tw-text'}`}>
+                <div className={`rounded-xl p-3 border ${new Date(task.deadline) < new Date() ? 'bg-red-50 border-red-200' : 'bg-[#f0fff8] border-green-200'}`}>
+                  <div className={`text-xs font-bold uppercase tracking-wide mb-1 ${new Date(task.deadline) < new Date() ? 'text-tw-danger' : 'text-green-700'}`}>Deadline</div>
+                  <span className={`text-sm font-semibold ${new Date(task.deadline) < new Date() ? 'text-tw-danger' : 'text-green-700'}`}>
                     {new Date(task.deadline).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                   </span>
                 </div>
               )}
 
               {(task.returnReason || task.cancelReason) && (
-                <div className={`rounded-lg p-3 ${task.status === 'BLOCKED' ? 'bg-orange-50 border border-orange-200' : 'bg-red-50 border border-red-200'}`}>
-                  <div className={`text-xs font-semibold mb-1 ${task.status === 'BLOCKED' ? 'text-orange-700' : 'text-tw-danger'}`}>
+                <div className={`rounded-xl p-3 ${task.status === 'BLOCKED' ? 'bg-orange-50 border border-orange-200' : 'bg-red-50 border border-red-200'}`}>
+                  <div className={`text-xs font-bold mb-1.5 ${task.status === 'BLOCKED' ? 'text-orange-700' : 'text-tw-danger'}`}>
                     {task.status === 'BLOCKED' ? 'Blocked reason' : 'Return / Rejection reason'}
                   </div>
                   <p className="text-sm text-tw-text">{task.returnReason || task.cancelReason}</p>
@@ -254,7 +263,7 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
 
               {task.parentTaskId && (
                 <div>
-                  <div className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">Hierarchy</div>
+                  <div className="text-xs font-bold text-tw-text-secondary uppercase tracking-wide mb-1">Hierarchy</div>
                   <span className="badge badge-gray">Part of a parent task</span>
                 </div>
               )}
@@ -294,63 +303,52 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
 
           {/* UPDATES */}
           {tab === 'updates' && (
-            <div>
-              {progressLogs.length === 0 ? (
-                <div className="text-center py-8 text-tw-text-secondary text-sm">No progress updates logged yet.</div>
-              ) : (
-                <div className="space-y-3">
-                  {progressLogs.map(log => {
-                    const d = new Date(log.logDate)
-                    return (
-                      <div key={log.id} className="bg-tw-hover rounded-xl px-4 py-3">
-                        <div className="flex items-center justify-between gap-2 mb-1.5">
-                          <div className="flex items-center gap-2">
-                            <div className="w-5 h-5 rounded-full bg-tw-primary flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                              {(log.authorName || '?').charAt(0).toUpperCase()}
-                            </div>
-                            <span className="text-xs font-semibold text-tw-text">{log.authorName || log.authorType}</span>
+            <div className="flex flex-col h-full gap-3">
+              <div className="flex-1 space-y-2 overflow-y-auto">
+                {progressLogs.length === 0 ? (
+                  <div className="text-center py-8 text-tw-text-secondary text-sm">No progress updates logged yet.</div>
+                ) : progressLogs.map((log, idx) => {
+                  const d = new Date(log.logDate)
+                  const avatarColors = ['bg-[#0073ea]', 'bg-[#9c27b0]', 'bg-[#00a693]', 'bg-[#ff7575]', 'bg-[#ff9800]']
+                  const avatarColor = avatarColors[idx % avatarColors.length]
+                  return (
+                    <div key={log.id} className="rounded-xl border border-tw-border bg-white px-4 py-3 shadow-sm">
+                      <div className="flex items-center justify-between gap-2 mb-1.5">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-6 h-6 rounded-full ${avatarColor} flex items-center justify-center text-white text-xs font-bold flex-shrink-0`}>
+                            {(log.authorName || '?').charAt(0).toUpperCase()}
                           </div>
-                          <span className="text-xs text-tw-text-secondary whitespace-nowrap">
-                            {d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} · {d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
-                          </span>
+                          <span className="text-sm font-semibold text-tw-text">{log.authorName || log.authorType}</span>
                         </div>
-                        <p className="text-sm text-tw-text leading-relaxed break-words">{log.note}</p>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* COMMENTS */}
-          {tab === 'comments' && (
-            <div className="flex flex-col h-full">
-              <div className="flex-1 space-y-3 mb-4">
-                {comments.length === 0 && <div className="text-center py-8 text-tw-text-secondary text-sm">No comments yet.</div>}
-                {comments.map(c => (
-                  <div key={c.id} className="flex gap-2">
-                    <div className="w-7 h-7 rounded-full bg-tw-primary flex items-center justify-center text-white text-xs font-bold flex-shrink-0 mt-0.5">
-                      {c.authorName ? c.authorName.charAt(0).toUpperCase() : (c.authorType === 'director' ? 'D' : 'P')}
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <span className="text-xs font-semibold text-tw-text">
-                          {c.authorName || (c.authorType === 'director' ? 'Director' : 'Personnel')}
+                        <span className="text-xs text-tw-text-secondary whitespace-nowrap">
+                          {d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · {d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
                         </span>
-                        <span className="text-xs text-tw-text-secondary capitalize">{c.authorType}</span>
-                        <span className="text-xs text-tw-text-secondary">{new Date(c.createdAt).toLocaleString()}</span>
                       </div>
-                      <div className="bg-tw-hover rounded-lg px-3 py-2 text-sm text-tw-text">{c.content}</div>
+                      <p className="text-sm text-tw-text leading-relaxed break-words pl-8">{log.note}</p>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
-              <div className="flex gap-2 mt-auto">
-                <input className="input flex-1 text-sm" placeholder="Write a comment..." value={newComment}
-                  onChange={e => setNewComment(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && !e.shiftKey && submitComment()} />
-                <button onClick={submitComment} disabled={!newComment.trim()} className="btn-primary text-sm px-3">Send</button>
+              {/* Add update input */}
+              <div className="border-t border-tw-border pt-3 mt-auto">
+                <div className="flex gap-2 items-end">
+                  <textarea
+                    className="input flex-1 text-sm resize-none"
+                    rows={2}
+                    placeholder="Add a progress update..."
+                    value={newUpdate}
+                    onChange={e => setNewUpdate(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitUpdate() } }}
+                  />
+                  <button
+                    onClick={submitUpdate}
+                    disabled={!newUpdate.trim() || addingUpdate}
+                    className="btn-primary text-sm px-4 py-2 h-fit"
+                  >
+                    {addingUpdate ? '...' : 'Add'}
+                  </button>
+                </div>
+                <p className="text-xs text-tw-text-secondary mt-1">Press Enter to submit, Shift+Enter for new line</p>
               </div>
             </div>
           )}
@@ -360,8 +358,8 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
             <div className="space-y-1">
               {history.length === 0 && <div className="text-center py-8 text-tw-text-secondary text-sm">No history yet.</div>}
               {history.map(log => (
-                <div key={log.id} className="flex items-start gap-3 py-2.5 border-b border-tw-border last:border-0">
-                  <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${
+                <div key={log.id} className="flex items-start gap-3 py-3 border-b border-tw-border last:border-0">
+                  <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${
                     log.event.includes('APPROVED') ? 'bg-tw-success' :
                     log.event.includes('REJECTED') || log.event.includes('CANCELLED') ? 'bg-tw-danger' :
                     log.event.includes('BLOCKED') ? 'bg-orange-500' :
@@ -369,19 +367,18 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
                   }`} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs font-semibold text-tw-text">
+                      <span className="text-sm font-semibold text-tw-text">
                         {eventLabels[log.event] || log.event.replace(/_/g, ' ')}
                       </span>
-                      <span className="text-xs text-tw-primary font-medium">
+                      <span className="text-sm text-tw-primary font-medium">
                         {log.actorName || `${log.actorType === 'director' ? 'Director' : 'Personnel'}`}
                       </span>
                     </div>
-                    {/* Show payload details if meaningful */}
                     {log.payload?.reason && (
-                      <div className="text-xs text-tw-text-secondary mt-0.5 italic">"{log.payload.reason}"</div>
+                      <div className="text-sm text-tw-text-secondary mt-0.5 italic">"{log.payload.reason}"</div>
                     )}
                     {log.payload?.title && log.event === 'TASK_CREATED' && (
-                      <div className="text-xs text-tw-text-secondary mt-0.5">"{log.payload.title}"</div>
+                      <div className="text-sm text-tw-text-secondary mt-0.5">"{log.payload.title}"</div>
                     )}
                     <div className="text-xs text-tw-text-secondary mt-0.5">{new Date(log.createdAt).toLocaleString()}</div>
                   </div>
