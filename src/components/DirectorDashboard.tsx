@@ -131,32 +131,35 @@ function ApprovalTaskRow({
               )}
 
               {/* ── Task meta ── */}
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {task.description && (
-                  <div>
-                    <div className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">Description</div>
-                    <p className="text-sm text-tw-text leading-relaxed whitespace-pre-wrap">{task.description}</p>
-                  </div>
+                  <p className="text-sm text-tw-text leading-relaxed whitespace-pre-wrap">{task.description}</p>
                 )}
-                <div className="flex flex-wrap gap-6 text-xs">
+
+                {/* Assignees + deadline chips row */}
+                <div className="flex items-start justify-between gap-6">
                   {task.assignments?.length > 0 && (
                     <div>
-                      <div className="font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">Assigned To</div>
-                      {task.assignments.map(a => (
-                        <div key={a.id} className="flex items-center gap-1.5 text-tw-text">
-                          <div className="w-5 h-5 rounded-full bg-tw-primary flex items-center justify-center text-white font-bold text-xs">
-                            {(a.personnel?.name || a.department?.name || '?').charAt(0)}
+                      <div className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-2">Assigned To</div>
+                      <div className="flex flex-wrap gap-2">
+                        {task.assignments.map(a => (
+                          <div key={a.id} className="flex items-center gap-1.5 bg-white border border-tw-border rounded-full px-2.5 py-1">
+                            <div className="w-4 h-4 rounded-full bg-tw-primary flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
+                              {(a.personnel?.name || a.department?.name || '?').charAt(0)}
+                            </div>
+                            <span className="text-xs font-medium text-tw-text">{a.personnel?.name || a.department?.name || a.group?.name}</span>
+                            <span className="text-xs text-tw-text-secondary">{a.personnel ? '· person' : a.department ? '· dept' : '· group'}</span>
                           </div>
-                          {a.personnel?.name || a.department?.name || a.group?.name}
-                          <span className="text-tw-text-secondary ml-1">{a.personnel ? '(person)' : a.department ? '(dept)' : '(group)'}</span>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
                   )}
                   {task.deadline && (
-                    <div>
-                      <div className="font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">Deadline</div>
-                      <span className="text-tw-text">{new Date(task.deadline).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+                    <div className="text-right flex-shrink-0">
+                      <div className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-2">Deadline</div>
+                      <span className="text-xs font-medium text-tw-text bg-white border border-tw-border rounded-lg px-2.5 py-1 inline-block">
+                        {new Date(task.deadline).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                      </span>
                     </div>
                   )}
                 </div>
@@ -185,12 +188,12 @@ function ApprovalTaskRow({
                 )}
               </div>
 
-              {/* ── Subtasks table ── */}
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="w-3 h-3 rounded bg-tw-indigo inline-block" />
+              {/* ── Subtasks ── */}
+              <div className="border-t border-tw-primary/15 pt-4 mt-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="w-2.5 h-2.5 rounded-sm bg-tw-indigo inline-block" />
                   <span className="text-xs font-bold text-tw-indigo uppercase tracking-wider">
-                    Subtasks {subtasks.length > 0 ? `(${subtasks.length})` : ''}
+                    Subtasks{subtasks.length > 0 ? ` (${subtasks.length})` : ''}
                   </span>
                 </div>
                 {loadingS ? (
@@ -198,59 +201,37 @@ function ApprovalTaskRow({
                 ) : subtasks.length === 0 ? (
                   <div className="text-xs text-tw-text-secondary italic py-1">No subtasks.</div>
                 ) : (
-                  <div className="bg-white border border-tw-indigo/20 rounded-lg overflow-hidden shadow-sm">
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="bg-tw-indigo-light border-b border-tw-indigo/20">
-                          <th className="w-px px-2 py-2.5"></th>
-                          <th className="text-left px-3 py-2.5 font-bold text-tw-indigo uppercase tracking-wider">Subtask</th>
-                          <th className="text-left px-3 py-2.5 font-bold text-tw-indigo uppercase tracking-wider">Status</th>
-                          <th className="text-left px-3 py-2.5 font-bold text-tw-indigo uppercase tracking-wider">Priority</th>
-                          <th className="text-left px-3 py-2.5 font-bold text-tw-indigo uppercase tracking-wider">Assigned To</th>
-                          <th className="text-left px-3 py-2.5 font-bold text-tw-indigo uppercase tracking-wider">Deadline</th>
-                          <th className="text-left px-3 py-2.5 font-bold text-tw-indigo uppercase tracking-wider">Days Left</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-tw-border">
-                        {subtasks.map(s => {
-                          const assignee = s.assignments?.[0]
-                          const assigneeName = assignee?.personnel?.name || assignee?.department?.name || assignee?.group?.name || '—'
-                          const dl = s.deadline ? Math.ceil((new Date(s.deadline).setHours(0,0,0,0) - new Date().setHours(0,0,0,0)) / 86400000) : null
-                          const isOverdue = dl !== null && dl < 0
-                          return (
-                            <tr key={s.id} className="hover:bg-tw-hover transition-colors">
-                              <td className="pl-2 pr-0 py-2">
-                                <div className={`w-2 h-2 rounded-full ${subtaskStatusDot[s.status] || 'bg-gray-400'}`} />
-                              </td>
-                              <td className="px-3 py-2 font-medium text-tw-text max-w-xs truncate">{s.title}</td>
-                              <td className="px-3 py-2 whitespace-nowrap">
+                  <div className="bg-white border border-tw-indigo/20 rounded-xl overflow-hidden shadow-sm">
+                    <div className="divide-y divide-tw-border">
+                      {subtasks.map(s => {
+                        const assignee = s.assignments?.[0]
+                        const assigneeName = assignee?.personnel?.name || assignee?.department?.name || assignee?.group?.name || '—'
+                        const dl = s.deadline ? Math.ceil((new Date(s.deadline).setHours(0,0,0,0) - new Date().setHours(0,0,0,0)) / 86400000) : null
+                        const isOverdue = dl !== null && dl < 0
+                        return (
+                          <div key={s.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-blue-50 transition-colors">
+                            <div className={`w-2 h-2 rounded-full flex-shrink-0 ${subtaskStatusDot[s.status] || 'bg-gray-400'}`} />
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-medium text-tw-text truncate">{s.title}</div>
+                              <div className="flex items-center gap-2 mt-0.5">
                                 <span className={`badge text-xs ${subtaskStatusBadge[s.status] || 'badge-gray'}`}>{s.status.replace('_', ' ')}</span>
-                              </td>
-                              <td className="px-3 py-2 whitespace-nowrap">
-                                <span className={`badge text-xs ${{
-                                  CRITICAL: 'badge-danger', HIGH: 'badge-warning', MEDIUM: 'badge-primary', LOW: 'badge-gray'
-                                }[s.priority]}`}>{s.priority}</span>
-                              </td>
-                              <td className="px-3 py-2 text-tw-text-secondary whitespace-nowrap">{assigneeName}</td>
-                              <td className="px-3 py-2 whitespace-nowrap">
-                                {s.deadline
-                                  ? <span className={isOverdue ? 'text-tw-danger font-semibold' : 'text-tw-text-secondary'}>
-                                      {new Date(s.deadline).toLocaleDateString()}
-                                    </span>
-                                  : <span className="text-tw-text-secondary">—</span>}
-                              </td>
-                              <td className="px-3 py-2 whitespace-nowrap">
-                                {dl === null ? <span className="text-tw-text-secondary">—</span>
-                                  : dl < 0  ? <span className="inline-flex text-xs font-semibold text-white bg-tw-danger rounded-full px-2 py-0.5">{Math.abs(dl)}d overdue</span>
-                                  : dl === 0 ? <span className="inline-flex text-xs font-semibold text-orange-800 bg-orange-100 border border-orange-300 rounded-full px-2 py-0.5">Due today</span>
-                                  : dl <= 3  ? <span className="inline-flex text-xs font-semibold text-orange-700 bg-orange-50 border border-orange-200 rounded-full px-2 py-0.5">{dl}d left</span>
-                                  : <span className="text-tw-text-secondary">{dl}d left</span>}
-                              </td>
-                            </tr>
-                          )
-                        })}
-                      </tbody>
-                    </table>
+                                <span className="text-xs text-tw-text-secondary truncate">→ {assigneeName}</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3 flex-shrink-0">
+                              <span className={`badge text-xs ${{
+                                CRITICAL: 'badge-danger', HIGH: 'badge-warning', MEDIUM: 'badge-primary', LOW: 'badge-gray'
+                              }[s.priority]}`}>{s.priority}</span>
+                              {dl === null ? null
+                                : isOverdue ? <span className="text-xs font-semibold text-tw-danger">{Math.abs(dl)}d over</span>
+                                : dl === 0  ? <span className="text-xs font-semibold text-orange-600">Today</span>
+                                : dl <= 3   ? <span className="text-xs font-semibold text-orange-500">{dl}d left</span>
+                                : <span className="text-xs text-tw-text-secondary">{dl}d</span>}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
                   </div>
                 )}
               </div>
