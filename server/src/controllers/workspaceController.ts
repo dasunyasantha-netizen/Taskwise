@@ -207,12 +207,24 @@ export async function updatePersonnel(req: Request, res: Response): Promise<void
     }
     const person = await prisma.personnel.findFirst({ where: { id: req.params.id, workspaceId, deletedAt: null } })
     if (!person) { res.status(404).json({ error: 'Personnel not found' }); return }
-    const { name, phone, nic, email, supervisorId } = req.body
+    const { name, phone, nic, email, supervisorId, departmentId } = req.body
+
+    // If phone is changing, check uniqueness (phone IS the login username)
+    if (phone && phone !== person.phone) {
+      const phoneConflictPersonnel = await prisma.personnel.findFirst({ where: { phone, workspaceId, NOT: { id: req.params.id } } })
+      if (phoneConflictPersonnel) { res.status(409).json({ error: 'Phone number is already in use by another person' }); return }
+      const phoneConflictDirector = await prisma.director.findFirst({ where: { phone, workspaceId } })
+      if (phoneConflictDirector) { res.status(409).json({ error: 'Phone number is already in use by another person' }); return }
+    }
+
     // Directors can set any supervisorId; personnel can set their own supervisorId (for approval chain setup)
-    const supervisorUpdate = supervisorId !== undefined
-      ? { supervisorId: supervisorId || null }
-      : {}
-    const updated = await prisma.personnel.update({ where: { id: req.params.id }, data: { name, phone, nic, email, ...supervisorUpdate } })
+    const supervisorUpdate = supervisorId !== undefined ? { supervisorId: supervisorId || null } : {}
+    const deptUpdate = actorType === 'director' && departmentId ? { departmentId } : {}
+
+    const updated = await prisma.personnel.update({
+      where: { id: req.params.id },
+      data: { name, phone, nic: nic || null, email: email || null, ...supervisorUpdate, ...deptUpdate }
+    })
     const { password: _p, ...safe } = updated
     res.json(safe)
   } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }

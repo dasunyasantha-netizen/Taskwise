@@ -180,22 +180,20 @@ function ExpandedRow({ task, colSpan, actorId, departmentId, onOpen, onSubtaskCl
             </div>
           )}
 
-          {/* ── Two-column layout: subtasks + progress ── */}
-          <div className="grid grid-cols-2 gap-4">
-
-            {/* Left: Subtasks */}
-            <div className="bg-white border border-tw-indigo/20 rounded-xl overflow-hidden shadow-sm">
-              <div className="flex items-center gap-2 px-4 py-2.5 bg-tw-indigo-light border-b border-tw-indigo/20">
-                <span className="w-2.5 h-2.5 rounded-sm bg-tw-indigo inline-block" />
-                <span className="text-xs font-bold text-tw-indigo uppercase tracking-wider">
-                  Subtasks{subtasks.length > 0 ? ` (${subtasks.length})` : ''}
-                </span>
-              </div>
-              {loadingS ? (
-                <div className="px-4 py-4 text-xs text-tw-text-secondary">Loading…</div>
-              ) : subtasks.length === 0 ? (
-                <div className="px-4 py-4 text-xs text-tw-text-secondary italic">No subtasks yet.</div>
-              ) : (
+          {/* ── Subtasks ── */}
+          <div className="border-t border-tw-primary/15 pt-4">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="w-2.5 h-2.5 rounded-sm bg-tw-indigo inline-block" />
+              <span className="text-xs font-bold text-tw-indigo uppercase tracking-wider">
+                Subtasks{subtasks.length > 0 ? ` (${subtasks.length})` : ''}
+              </span>
+            </div>
+            {loadingS ? (
+              <div className="text-xs text-tw-text-secondary py-1">Loading…</div>
+            ) : subtasks.length === 0 ? (
+              <div className="text-xs text-tw-text-secondary italic py-1">No subtasks yet.</div>
+            ) : (
+              <div className="bg-white border border-tw-indigo/20 rounded-xl overflow-hidden shadow-sm">
                 <div className="divide-y divide-tw-border">
                   {subtasks.map(s => {
                     const assignee = s.assignments?.[0]
@@ -216,66 +214,70 @@ function ExpandedRow({ task, colSpan, actorId, departmentId, onOpen, onSubtaskCl
                         </div>
                         <div className="flex-shrink-0 text-right">
                           {dl === null ? null
-                            : dl < 0  ? <span className="text-xs font-semibold text-tw-danger">{Math.abs(dl)}d over</span>
-                            : dl === 0 ? <span className="text-xs font-semibold text-orange-600">Today</span>
-                            : dl <= 3  ? <span className="text-xs font-semibold text-orange-500">{dl}d left</span>
+                            : isOverdue ? <span className="text-xs font-semibold text-tw-danger">{Math.abs(dl)}d over</span>
+                            : dl === 0  ? <span className="text-xs font-semibold text-orange-600">Today</span>
+                            : dl <= 3   ? <span className="text-xs font-semibold text-orange-500">{dl}d left</span>
                             : <span className="text-xs text-tw-text-secondary">{dl}d</span>}
                         </div>
                       </div>
                     )
                   })}
                 </div>
-              )}
-            </div>
+              </div>
+            )}
+          </div>
 
-            {/* Right: Progress updates */}
-            <div className="bg-white border border-tw-success/25 rounded-xl overflow-hidden shadow-sm flex flex-col">
-              <div className="flex items-center gap-2 px-4 py-2.5 bg-tw-success-light border-b border-tw-success/20">
+          {/* ── Progress updates ── */}
+          <div className="border-t border-tw-primary/15 pt-4">
+            <div className="flex items-center justify-between gap-2 mb-3">
+              <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-sm bg-tw-success inline-block" />
                 <span className="text-xs font-bold text-green-700 uppercase tracking-wider">
                   Progress Updates{progressLogs.length > 0 ? ` (${progressLogs.length})` : ''}
                 </span>
               </div>
+            </div>
 
-              {canAddLog && (
-                <div className="flex gap-2 px-3 py-2.5 border-b border-tw-border">
-                  <input
-                    className="input flex-1 text-sm py-1.5"
-                    placeholder="What did you work on today?"
-                    value={progressNote}
-                    onChange={e => setProgressNote(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleAddLog()}
-                  />
-                  <button
-                    disabled={!progressNote.trim() || progressLoading}
-                    onClick={e => { e.stopPropagation(); handleAddLog() }}
-                    className="text-sm py-1.5 px-3 rounded-lg bg-tw-success text-white font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity flex-shrink-0">
-                    {progressLoading ? '…' : 'Add'}
-                  </button>
-                </div>
-              )}
+            {canAddLog && (
+              <div className="flex gap-2 mb-3">
+                <input
+                  className="input flex-1 text-sm py-1.5"
+                  placeholder="What did you work on today?"
+                  value={progressNote}
+                  onChange={e => setProgressNote(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleAddLog()}
+                />
+                <button
+                  disabled={!progressNote.trim() || progressLoading}
+                  onClick={e => { e.stopPropagation(); handleAddLog() }}
+                  className="text-sm py-1.5 px-4 rounded-lg bg-tw-success text-white font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity flex-shrink-0">
+                  {progressLoading ? '…' : 'Add'}
+                </button>
+              </div>
+            )}
 
-              {progressLogs.length === 0 ? (
-                <div className="px-4 py-4 text-xs text-tw-text-secondary italic">No updates logged yet.</div>
-              ) : (
-                <div className="divide-y divide-tw-border overflow-y-auto max-h-48">
+            {progressLogs.length === 0 ? (
+              <div className="text-xs text-tw-text-secondary italic py-1">No updates logged yet.</div>
+            ) : (
+              <div className="bg-white border border-tw-success/25 rounded-xl overflow-hidden shadow-sm">
+                <div className="divide-y divide-tw-border">
                   {progressLogs.map(log => {
                     const d = new Date(log.logDate)
                     return (
-                      <div key={log.id} className="px-4 py-2.5 hover:bg-tw-hover transition-colors">
+                      <div key={log.id} className="px-4 py-3 hover:bg-tw-hover transition-colors">
                         <div className="flex items-center justify-between gap-2 mb-1">
-                          <span className="text-xs text-tw-text-secondary whitespace-nowrap">
-                            {d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · {d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                          <span className="text-xs text-tw-text-secondary">
+                            {d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} · {d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
                           </span>
-                          <span className="text-xs text-tw-text-secondary font-medium whitespace-nowrap">{log.authorName}</span>
+                          <span className="text-xs font-medium text-tw-text-secondary">{log.authorName}</span>
                         </div>
                         <p className="text-sm text-tw-text break-words leading-relaxed">{log.note}</p>
                       </div>
                     )
                   })}
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
 
           {/* ── Action bar ── */}

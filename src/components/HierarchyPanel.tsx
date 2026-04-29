@@ -13,6 +13,9 @@ export default function HierarchyPanel() {
   const [showPersonnelModal, setShowPersonnelModal] = useState(false)
   const [showGroupModal, setShowGroupModal] = useState(false)
   const [showMoveModal, setShowMoveModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [editingPersonnel, setEditingPersonnel] = useState<Personnel | null>(null)
+  const [editForm, setEditForm] = useState({ name: '', phone: '', email: '', nic: '', departmentId: '', supervisorId: '' })
 
   const [deptForm, setDeptForm] = useState({ name: '', layerId: '' })
   const [personnelForm, setPersonnelForm] = useState({ name: '', phone: '', email: '', nic: '', departmentId: '' })
@@ -94,6 +97,29 @@ export default function HierarchyPanel() {
   const deletePersonnel = async (id: string) => {
     if (!confirm('Remove this personnel member?')) return
     await workspaceApi.deletePersonnel(id); await load()
+  }
+
+  const openEditModal = (p: Personnel) => {
+    setEditingPersonnel(p)
+    setEditForm({ name: p.name, phone: p.phone || '', email: p.email || '', nic: p.nic || '', departmentId: p.departmentId || '', supervisorId: p.supervisorId || '' })
+    setShowEditModal(true)
+  }
+
+  const saveEdit = async () => {
+    if (!editingPersonnel || !editForm.name || !editForm.phone) return
+    setSaving(true)
+    try {
+      await workspaceApi.updatePersonnel(editingPersonnel.id, {
+        name: editForm.name,
+        phone: editForm.phone,
+        email: editForm.email,
+        nic: editForm.nic,
+        departmentId: editForm.departmentId || undefined,
+        supervisorId: editForm.supervisorId || null,
+      })
+      setShowEditModal(false); setEditingPersonnel(null); await load()
+    } catch (e: unknown) { setError(e instanceof Error ? e.message : 'Error') }
+    setSaving(false)
   }
 
   const movePersonnel = async () => {
@@ -237,58 +263,116 @@ export default function HierarchyPanel() {
 
       {/* PERSONNEL TAB */}
       {activeTab === 'personnel' && (
-        <div className="card overflow-hidden">
-          <div className="px-4 py-3 bg-tw-hover border-b border-tw-border">
-            <p className="text-xs text-tw-text-secondary">
-              Set each person's <strong>direct supervisor</strong> so submitted tasks route up the approval chain automatically.
-            </p>
+        <div className="space-y-3">
+          {/* Summary bar */}
+          <div className="grid grid-cols-3 gap-3 mb-2">
+            <div className="rounded-xl px-4 py-3 bg-gradient-to-br from-[#0073ea] to-[#1a8cff] text-white shadow-sm">
+              <div className="text-2xl font-bold">{allPersonnel.length}</div>
+              <div className="text-xs opacity-80 mt-0.5">Total Personnel</div>
+            </div>
+            <div className="rounded-xl px-4 py-3 bg-gradient-to-br from-[#9c27b0] to-[#b94fcb] text-white shadow-sm">
+              <div className="text-2xl font-bold">{allPersonnel.filter(p => p.supervisorId).length}</div>
+              <div className="text-xs opacity-80 mt-0.5">With Supervisor Set</div>
+            </div>
+            <div className="rounded-xl px-4 py-3 bg-gradient-to-br from-[#ff7575] to-[#ff5c5c] text-white shadow-sm">
+              <div className="text-2xl font-bold">{allPersonnel.filter(p => !p.supervisorId).length}</div>
+              <div className="text-xs opacity-80 mt-0.5">Supervisor Pending</div>
+            </div>
           </div>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-[#f0f4ff] border-b-2 border-tw-primary/20">
-                {['Name', 'Phone', 'Department', 'Layer', 'Supervisor', 'Actions'].map(h => (
-                  <th key={h} className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-tw-border">
-              {allPersonnel.length === 0 ? (
-                <tr><td colSpan={6} className="px-4 py-8 text-center text-tw-text-secondary text-sm">No personnel yet. Add some using the button above.</td></tr>
-              ) : allPersonnel.map(p => {
-                const dept = allDepts.find(d => d.id === p.departmentId)
-                const layer = layers.find(l => l.id === dept?.layerId)
-                const supervisor = allPersonnel.find(s => s.id === p.supervisorId)
-                return (
-                  <tr key={p.id} className="hover:bg-tw-hover transition-colors">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-full bg-tw-primary flex items-center justify-center text-white text-xs font-bold">{p.name.charAt(0)}</div>
-                        <span className="font-medium text-tw-text">{p.name}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-tw-text-secondary">{p.phone || p.email || '—'}</td>
-                    <td className="px-4 py-3"><span className="badge badge-primary">{dept?.name || '—'}</span></td>
-                    <td className="px-4 py-3 text-tw-text-secondary text-xs">{layer?.name || '—'}</td>
-                    <td className="px-4 py-3">
-                      {supervisor
-                        ? <span className="inline-flex items-center gap-1 text-xs text-tw-text">
-                            <div className="w-5 h-5 rounded-full bg-tw-indigo flex items-center justify-center text-white text-xs font-bold flex-shrink-0">{supervisor.name.charAt(0)}</div>
-                            {supervisor.name}
-                          </span>
-                        : <span className="text-xs text-tw-text-secondary italic">Not set</span>}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex gap-2">
-                        <button onClick={() => { setSettingSupervisorFor(p); setSupervisorTarget(p.supervisorId || '') }} className="text-xs text-tw-indigo hover:underline">Supervisor</button>
-                        <button onClick={() => { setMovingPersonnel(p); setShowMoveModal(true) }} className="text-xs text-tw-primary hover:underline">Move</button>
-                        <button onClick={() => deletePersonnel(p.id)} className="text-xs text-tw-danger hover:underline">Remove</button>
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+
+          <div className="card overflow-hidden">
+            <div className="px-4 py-2.5 bg-gradient-to-r from-[#f0f4ff] to-[#f6f0ff] border-b border-tw-border flex items-center justify-between">
+              <p className="text-xs text-tw-text-secondary">
+                Edit personnel details, set their direct supervisor, or move them to a different department.
+              </p>
+            </div>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gradient-to-r from-[#f0f4ff] to-[#faf0ff] border-b-2 border-tw-primary/20">
+                  {['Name', 'Contact', 'Department', 'Layer', 'Supervisor', 'Actions'].map((h, i) => (
+                    <th key={h} className={`text-left px-4 py-3 text-xs font-bold uppercase tracking-wider ${
+                      i === 0 ? 'text-[#0073ea]' : i === 2 ? 'text-[#9c27b0]' : i === 4 ? 'text-[#00a693]' : 'text-tw-text-secondary'
+                    }`}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-tw-border">
+                {allPersonnel.length === 0 ? (
+                  <tr><td colSpan={6} className="px-4 py-8 text-center text-tw-text-secondary text-sm">No personnel yet. Add some using the button above.</td></tr>
+                ) : allPersonnel.map((p, idx) => {
+                  const dept = allDepts.find(d => d.id === p.departmentId)
+                  const layer = layers.find(l => l.id === dept?.layerId)
+                  const supervisor = allPersonnel.find(s => s.id === p.supervisorId)
+                  const avatarColors = ['bg-[#0073ea]', 'bg-[#9c27b0]', 'bg-[#00a693]', 'bg-[#ff7575]', 'bg-[#ff9800]', 'bg-[#4caf50]']
+                  const avatarColor = avatarColors[idx % avatarColors.length]
+                  return (
+                    <tr key={p.id} className="hover:bg-[#f8f9ff] transition-colors group">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2.5">
+                          <div className={`w-8 h-8 rounded-full ${avatarColor} flex items-center justify-center text-white text-sm font-bold shadow-sm`}>
+                            {p.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <div className="font-semibold text-tw-text text-sm leading-tight">{p.name}</div>
+                            {p.nic && <div className="text-xs text-tw-text-secondary">{p.nic}</div>}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="text-xs text-tw-text">{p.phone || '—'}</div>
+                        {p.email && <div className="text-xs text-tw-text-secondary">{p.email}</div>}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700 border border-purple-200">
+                          {dept?.name || '—'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-600 border border-blue-100">
+                          {layer?.name || '—'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        {supervisor
+                          ? <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-teal-50 border border-teal-200 text-xs text-teal-700">
+                              <div className="w-4 h-4 rounded-full bg-[#00a693] flex items-center justify-center text-white text-xs font-bold">{supervisor.name.charAt(0)}</div>
+                              {supervisor.name}
+                            </span>
+                          : <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 border border-amber-200 text-xs text-amber-600">
+                              <span>⚠</span> Not set
+                            </span>}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex gap-1.5">
+                          <button
+                            onClick={() => openEditModal(p)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-[#0073ea] text-white hover:bg-[#0060c0] transition-colors shadow-sm"
+                            title="Edit personnel details"
+                          >
+                            ✏️ Edit
+                          </button>
+                          <button
+                            onClick={() => { setMovingPersonnel(p); setShowMoveModal(true) }}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-[#9c27b0] text-white hover:bg-[#7b1fa2] transition-colors shadow-sm"
+                            title="Move to another department"
+                          >
+                            ⇄ Move
+                          </button>
+                          <button
+                            onClick={() => deletePersonnel(p.id)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-red-500 text-white hover:bg-red-600 transition-colors shadow-sm"
+                            title="Remove personnel"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -423,6 +507,62 @@ export default function HierarchyPanel() {
             <div className="flex gap-2 justify-end">
               <button onClick={() => setShowGroupModal(false)} className="btn-secondary">Cancel</button>
               <button onClick={createGroup} disabled={saving} className="btn-primary">{saving ? 'Creating...' : 'Create'}</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* MODAL: Edit Personnel */}
+      {showEditModal && editingPersonnel && (
+        <Modal title={`Edit — ${editingPersonnel.name}`} onClose={() => { setShowEditModal(false); setEditingPersonnel(null) }}>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-tw-text mb-1">Full Name <span className="text-tw-danger">*</span></label>
+              <input className="input" placeholder="John Smith" value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-tw-text mb-1">Phone Number <span className="text-tw-danger">*</span></label>
+              <input className="input" type="tel" placeholder="07X XXXXXXX" value={editForm.phone} onChange={e => setEditForm(f => ({ ...f, phone: e.target.value }))} />
+              {editForm.phone !== (editingPersonnel.phone || '') && (
+                <div className="mt-1.5 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5">
+                  <p className="text-xs text-amber-700">⚠ Changing phone number will also update their login username.</p>
+                </div>
+              )}
+              {editForm.phone === (editingPersonnel.phone || '') && (
+                <p className="text-xs text-tw-text-secondary mt-0.5">This is also their login username.</p>
+              )}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-tw-text mb-1">Email <span className="text-tw-text-secondary font-normal">(optional)</span></label>
+              <input className="input" type="email" placeholder="john@example.com" value={editForm.email} onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-tw-text mb-1">NIC <span className="text-tw-text-secondary font-normal">(optional)</span></label>
+              <input className="input" placeholder="XXXXXXXXXV" value={editForm.nic} onChange={e => setEditForm(f => ({ ...f, nic: e.target.value }))} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-tw-text mb-1">Supervisor</label>
+              <Select
+                value={editForm.supervisorId}
+                onChange={val => setEditForm(f => ({ ...f, supervisorId: val }))}
+                placeholder="No supervisor set..."
+                options={allPersonnel
+                  .filter(p => p.id !== editingPersonnel.id && !p.deletedAt)
+                  .map(p => {
+                    const d = allDepts.find(d => d.id === p.departmentId)
+                    const l = layers.find(l => l.id === d?.layerId)
+                    return { value: p.id, label: p.name, group: `${l?.name} — ${d?.name}` }
+                  })}
+              />
+              {editForm.supervisorId && (
+                <button className="mt-1 text-xs text-tw-text-secondary underline" onClick={() => setEditForm(f => ({ ...f, supervisorId: '' }))}>Clear supervisor</button>
+              )}
+            </div>
+            <div className="flex gap-2 justify-end pt-1">
+              <button onClick={() => { setShowEditModal(false); setEditingPersonnel(null) }} className="btn-secondary">Cancel</button>
+              <button onClick={saveEdit} disabled={saving || !editForm.name || !editForm.phone} className="btn-primary">
+                {saving ? 'Saving...' : 'Save Changes'}
+              </button>
             </div>
           </div>
         </Modal>
