@@ -320,48 +320,43 @@ export default function HierarchyPanel() {
               )
             }
 
-            // Group personnel by department, preserving layer order
-            const grouped = allDepts.map((dept, deptIdx) => {
-              const layer = layers.find(l => l.id === dept.layerId)
-              const members = filtered.filter(p => p.departmentId === dept.id)
-              return { dept, layer, members, deptIdx }
+            // Group by layer only
+            const layerGroups = layers.map((layer, layerIdx) => {
+              const layerDeptIds = new Set((layer.departments || []).map(d => d.id))
+              const members = filtered.filter(p => layerDeptIds.has(p.departmentId))
+              return { layer, members, layerIdx }
             }).filter(g => g.members.length > 0)
 
-            // Personnel with no department
             const unassigned = filtered.filter(p => !allDepts.find(d => d.id === p.departmentId))
 
             return (
-              <div className="space-y-3">
-                {grouped.map(({ dept, layer, members, deptIdx }, groupIdx) => (
-                  <div key={dept.id} className="card overflow-hidden">
-                    {/* Department header */}
-                    <div className={`px-4 py-2.5 bg-gradient-to-r ${deptHeaderColors[deptIdx % deptHeaderColors.length]} border-b-2 flex items-center gap-3`}>
-                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-bold ${avatarColors[deptIdx % avatarColors.length]}`}>
-                        {dept.name.charAt(0).toUpperCase()}
+              <div className="space-y-4">
+                {layerGroups.map(({ layer, members, layerIdx }) => (
+                  <div key={layer.id} className="card overflow-hidden">
+                    <div className={`px-4 py-3 bg-gradient-to-r ${deptHeaderColors[layerIdx % deptHeaderColors.length]} border-b-2 flex items-center gap-3`}>
+                      <div className={`w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold ${avatarColors[layerIdx % avatarColors.length]}`}>
+                        {layer.number}
                       </div>
-                      <div className="flex-1">
-                        <span className="font-bold text-sm">{dept.name}</span>
-                        <span className="ml-2 text-xs opacity-70">{layer?.name}</span>
-                      </div>
+                      <span className="font-bold text-sm flex-1">{layer.name}</span>
                       <span className="text-xs font-semibold opacity-70">{members.length} {members.length === 1 ? 'person' : 'people'}</span>
                     </div>
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="bg-tw-hover border-b border-tw-border">
-                          {['Name', 'Contact', 'Layer', 'Supervisor', 'Actions'].map((h, i) => (
+                          {['Name', 'Contact', 'Department', 'Supervisor', 'Actions'].map(h => (
                             <th key={h} className="text-left px-4 py-2 text-xs font-semibold text-tw-text-secondary uppercase tracking-wider">{h}</th>
                           ))}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-tw-border">
-                        {members.map((p, idx) => {
+                        {members.map(p => {
                           const supervisor = allPersonnel.find(s => s.id === p.supervisorId)
-                          const avatarColor = avatarColors[(deptIdx * 3 + idx) % avatarColors.length]
+                          const dept = allDepts.find(d => d.id === p.departmentId)
                           return (
                             <tr key={p.id} className="hover:bg-[#f8f9ff] transition-colors">
                               <td className="px-4 py-3">
                                 <div className="flex items-center gap-2.5">
-                                  <div className={`w-8 h-8 rounded-full ${avatarColor} flex items-center justify-center text-white text-sm font-bold shadow-sm`}>
+                                  <div className={`w-8 h-8 rounded-full ${avatarColors[layerIdx % avatarColors.length]} flex items-center justify-center text-white text-sm font-bold shadow-sm`}>
                                     {p.name.charAt(0).toUpperCase()}
                                   </div>
                                   <div>
@@ -375,8 +370,8 @@ export default function HierarchyPanel() {
                                 {p.email && <div className="text-xs text-tw-text-secondary">{p.email}</div>}
                               </td>
                               <td className="px-4 py-3">
-                                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-600 border border-blue-100">
-                                  {layer?.name || '—'}
+                                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-purple-50 text-purple-600 border border-purple-100">
+                                  {dept?.name || '—'}
                                 </span>
                               </td>
                               <td className="px-4 py-3">
@@ -391,9 +386,9 @@ export default function HierarchyPanel() {
                               </td>
                               <td className="px-4 py-3">
                                 <div className="flex gap-1.5">
-                                  <button onClick={() => openEditModal(p)} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-[#0073ea] text-white hover:bg-[#0060c0] transition-colors shadow-sm" title="Edit">✏️ Edit</button>
-                                  <button onClick={() => { setMovingPersonnel(p); setShowMoveModal(true) }} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-[#9c27b0] text-white hover:bg-[#7b1fa2] transition-colors shadow-sm" title="Move">⇄ Move</button>
-                                  <button onClick={() => deletePersonnel(p.id)} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-red-500 text-white hover:bg-red-600 transition-colors shadow-sm" title="Remove">✕</button>
+                                  <button onClick={() => openEditModal(p)} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-[#0073ea] text-white hover:bg-[#0060c0] transition-colors shadow-sm">✏️ Edit</button>
+                                  <button onClick={() => { setMovingPersonnel(p); setShowMoveModal(true) }} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-[#9c27b0] text-white hover:bg-[#7b1fa2] transition-colors shadow-sm">⇄ Move</button>
+                                  <button onClick={() => deletePersonnel(p.id)} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-red-500 text-white hover:bg-red-600 transition-colors shadow-sm">✕</button>
                                 </div>
                               </td>
                             </tr>
@@ -407,29 +402,48 @@ export default function HierarchyPanel() {
                 {unassigned.length > 0 && (
                   <div className="card overflow-hidden">
                     <div className="px-4 py-2.5 bg-gray-50 border-b-2 border-gray-200 flex items-center gap-3">
-                      <div className="w-7 h-7 rounded-lg bg-gray-400 flex items-center justify-center text-white text-xs font-bold">?</div>
-                      <span className="font-bold text-sm text-gray-500">Unassigned</span>
-                      <span className="ml-auto text-xs text-gray-400">{unassigned.length} people</span>
+                      <div className="w-7 h-7 rounded-full bg-gray-400 flex items-center justify-center text-white text-xs font-bold">?</div>
+                      <span className="font-bold text-sm text-gray-500 flex-1">Unassigned</span>
+                      <span className="text-xs text-gray-400">{unassigned.length} people</span>
                     </div>
                     <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-tw-hover border-b border-tw-border">
+                          {['Name', 'Contact', 'Department', 'Supervisor', 'Actions'].map(h => (
+                            <th key={h} className="text-left px-4 py-2 text-xs font-semibold text-tw-text-secondary uppercase tracking-wider">{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
                       <tbody className="divide-y divide-tw-border">
-                        {unassigned.map((p, idx) => (
-                          <tr key={p.id} className="hover:bg-[#f8f9ff] transition-colors">
-                            <td className="px-4 py-3">
-                              <div className="flex items-center gap-2.5">
-                                <div className="w-8 h-8 rounded-full bg-gray-400 flex items-center justify-center text-white text-sm font-bold">{p.name.charAt(0).toUpperCase()}</div>
-                                <span className="font-semibold text-tw-text text-sm">{p.name}</span>
-                              </div>
-                            </td>
-                            <td className="px-4 py-3 text-xs text-tw-text-secondary">{p.phone || '—'}</td>
-                            <td className="px-4 py-3">
-                              <div className="flex gap-1.5">
-                                <button onClick={() => openEditModal(p)} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-[#0073ea] text-white hover:bg-[#0060c0] transition-colors shadow-sm">✏️ Edit</button>
-                                <button onClick={() => deletePersonnel(p.id)} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-red-500 text-white hover:bg-red-600 transition-colors shadow-sm">✕</button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
+                        {unassigned.map(p => {
+                          const supervisor = allPersonnel.find(s => s.id === p.supervisorId)
+                          return (
+                            <tr key={p.id} className="hover:bg-[#f8f9ff] transition-colors">
+                              <td className="px-4 py-3">
+                                <div className="flex items-center gap-2.5">
+                                  <div className="w-8 h-8 rounded-full bg-gray-400 flex items-center justify-center text-white text-sm font-bold">{p.name.charAt(0).toUpperCase()}</div>
+                                  <span className="font-semibold text-tw-text text-sm">{p.name}</span>
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 text-xs text-tw-text-secondary">{p.phone || '—'}</td>
+                              <td className="px-4 py-3"><span className="text-xs text-tw-text-secondary italic">—</span></td>
+                              <td className="px-4 py-3">
+                                {supervisor
+                                  ? <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-teal-50 border border-teal-200 text-xs text-teal-700">
+                                      <div className="w-4 h-4 rounded-full bg-[#00a693] flex items-center justify-center text-white text-xs font-bold">{supervisor.name.charAt(0)}</div>
+                                      {supervisor.name}
+                                    </span>
+                                  : <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 border border-amber-200 text-xs text-amber-600"><span>⚠</span> Not set</span>}
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="flex gap-1.5">
+                                  <button onClick={() => openEditModal(p)} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-[#0073ea] text-white hover:bg-[#0060c0] transition-colors shadow-sm">✏️ Edit</button>
+                                  <button onClick={() => deletePersonnel(p.id)} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-red-500 text-white hover:bg-red-600 transition-colors shadow-sm">✕</button>
+                                </div>
+                              </td>
+                            </tr>
+                          )
+                        })}
                       </tbody>
                     </table>
                   </div>
