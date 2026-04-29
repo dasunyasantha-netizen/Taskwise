@@ -116,7 +116,7 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
 
   // Action permissions
   const canStart   = task.status === 'ASSIGNED'
-  const canSubmit  = task.status === 'IN_PROGRESS'
+  const canSubmit  = !isDirector && task.status === 'IN_PROGRESS'
   const canBlock   = task.status === 'IN_PROGRESS'
   const canUnblock = task.status === 'BLOCKED'
   const canReturn  = task.status === 'IN_PROGRESS'
