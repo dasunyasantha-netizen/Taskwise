@@ -340,7 +340,14 @@ export default function HierarchyPanel() {
                       <span className="font-bold text-sm flex-1">{layer.name}</span>
                       <span className="text-xs font-semibold opacity-70">{members.length} {members.length === 1 ? 'person' : 'people'}</span>
                     </div>
-                    <table className="w-full text-sm">
+                    <table className="w-full text-sm table-fixed">
+                      <colgroup>
+                        <col className="w-[28%]" />
+                        <col className="w-[20%]" />
+                        <col className="w-[18%]" />
+                        <col className="w-[20%]" />
+                        <col className="w-[14%]" />
+                      </colgroup>
                       <thead>
                         <tr className="bg-tw-hover border-b border-tw-border">
                           {['Name', 'Contact', 'Department', 'Supervisor', 'Actions'].map(h => (
@@ -360,8 +367,8 @@ export default function HierarchyPanel() {
                                     {p.name.charAt(0).toUpperCase()}
                                   </div>
                                   <div>
-                                    <div className="font-semibold text-tw-text text-sm leading-tight">{p.name}</div>
-                                    {p.nic && <div className="text-xs text-tw-text-secondary">{p.nic}</div>}
+                                    <div className="font-semibold text-tw-text text-sm leading-tight truncate">{p.name}</div>
+                                    {p.nic && <div className="text-xs text-tw-text-secondary truncate">{p.nic}</div>}
                                   </div>
                                 </div>
                               </td>
@@ -406,7 +413,14 @@ export default function HierarchyPanel() {
                       <span className="font-bold text-sm text-gray-500 flex-1">Unassigned</span>
                       <span className="text-xs text-gray-400">{unassigned.length} people</span>
                     </div>
-                    <table className="w-full text-sm">
+                    <table className="w-full text-sm table-fixed">
+                      <colgroup>
+                        <col className="w-[28%]" />
+                        <col className="w-[20%]" />
+                        <col className="w-[18%]" />
+                        <col className="w-[20%]" />
+                        <col className="w-[14%]" />
+                      </colgroup>
                       <thead>
                         <tr className="bg-tw-hover border-b border-tw-border">
                           {['Name', 'Contact', 'Department', 'Supervisor', 'Actions'].map(h => (
