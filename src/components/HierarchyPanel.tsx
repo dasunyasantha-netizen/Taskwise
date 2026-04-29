@@ -31,6 +31,7 @@ export default function HierarchyPanel() {
   const [allGroups, setAllGroups] = useState<Group[]>([])
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
+  const [personnelSearch, setPersonnelSearch] = useState('')
 
   const load = async () => {
     setLoading(true)
@@ -264,6 +265,24 @@ export default function HierarchyPanel() {
       {/* PERSONNEL TAB */}
       {activeTab === 'personnel' && (
         <div className="space-y-3">
+          {/* Search bar */}
+          <div className="relative">
+            <span className="absolute inset-y-0 left-3 flex items-center text-tw-text-secondary pointer-events-none">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" /></svg>
+            </span>
+            <input
+              className="input pl-9 pr-9"
+              placeholder="Search by name, phone, email or NIC..."
+              value={personnelSearch}
+              onChange={e => setPersonnelSearch(e.target.value)}
+            />
+            {personnelSearch && (
+              <button className="absolute inset-y-0 right-3 flex items-center text-tw-text-secondary hover:text-tw-text" onClick={() => setPersonnelSearch('')}>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            )}
+          </div>
+
           {/* Summary bar */}
           <div className="grid grid-cols-3 gap-3 mb-2">
             <div className="rounded-xl px-4 py-3 bg-gradient-to-br from-[#0073ea] to-[#1a8cff] text-white shadow-sm">
@@ -291,6 +310,16 @@ export default function HierarchyPanel() {
               'from-[#edfff0] to-[#e8fff5] border-[#4caf50]/20 text-[#4caf50]',
             ]
 
+            const q = personnelSearch.trim().toLowerCase()
+            const filtered = q
+              ? allPersonnel.filter(p =>
+                  p.name.toLowerCase().includes(q) ||
+                  (p.phone || '').toLowerCase().includes(q) ||
+                  (p.email || '').toLowerCase().includes(q) ||
+                  (p.nic || '').toLowerCase().includes(q)
+                )
+              : allPersonnel
+
             if (allPersonnel.length === 0) {
               return (
                 <div className="card px-4 py-8 text-center text-tw-text-secondary text-sm">
@@ -299,15 +328,23 @@ export default function HierarchyPanel() {
               )
             }
 
+            if (filtered.length === 0) {
+              return (
+                <div className="card px-4 py-8 text-center text-tw-text-secondary text-sm">
+                  No personnel match "<strong>{personnelSearch}</strong>".
+                </div>
+              )
+            }
+
             // Group personnel by department, preserving layer order
             const grouped = allDepts.map((dept, deptIdx) => {
               const layer = layers.find(l => l.id === dept.layerId)
-              const members = allPersonnel.filter(p => p.departmentId === dept.id)
+              const members = filtered.filter(p => p.departmentId === dept.id)
               return { dept, layer, members, deptIdx }
             }).filter(g => g.members.length > 0)
 
             // Personnel with no department
-            const unassigned = allPersonnel.filter(p => !allDepts.find(d => d.id === p.departmentId))
+            const unassigned = filtered.filter(p => !allDepts.find(d => d.id === p.departmentId))
 
             return (
               <div className="space-y-3">
