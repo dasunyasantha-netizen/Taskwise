@@ -123,10 +123,11 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
     // Show supervisor-selection modal only for subtasks in a personnel chain.
     // Top-level tasks assigned by the director go straight back to the director — no chain needed.
     // Subtasks assigned by personnel need the chain built upward.
+    // Only prompt for supervisor when the person opens a subtask they need to work on
+    // (not when viewing already-submitted/approved work, and not for tasks assigned directly by the director)
     const isSubtask = !!task.parentTaskId
-    const isInMyApprovalQueue = isSubtask && task.status === 'SUBMITTED' && task.approvalById === actorId && task.approvalByType === 'personnel'
-    const isActiveMine = isSubtask && (isMyTask || canSelfAssign) && !['APPROVED', 'CANCELLED'].includes(task.status)
-    if ((isActiveMine || isInMyApprovalQueue) && mySupervisorId === null) {
+    const isActiveMine = isSubtask && (isMyTask || canSelfAssign) && ['IN_PROGRESS', 'ASSIGNED', 'PENDING', 'BLOCKED', 'RETURNED', 'REJECTED'].includes(task.status)
+    if (isActiveMine && mySupervisorId === null) {
       workspaceApi.getPersonnelAboveMe()
         .then(result => {
           setSupervisorOptions(result.items)
