@@ -549,7 +549,9 @@ export async function approveTask(req: Request, res: Response): Promise<void> {
     const task = await prisma.task.findFirst({ where: { id: req.params.id, workspaceId, deletedAt: null } })
     if (!task) { res.status(404).json({ error: 'Task not found' }); return }
     if (task.status !== 'SUBMITTED') { res.status(400).json({ error: 'Task must be SUBMITTED to approve' }); return }
-    if (task.approvalById !== actorId || task.approvalByType !== actorType) {
+    // Directors can approve any submitted task; personnel can only approve tasks routed to them
+    const isDirector = actorType === 'director'
+    if (!isDirector && (task.approvalById !== actorId || task.approvalByType !== actorType)) {
       res.status(403).json({ error: 'Only the assigning authority can approve this task' }); return
     }
 
@@ -626,7 +628,7 @@ export async function rejectTask(req: Request, res: Response): Promise<void> {
     const task = await prisma.task.findFirst({ where: { id: req.params.id, workspaceId, deletedAt: null } })
     if (!task) { res.status(404).json({ error: 'Task not found' }); return }
     if (task.status !== 'SUBMITTED') { res.status(400).json({ error: 'Task must be SUBMITTED to reject' }); return }
-    if (task.approvalById !== actorId || task.approvalByType !== actorType) {
+    if (actorType !== 'director' && (task.approvalById !== actorId || task.approvalByType !== actorType)) {
       res.status(403).json({ error: 'Only the assigning authority can reject this task' }); return
     }
     await prisma.$transaction(async tx => {
