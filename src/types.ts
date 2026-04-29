@@ -139,6 +139,7 @@ export interface Task {
   actedById?: string
   actedByType?: ActorType
   actedByName?: string
+  startedAt?: string
   returnReason?: string
   returnedAt?: string
   cancelledAt?: string

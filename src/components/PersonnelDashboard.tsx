@@ -5,6 +5,7 @@ import NotificationsMenu from './NotificationsMenu'
 import PersonnelTaskModal from './PersonnelTaskModal'
 import BoardView from './BoardView'
 import ProfilePage from './ProfilePage'
+import ElapsedDays from './ElapsedDays'
 
 interface Props {
   user: AuthUser
@@ -650,9 +651,14 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
 
                               {/* Status */}
                               <td className="px-4 py-3.5 whitespace-nowrap">
-                                <span className={`badge ${statusBadge[t.status] || 'badge-gray'}`}>
-                                  {displayStatus(t.status)}
-                                </span>
+                                <div className="flex flex-col gap-1">
+                                  <span className={`badge ${statusBadge[t.status] || 'badge-gray'}`}>
+                                    {displayStatus(t.status)}
+                                  </span>
+                                  {t.startedAt && !['APPROVED','CANCELLED','REJECTED'].includes(t.status) && (
+                                    <ElapsedDays startedAt={t.startedAt} />
+                                  )}
+                                </div>
                               </td>
 
                               {/* Priority */}

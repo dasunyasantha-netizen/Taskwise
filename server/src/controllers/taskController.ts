@@ -303,7 +303,7 @@ export async function acceptTask(req: Request, res: Response): Promise<void> {
       // If already personally assigned, just update status
       await tx.task.update({
         where: { id: task.id },
-        data: { status: 'IN_PROGRESS', actedById: actorId, actedByType: 'personnel' }
+        data: { status: 'IN_PROGRESS', actedById: actorId, actedByType: 'personnel', startedAt: new Date() }
       })
       await writeAudit(tx, workspaceId, 'TASK_ACCEPTED', 'personnel', actorId, task.id, { acceptedBy: actorId })
       if (task.approvalById && task.approvalByType) {
@@ -389,6 +389,7 @@ export async function startTask(req: Request, res: Response): Promise<void> {
           status: 'IN_PROGRESS',
           actedById: actorId,
           actedByType: actorType,
+          startedAt: new Date(),
         }
       })
       await writeAudit(tx, workspaceId, 'TASK_STARTED', actorType, actorId, task.id, { actedBy: actorId })

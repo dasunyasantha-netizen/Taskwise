@@ -1,5 +1,6 @@
 import React from 'react'
 import type { Task } from '../types'
+import ElapsedDays from './ElapsedDays'
 
 interface Props {
   task: Task
@@ -71,9 +72,14 @@ export default function TaskCard({ task, onClick }: Props) {
 
         {/* Footer row */}
         <div className="flex items-center justify-between gap-2 flex-wrap">
-          <span className={`badge ${statusBadge[task.status] || 'badge-gray'} text-xs`}>
-            {task.status.replace('_', ' ')}
-          </span>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className={`badge ${statusBadge[task.status] || 'badge-gray'} text-xs`}>
+              {task.status.replace('_', ' ')}
+            </span>
+            {task.startedAt && !['APPROVED', 'CANCELLED', 'REJECTED'].includes(task.status) && (
+              <ElapsedDays startedAt={task.startedAt} />
+            )}
+          </div>
           <div className="flex items-center gap-2">
             {subtaskCount > 0 && (
               <span className="text-xs text-tw-text-secondary flex items-center gap-0.5">

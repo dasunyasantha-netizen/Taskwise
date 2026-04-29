@@ -219,6 +219,8 @@ model Task {
   actedById   String?
   actedByType String? // "director" | "personnel"
 
+  startedAt    DateTime? // when status first moved to IN_PROGRESS
+
   returnReason String?
   returnedAt   DateTime?
   cancelledAt  DateTime?

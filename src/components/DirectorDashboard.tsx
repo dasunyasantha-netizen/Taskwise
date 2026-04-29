@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import type { AuthUser, ViewMode, Project, Task, AuditLog, TaskComment } from '../types'
+import ElapsedDays from './ElapsedDays'
 import { projectApi, taskApi, auditApi } from '../services/apiService'
 import NotificationsMenu from './NotificationsMenu'
 import HierarchyPanel from './HierarchyPanel'
@@ -95,7 +96,10 @@ function ApprovalTaskRow({
         </td>
         <td className="px-4 py-3">
           <div className="font-medium text-tw-text">{task.title}</div>
-          <div className="text-xs text-tw-text-secondary mt-0.5">Submitted by {submittedBy}</div>
+          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+            <span className="text-xs text-tw-text-secondary">Submitted by {submittedBy}</span>
+            {task.startedAt && <ElapsedDays startedAt={task.startedAt} />}
+          </div>
         </td>
         <td className="px-4 py-3 text-xs text-tw-text-secondary">{task.project?.name || '—'}</td>
         <td className="px-4 py-3 text-xs text-tw-text-secondary whitespace-nowrap">
