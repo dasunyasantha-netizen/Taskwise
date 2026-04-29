@@ -14,17 +14,16 @@ interface Props {
 }
 
 const COLUMNS = [
-  { status: 'PENDING',     label: 'Pending',     color: 'bg-gray-400' },
-  { status: 'ASSIGNED',    label: 'Assigned',    color: 'bg-blue-400' },
-  { status: 'IN_PROGRESS', label: 'In Progress', color: 'bg-yellow-400' },
-  { status: 'BLOCKED',     label: 'Blocked',     color: 'bg-orange-500' },
-  { status: 'SUBMITTED',   label: 'Submitted',   color: 'bg-purple-400' },
-  { status: 'APPROVED',    label: 'Approved',    color: 'bg-green-400' },
-  { status: 'RETURNED',    label: 'Returned',    color: 'bg-red-400' },
+  { status: 'NOT_STARTED', label: 'Not Started', color: 'bg-gray-400', statuses: ['PENDING', 'ASSIGNED'] },
+  { status: 'IN_PROGRESS', label: 'In Progress', color: 'bg-yellow-400', statuses: ['IN_PROGRESS'] },
+  { status: 'BLOCKED',     label: 'Blocked',     color: 'bg-orange-500', statuses: ['BLOCKED'] },
+  { status: 'SUBMITTED',   label: 'Submitted',   color: 'bg-purple-400', statuses: ['SUBMITTED'] },
+  { status: 'APPROVED',    label: 'Approved',    color: 'bg-green-400',  statuses: ['APPROVED'] },
+  { status: 'RETURNED',    label: 'Returned',    color: 'bg-red-400',    statuses: ['RETURNED'] },
 ]
 
 const DRAG_TRANSITIONS: Record<string, string[]> = {
-  PENDING:     ['ASSIGNED'],
+  PENDING:     ['IN_PROGRESS'],
   ASSIGNED:    ['IN_PROGRESS'],
   IN_PROGRESS: ['BLOCKED', 'SUBMITTED'],
   BLOCKED:     ['IN_PROGRESS'],
@@ -271,7 +270,7 @@ export default function BoardView({ project, isDirector, actorId }: Props) {
     } catch (e: unknown) { setError(e instanceof Error ? e.message : 'Action failed'); await loadTasks() }
   }
 
-  const columnTasks = (status: string) => tasks.filter(t => t.status === status)
+  const columnTasks = (col: typeof COLUMNS[number]) => tasks.filter(t => col.statuses.includes(t.status))
 
   // Intermediate modal data
   const currentIdx = intermediateLayers.indexOf(intermediateLayer)
@@ -315,18 +314,18 @@ export default function BoardView({ project, isDirector, actorId }: Props) {
                 <div className={`w-2.5 h-2.5 rounded-full ${col.color}`} />
                 <span className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide">{col.label}</span>
                 <span className="ml-auto bg-tw-hover text-tw-text-secondary text-xs rounded-full px-1.5 py-0.5 font-medium">
-                  {columnTasks(col.status).length}
+                  {columnTasks(col).length}
                 </span>
               </div>
               <div className={`space-y-0 min-h-12 rounded-xl transition-colors ${isDropTarget ? 'bg-blue-50 ring-2 ring-tw-primary ring-opacity-40' : ''}`}>
-                {columnTasks(col.status).map(task => (
+                {columnTasks(col).map(task => (
                   <div key={task.id} draggable
                     onDragStart={() => handleDragStart(task)} onDragEnd={handleDragEnd}
                     className={`transition-opacity ${draggingId === task.id ? 'opacity-40' : 'opacity-100'}`}>
                     <TaskCard task={task} onClick={t => setSelectedTask(t)} />
                   </div>
                 ))}
-                {columnTasks(col.status).length === 0 && (
+                {columnTasks(col).length === 0 && (
                   <div className={`border-2 border-dashed rounded-xl h-16 flex items-center justify-center transition-colors ${isDropTarget ? 'border-tw-primary' : 'border-tw-border'}`}>
                     <span className="text-xs text-tw-text-secondary">{isDropTarget ? 'Drop here' : 'No tasks'}</span>
                   </div>
