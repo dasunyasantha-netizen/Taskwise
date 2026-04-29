@@ -283,22 +283,6 @@ export default function HierarchyPanel() {
             )}
           </div>
 
-          {/* Summary bar */}
-          <div className="grid grid-cols-3 gap-3 mb-2">
-            <div className="rounded-xl px-4 py-3 bg-gradient-to-br from-[#0073ea] to-[#1a8cff] text-white shadow-sm">
-              <div className="text-2xl font-bold">{allPersonnel.length}</div>
-              <div className="text-xs opacity-80 mt-0.5">Total Personnel</div>
-            </div>
-            <div className="rounded-xl px-4 py-3 bg-gradient-to-br from-[#9c27b0] to-[#b94fcb] text-white shadow-sm">
-              <div className="text-2xl font-bold">{allPersonnel.filter(p => p.supervisorId).length}</div>
-              <div className="text-xs opacity-80 mt-0.5">With Supervisor Set</div>
-            </div>
-            <div className="rounded-xl px-4 py-3 bg-gradient-to-br from-[#ff7575] to-[#ff5c5c] text-white shadow-sm">
-              <div className="text-2xl font-bold">{allPersonnel.filter(p => !p.supervisorId).length}</div>
-              <div className="text-xs opacity-80 mt-0.5">Supervisor Pending</div>
-            </div>
-          </div>
-
           {(() => {
             const avatarColors = ['bg-[#0073ea]', 'bg-[#9c27b0]', 'bg-[#00a693]', 'bg-[#ff7575]', 'bg-[#ff9800]', 'bg-[#4caf50]']
             const deptHeaderColors = [
