@@ -444,9 +444,10 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
       ])
       const myTasks = tasks.filter(t => {
         if (['APPROVED', 'CANCELLED'].includes(t.status)) return false
-        if (t.parentTaskId) return false
         const directlyAssigned = t.assignments?.some(a => a.personnelId === user.actorId)
-        const deptAssigned     = t.assignments?.some(a => a.departmentId === user.departmentId && !t.assignments?.some(p => p.personnelId))
+        // Subtasks only appear if directly assigned to this person (no dept-level assignment for subtasks)
+        if (t.parentTaskId) return directlyAssigned
+        const deptAssigned = t.assignments?.some(a => a.departmentId === user.departmentId && !t.assignments?.some(p => p.personnelId))
         return directlyAssigned || deptAssigned
       })
       // Tasks awaiting this person's approval as a supervisor
@@ -634,6 +635,9 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
                               <td className="px-4 py-3.5 max-w-xs">
                                 <div className="font-semibold text-tw-text text-sm">{t.title}</div>
                                 <div className="flex items-center gap-2 mt-0.5">
+                                  {t.parentTaskId && (
+                                    <span className="text-xs text-purple-600 font-medium">↳ subtask</span>
+                                  )}
                                   {(t._count?.subtasks ?? 0) > 0 && (
                                     <span className="text-xs text-tw-indigo font-medium">
                                       ⊞ {t._count!.subtasks} subtask{t._count!.subtasks !== 1 ? 's' : ''}
@@ -642,11 +646,16 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
                                 </div>
                               </td>
 
-                              {/* Project */}
+                              {/* Project / Parent task */}
                               <td className="px-4 py-3.5 text-sm text-tw-text-secondary whitespace-nowrap">
-                                {t.project?.name
-                                  ? <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-tw-teal inline-block" />{t.project.name}</span>
-                                  : '—'}
+                                {t.parentTaskId
+                                  ? <span className="inline-flex items-center gap-1 text-purple-600">
+                                      <span className="w-2 h-2 rounded-full bg-purple-400 inline-block" />
+                                      {t.parent?.title ?? 'Subtask'}
+                                    </span>
+                                  : t.project?.name
+                                    ? <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-tw-teal inline-block" />{t.project.name}</span>
+                                    : '—'}
                               </td>
 
                               {/* Status */}

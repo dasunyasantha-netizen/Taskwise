@@ -4,6 +4,7 @@ import { buildTaskVisibilityFilter } from '../helpers/visibility'
 
 const TASK_INCLUDE = {
   project: true,
+  parent: { select: { id: true, title: true } },
   assignments: {
     include: {
       personnel: { select: { id: true, name: true, avatarUrl: true } },
