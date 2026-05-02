@@ -456,9 +456,11 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
         t.approvalById === user.actorId &&
         t.approvalByType === 'personnel'
       )
+      // Only show projects where this person has at least one visible task
+      const visibleProjectIds = new Set(tasks.map(t => t.projectId))
       setQueue(myTasks)
       setApprovalTasks(pendingApproval)
-      setProjects(projs)
+      setProjects(projs.filter(p => visibleProjectIds.has(p.id)))
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Failed to load tasks')
     }
