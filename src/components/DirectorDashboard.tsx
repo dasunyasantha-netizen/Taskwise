@@ -727,7 +727,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
           {mobileNavItems.map(item => (
             <button key={item.view}
               onClick={() => { if (item.view === 'project_board') setSelectedProject(null); setView(item.view) }}
-              className={`flex-1 flex flex-col items-center justify-center py-2.5 px-1 gap-0.5 relative transition-colors
+              className={`flex-1 flex flex-col items-center justify-center py-4 px-1 gap-1 relative transition-colors
                 ${activeView === item.view ? 'text-tw-primary' : 'text-gray-400'}`}>
               {activeView === item.view && (
                 <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-tw-primary rounded-full" />

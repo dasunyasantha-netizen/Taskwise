@@ -1173,7 +1173,7 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
           {navItems.map(item => (
             <button key={item.view}
               onClick={() => { setView(item.view); setSelectedProject(null) }}
-              className={`flex-1 flex flex-col items-center justify-center py-2.5 px-1 gap-0.5 relative transition-colors
+              className={`flex-1 flex flex-col items-center justify-center py-4 px-1 gap-1 relative transition-colors
                 ${currentView === item.view ? 'text-tw-primary' : 'text-gray-400'}`}>
               {/* Active indicator */}
               {currentView === item.view && (

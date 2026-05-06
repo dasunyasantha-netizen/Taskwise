@@ -170,15 +170,19 @@ export default function HierarchyPanel() {
 
   return (
     <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-xl font-bold text-tw-text">Team Hierarchy</h1>
-          <p className="text-sm text-tw-text-secondary mt-0.5">Manage layers, departments, personnel and groups</p>
-        </div>
+      <div className="mb-6">
+        <h1 className="text-xl font-bold text-tw-text">Team Hierarchy</h1>
+        <p className="text-sm text-tw-text-secondary mt-0.5 mb-4">Manage layers, departments, personnel and groups</p>
         <div className="flex gap-2">
-          <button onClick={() => setShowDeptModal(true)} className="btn-secondary text-xs">+ Department</button>
-          <button onClick={() => setShowPersonnelModal(true)} className="btn-secondary text-xs">+ Personnel</button>
-          <button onClick={() => setShowGroupModal(true)} className="btn-secondary text-xs">+ Group</button>
+          <button onClick={() => setShowDeptModal(true)} className="flex-1 btn-secondary text-xs py-2.5 flex items-center justify-center gap-1">
+            <span className="text-base leading-none">+</span> Department
+          </button>
+          <button onClick={() => setShowPersonnelModal(true)} className="flex-1 btn-secondary text-xs py-2.5 flex items-center justify-center gap-1">
+            <span className="text-base leading-none">+</span> Personnel
+          </button>
+          <button onClick={() => setShowGroupModal(true)} className="flex-1 btn-secondary text-xs py-2.5 flex items-center justify-center gap-1">
+            <span className="text-base leading-none">+</span> Group
+          </button>
         </div>
       </div>
 
