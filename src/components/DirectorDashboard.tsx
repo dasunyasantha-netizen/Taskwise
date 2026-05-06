@@ -402,11 +402,58 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
   // Avatar/initials for sidebar
   const initials = user.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
 
+  // Mobile nav items (condensed — 5 max for bottom bar)
+  const mobileNavItems = [
+    { label: 'Dashboard', view: 'director_dashboard' as ViewMode, icon: '⊞' },
+    { label: 'Projects',  view: 'project_board'      as ViewMode, icon: '📋' },
+    { label: 'Approvals', view: 'approval_queue'     as ViewMode, icon: '✅', badge: stats.pending_approval },
+    { label: 'Hierarchy', view: 'hierarchy_manager'  as ViewMode, icon: '👥' },
+    { label: 'More',      view: 'profile'            as ViewMode, icon: '👤' },
+  ]
+
   return (
-    <div className="min-h-screen bg-tw-bg flex">
-      {/* Sidebar */}
-      <aside className="w-60 bg-[#1f2d3d] flex flex-col flex-shrink-0">
-        {/* Workspace branding */}
+    <div className="min-h-screen bg-tw-bg flex relative overflow-hidden">
+
+      {/* ── Watermark ───────────────────────────────────────────────────── */}
+      <div className="pointer-events-none fixed inset-0 z-0 flex items-end justify-center overflow-hidden">
+        <svg viewBox="0 0 400 520" xmlns="http://www.w3.org/2000/svg"
+          className="w-[340px] md:w-[420px] opacity-[0.045] select-none"
+          style={{ marginBottom: '-40px' }}>
+          <circle cx="60" cy="210" r="22" fill="#F5A623"/><rect x="44" y="234" width="32" height="80" rx="10" fill="#F5A623"/>
+          <line x1="44" y1="255" x2="10" y2="195" stroke="#F5A623" strokeWidth="14" strokeLinecap="round"/>
+          <line x1="76" y1="255" x2="108" y2="205" stroke="#F5A623" strokeWidth="14" strokeLinecap="round"/>
+          <line x1="52" y1="314" x2="44" y2="390" stroke="#F5A623" strokeWidth="14" strokeLinecap="round"/>
+          <line x1="68" y1="314" x2="76" y2="390" stroke="#F5A623" strokeWidth="14" strokeLinecap="round"/>
+          <circle cx="120" cy="240" r="20" fill="#E91E8C"/><rect x="105" y="262" width="30" height="75" rx="10" fill="#E91E8C"/>
+          <line x1="105" y1="280" x2="75" y2="225" stroke="#E91E8C" strokeWidth="13" strokeLinecap="round"/>
+          <line x1="135" y1="280" x2="160" y2="230" stroke="#E91E8C" strokeWidth="13" strokeLinecap="round"/>
+          <line x1="112" y1="337" x2="105" y2="400" stroke="#E91E8C" strokeWidth="13" strokeLinecap="round"/>
+          <line x1="128" y1="337" x2="135" y2="400" stroke="#E91E8C" strokeWidth="13" strokeLinecap="round"/>
+          <circle cx="185" cy="175" r="24" fill="#1E88E5"/><rect x="168" y="201" width="34" height="90" rx="11" fill="#1E88E5"/>
+          <line x1="168" y1="220" x2="125" y2="145" stroke="#1E88E5" strokeWidth="15" strokeLinecap="round"/>
+          <line x1="202" y1="220" x2="242" y2="150" stroke="#1E88E5" strokeWidth="15" strokeLinecap="round"/>
+          <line x1="175" y1="291" x2="165" y2="390" stroke="#1E88E5" strokeWidth="15" strokeLinecap="round"/>
+          <line x1="195" y1="291" x2="205" y2="390" stroke="#1E88E5" strokeWidth="15" strokeLinecap="round"/>
+          <circle cx="255" cy="195" r="22" fill="#43A047"/><rect x="239" y="219" width="32" height="82" rx="10" fill="#43A047"/>
+          <line x1="239" y1="237" x2="205" y2="170" stroke="#43A047" strokeWidth="14" strokeLinecap="round"/>
+          <line x1="271" y1="237" x2="305" y2="172" stroke="#43A047" strokeWidth="14" strokeLinecap="round"/>
+          <line x1="246" y1="301" x2="238" y2="390" stroke="#43A047" strokeWidth="14" strokeLinecap="round"/>
+          <line x1="262" y1="301" x2="270" y2="390" stroke="#43A047" strokeWidth="14" strokeLinecap="round"/>
+          <circle cx="335" cy="185" r="23" fill="#8E24AA"/><rect x="319" y="210" width="32" height="84" rx="10" fill="#8E24AA"/>
+          <line x1="319" y1="228" x2="282" y2="155" stroke="#8E24AA" strokeWidth="14" strokeLinecap="round"/>
+          <line x1="351" y1="228" x2="386" y2="158" stroke="#8E24AA" strokeWidth="14" strokeLinecap="round"/>
+          <line x1="326" y1="294" x2="318" y2="390" stroke="#8E24AA" strokeWidth="14" strokeLinecap="round"/>
+          <line x1="342" y1="294" x2="350" y2="390" stroke="#8E24AA" strokeWidth="14" strokeLinecap="round"/>
+          <circle cx="375" cy="220" r="20" fill="#00897B"/><rect x="361" y="242" width="28" height="76" rx="9" fill="#00897B"/>
+          <line x1="361" y1="258" x2="336" y2="200" stroke="#00897B" strokeWidth="12" strokeLinecap="round"/>
+          <line x1="389" y1="258" x2="412" y2="202" stroke="#00897B" strokeWidth="12" strokeLinecap="round"/>
+          <line x1="367" y1="318" x2="360" y2="395" stroke="#00897B" strokeWidth="12" strokeLinecap="round"/>
+          <line x1="382" y1="318" x2="389" y2="395" stroke="#00897B" strokeWidth="12" strokeLinecap="round"/>
+        </svg>
+      </div>
+
+      {/* ── Desktop Sidebar ──────────────────────────────────────────────── */}
+      <aside className="hidden md:flex w-60 bg-[#1f2d3d] flex-col flex-shrink-0 relative z-10">
         <div className="px-5 py-4 border-b border-white/10">
           {user.companyLogo ? (
             <div className="flex items-center gap-2.5">
@@ -437,10 +484,8 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
         </nav>
 
         <div className="px-3 py-3 border-t border-white/10">
-          <button
-            onClick={() => setView('profile' as ViewMode)}
-            className="flex items-center gap-2.5 px-2 py-2 mb-1 w-full rounded-lg hover:bg-white/10 transition-colors"
-          >
+          <button onClick={() => setView('profile' as ViewMode)}
+            className="flex items-center gap-2.5 px-2 py-2 mb-1 w-full rounded-lg hover:bg-white/10 transition-colors">
             {user.avatarUrl ? (
               <img src={user.avatarUrl} alt="Avatar" className="w-8 h-8 rounded-full object-cover" />
             ) : (
@@ -456,66 +501,82 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
         </div>
       </aside>
 
-      {/* Main */}
-      <div className="flex-1 flex flex-col min-w-0">
-        <header className="bg-tw-surface border-b border-tw-border px-6 py-3.5 flex items-center justify-between flex-shrink-0">
-          <div className="text-base font-semibold text-tw-text">
-            {currentView === 'project_board' && selectedProject ? (
-              <span className="flex items-center gap-1.5 text-sm">
-                <button onClick={() => setSelectedProject(null)} className="text-tw-text-secondary hover:text-tw-primary">Projects</button>
-                <span className="text-tw-text-secondary">/</span>
-                <span className="text-tw-text font-semibold">{selectedProject.name}</span>
-              </span>
-            ) : (
-              <span className="capitalize">{currentView.replace(/_/g, ' ')}</span>
-            )}
-          </div>
+      {/* ── Main ────────────────────────────────────────────────────────── */}
+      <div className="flex-1 flex flex-col min-w-0 relative z-10">
+        {/* Top bar */}
+        <header className="bg-[#1f2d3d] md:bg-tw-surface border-b border-white/10 md:border-tw-border px-4 md:px-6 py-3 md:py-3.5 flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-3">
+            {user.companyLogo ? (
+              <img src={user.companyLogo} alt="Logo" className="w-7 h-7 rounded object-contain md:hidden" />
+            ) : (
+              <div className="w-7 h-7 bg-tw-primary rounded-lg flex items-center justify-center md:hidden flex-shrink-0">
+                <span className="text-white font-bold text-xs">T</span>
+              </div>
+            )}
+            <div>
+              <div className="font-bold text-white md:text-tw-text text-sm md:text-base">
+                {currentView === 'project_board' && selectedProject ? selectedProject.name
+                  : currentView === 'director_dashboard' ? 'Dashboard'
+                  : currentView === 'approval_queue' ? 'Approvals'
+                  : currentView === 'overdue' ? 'Overdue'
+                  : currentView === 'hierarchy_manager' ? 'Team Hierarchy'
+                  : currentView === 'audit_log' ? 'Audit Log'
+                  : currentView === 'settings' ? 'Settings'
+                  : 'My Profile'}
+              </div>
+              <div className="text-xs text-white/50 md:hidden">{user.name} · Director</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
             {currentView === 'project_board' && selectedProject && (
-              <div className="flex bg-tw-hover rounded-lg p-0.5 gap-0.5">
-                <button
-                  onClick={() => setProjectSubView('board')}
-                  className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${projectSubView === 'board' ? 'bg-white text-tw-primary shadow-card' : 'text-tw-text-secondary'}`}
-                >
+              <div className="hidden md:flex bg-tw-hover rounded-lg p-0.5 gap-0.5">
+                <button onClick={() => setProjectSubView('board')}
+                  className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${projectSubView === 'board' ? 'bg-white text-tw-primary shadow-card' : 'text-tw-text-secondary'}`}>
                   Board
                 </button>
-                <button
-                  onClick={() => setProjectSubView('flowchart')}
-                  className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${projectSubView === 'flowchart' ? 'bg-white text-tw-primary shadow-card' : 'text-tw-text-secondary'}`}
-                >
+                <button onClick={() => setProjectSubView('flowchart')}
+                  className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${projectSubView === 'flowchart' ? 'bg-white text-tw-primary shadow-card' : 'text-tw-text-secondary'}`}>
                   Flowchart
                 </button>
               </div>
+            )}
+            {currentView === 'project_board' && selectedProject && (
+              <button onClick={() => setSelectedProject(null)}
+                className="md:hidden text-white/70 p-1.5 rounded-lg">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/>
+                </svg>
+              </button>
             )}
             <NotificationsMenu />
           </div>
         </header>
 
-        <main className="flex-1 overflow-auto">
+        <main className="flex-1 overflow-auto pb-20 md:pb-0">
 
           {/* DASHBOARD */}
           {currentView === 'director_dashboard' && (
-            <div className="p-6">
-              <h1 className="text-2xl font-bold text-tw-text mb-1">Welcome back, {user.name.split(' ')[0]}</h1>
-              <p className="text-sm text-tw-text-secondary mb-6">Here's what's happening across your workspace.</p>
+            <div className="p-4 md:p-6">
+              <h1 className="text-xl md:text-2xl font-bold text-tw-text mb-1">Welcome back, {user.name.split(' ')[0]}</h1>
+              <p className="text-sm text-tw-text-secondary mb-4 md:mb-6">Here's what's happening across your workspace.</p>
 
               {statsLoading ? <div className="text-sm text-tw-text-secondary">Loading...</div> : (
                 <>
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6 md:mb-8">
                     {[
-                      { label: 'Projects', value: stats.projects, color: 'text-tw-primary', bg: 'bg-blue-50' },
-                      { label: 'Total Tasks', value: stats.totalTasks, color: 'text-tw-text', bg: 'bg-gray-50' },
-                      { label: 'Pending Approval', value: stats.pending_approval, color: 'text-purple-600', bg: 'bg-purple-50' },
-                      { label: 'Overdue', value: stats.overdue, color: 'text-tw-danger', bg: 'bg-red-50' },
+                      { label: 'Projects', value: stats.projects, color: 'text-tw-primary', bg: 'bg-blue-50', icon: '📋' },
+                      { label: 'Total Tasks', value: stats.totalTasks, color: 'text-tw-text', bg: 'bg-gray-50', icon: '✓' },
+                      { label: 'Pending Approval', value: stats.pending_approval, color: 'text-purple-600', bg: 'bg-purple-50', icon: '⏳' },
+                      { label: 'Overdue', value: stats.overdue, color: 'text-tw-danger', bg: 'bg-red-50', icon: '⚠' },
                     ].map(s => (
-                      <div key={s.label} className={`card p-4 ${s.bg}`}>
-                        <div className={`text-3xl font-bold ${s.color} mb-1`}>{s.value}</div>
-                        <div className="text-sm text-tw-text-secondary">{s.label}</div>
+                      <div key={s.label} className={`rounded-2xl p-4 ${s.bg} border border-white/50`}>
+                        <div className={`text-2xl md:text-3xl font-bold ${s.color} mb-0.5`}>{s.value}</div>
+                        <div className="text-xs md:text-sm text-tw-text-secondary">{s.label}</div>
                       </div>
                     ))}
                   </div>
 
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
                     <div className="card overflow-hidden">
                       <div className="px-4 py-3 border-b border-tw-border flex items-center justify-between">
                         <span className="font-semibold text-tw-text text-sm">Pending Approvals</span>
@@ -659,6 +720,29 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
           )}
         </main>
       </div>
+
+      {/* ── Mobile bottom tab bar ──────────────────────────────────────── */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-20 bg-white border-t border-gray-200 shadow-[0_-2px_16px_rgba(0,0,0,0.08)]">
+        <div className="flex items-stretch">
+          {mobileNavItems.map(item => (
+            <button key={item.view}
+              onClick={() => { if (item.view === 'project_board') setSelectedProject(null); setView(item.view) }}
+              className={`flex-1 flex flex-col items-center justify-center py-2.5 px-1 gap-0.5 relative transition-colors
+                ${activeView === item.view ? 'text-tw-primary' : 'text-gray-400'}`}>
+              {activeView === item.view && (
+                <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-tw-primary rounded-full" />
+              )}
+              <span className="text-lg leading-none">{item.icon}</span>
+              <span className="text-[10px] font-semibold leading-none">{item.label}</span>
+              {item.badge ? (
+                <span className="absolute top-1.5 right-[20%] bg-red-500 text-white text-[9px] rounded-full w-4 h-4 flex items-center justify-center font-bold">
+                  {item.badge}
+                </span>
+              ) : null}
+            </button>
+          ))}
+        </div>
+      </nav>
     </div>
   )
 }
