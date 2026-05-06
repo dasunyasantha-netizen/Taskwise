@@ -133,7 +133,6 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
   }
 
   // Action permissions
-  const canStart   = task.status === 'ASSIGNED'
   const canSubmit  = !isDirector && task.status === 'IN_PROGRESS'
   const canBlock   = task.status === 'IN_PROGRESS'
   const canUnblock = task.status === 'BLOCKED'
@@ -175,8 +174,7 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
 
           {/* Action buttons */}
           <div className="flex flex-wrap gap-2 mt-3">
-            {canStart   && <button disabled={actionLoading} onClick={() => doAction(() => taskApi.start(task.id))} className="btn-primary text-xs py-1.5">▶ Start</button>}
-            {canSubmit  && <button disabled={actionLoading} onClick={() => doAction(() => taskApi.submit(task.id))} className="btn-primary text-xs py-1.5">✓ Submit for Approval</button>}
+            {canSubmit  &&<button disabled={actionLoading} onClick={() => doAction(() => taskApi.submit(task.id))} className="btn-primary text-xs py-1.5">✓ Submit for Approval</button>}
             {canBlock   && <button disabled={actionLoading} onClick={() => setShowReasonModal('block')} className="text-xs py-1.5 px-3 rounded-lg border border-orange-300 text-orange-700 bg-orange-50 hover:bg-orange-100 font-semibold transition-colors">⊘ Mark Blocked</button>}
             {canUnblock && <button disabled={actionLoading} onClick={() => doAction(() => taskApi.unblock(task.id))} className="btn-secondary text-xs py-1.5">↺ Unblock</button>}
             {canReturn  && <button disabled={actionLoading} onClick={() => setShowReasonModal('return')} className="btn-secondary text-xs py-1.5">↩ Return</button>}
