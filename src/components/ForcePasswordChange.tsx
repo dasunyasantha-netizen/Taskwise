@@ -44,89 +44,79 @@ export default function ForcePasswordChange({ user, onPasswordChanged, onLogout 
   }
 
   return (
-    <div className="min-h-screen bg-tw-bg flex flex-col items-center justify-center">
-      <div className="card p-8 w-full max-w-md shadow-panel">
-        {/* Header */}
-        <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-yellow-100 mb-3">
+    <div className="min-h-screen bg-[#1f2d3d] flex flex-col items-center justify-center px-4 relative overflow-hidden">
+      {/* Watermark */}
+      <div className="pointer-events-none absolute inset-0 flex items-end justify-center overflow-hidden opacity-10">
+        <svg viewBox="0 0 400 520" xmlns="http://www.w3.org/2000/svg" className="w-80 select-none" style={{marginBottom:'-40px'}}>
+          <circle cx="185" cy="175" r="24" fill="#1E88E5"/><rect x="168" y="201" width="34" height="90" rx="11" fill="#1E88E5"/>
+          <line x1="168" y1="220" x2="125" y2="145" stroke="#1E88E5" strokeWidth="15" strokeLinecap="round"/><line x1="202" y1="220" x2="242" y2="150" stroke="#1E88E5" strokeWidth="15" strokeLinecap="round"/>
+          <line x1="175" y1="291" x2="165" y2="390" stroke="#1E88E5" strokeWidth="15" strokeLinecap="round"/><line x1="195" y1="291" x2="205" y2="390" stroke="#1E88E5" strokeWidth="15" strokeLinecap="round"/>
+          <circle cx="335" cy="185" r="23" fill="#8E24AA"/><rect x="319" y="210" width="32" height="84" rx="10" fill="#8E24AA"/>
+          <line x1="319" y1="228" x2="282" y2="155" stroke="#8E24AA" strokeWidth="14" strokeLinecap="round"/><line x1="351" y1="228" x2="386" y2="158" stroke="#8E24AA" strokeWidth="14" strokeLinecap="round"/>
+          <line x1="326" y1="294" x2="318" y2="390" stroke="#8E24AA" strokeWidth="14" strokeLinecap="round"/><line x1="342" y1="294" x2="350" y2="390" stroke="#8E24AA" strokeWidth="14" strokeLinecap="round"/>
+        </svg>
+      </div>
+
+      <div className="text-center mb-6 relative z-10">
+        <div className="inline-flex items-center gap-3 mb-1">
+          <div className="w-10 h-10 bg-tw-primary rounded-xl flex items-center justify-center shadow-lg">
+            <span className="text-white font-bold text-lg">T</span>
+          </div>
+          <span className="text-2xl font-bold text-white">TaskWise</span>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-3xl p-6 md:p-8 w-full max-w-sm shadow-2xl relative z-10">
+        <div className="text-center mb-5">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-yellow-100 mb-3">
             <span className="text-2xl">🔒</span>
           </div>
-          <h1 className="text-xl font-bold text-tw-text">Set Your Password</h1>
+          <h1 className="text-lg font-bold text-tw-text">Set Your Password</h1>
           <p className="text-sm text-tw-text-secondary mt-1">
-            Welcome, <span className="font-medium text-tw-text">{user.name}</span>. You must set a new password before continuing.
+            Welcome, <span className="font-medium text-tw-text">{user.name}</span>
           </p>
         </div>
 
-        {/* Info box */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 mb-5">
-          <p className="text-sm text-blue-700">
+        <div className="bg-blue-50 rounded-2xl px-4 py-3 mb-5">
+          <p className="text-xs text-blue-700">
             Your temporary password is the <strong>last 6 digits of your phone number</strong> ({user.phone?.slice(-6)}).
-            Enter it below, then choose a new password.
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-tw-text mb-1">Temporary Password</label>
-            <input
-              type="password"
-              className="input"
-              placeholder="Last 6 digits of your phone"
-              value={currentPassword}
-              onChange={e => setCurrentPassword(e.target.value)}
-              required
-              autoFocus
-            />
+            <label className="block text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1.5">Temporary Password</label>
+            <input type="password" className="input rounded-xl" placeholder="Last 6 digits of your phone"
+              value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} required autoFocus />
           </div>
           <div>
-            <label className="block text-sm font-medium text-tw-text mb-1">New Password</label>
-            <input
-              type="password"
-              className="input"
-              placeholder="Min 8 characters"
-              value={newPassword}
-              onChange={e => setNewPassword(e.target.value)}
-              required
-            />
+            <label className="block text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1.5">New Password</label>
+            <input type="password" className="input rounded-xl" placeholder="Min 8 characters"
+              value={newPassword} onChange={e => setNewPassword(e.target.value)} required />
           </div>
           <div>
-            <label className="block text-sm font-medium text-tw-text mb-1">Confirm New Password</label>
-            <input
-              type="password"
-              className="input"
-              placeholder="Repeat new password"
-              value={confirmPassword}
-              onChange={e => setConfirmPassword(e.target.value)}
-              required
-            />
+            <label className="block text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1.5">Confirm Password</label>
+            <input type="password" className="input rounded-xl" placeholder="Repeat new password"
+              value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required />
           </div>
 
           {error && (
-            <div className="bg-red-50 border border-red-200 text-tw-danger text-sm px-3 py-2 rounded-lg">
-              {error}
-            </div>
+            <div className="bg-red-50 border border-red-200 text-tw-danger text-sm px-3 py-2 rounded-xl">{error}</div>
           )}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="btn-primary w-full justify-center flex items-center gap-2 py-2.5"
-          >
+          <button type="submit" disabled={loading}
+            className="w-full py-3.5 rounded-2xl bg-tw-primary text-white font-bold text-sm active:opacity-80 disabled:opacity-60 mt-1">
             {loading ? 'Saving…' : 'Set Password & Continue'}
           </button>
         </form>
 
-        <button
-          onClick={onLogout}
-          className="w-full mt-3 text-center text-xs text-tw-text-secondary hover:text-tw-danger transition-colors"
-        >
+        <button onClick={onLogout}
+          className="w-full mt-4 text-center text-xs text-tw-text-secondary hover:text-tw-danger transition-colors">
           Sign out
         </button>
       </div>
 
-      <p className="mt-6 text-tw-text-secondary text-xs">
-        Created by <span className="font-semibold text-tw-text">SysWise</span>
-      </p>
+      <p className="mt-5 text-white/40 text-xs relative z-10">Created by SysWise</p>
     </div>
   )
 }
