@@ -149,7 +149,8 @@ export async function directorRegister(req: Request, res: Response): Promise<voi
         phone: director.phone,
       }
     })
-  } catch (err) {
+  } catch (err: unknown) {
+    if ((err as { code?: string }).code === 'P2002') { res.status(409).json({ error: 'Phone already registered' }); return }
     console.error(err)
     res.status(500).json({ error: 'Internal server error' })
   }

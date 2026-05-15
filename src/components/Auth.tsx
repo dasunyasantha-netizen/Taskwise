@@ -27,20 +27,12 @@ export default function Auth({ onLogin }: Props) {
   }
 
   return (
-    <div className="min-h-screen bg-[#1f2d3d] flex flex-col items-center justify-center px-4 relative overflow-hidden">
-      {/* Watermark */}
-      <div className="pointer-events-none absolute inset-0 flex items-end justify-center overflow-hidden opacity-10">
-        <svg viewBox="0 0 400 520" xmlns="http://www.w3.org/2000/svg" className="w-80 select-none" style={{marginBottom:'-40px'}}>
-          <circle cx="60" cy="210" r="22" fill="#F5A623"/><rect x="44" y="234" width="32" height="80" rx="10" fill="#F5A623"/>
-          <line x1="44" y1="255" x2="10" y2="195" stroke="#F5A623" strokeWidth="14" strokeLinecap="round"/><line x1="76" y1="255" x2="108" y2="205" stroke="#F5A623" strokeWidth="14" strokeLinecap="round"/>
-          <line x1="52" y1="314" x2="44" y2="390" stroke="#F5A623" strokeWidth="14" strokeLinecap="round"/><line x1="68" y1="314" x2="76" y2="390" stroke="#F5A623" strokeWidth="14" strokeLinecap="round"/>
-          <circle cx="185" cy="175" r="24" fill="#1E88E5"/><rect x="168" y="201" width="34" height="90" rx="11" fill="#1E88E5"/>
-          <line x1="168" y1="220" x2="125" y2="145" stroke="#1E88E5" strokeWidth="15" strokeLinecap="round"/><line x1="202" y1="220" x2="242" y2="150" stroke="#1E88E5" strokeWidth="15" strokeLinecap="round"/>
-          <line x1="175" y1="291" x2="165" y2="390" stroke="#1E88E5" strokeWidth="15" strokeLinecap="round"/><line x1="195" y1="291" x2="205" y2="390" stroke="#1E88E5" strokeWidth="15" strokeLinecap="round"/>
-          <circle cx="335" cy="185" r="23" fill="#8E24AA"/><rect x="319" y="210" width="32" height="84" rx="10" fill="#8E24AA"/>
-          <line x1="319" y1="228" x2="282" y2="155" stroke="#8E24AA" strokeWidth="14" strokeLinecap="round"/><line x1="351" y1="228" x2="386" y2="158" stroke="#8E24AA" strokeWidth="14" strokeLinecap="round"/>
-          <line x1="326" y1="294" x2="318" y2="390" stroke="#8E24AA" strokeWidth="14" strokeLinecap="round"/><line x1="342" y1="294" x2="350" y2="390" stroke="#8E24AA" strokeWidth="14" strokeLinecap="round"/>
-        </svg>
+    <div className="min-h-screen flex flex-col items-center justify-center px-4 relative overflow-hidden"
+      style={{ background: '#1f2d3d' }}>
+      {/* Login background image */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <img src="/taskwise/login-bg.png" alt="" className="w-full h-full object-cover select-none"
+          style={{ opacity: 0.25 }} />
       </div>
 
       {/* Branding above card */}
@@ -51,7 +43,7 @@ export default function Auth({ onLogin }: Props) {
           </div>
           <span className="text-3xl font-bold text-white">TaskWise</span>
         </div>
-        <p className="text-white/60 text-sm">Sri Lanka Youth Corps</p>
+        <p className="text-white/60 text-sm">National Youth Services Council</p>
       </div>
 
       <div className="bg-white rounded-3xl p-6 md:p-8 w-full max-w-sm shadow-2xl relative z-10">

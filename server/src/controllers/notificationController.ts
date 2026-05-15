@@ -1,6 +1,35 @@
 import { Request, Response } from 'express'
 import prisma from '../prisma'
 
+// GET /api/notifications/vapid-public-key
+export async function getVapidKey(_req: Request, res: Response): Promise<void> {
+  res.json({ publicKey: process.env.VAPID_PUBLIC_KEY })
+}
+
+// POST /api/notifications/push-subscribe
+export async function savePushSubscription(req: Request, res: Response): Promise<void> {
+  try {
+    const { actorId, actorType, workspaceId } = req.user!
+    const { endpoint, keys } = req.body
+    if (!endpoint || !keys?.p256dh || !keys?.auth) { res.status(400).json({ error: 'Invalid subscription' }); return }
+    await prisma.pushSubscription.upsert({
+      where: { endpoint },
+      update: { actorId, actorType, workspaceId, p256dh: keys.p256dh, auth: keys.auth },
+      create: { actorId, actorType, workspaceId, endpoint, p256dh: keys.p256dh, auth: keys.auth },
+    })
+    res.json({ success: true })
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
+}
+
+// DELETE /api/notifications/push-subscribe
+export async function removePushSubscription(req: Request, res: Response): Promise<void> {
+  try {
+    const { endpoint } = req.body
+    if (endpoint) await prisma.pushSubscription.deleteMany({ where: { endpoint } })
+    res.json({ success: true })
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
+}
+
 // GET /api/notifications
 export async function listNotifications(req: Request, res: Response): Promise<void> {
   try {

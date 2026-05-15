@@ -1,6 +1,7 @@
 import { Request, Response } from 'express'
 import prisma from '../prisma'
 import { buildTaskVisibilityFilter } from '../helpers/visibility'
+import { sendPushToActor } from '../helpers/push'
 
 const TASK_INCLUDE = {
   project: true,
@@ -58,6 +59,8 @@ async function notifyActor(db: TxClient | typeof prisma, workspaceId: string, re
       taskId,
     }
   })
+  // Fire-and-forget push notification
+  sendPushToActor(recipientId, recipientType, title, message)
 }
 
 // GET /api/tasks
@@ -214,7 +217,7 @@ export async function updateTask(req: Request, res: Response): Promise<void> {
     const task = await prisma.task.findFirst({ where: { id: req.params.id, workspaceId, deletedAt: null } })
     if (!task) { res.status(404).json({ error: 'Task not found' }); return }
 
-    const { title, description, priority, deadline } = req.body
+    const { title, description, priority, deadline, reassignPersonnelId } = req.body
 
     // Deadline edit: only allowed by whoever set it
     if (deadline !== undefined && task.deadline?.toISOString() !== new Date(deadline).toISOString()) {
@@ -223,18 +226,63 @@ export async function updateTask(req: Request, res: Response): Promise<void> {
       }
     }
 
+    // Reassign: validate target personnel exists in workspace
+    if (reassignPersonnelId) {
+      if (actorType !== 'director') { res.status(403).json({ error: 'Only directors can reassign tasks' }); return }
+      const target = await prisma.personnel.findFirst({ where: { id: reassignPersonnelId, workspaceId, deletedAt: null } })
+      if (!target) { res.status(404).json({ error: 'Personnel not found' }); return }
+    }
+
     const updated = await prisma.$transaction(async tx => {
       const t = await tx.task.update({
         where: { id: req.params.id },
         data: {
-          title,
-          description,
-          priority,
-          deadline: deadline ? new Date(deadline) : undefined,
+          title:       title       ?? task.title,
+          description: description ?? task.description,
+          priority:    priority    ?? task.priority,
+          deadline: deadline !== undefined ? (deadline ? new Date(deadline) : null) : task.deadline,
           deadlineSetById:   deadline ? actorId   : task.deadlineSetById  || undefined,
           deadlineSetByType: deadline ? actorType : task.deadlineSetByType || undefined,
         }
       })
+
+      const editorName = actorType === 'director'
+        ? (await tx.director.findUnique({ where: { id: actorId }, select: { name: true } }))?.name ?? 'Director'
+        : (await tx.personnel.findUnique({ where: { id: actorId }, select: { name: true } }))?.name ?? 'Someone'
+
+      // Handle reassignment: replace all existing assignments with the new person
+      if (reassignPersonnelId) {
+        const oldAssignments = await tx.taskAssignment.findMany({ where: { taskId: task.id } })
+        // Notify old assignees they've been removed
+        for (const a of oldAssignments) {
+          if (a.personnelId && a.personnelId !== reassignPersonnelId) {
+            await notifyActor(tx, workspaceId, 'personnel', a.personnelId, 'task_updated', 'Task Reassigned',
+              `"${t.title}" has been reassigned by ${editorName}`, t.id)
+          }
+        }
+        await tx.taskAssignment.deleteMany({ where: { taskId: task.id } })
+        await tx.taskAssignment.create({ data: { taskId: task.id, personnelId: reassignPersonnelId } })
+        // Notify new assignee
+        await notifyActor(tx, workspaceId, 'personnel', reassignPersonnelId, 'task_assigned', 'Task Assigned',
+          `You have been assigned: "${t.title}"`, t.id)
+        await writeAudit(tx, workspaceId, 'TASK_REASSIGNED', actorType, actorId, t.id, { reassignedTo: reassignPersonnelId })
+      } else {
+        // Regular update — notify existing assignees
+        const assignments = await tx.taskAssignment.findMany({ where: { taskId: task.id } })
+        const notifyMsg = `"${t.title}" was updated by ${editorName}`
+        for (const a of assignments) {
+          if (a.personnelId && a.personnelId !== actorId) {
+            await notifyActor(tx, workspaceId, 'personnel', a.personnelId, 'task_updated', 'Task Updated', notifyMsg, t.id)
+          }
+        }
+        if (actorType === 'personnel') {
+          const workspace = await tx.workspace.findUnique({ where: { id: workspaceId }, include: { director: { select: { id: true } } } })
+          if (workspace?.director?.id) {
+            await notifyActor(tx, workspaceId, 'director', workspace.director.id, 'task_updated', 'Task Updated', notifyMsg, t.id)
+          }
+        }
+      }
+
       await writeAudit(tx, workspaceId, 'TASK_UPDATED', actorType, actorId, t.id, req.body)
       return t
     })
@@ -262,7 +310,10 @@ export async function assignTask(req: Request, res: Response): Promise<void> {
       }
     })
     res.json({ success: true })
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
+  } catch (err: unknown) {
+    if ((err as { code?: string }).code === 'P2002') { res.status(409).json({ error: 'Already assigned to this person, group, or department' }); return }
+    console.error(err); res.status(500).json({ error: 'Internal server error' })
+  }
 }
 
 // POST /api/tasks/:id/accept

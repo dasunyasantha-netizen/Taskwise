@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react'
-import type { AuthUser, ViewMode, Project, Task, AuditLog, TaskComment } from '../types'
+import type { AuthUser, ViewMode, Project, Task, AuditLog, TaskComment, Layer, Personnel, Group } from '../types'
 import ElapsedDays from './ElapsedDays'
-import { projectApi, taskApi, auditApi } from '../services/apiService'
+import { projectApi, taskApi, auditApi, workspaceApi } from '../services/apiService'
 import NotificationsMenu from './NotificationsMenu'
+import { usePWA } from '../hooks/usePWA'
 import HierarchyPanel from './HierarchyPanel'
 import ProjectManager from './ProjectManager'
 import BoardView from './BoardView'
 import FlowchartView from './FlowchartView'
 import ProfilePage from './ProfilePage'
 import WorkspaceSettings from './WorkspaceSettings'
+import TaskDetailPanel from './TaskDetailPanel'
 
 interface Props {
   user: AuthUser
@@ -343,6 +345,64 @@ function ApprovalQueueView({ tasks, actorId, onRefresh }: { tasks: Task[]; actor
   )
 }
 
+// ─── Mobile User Menu ────────────────────────────────────────────────────────
+function MobileUserMenu({ user, onProfile, onSettings, onLogout }: { user: AuthUser; onProfile: () => void; onSettings: () => void; onLogout: () => void }) {
+  const [open, setOpen] = useState(false)
+  const ref = React.useRef<HTMLDivElement>(null)
+  const initials = user.name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  return (
+    <div ref={ref} className="relative md:hidden">
+      <button onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-1.5 pl-1 pr-2 py-1 rounded-xl bg-white/10 hover:bg-white/20 transition-colors">
+        {user.avatarUrl
+          ? <img src={user.avatarUrl} alt="" className="w-6 h-6 rounded-full object-cover" />
+          : <div className="w-6 h-6 rounded-full bg-tw-primary flex items-center justify-center text-white text-xs font-bold">{initials}</div>
+        }
+        <svg className={`w-3 h-3 text-white/70 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/>
+        </svg>
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden z-50">
+          {/* User info header */}
+          <div className="px-4 py-3 bg-[#f0f4ff] border-b border-gray-100">
+            <div className="font-semibold text-tw-text text-sm truncate">{user.name}</div>
+            <div className="text-xs text-tw-text-secondary">Director</div>
+          </div>
+          <button onClick={() => { onProfile(); setOpen(false) }}
+            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-tw-text hover:bg-tw-hover transition-colors">
+            <svg className="w-4 h-4 text-tw-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+            </svg>
+            My Profile
+          </button>
+          <button onClick={() => { onSettings(); setOpen(false) }}
+            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-tw-text hover:bg-tw-hover transition-colors border-t border-gray-50">
+            <svg className="w-4 h-4 text-tw-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+            </svg>
+            Settings
+          </button>
+          <button onClick={() => { onLogout(); setOpen(false) }}
+            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-tw-danger hover:bg-red-50 transition-colors border-t border-gray-100">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+            </svg>
+            Sign Out
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Director Dashboard ───────────────────────────────────────────────────────
 export default function DirectorDashboard({ user, currentView, setView, onLogout, onUserUpdate }: Props) {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
@@ -354,6 +414,9 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
   const [auditLogs, setAuditLogs] = useState<unknown[]>([])
   const [statsLoading, setStatsLoading] = useState(true)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
+  const [panelLayers, setPanelLayers] = useState<Layer[]>([])
+  const [panelPersonnel, setPanelPersonnel] = useState<Personnel[]>([])
+  const [panelGroups, setPanelGroups] = useState<Group[]>([])
 
   const loadDashboard = async () => {
     setStatsLoading(true)
@@ -379,6 +442,15 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
 
   useEffect(() => { loadDashboard() }, [])
   useEffect(() => { if (currentView === 'audit_log') loadAudit() }, [currentView])
+  useEffect(() => {
+    if (selectedTask && panelLayers.length === 0) {
+      Promise.all([
+        workspaceApi.getLayers() as Promise<Layer[]>,
+        workspaceApi.getPersonnel() as Promise<Personnel[]>,
+        workspaceApi.getGroups() as Promise<Group[]>,
+      ]).then(([l, p, g]) => { setPanelLayers(l); setPanelPersonnel(p); setPanelGroups(g) }).catch(() => {})
+    }
+  }, [selectedTask])
 
   const handleSelectProject = (p: Project) => {
     setSelectedProject(p)
@@ -402,6 +474,9 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
   // Avatar/initials for sidebar
   const initials = user.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
 
+  const { canInstall, isIOS, installApp, pushEnabled, enablePush } = usePWA()
+  const [showIOSGuide, setShowIOSGuide] = useState(false)
+
   // Mobile nav items (condensed — 5 max for bottom bar)
   const mobileNavItems = [
     { label: 'Dashboard', view: 'director_dashboard' as ViewMode, icon: '⊞' },
@@ -415,41 +490,9 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
     <div className="min-h-screen bg-tw-bg flex relative overflow-hidden">
 
       {/* ── Watermark ───────────────────────────────────────────────────── */}
-      <div className="pointer-events-none fixed inset-0 z-0 flex items-end justify-center overflow-hidden">
-        <svg viewBox="0 0 400 520" xmlns="http://www.w3.org/2000/svg"
-          className="w-[340px] md:w-[420px] opacity-[0.045] select-none"
-          style={{ marginBottom: '-40px' }}>
-          <circle cx="60" cy="210" r="22" fill="#F5A623"/><rect x="44" y="234" width="32" height="80" rx="10" fill="#F5A623"/>
-          <line x1="44" y1="255" x2="10" y2="195" stroke="#F5A623" strokeWidth="14" strokeLinecap="round"/>
-          <line x1="76" y1="255" x2="108" y2="205" stroke="#F5A623" strokeWidth="14" strokeLinecap="round"/>
-          <line x1="52" y1="314" x2="44" y2="390" stroke="#F5A623" strokeWidth="14" strokeLinecap="round"/>
-          <line x1="68" y1="314" x2="76" y2="390" stroke="#F5A623" strokeWidth="14" strokeLinecap="round"/>
-          <circle cx="120" cy="240" r="20" fill="#E91E8C"/><rect x="105" y="262" width="30" height="75" rx="10" fill="#E91E8C"/>
-          <line x1="105" y1="280" x2="75" y2="225" stroke="#E91E8C" strokeWidth="13" strokeLinecap="round"/>
-          <line x1="135" y1="280" x2="160" y2="230" stroke="#E91E8C" strokeWidth="13" strokeLinecap="round"/>
-          <line x1="112" y1="337" x2="105" y2="400" stroke="#E91E8C" strokeWidth="13" strokeLinecap="round"/>
-          <line x1="128" y1="337" x2="135" y2="400" stroke="#E91E8C" strokeWidth="13" strokeLinecap="round"/>
-          <circle cx="185" cy="175" r="24" fill="#1E88E5"/><rect x="168" y="201" width="34" height="90" rx="11" fill="#1E88E5"/>
-          <line x1="168" y1="220" x2="125" y2="145" stroke="#1E88E5" strokeWidth="15" strokeLinecap="round"/>
-          <line x1="202" y1="220" x2="242" y2="150" stroke="#1E88E5" strokeWidth="15" strokeLinecap="round"/>
-          <line x1="175" y1="291" x2="165" y2="390" stroke="#1E88E5" strokeWidth="15" strokeLinecap="round"/>
-          <line x1="195" y1="291" x2="205" y2="390" stroke="#1E88E5" strokeWidth="15" strokeLinecap="round"/>
-          <circle cx="255" cy="195" r="22" fill="#43A047"/><rect x="239" y="219" width="32" height="82" rx="10" fill="#43A047"/>
-          <line x1="239" y1="237" x2="205" y2="170" stroke="#43A047" strokeWidth="14" strokeLinecap="round"/>
-          <line x1="271" y1="237" x2="305" y2="172" stroke="#43A047" strokeWidth="14" strokeLinecap="round"/>
-          <line x1="246" y1="301" x2="238" y2="390" stroke="#43A047" strokeWidth="14" strokeLinecap="round"/>
-          <line x1="262" y1="301" x2="270" y2="390" stroke="#43A047" strokeWidth="14" strokeLinecap="round"/>
-          <circle cx="335" cy="185" r="23" fill="#8E24AA"/><rect x="319" y="210" width="32" height="84" rx="10" fill="#8E24AA"/>
-          <line x1="319" y1="228" x2="282" y2="155" stroke="#8E24AA" strokeWidth="14" strokeLinecap="round"/>
-          <line x1="351" y1="228" x2="386" y2="158" stroke="#8E24AA" strokeWidth="14" strokeLinecap="round"/>
-          <line x1="326" y1="294" x2="318" y2="390" stroke="#8E24AA" strokeWidth="14" strokeLinecap="round"/>
-          <line x1="342" y1="294" x2="350" y2="390" stroke="#8E24AA" strokeWidth="14" strokeLinecap="round"/>
-          <circle cx="375" cy="220" r="20" fill="#00897B"/><rect x="361" y="242" width="28" height="76" rx="9" fill="#00897B"/>
-          <line x1="361" y1="258" x2="336" y2="200" stroke="#00897B" strokeWidth="12" strokeLinecap="round"/>
-          <line x1="389" y1="258" x2="412" y2="202" stroke="#00897B" strokeWidth="12" strokeLinecap="round"/>
-          <line x1="367" y1="318" x2="360" y2="395" stroke="#00897B" strokeWidth="12" strokeLinecap="round"/>
-          <line x1="382" y1="318" x2="389" y2="395" stroke="#00897B" strokeWidth="12" strokeLinecap="round"/>
-        </svg>
+      <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
+        <img src="/taskwise/watermark.jpeg" alt="" className="absolute bottom-0 right-0 select-none"
+          style={{ opacity: 0.13, mixBlendMode: 'multiply' as const, width: '100%', maxWidth: '480px', right: '50%', transform: 'translateX(50%)' }} />
       </div>
 
       {/* ── Desktop Sidebar ──────────────────────────────────────────────── */}
@@ -524,7 +567,6 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
                   : currentView === 'settings' ? 'Settings'
                   : 'My Profile'}
               </div>
-              <div className="text-xs text-white/50 md:hidden">{user.name} · Director</div>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -548,7 +590,55 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
                 </svg>
               </button>
             )}
+            {/* Install App button — mobile only, show when not installed */}
+            {canInstall && (
+              <button onClick={isIOS ? () => setShowIOSGuide(true) : installApp}
+                className="md:hidden flex items-center gap-1 bg-white/10 hover:bg-white/20 text-white text-xs font-medium px-2.5 py-1.5 rounded-lg transition-colors"
+                title="Install App">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                </svg>
+                <span>Install</span>
+              </button>
+            )}
+            {showIOSGuide && (
+              <div className="fixed inset-0 z-50 flex items-end justify-center p-4 bg-black/40" onClick={() => setShowIOSGuide(false)}>
+                <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-5" onClick={e => e.stopPropagation()}>
+                  <h3 className="font-semibold text-tw-text mb-3 text-center">Install TaskWise</h3>
+                  <div className="space-y-3 text-sm text-tw-text-secondary">
+                    <div className="flex items-start gap-3">
+                      <span className="w-6 h-6 rounded-full bg-tw-primary text-white text-xs flex items-center justify-center flex-shrink-0 font-bold">1</span>
+                      <span>Tap the <strong className="text-tw-text">Share</strong> button at the bottom of Safari
+                        <svg className="inline w-4 h-4 ml-1 text-[#007aff]" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l-4 4h3v8h2V6h3l-4-4zm-7 14v4h14v-4h-2v2H7v-2H5z"/></svg>
+                      </span>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <span className="w-6 h-6 rounded-full bg-tw-primary text-white text-xs flex items-center justify-center flex-shrink-0 font-bold">2</span>
+                      <span>Scroll down and tap <strong className="text-tw-text">Add to Home Screen</strong></span>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <span className="w-6 h-6 rounded-full bg-tw-primary text-white text-xs flex items-center justify-center flex-shrink-0 font-bold">3</span>
+                      <span>Tap <strong className="text-tw-text">Add</strong> in the top-right corner</span>
+                    </div>
+                  </div>
+                  <button onClick={() => setShowIOSGuide(false)} className="mt-5 w-full btn-primary text-sm py-2.5">Got it</button>
+                </div>
+              </div>
+            )}
+            {/* Push notifications button — mobile only */}
+            {!pushEnabled && (
+              <button onClick={enablePush}
+                className="md:hidden flex items-center gap-1 bg-white/10 hover:bg-white/20 text-white text-xs font-medium px-2.5 py-1.5 rounded-lg transition-colors"
+                title="Enable Notifications">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+                </svg>
+                <span className="hidden xs:inline">Notify</span>
+              </button>
+            )}
             <NotificationsMenu />
+            {/* Mobile user menu */}
+            <MobileUserMenu user={user} onProfile={() => setView('profile' as ViewMode)} onSettings={() => setView('settings' as ViewMode)} onLogout={onLogout} />
           </div>
         </header>
 
@@ -603,7 +693,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
                       {overdueList.length === 0 ? (
                         <div className="p-6 text-center text-tw-text-secondary text-sm">No overdue tasks 🎉</div>
                       ) : overdueList.slice(0, 4).map(t => (
-                        <div key={t.id} className="px-4 py-3 border-b border-tw-border last:border-0 flex items-center justify-between">
+                        <div key={t.id} onClick={() => setSelectedTask(t)} className="px-4 py-3 border-b border-tw-border last:border-0 flex items-center justify-between cursor-pointer hover:bg-tw-hover transition-colors">
                           <div>
                             <div className="text-sm font-medium text-tw-text">{t.title}</div>
                             <div className="text-xs text-tw-danger">{t.deadline ? new Date(t.deadline).toLocaleDateString() : ''}</div>
@@ -673,7 +763,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
                     </thead>
                     <tbody className="divide-y divide-tw-border">
                       {overdueList.map(t => (
-                        <tr key={t.id} className="hover:bg-tw-hover">
+                        <tr key={t.id} onClick={() => setSelectedTask(t)} className="hover:bg-tw-hover cursor-pointer">
                           <td className="px-4 py-3 font-medium text-tw-text">{t.title}</td>
                           <td className="px-4 py-3 text-tw-text-secondary">{t.project?.name}</td>
                           <td className="px-4 py-3 text-tw-danger font-medium">{t.deadline ? new Date(t.deadline).toLocaleDateString() : '—'}</td>
@@ -743,6 +833,20 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
           ))}
         </div>
       </nav>
+
+      {/* ── Task Detail Panel (overdue / flowchart click-through) ─────── */}
+      {selectedTask && (
+        <TaskDetailPanel
+          task={selectedTask}
+          isDirector={true}
+          actorId={user.actorId}
+          layers={panelLayers}
+          personnel={panelPersonnel}
+          groups={panelGroups}
+          onClose={() => setSelectedTask(null)}
+          onRefresh={loadDashboard}
+        />
+      )}
     </div>
   )
 }

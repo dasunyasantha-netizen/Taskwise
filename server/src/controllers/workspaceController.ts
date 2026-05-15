@@ -127,15 +127,23 @@ export async function createPersonnel(req: Request, res: Response): Promise<void
       const nicDirector = await prisma.director.findUnique({ where: { nic } })
       if (nicDirector) { res.status(409).json({ error: 'NIC already registered' }); return }
     }
-    // Auto-generate password: last 6 digits of phone number
-    const tempPassword = phone.replace(/\D/g, '').slice(-6)
-    const hashed = await bcrypt.hash(tempPassword, 12)
+    const hashed = await bcrypt.hash('Test@123', 12)
     const person = await prisma.personnel.create({
       data: { name, phone, email, nic, password: hashed, departmentId, workspaceId: req.user!.workspaceId, mustChangePassword: true }
     })
     const { password: _p, ...safe } = person
     res.status(201).json(safe)
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
+  } catch (err: unknown) {
+    if (err && typeof err === 'object' && 'code' in err) {
+      const prismaErr = err as { code: string; meta?: { target?: string[] } }
+      if (prismaErr.code === 'P2002') {
+        const field = prismaErr.meta?.target?.[0] ?? 'field'
+        const label = field === 'nic' ? 'NIC' : field === 'phone' ? 'Phone number' : field
+        res.status(409).json({ error: `${label} already registered` }); return
+      }
+    }
+    console.error(err); res.status(500).json({ error: 'Internal server error' })
+  }
 }
 
 // PUT /api/workspace/profile  — update own profile (works for both directors and personnel)
@@ -209,12 +217,20 @@ export async function updatePersonnel(req: Request, res: Response): Promise<void
     if (!person) { res.status(404).json({ error: 'Personnel not found' }); return }
     const { name, phone, nic, email, supervisorId, departmentId } = req.body
 
-    // If phone is changing, check uniqueness (phone IS the login username)
+    // If phone is changing, check uniqueness globally
     if (phone && phone !== person.phone) {
-      const phoneConflictPersonnel = await prisma.personnel.findFirst({ where: { phone, workspaceId, NOT: { id: req.params.id } } })
-      if (phoneConflictPersonnel) { res.status(409).json({ error: 'Phone number is already in use by another person' }); return }
-      const phoneConflictDirector = await prisma.director.findFirst({ where: { phone, workspaceId } })
-      if (phoneConflictDirector) { res.status(409).json({ error: 'Phone number is already in use by another person' }); return }
+      const phoneConflictPersonnel = await prisma.personnel.findFirst({ where: { phone, NOT: { id: req.params.id } } })
+      if (phoneConflictPersonnel) { res.status(409).json({ error: 'Phone number is already in use' }); return }
+      const phoneConflictDirector = await prisma.director.findFirst({ where: { phone } })
+      if (phoneConflictDirector) { res.status(409).json({ error: 'Phone number is already in use' }); return }
+    }
+
+    // If NIC is changing, check uniqueness globally
+    if (nic && nic !== person.nic) {
+      const nicConflictPersonnel = await prisma.personnel.findFirst({ where: { nic, NOT: { id: req.params.id } } })
+      if (nicConflictPersonnel) { res.status(409).json({ error: 'NIC already in use' }); return }
+      const nicConflictDirector = await prisma.director.findFirst({ where: { nic } })
+      if (nicConflictDirector) { res.status(409).json({ error: 'NIC already in use' }); return }
     }
 
     // Directors can set any supervisorId; personnel can set their own supervisorId (for approval chain setup)
@@ -227,7 +243,14 @@ export async function updatePersonnel(req: Request, res: Response): Promise<void
     })
     const { password: _p, ...safe } = updated
     res.json(safe)
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
+  } catch (err: unknown) {
+    if ((err as { code?: string }).code === 'P2002') {
+      const field = (err as { meta?: { target?: string[] } }).meta?.target?.[0] ?? ''
+      const label = field === 'nic' ? 'NIC' : field === 'phone' ? 'Phone number' : 'A unique field'
+      res.status(409).json({ error: `${label} already in use` }); return
+    }
+    console.error(err); res.status(500).json({ error: 'Internal server error' })
+  }
 }
 
 // GET /api/workspace/personnel/above-me

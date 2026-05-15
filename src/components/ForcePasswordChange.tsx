@@ -46,15 +46,9 @@ export default function ForcePasswordChange({ user, onPasswordChanged, onLogout 
   return (
     <div className="min-h-screen bg-[#1f2d3d] flex flex-col items-center justify-center px-4 relative overflow-hidden">
       {/* Watermark */}
-      <div className="pointer-events-none absolute inset-0 flex items-end justify-center overflow-hidden opacity-10">
-        <svg viewBox="0 0 400 520" xmlns="http://www.w3.org/2000/svg" className="w-80 select-none" style={{marginBottom:'-40px'}}>
-          <circle cx="185" cy="175" r="24" fill="#1E88E5"/><rect x="168" y="201" width="34" height="90" rx="11" fill="#1E88E5"/>
-          <line x1="168" y1="220" x2="125" y2="145" stroke="#1E88E5" strokeWidth="15" strokeLinecap="round"/><line x1="202" y1="220" x2="242" y2="150" stroke="#1E88E5" strokeWidth="15" strokeLinecap="round"/>
-          <line x1="175" y1="291" x2="165" y2="390" stroke="#1E88E5" strokeWidth="15" strokeLinecap="round"/><line x1="195" y1="291" x2="205" y2="390" stroke="#1E88E5" strokeWidth="15" strokeLinecap="round"/>
-          <circle cx="335" cy="185" r="23" fill="#8E24AA"/><rect x="319" y="210" width="32" height="84" rx="10" fill="#8E24AA"/>
-          <line x1="319" y1="228" x2="282" y2="155" stroke="#8E24AA" strokeWidth="14" strokeLinecap="round"/><line x1="351" y1="228" x2="386" y2="158" stroke="#8E24AA" strokeWidth="14" strokeLinecap="round"/>
-          <line x1="326" y1="294" x2="318" y2="390" stroke="#8E24AA" strokeWidth="14" strokeLinecap="round"/><line x1="342" y1="294" x2="350" y2="390" stroke="#8E24AA" strokeWidth="14" strokeLinecap="round"/>
-        </svg>
+      <div className="pointer-events-none absolute inset-0 flex items-end justify-center overflow-hidden">
+        <img src="/taskwise/watermark.jpeg" alt="" className="w-72 select-none object-contain"
+          style={{ opacity: 0.08, marginBottom: '-20px' }} />
       </div>
 
       <div className="text-center mb-6 relative z-10">

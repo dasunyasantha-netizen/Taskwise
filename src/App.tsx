@@ -4,6 +4,7 @@ import Auth from './components/Auth'
 import ForcePasswordChange from './components/ForcePasswordChange'
 import DirectorDashboard from './components/DirectorDashboard'
 import PersonnelDashboard from './components/PersonnelDashboard'
+import { authApi } from './services/apiService'
 
 const TOKEN_KEY = 'taskwise_token'
 const USER_KEY  = 'taskwise_user'
@@ -19,11 +20,23 @@ export default function App() {
     if (token && userData) {
       try {
         const parsed = JSON.parse(userData) as AuthUser
+        // Show cached user immediately so the app feels instant
         setUser(parsed)
-        // mustChangePassword users stay gated — don't navigate to dashboard
         if (!parsed.mustChangePassword) {
           setView(parsed.actorType === 'director' ? 'director_dashboard' : 'personnel_queue')
         }
+        // Refresh from server to pick up any workspace changes (name, logo, etc.)
+        authApi.me().then(fresh => {
+          const updated = { ...parsed, ...(fresh as Partial<AuthUser>) }
+          setUser(updated)
+          localStorage.setItem(USER_KEY, JSON.stringify(updated))
+        }).catch(() => {
+          // Token invalid/expired — force logout
+          localStorage.removeItem(TOKEN_KEY)
+          localStorage.removeItem(USER_KEY)
+          setUser(null)
+          setView('login')
+        })
       } catch {
         localStorage.removeItem(TOKEN_KEY)
         localStorage.removeItem(USER_KEY)

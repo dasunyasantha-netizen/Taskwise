@@ -77,7 +77,7 @@ export const workspaceApi = {
 
 // ─── Projects ────────────────────────────────────────────────────────────────
 export const projectApi = {
-  list:   ()              => api.get('/projects'),
+  list:   (params?: string) => api.get(`/projects${params ? '?' + params : ''}`),
   get:    (id: string)    => api.get(`/projects/${id}`),
   create: (data: unknown) => api.post('/projects', data),
   update: (id: string, data: unknown) => api.put(`/projects/${id}`, data),
@@ -114,9 +114,12 @@ export const taskApi = {
 
 // ─── Notifications ───────────────────────────────────────────────────────────
 export const notificationApi = {
-  list:    () => api.get('/notifications'),
-  read:    (id: string) => api.post(`/notifications/${id}/read`),
-  readAll: () => api.post('/notifications/read-all'),
+  list:                 () => api.get('/notifications'),
+  read:                 (id: string) => api.post(`/notifications/${id}/read`),
+  readAll:              () => api.post('/notifications/read-all'),
+  getVapidKey:          () => fetch(`${BASE_URL}/notifications/vapid-public-key`).then(r => r.json()),
+  savePushSubscription: (sub: object) => api.post('/notifications/push-subscribe', sub),
+  removePushSubscription: (endpoint: string) => request('DELETE', '/notifications/push-subscribe', { endpoint }),
 }
 
 // ─── Audit / Reports ─────────────────────────────────────────────────────────

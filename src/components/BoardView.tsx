@@ -6,6 +6,8 @@ import TaskDetailPanel from './TaskDetailPanel'
 import DatePicker from './DatePicker'
 import Select from './Select'
 import PersonPickerModal from './PersonPickerModal'
+import FilterBar, { DEFAULT_FILTERS, filterTasks } from './FilterBar'
+import type { ActiveFilters } from './FilterBar'
 
 interface Props {
   project: Project
@@ -160,6 +162,8 @@ export default function BoardView({ project, isDirector, actorId }: Props) {
   const [intermediateSelections, setIntermediateSelections] = useState<Record<number, string[]>>({})
   const [intermediateError, setIntermediateError] = useState('')
 
+  const [filters, setFilters] = useState<ActiveFilters>(DEFAULT_FILTERS)
+
   const loadTasks = async () => {
     setLoading(true)
     try {
@@ -270,7 +274,8 @@ export default function BoardView({ project, isDirector, actorId }: Props) {
     } catch (e: unknown) { setError(e instanceof Error ? e.message : 'Action failed'); await loadTasks() }
   }
 
-  const columnTasks = (col: typeof COLUMNS[number]) => tasks.filter(t => col.statuses.includes(t.status))
+  const filteredTasks = filterTasks(tasks, filters, layers, personnel)
+  const columnTasks = (col: typeof COLUMNS[number]) => filteredTasks.filter(t => col.statuses.includes(t.status))
 
   // Intermediate modal data
   const currentIdx = intermediateLayers.indexOf(intermediateLayer)
@@ -287,7 +292,7 @@ export default function BoardView({ project, isDirector, actorId }: Props) {
         <div className="flex items-center gap-3">
           <div className="w-4 h-4 rounded-full" style={{ backgroundColor: project.color }} />
           <h1 className="text-xl font-bold text-tw-text">{project.name}</h1>
-          <span className="badge badge-gray">{tasks.length} tasks</span>
+          <span className="badge badge-gray">{filteredTasks.length}{filteredTasks.length !== tasks.length ? ` / ${tasks.length}` : ''} tasks</span>
         </div>
         {isDirector && (
           <button onClick={() => { setShowCreateModal(true); setAssignTarget({ type: 'personnel', id: '' }) }} className="btn-primary">+ New Task</button>
@@ -300,6 +305,14 @@ export default function BoardView({ project, isDirector, actorId }: Props) {
           <button onClick={() => setError('')} className="text-tw-danger font-bold ml-2">×</button>
         </div>
       )}
+
+      <FilterBar
+        filters={filters}
+        layers={layers}
+        personnel={personnel}
+        mode="task"
+        onChange={setFilters}
+      />
 
       <div className="flex gap-4 overflow-x-auto pb-4 flex-1">
         {COLUMNS.map(col => {

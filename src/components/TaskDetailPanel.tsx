@@ -61,6 +61,10 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
   const [loading, setLoading] = useState(false)
   const [actionLoading, setActionLoading] = useState(false)
   const [actionError, setActionError] = useState('')
+  const [editing, setEditing] = useState(false)
+  const currentAssigneeId = task.assignments?.find(a => a.personnelId)?.personnelId ?? ''
+  const [editForm, setEditForm] = useState({ title: task.title, description: task.description || '', priority: task.priority, deadline: task.deadline ? task.deadline.slice(0, 10) : '', assignedTo: currentAssigneeId })
+  const [editSaving, setEditSaving] = useState(false)
 
   const allDepts = layers.flatMap(l => l.departments || [])
 
@@ -132,7 +136,24 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
     setLoading(false)
   }
 
+  const saveEdit = async () => {
+    setEditSaving(true)
+    try {
+      await taskApi.update(task.id, {
+        title: editForm.title,
+        description: editForm.description || null,
+        priority: editForm.priority,
+        deadline: editForm.deadline || null,
+        ...(editForm.assignedTo !== currentAssigneeId ? { reassignPersonnelId: editForm.assignedTo || null } : {}),
+      })
+      setEditing(false)
+      await onRefresh()
+    } catch (e: unknown) { setActionError(e instanceof Error ? e.message : 'Failed to save') }
+    setEditSaving(false)
+  }
+
   // Action permissions
+  const canEdit    = isDirector && !['APPROVED', 'CANCELLED'].includes(task.status)
   const canSubmit  = !isDirector && task.status === 'IN_PROGRESS'
   const canBlock   = task.status === 'IN_PROGRESS'
   const canUnblock = task.status === 'BLOCKED'
@@ -159,10 +180,59 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
                 {task.project && <span className="text-xs text-tw-text-secondary font-medium">📋 {task.project.name}</span>}
                 {task.parentTaskId && <span className="text-xs text-tw-text-secondary bg-tw-hover px-1.5 py-0.5 rounded font-medium">Subtask</span>}
               </div>
-              <h2 className="font-bold text-tw-text text-base leading-snug">{task.title}</h2>
+              {editing ? (
+                <input className="input text-sm font-bold w-full" value={editForm.title}
+                  onChange={e => setEditForm(f => ({ ...f, title: e.target.value }))} autoFocus />
+              ) : (
+                <h2 className="font-bold text-tw-text text-base leading-snug">{task.title}</h2>
+              )}
             </div>
-            <button onClick={onClose} className="text-tw-text-secondary hover:text-tw-text text-2xl leading-none mt-0.5">×</button>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              {canEdit && !editing && (
+                <button onClick={() => { setEditing(true); setEditForm({ title: task.title, description: task.description || '', priority: task.priority, deadline: task.deadline ? task.deadline.slice(0, 10) : '', assignedTo: currentAssigneeId }) }}
+                  className="text-xs text-tw-primary hover:underline font-medium px-2 py-1 rounded-lg hover:bg-tw-hover transition-colors">
+                  ✎ Edit
+                </button>
+              )}
+              <button onClick={onClose} className="text-tw-text-secondary hover:text-tw-text text-2xl leading-none">×</button>
+            </div>
           </div>
+
+          {/* Inline edit form */}
+          {editing && (
+            <div className="mt-3 space-y-3 border-t border-tw-border pt-3">
+              <div>
+                <label className="block text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">Description</label>
+                <textarea className="input resize-none text-sm" rows={3} value={editForm.description}
+                  onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))} placeholder="Task description..." />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">Priority</label>
+                  <Select value={editForm.priority} onChange={val => setEditForm(f => ({ ...f, priority: val as typeof f.priority }))}
+                    options={[{ value: 'LOW', label: 'Low' }, { value: 'MEDIUM', label: 'Medium' }, { value: 'HIGH', label: 'High' }, { value: 'CRITICAL', label: 'Critical' }]} />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">Deadline</label>
+                  <DatePicker value={editForm.deadline} onChange={val => setEditForm(f => ({ ...f, deadline: val }))} />
+                </div>
+              </div>
+              {personnel.length > 0 && (
+                <div>
+                  <label className="block text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">Assigned To</label>
+                  <Select value={editForm.assignedTo} onChange={val => setEditForm(f => ({ ...f, assignedTo: val }))}
+                    placeholder="Unassigned"
+                    options={[{ value: '', label: 'Unassigned' }, ...personnel.map(p => ({ value: p.id, label: p.name }))]} />
+                </div>
+              )}
+              <div className="flex gap-2 justify-end">
+                <button onClick={() => setEditing(false)} className="btn-secondary text-xs py-1.5">Cancel</button>
+                <button onClick={saveEdit} disabled={editSaving || !editForm.title} className="btn-primary text-xs py-1.5">
+                  {editSaving ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Action error */}
           {actionError && (

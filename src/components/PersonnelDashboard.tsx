@@ -6,6 +6,7 @@ import PersonnelTaskModal from './PersonnelTaskModal'
 import BoardView from './BoardView'
 import ProfilePage from './ProfilePage'
 import ElapsedDays from './ElapsedDays'
+import { usePWA } from '../hooks/usePWA'
 
 interface Props {
   user: AuthUser
@@ -670,8 +671,60 @@ function MobileApprovalCard({ task, onRefresh, onOpen }: { task: Task; onRefresh
   )
 }
 
+// ── Mobile User Menu ─────────────────────────────────────────────────────────
+function MobileUserMenu({ user, onProfile, onLogout }: { user: AuthUser; onProfile: () => void; onLogout: () => void }) {
+  const [open, setOpen] = useState(false)
+  const ref = React.useRef<HTMLDivElement>(null)
+  const initials = user.name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  return (
+    <div ref={ref} className="relative md:hidden">
+      <button onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-1.5 pl-1 pr-2 py-1 rounded-xl bg-white/10 hover:bg-white/20 transition-colors">
+        {user.avatarUrl
+          ? <img src={user.avatarUrl} alt="" className="w-6 h-6 rounded-full object-cover" />
+          : <div className="w-6 h-6 rounded-full bg-tw-primary flex items-center justify-center text-white text-xs font-bold">{initials}</div>
+        }
+        <svg className={`w-3 h-3 text-white/70 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/>
+        </svg>
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden z-50">
+          <div className="px-4 py-3 bg-[#f0f4ff] border-b border-gray-100">
+            <div className="font-semibold text-tw-text text-sm truncate">{user.name}</div>
+            <div className="text-xs text-tw-text-secondary">Personnel</div>
+          </div>
+          <button onClick={() => { onProfile(); setOpen(false) }}
+            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-tw-text hover:bg-tw-hover transition-colors">
+            <svg className="w-4 h-4 text-tw-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+            </svg>
+            My Profile
+          </button>
+          <button onClick={() => { onLogout(); setOpen(false) }}
+            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-tw-danger hover:bg-red-50 transition-colors border-t border-gray-100">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+            </svg>
+            Sign Out
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Main dashboard ────────────────────────────────────────────────────────────
 export default function PersonnelDashboard({ user, currentView, setView, onLogout, onUserUpdate }: Props) {
+  const { canInstall, isIOS, installApp, pushEnabled, enablePush } = usePWA()
+  const [showIOSGuide, setShowIOSGuide] = useState(false)
   const [queue, setQueue]               = useState<Task[]>([])
   const [projects, setProjects]         = useState<Project[]>([])
   const [personnel, setPersonnel]       = useState<Personnel[]>([])
@@ -743,73 +796,15 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
     !t.assignments?.some(a => a.personnelId)
   ).length
 
-  const COL_COUNT = 9   // total <th> columns including the expand chevron
+  const COL_COUNT = 8   // total <th> columns including the expand chevron
 
   return (
     <div className="min-h-screen bg-tw-bg flex relative overflow-hidden">
 
       {/* ── Watermark ───────────────────────────────────────────────────── */}
-      <div className="pointer-events-none fixed inset-0 z-0 flex items-end justify-center overflow-hidden">
-        <svg viewBox="0 0 400 520" xmlns="http://www.w3.org/2000/svg"
-          className="w-[340px] md:w-[420px] opacity-[0.045] select-none"
-          style={{ marginBottom: '-40px' }}>
-          {/* Yellow figure */}
-          <circle cx="60" cy="210" r="22" fill="#F5A623"/>
-          <rect x="44" y="234" width="32" height="80" rx="10" fill="#F5A623"/>
-          <line x1="44" y1="255" x2="10" y2="195" stroke="#F5A623" strokeWidth="14" strokeLinecap="round"/>
-          <line x1="76" y1="255" x2="108" y2="205" stroke="#F5A623" strokeWidth="14" strokeLinecap="round"/>
-          <line x1="52" y1="314" x2="44" y2="390" stroke="#F5A623" strokeWidth="14" strokeLinecap="round"/>
-          <line x1="68" y1="314" x2="76" y2="390" stroke="#F5A623" strokeWidth="14" strokeLinecap="round"/>
-          {/* Pink figure */}
-          <circle cx="120" cy="240" r="20" fill="#E91E8C"/>
-          <rect x="105" y="262" width="30" height="75" rx="10" fill="#E91E8C"/>
-          <line x1="105" y1="280" x2="75" y2="225" stroke="#E91E8C" strokeWidth="13" strokeLinecap="round"/>
-          <line x1="135" y1="280" x2="160" y2="230" stroke="#E91E8C" strokeWidth="13" strokeLinecap="round"/>
-          <line x1="112" y1="337" x2="105" y2="400" stroke="#E91E8C" strokeWidth="13" strokeLinecap="round"/>
-          <line x1="128" y1="337" x2="135" y2="400" stroke="#E91E8C" strokeWidth="13" strokeLinecap="round"/>
-          {/* Blue figure (tall) */}
-          <circle cx="185" cy="175" r="24" fill="#1E88E5"/>
-          <rect x="168" y="201" width="34" height="90" rx="11" fill="#1E88E5"/>
-          <line x1="168" y1="220" x2="125" y2="145" stroke="#1E88E5" strokeWidth="15" strokeLinecap="round"/>
-          <line x1="202" y1="220" x2="242" y2="150" stroke="#1E88E5" strokeWidth="15" strokeLinecap="round"/>
-          <line x1="175" y1="291" x2="165" y2="390" stroke="#1E88E5" strokeWidth="15" strokeLinecap="round"/>
-          <line x1="195" y1="291" x2="205" y2="390" stroke="#1E88E5" strokeWidth="15" strokeLinecap="round"/>
-          {/* Dark blue figure */}
-          <circle cx="200" cy="200" r="18" fill="#1A237E"/>
-          <rect x="187" y="220" width="26" height="70" rx="9" fill="#1A237E"/>
-          <line x1="187" y1="236" x2="158" y2="180" stroke="#1A237E" strokeWidth="12" strokeLinecap="round"/>
-          <line x1="213" y1="236" x2="240" y2="182" stroke="#1A237E" strokeWidth="12" strokeLinecap="round"/>
-          <line x1="193" y1="290" x2="185" y2="370" stroke="#1A237E" strokeWidth="12" strokeLinecap="round"/>
-          <line x1="207" y1="290" x2="215" y2="370" stroke="#1A237E" strokeWidth="12" strokeLinecap="round"/>
-          {/* Green figure */}
-          <circle cx="255" cy="195" r="22" fill="#43A047"/>
-          <rect x="239" y="219" width="32" height="82" rx="10" fill="#43A047"/>
-          <line x1="239" y1="237" x2="205" y2="170" stroke="#43A047" strokeWidth="14" strokeLinecap="round"/>
-          <line x1="271" y1="237" x2="305" y2="172" stroke="#43A047" strokeWidth="14" strokeLinecap="round"/>
-          <line x1="246" y1="301" x2="238" y2="390" stroke="#43A047" strokeWidth="14" strokeLinecap="round"/>
-          <line x1="262" y1="301" x2="270" y2="390" stroke="#43A047" strokeWidth="14" strokeLinecap="round"/>
-          {/* Red figure */}
-          <circle cx="310" cy="230" r="20" fill="#E53935"/>
-          <rect x="296" y="252" width="30" height="76" rx="10" fill="#E53935"/>
-          <line x1="296" y1="268" x2="262" y2="205" stroke="#E53935" strokeWidth="13" strokeLinecap="round"/>
-          <line x1="326" y1="268" x2="356" y2="210" stroke="#E53935" strokeWidth="13" strokeLinecap="round"/>
-          <line x1="303" y1="328" x2="296" y2="400" stroke="#E53935" strokeWidth="13" strokeLinecap="round"/>
-          <line x1="319" y1="328" x2="326" y2="400" stroke="#E53935" strokeWidth="13" strokeLinecap="round"/>
-          {/* Purple figure */}
-          <circle cx="335" cy="185" r="23" fill="#8E24AA"/>
-          <rect x="319" y="210" width="32" height="84" rx="10" fill="#8E24AA"/>
-          <line x1="319" y1="228" x2="282" y2="155" stroke="#8E24AA" strokeWidth="14" strokeLinecap="round"/>
-          <line x1="351" y1="228" x2="386" y2="158" stroke="#8E24AA" strokeWidth="14" strokeLinecap="round"/>
-          <line x1="326" y1="294" x2="318" y2="390" stroke="#8E24AA" strokeWidth="14" strokeLinecap="round"/>
-          <line x1="342" y1="294" x2="350" y2="390" stroke="#8E24AA" strokeWidth="14" strokeLinecap="round"/>
-          {/* Teal figure */}
-          <circle cx="375" cy="220" r="20" fill="#00897B"/>
-          <rect x="361" y="242" width="28" height="76" rx="9" fill="#00897B"/>
-          <line x1="361" y1="258" x2="336" y2="200" stroke="#00897B" strokeWidth="12" strokeLinecap="round"/>
-          <line x1="389" y1="258" x2="412" y2="202" stroke="#00897B" strokeWidth="12" strokeLinecap="round"/>
-          <line x1="367" y1="318" x2="360" y2="395" stroke="#00897B" strokeWidth="12" strokeLinecap="round"/>
-          <line x1="382" y1="318" x2="389" y2="395" stroke="#00897B" strokeWidth="12" strokeLinecap="round"/>
-        </svg>
+      <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
+        <img src="/taskwise/watermark.jpeg" alt="" className="absolute bottom-0 select-none"
+          style={{ opacity: 0.13, mixBlendMode: 'multiply' as const, width: '100%', maxWidth: '480px', left: '50%', transform: 'translateX(-50%)' }} />
       </div>
 
       {/* ── Desktop Sidebar ──────────────────────────────────────────────── */}
@@ -896,7 +891,54 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
             </button>
+            {/* Install App button — mobile only */}
+            {canInstall && (
+              <button onClick={isIOS ? () => setShowIOSGuide(true) : installApp}
+                className="md:hidden flex items-center gap-1 bg-white/10 hover:bg-white/20 text-white text-xs font-medium px-2.5 py-1.5 rounded-lg transition-colors"
+                title="Install App">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                </svg>
+                <span>Install</span>
+              </button>
+            )}
+            {showIOSGuide && (
+              <div className="fixed inset-0 z-50 flex items-end justify-center p-4 bg-black/40" onClick={() => setShowIOSGuide(false)}>
+                <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-5" onClick={e => e.stopPropagation()}>
+                  <h3 className="font-semibold text-tw-text mb-3 text-center">Install TaskWise</h3>
+                  <div className="space-y-3 text-sm text-tw-text-secondary">
+                    <div className="flex items-start gap-3">
+                      <span className="w-6 h-6 rounded-full bg-tw-primary text-white text-xs flex items-center justify-center flex-shrink-0 font-bold">1</span>
+                      <span>Tap the <strong className="text-tw-text">Share</strong> button at the bottom of Safari
+                        <svg className="inline w-4 h-4 ml-1 text-[#007aff]" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l-4 4h3v8h2V6h3l-4-4zm-7 14v4h14v-4h-2v2H7v-2H5z"/></svg>
+                      </span>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <span className="w-6 h-6 rounded-full bg-tw-primary text-white text-xs flex items-center justify-center flex-shrink-0 font-bold">2</span>
+                      <span>Scroll down and tap <strong className="text-tw-text">Add to Home Screen</strong></span>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <span className="w-6 h-6 rounded-full bg-tw-primary text-white text-xs flex items-center justify-center flex-shrink-0 font-bold">3</span>
+                      <span>Tap <strong className="text-tw-text">Add</strong> in the top-right corner</span>
+                    </div>
+                  </div>
+                  <button onClick={() => setShowIOSGuide(false)} className="mt-5 w-full btn-primary text-sm py-2.5">Got it</button>
+                </div>
+              </div>
+            )}
+            {/* Push notifications button — mobile only */}
+            {!pushEnabled && (
+              <button onClick={enablePush}
+                className="md:hidden flex items-center gap-1 bg-white/10 hover:bg-white/20 text-white text-xs font-medium px-2.5 py-1.5 rounded-lg transition-colors"
+                title="Enable Notifications">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+                </svg>
+                <span className="hidden xs:inline">Notify</span>
+              </button>
+            )}
             <NotificationsMenu />
+            <MobileUserMenu user={user} onProfile={() => setView('profile' as ViewMode)} onLogout={onLogout} />
           </div>
         </header>
 
@@ -996,13 +1038,12 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
                       <thead>
                         <tr className="bg-[#f0f4ff] border-b-2 border-tw-primary/20">
                           <th className="w-px px-3 py-3"></th>
-                          <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider">Task</th>
-                          <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider">Project</th>
-                          <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider">Status</th>
-                          <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider">Priority</th>
-                          <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider">Assigned By</th>
-                          <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider">Deadline</th>
-                          <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider">Days Left</th>
+                          <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider w-full">Task</th>
+                          <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider whitespace-nowrap">Project</th>
+                          <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider whitespace-nowrap">Status</th>
+                          <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider whitespace-nowrap">Priority</th>
+                          <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider whitespace-nowrap">Deadline</th>
+                          <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider whitespace-nowrap">Days Left</th>
                           <th className="w-8 px-2 py-3"></th>
                         </tr>
                       </thead>
@@ -1021,7 +1062,7 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
                                 <td className="pl-3 pr-0 py-3.5">
                                   <div className={`w-1.5 h-9 rounded-full ${priorityBar[t.priority]}`} />
                                 </td>
-                                <td className="px-4 py-3.5 max-w-xs">
+                                <td className="px-4 py-3.5">
                                   <div className="font-semibold text-tw-text text-sm">{t.title}</div>
                                   <div className="flex items-center gap-2 mt-0.5">
                                     {t.parentTaskId && <span className="text-xs text-purple-600 font-medium">↳ subtask</span>}
@@ -1044,7 +1085,6 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
                                 <td className="px-4 py-3.5 whitespace-nowrap">
                                   <span className={`badge ${priorityBadge[t.priority]}`}>{t.priority}</span>
                                 </td>
-                                <td className="px-4 py-3.5 text-sm text-tw-text-secondary whitespace-nowrap">{assigneeName}</td>
                                 <td className="px-4 py-3.5 text-sm whitespace-nowrap">
                                   {t.deadline
                                     ? <span className={isOverdue ? 'text-tw-danger font-semibold' : 'text-tw-text-secondary'}>📅 {new Date(t.deadline).toLocaleDateString()}</span>
