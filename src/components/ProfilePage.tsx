@@ -190,6 +190,11 @@ export default function ProfilePage({ user, onUserUpdate }: Props) {
             <div>
               <label className="block text-sm font-medium text-tw-text mb-1">Phone Number</label>
               <input className="input" type="tel" value={phone} onChange={e => setPhone(e.target.value)} required />
+              {phone.trim() !== (user.phone || '').trim() && (
+                <p className="mt-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 leading-snug">
+                  Your phone number is your login username. After saving, use <strong>{phone.trim()}</strong> to log in next time.
+                </p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-tw-text mb-1">Email <span className="text-tw-text-secondary font-normal">(optional)</span></label>
