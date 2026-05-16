@@ -11,6 +11,7 @@ import FlowchartView from './FlowchartView'
 import ProfilePage from './ProfilePage'
 import WorkspaceSettings from './WorkspaceSettings'
 import TaskDetailPanel from './TaskDetailPanel'
+import RecentUpdatesView from './RecentUpdatesView'
 
 interface Props {
   user: AuthUser
@@ -476,8 +477,9 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
     { label: 'Dashboard',      view: 'director_dashboard' as ViewMode, icon: '⊞' },
     { label: 'Projects',       view: 'project_board'      as ViewMode, icon: '📋' },
     { label: 'Approval Queue', view: 'approval_queue'     as ViewMode, icon: '✅', badge: stats.pending_approval },
-    { label: 'Overdue Tasks',  view: 'overdue'            as ViewMode, icon: '⏰', badge: stats.overdue },
-    { label: 'Team Hierarchy', view: 'hierarchy_manager'  as ViewMode, icon: '👥' },
+    { label: 'Overdue Tasks',   view: 'overdue'          as ViewMode, icon: '⏰', badge: stats.overdue },
+    { label: 'Recent Updates',  view: 'recent_updates'   as ViewMode, icon: '🕐' },
+    { label: 'Team Hierarchy',  view: 'hierarchy_manager' as ViewMode, icon: '👥' },
     { label: 'Audit Log',      view: 'audit_log'          as ViewMode, icon: '📜' },
     { label: 'Settings',       view: 'settings'           as ViewMode, icon: '⚙️' },
     { label: 'My Profile',     view: 'profile'            as ViewMode, icon: '👤' },
@@ -841,6 +843,9 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
               </div>
             </div>
           )}
+
+          {/* RECENT UPDATES */}
+          {currentView === 'recent_updates' && <RecentUpdatesView />}
 
           {/* AUDIT LOG */}
           {currentView === 'audit_log' && (

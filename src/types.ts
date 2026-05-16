@@ -228,5 +228,6 @@ export type ViewMode =
   | 'personnel_approval_queue'
   | 'audit_log'
   | 'overdue'
+  | 'recent_updates'
   | 'settings'
   | 'profile'

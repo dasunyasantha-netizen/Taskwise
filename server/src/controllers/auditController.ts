@@ -46,6 +46,59 @@ export async function getProgress(req: Request, res: Response): Promise<void> {
   } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
 }
 
+// GET /api/reports/recent-updates?date=YYYY-MM-DD
+// Returns all comments and progress logs for the given date (defaults to today)
+// scoped to the director's workspace, merged and sorted by createdAt desc
+export async function getRecentUpdates(req: Request, res: Response): Promise<void> {
+  try {
+    if (req.user!.actorType !== 'director') { res.status(403).json({ error: 'Director only' }); return }
+    const { workspaceId } = req.user!
+    const dateStr = (req.query.date as string) || new Date().toISOString().slice(0, 10)
+    const from = new Date(dateStr + 'T00:00:00.000Z')
+    const to   = new Date(dateStr + 'T23:59:59.999Z')
+
+    const [comments, progressLogs] = await Promise.all([
+      prisma.taskComment.findMany({
+        where: { task: { workspaceId }, createdAt: { gte: from, lte: to }, deletedAt: null },
+        include: {
+          task: { select: { id: true, title: true, project: { select: { id: true, name: true } } } },
+          authorDirector:  { select: { id: true, name: true } },
+          authorPersonnel: { select: { id: true, name: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.taskProgressLog.findMany({
+        where: { workspaceId, createdAt: { gte: from, lte: to } },
+        include: {
+          task: { select: { id: true, title: true, project: { select: { id: true, name: true } } } },
+          authorDirector:  { select: { id: true, name: true } },
+          authorPersonnel: { select: { id: true, name: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+    ])
+
+    const mapped = [
+      ...comments.map(c => ({
+        id: c.id, type: 'comment' as const,
+        taskId: c.taskId, taskTitle: c.task?.title || '',
+        projectName: c.task?.project?.name || '',
+        authorName: c.authorDirector?.name || c.authorPersonnel?.name || c.authorType,
+        content: c.content, createdAt: c.createdAt,
+      })),
+      ...progressLogs.map(l => ({
+        id: l.id, type: 'update' as const,
+        taskId: l.taskId, taskTitle: l.task?.title || '',
+        projectName: l.task?.project?.name || '',
+        authorName: l.authorDirector?.name || l.authorPersonnel?.name || l.authorType,
+        content: l.note, createdAt: l.createdAt,
+      })),
+    ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+
+    res.json(mapped)
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
+}
+
 // GET /api/reports/queue/:personnelId
 export async function getPersonnelQueueReport(req: Request, res: Response): Promise<void> {
   try {
