@@ -25,12 +25,15 @@ export default function DatePicker({ value, onChange, placeholder = 'Select date
   const [dropPos, setDropPos]       = useState({ top: 0, left: 0, width: 0, openUpward: false })
 
   const ref = useRef<HTMLDivElement>(null)
+  const dropRef = useRef<HTMLDivElement>(null)
   const close = useCallback(() => setOpen(false), [])
 
   useEffect(() => {
     if (!open) return
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) close()
+      const t = e.target as Node
+      if (ref.current?.contains(t) || dropRef.current?.contains(t)) return
+      close()
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
@@ -93,6 +96,7 @@ export default function DatePicker({ value, onChange, placeholder = 'Select date
 
   const dropdown = open ? createPortal(
     <div
+      ref={dropRef}
       style={{
         position: 'fixed',
         top: dropPos.openUpward ? undefined : dropPos.top,
