@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { auditApi } from '../services/apiService'
+import DatePicker from './DatePicker'
 
 interface UpdateItem {
   id: string
@@ -125,12 +126,11 @@ export default function RecentUpdatesView() {
               ))}
             </div>
             {/* Date picker */}
-            <input
-              type="date"
+            <DatePicker
               value={date}
-              max={todayStr()}
-              onChange={e => setDate(e.target.value)}
-              className="input text-sm py-1.5 w-40"
+              onChange={v => { if (v) setDate(v) }}
+              maxDate={todayStr()}
+              className="w-44"
             />
           </div>
         </div>

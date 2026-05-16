@@ -6,6 +6,7 @@ interface Props {
   onChange: (val: string) => void
   placeholder?: string
   minDate?: string
+  maxDate?: string
   className?: string
   triggerClassName?: string
 }
@@ -13,7 +14,7 @@ interface Props {
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 const DAYS   = ['Su','Mo','Tu','We','Th','Fr','Sa']
 
-export default function DatePicker({ value, onChange, placeholder = 'Select date', minDate, className = '', triggerClassName }: Props) {
+export default function DatePicker({ value, onChange, placeholder = 'Select date', minDate, maxDate, className = '', triggerClassName }: Props) {
   const today = new Date()
   const parsed = value ? new Date(value + 'T00:00:00') : null
 
@@ -50,6 +51,7 @@ export default function DatePicker({ value, onChange, placeholder = 'Select date
   }, [value])
 
   const minD = minDate ? new Date(minDate + 'T00:00:00') : null
+  const maxD = maxDate ? new Date(maxDate + 'T00:00:00') : null
 
   const getDaysInMonth = (y: number, m: number) => new Date(y, m + 1, 0).getDate()
   const getFirstDay    = (y: number, m: number) => new Date(y, m, 1).getDay()
@@ -74,8 +76,10 @@ export default function DatePicker({ value, onChange, placeholder = 'Select date
   const isToday = (day: number) => today.getFullYear() === viewYear && today.getMonth() === viewMonth && today.getDate() === day
 
   const isDisabled = (day: number) => {
-    if (!minD) return false
-    return new Date(viewYear, viewMonth, day) < minD
+    const d = new Date(viewYear, viewMonth, day)
+    if (minD && d < minD) return true
+    if (maxD && d > maxD) return true
+    return false
   }
 
   const daysInMonth = getDaysInMonth(viewYear, viewMonth)
@@ -111,7 +115,7 @@ export default function DatePicker({ value, onChange, placeholder = 'Select date
           {MONTHS[viewMonth]} {viewYear}
           <svg className={`w-3.5 h-3.5 transition-transform ${showYearPicker ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/></svg>
         </button>
-        <button onMouseDown={e => { e.preventDefault(); nextMonth() }} className="p-1.5 rounded-lg hover:bg-tw-hover transition-colors text-tw-text-secondary hover:text-tw-text">
+        <button onMouseDown={e => { e.preventDefault(); nextMonth() }} disabled={!!maxD && (viewYear > maxD.getFullYear() || (viewYear === maxD.getFullYear() && viewMonth >= maxD.getMonth()))} className="p-1.5 rounded-lg hover:bg-tw-hover transition-colors text-tw-text-secondary hover:text-tw-text disabled:opacity-30 disabled:cursor-not-allowed">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/></svg>
         </button>
       </div>
