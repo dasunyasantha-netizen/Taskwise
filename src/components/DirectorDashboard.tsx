@@ -411,6 +411,8 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
   const [recentTasks, setRecentTasks] = useState<Task[]>([])
   const [overdueList, setOverdueTasks] = useState<Task[]>([])
   const [approvalQueue, setApprovalQueue] = useState<Task[]>([])
+  const [dueSoonList, setDueSoonList] = useState<Task[]>([])
+  const [stalestList, setStalestList] = useState<Task[]>([])
   const [auditLogs, setAuditLogs] = useState<unknown[]>([])
   const [statsLoading, setStatsLoading] = useState(true)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
@@ -427,10 +429,22 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
         taskApi.list() as Promise<Task[]>,
       ])
       const submitted = allTasks.filter(t => t.status === 'SUBMITTED')
+      const now = new Date()
+      const in7Days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
+      const activeStatuses = ['ASSIGNED', 'IN_PROGRESS', 'BLOCKED']
+      const dueSoon = allTasks
+        .filter(t => t.deadline && activeStatuses.includes(t.status) && new Date(t.deadline) > now && new Date(t.deadline) <= in7Days)
+        .sort((a, b) => new Date(a.deadline!).getTime() - new Date(b.deadline!).getTime())
+      const stalest = allTasks
+        .filter(t => activeStatuses.includes(t.status) && t.assignments?.length > 0 && t.assignments[0].assignedAt)
+        .sort((a, b) => new Date(a.assignments[0].assignedAt).getTime() - new Date(b.assignments[0].assignedAt).getTime())
+        .slice(0, 10)
       setStats({ projects: projects.length, totalTasks: allTasks.length, overdue: overdue.length, pending_approval: submitted.length })
       setRecentTasks(allTasks.slice(0, 5))
       setOverdueTasks(overdue)
       setApprovalQueue(submitted)
+      setDueSoonList(dueSoon)
+      setStalestList(stalest)
     } catch { /* silent */ }
     setStatsLoading(false)
   }
@@ -701,6 +715,56 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
                           <span className="badge badge-danger text-xs">Overdue</span>
                         </div>
                       ))}
+                    </div>
+
+                    {/* Due in next 7 days */}
+                    <div className="card overflow-hidden">
+                      <div className="px-4 py-3 border-b border-tw-border flex items-center justify-between">
+                        <span className="font-semibold text-tw-text text-sm">Due in Next 7 Days</span>
+                        <span className="text-xs text-tw-text-secondary">{dueSoonList.length} task{dueSoonList.length !== 1 ? 's' : ''}</span>
+                      </div>
+                      {dueSoonList.length === 0 ? (
+                        <div className="p-6 text-center text-tw-text-secondary text-sm">Nothing due in the next 7 days</div>
+                      ) : dueSoonList.slice(0, 4).map(t => {
+                        const daysLeft = Math.ceil((new Date(t.deadline!).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+                        return (
+                          <div key={t.id} onClick={() => setSelectedTask(t)} className="px-4 py-3 border-b border-tw-border last:border-0 flex items-center justify-between cursor-pointer hover:bg-tw-hover transition-colors">
+                            <div className="min-w-0 flex-1 mr-3">
+                              <div className="text-sm font-medium text-tw-text truncate">{t.title}</div>
+                              <div className="text-xs text-tw-text-secondary">{t.project?.name}</div>
+                            </div>
+                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${daysLeft <= 2 ? 'bg-orange-100 text-orange-700' : 'bg-yellow-50 text-yellow-700'}`}>
+                              {daysLeft === 1 ? 'Tomorrow' : `${daysLeft}d left`}
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+
+                    {/* Stalest assigned tasks */}
+                    <div className="card overflow-hidden">
+                      <div className="px-4 py-3 border-b border-tw-border flex items-center justify-between">
+                        <span className="font-semibold text-tw-text text-sm">Sitting Longest</span>
+                        <span className="text-xs text-tw-text-secondary">Oldest 10 assigned</span>
+                      </div>
+                      {stalestList.length === 0 ? (
+                        <div className="p-6 text-center text-tw-text-secondary text-sm">No assigned tasks</div>
+                      ) : stalestList.slice(0, 4).map(t => {
+                        const assignedAt = new Date(t.assignments[0].assignedAt)
+                        const daysOld = Math.floor((Date.now() - assignedAt.getTime()) / (1000 * 60 * 60 * 24))
+                        const assignee = t.assignments[0].personnel?.name || t.assignments[0].group?.name || t.assignments[0].department?.name || '—'
+                        return (
+                          <div key={t.id} onClick={() => setSelectedTask(t)} className="px-4 py-3 border-b border-tw-border last:border-0 flex items-center justify-between cursor-pointer hover:bg-tw-hover transition-colors">
+                            <div className="min-w-0 flex-1 mr-3">
+                              <div className="text-sm font-medium text-tw-text truncate">{t.title}</div>
+                              <div className="text-xs text-tw-text-secondary truncate">{assignee}</div>
+                            </div>
+                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${daysOld >= 14 ? 'bg-red-100 text-red-700' : daysOld >= 7 ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-600'}`}>
+                              {daysOld}d
+                            </span>
+                          </div>
+                        )
+                      })}
                     </div>
                   </div>
                 </>
