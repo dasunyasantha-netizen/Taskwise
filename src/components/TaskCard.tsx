@@ -18,7 +18,6 @@ const statusBadge: Record<string, string> = {
   PENDING:     'badge-gray',
   ASSIGNED:    'badge-primary',
   IN_PROGRESS: 'badge-warning',
-  BLOCKED:     'bg-orange-100 text-orange-700 border border-orange-200',
   SUBMITTED:   'badge-purple',
   APPROVED:    'badge-success',
   RETURNED:    'badge-danger',
@@ -63,12 +62,6 @@ export default function TaskCard({ task, onClick }: Props) {
           <div className="text-xs text-tw-text-secondary mb-2 truncate">→ {assigneeNames}</div>
         )}
 
-        {/* Blocked reason */}
-        {task.status === 'BLOCKED' && task.returnReason && (
-          <div className="text-xs text-orange-600 bg-orange-50 rounded px-2 py-1 mb-2 truncate">
-            ⊘ {task.returnReason}
-          </div>
-        )}
 
         {/* Footer row */}
         <div className="flex items-center justify-between gap-2 flex-wrap">

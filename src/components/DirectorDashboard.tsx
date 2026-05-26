@@ -30,13 +30,12 @@ const priorityBadge: Record<string, string> = {
 }
 const subtaskStatusBadge: Record<string, string> = {
   PENDING: 'badge-gray', ASSIGNED: 'badge-primary', IN_PROGRESS: 'badge-warning',
-  BLOCKED: 'bg-orange-100 text-orange-700 border border-orange-200',
   SUBMITTED: 'badge-purple', APPROVED: 'badge-success',
   RETURNED: 'badge-danger', REJECTED: 'badge-danger', CANCELLED: 'badge-gray',
 }
 const subtaskStatusDot: Record<string, string> = {
   PENDING: 'bg-gray-400', ASSIGNED: 'bg-blue-500', IN_PROGRESS: 'bg-yellow-500',
-  BLOCKED: 'bg-orange-500', SUBMITTED: 'bg-purple-500', APPROVED: 'bg-green-500',
+  SUBMITTED: 'bg-purple-500', APPROVED: 'bg-green-500',
   RETURNED: 'bg-red-400', REJECTED: 'bg-red-500', CANCELLED: 'bg-gray-300',
 }
 
@@ -432,7 +431,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
       const submitted = allTasks.filter(t => t.status === 'SUBMITTED')
       const now = new Date()
       const in7Days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
-      const activeStatuses = ['ASSIGNED', 'IN_PROGRESS', 'BLOCKED']
+      const activeStatuses = ['ASSIGNED', 'IN_PROGRESS']
       const dueSoon = allTasks
         .filter(t => t.deadline && activeStatuses.includes(t.status) && new Date(t.deadline) > now && new Date(t.deadline) <= in7Days)
         .sort((a, b) => new Date(a.deadline!).getTime() - new Date(b.deadline!).getTime())

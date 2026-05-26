@@ -23,7 +23,6 @@ const priorityColors: Record<string, string> = {
 }
 const statusColors: Record<string, string> = {
   PENDING: 'badge-gray', ASSIGNED: 'badge-gray', IN_PROGRESS: 'badge-warning',
-  BLOCKED:   'bg-orange-100 text-orange-700 border border-orange-200',
   SUBMITTED: 'badge-purple', APPROVED: 'badge-success',
   RETURNED:  'badge-danger',  REJECTED: 'badge-danger', CANCELLED: 'badge-gray',
 }
@@ -34,8 +33,7 @@ const eventLabels: Record<string, string> = {
   TASK_UPDATED:    'Task updated',    TASK_STARTED:    'Work started',
   TASK_SUBMITTED:  'Submitted for approval',
   TASK_APPROVED:   'Task approved',   TASK_REJECTED:   'Task rejected',
-  TASK_RETURNED:   'Task returned',   TASK_BLOCKED:    'Task blocked',
-  TASK_UNBLOCKED:  'Task unblocked',  TASK_CANCELLED:  'Task cancelled',
+  TASK_RETURNED:   'Task returned',   TASK_CANCELLED:  'Task cancelled',
   SUBTASK_CREATED: 'Subtask created', COMMENT_ADDED:   'Comment added',
 }
 
@@ -67,14 +65,12 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
   const [showReturn,   setShowReturn]   = useState(false)
   const [showReassign, setShowReassign] = useState(false)
   const [showSubtask,  setShowSubtask]  = useState(false)
-  const [showBlock,    setShowBlock]    = useState(false)
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false)
 
   // Form state
   const [returnReason,   setReturnReason]   = useState('')
   const [reassignTarget, setReassignTarget] = useState('')
   const [reassignReason, setReassignReason] = useState('')
-  const [blockReason,    setBlockReason]    = useState('')
   const [subtaskForm,    setSubtaskForm]    = useState({ title: '', description: '', priority: 'MEDIUM', deadline: '', assignTo: '' })
   const [newComment,     setNewComment]     = useState('')
   const [blockingList,   setBlockingList]   = useState<{ id: string; title: string; status: string }[]>([])
@@ -99,8 +95,6 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
 
   const canAccept   = (isDeptPending && task.status === 'ASSIGNED') || canSelfAssign
   const canReturn   = (isDeptPending || isMyTask) && ['ASSIGNED', 'IN_PROGRESS'].includes(task.status)
-  const canBlock    = isMyTask && task.status === 'IN_PROGRESS'
-  const canUnblock  = isMyTask && task.status === 'BLOCKED'
   const canReopen   = isMyTask && task.status === 'REJECTED'
   const canSubmit   = (isMyTask || canSelfAssign) && ['PENDING', 'ASSIGNED', 'IN_PROGRESS'].includes(task.status)
   const canEdit     = isCreator && !['APPROVED', 'CANCELLED'].includes(task.status)
@@ -221,14 +215,6 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
     setShowReassign(false)
     setReassignTarget('')
     setReassignReason('')
-  }
-
-  // ── Block / Unblock ───────────────────────────────────────────────────────
-  const handleBlock = () => {
-    if (!blockReason.trim()) return
-    doAction(() => taskApi.block(task.id, blockReason))
-    setShowBlock(false)
-    setBlockReason('')
   }
 
   // ── Submit (with subtask pre-check) ──────────────────────────────────────
@@ -394,18 +380,6 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
                 + Create Subtask
               </button>
             )}
-            {canBlock && (
-              <button disabled={loading} onClick={() => setShowBlock(true)}
-                className="text-sm py-2 px-3 rounded-lg border border-orange-300 text-orange-700 bg-orange-50 hover:bg-orange-100 font-semibold transition-colors">
-                ⊘ Mark Blocked
-              </button>
-            )}
-            {canUnblock && (
-              <button disabled={loading} onClick={() => doAction(() => taskApi.unblock(task.id))}
-                className="btn-secondary text-sm py-2 px-4">
-                ↺ Unblock
-              </button>
-            )}
             {canReopen && (
               <button disabled={loading} onClick={() => doAction(() => taskApi.reopen(task.id))}
                 className="btn-secondary text-sm py-2 px-4">
@@ -513,11 +487,11 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
                 </div>
               )}
 
-              {/* Return/block reason */}
+              {/* Return reason */}
               {(task.returnReason || task.cancelReason) && (
-                <div className={`rounded-lg p-3 ${task.status === 'BLOCKED' ? 'bg-orange-50 border border-orange-200' : 'bg-red-50 border border-red-200'}`}>
-                  <div className={`text-xs font-semibold mb-1 ${task.status === 'BLOCKED' ? 'text-orange-700' : 'text-tw-danger'}`}>
-                    {task.status === 'BLOCKED' ? 'Blocked reason' : task.status === 'RETURNED' ? 'Returned reason' : 'Rejection reason'}
+                <div className="rounded-lg p-3 bg-red-50 border border-red-200">
+                  <div className="text-xs font-semibold mb-1 text-tw-danger">
+                    {task.status === 'RETURNED' ? 'Returned reason' : 'Rejection reason'}
                   </div>
                   <p className="text-sm text-tw-text">{task.returnReason || task.cancelReason}</p>
                 </div>
@@ -678,7 +652,7 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
                   <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${
                     log.event.includes('APPROVED') ? 'bg-tw-success' :
                     log.event.includes('REJECTED') || log.event.includes('CANCELLED') ? 'bg-tw-danger' :
-                    log.event.includes('BLOCKED') ? 'bg-orange-500' : 'bg-tw-primary'
+                    'bg-tw-primary'
                   }`} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -745,30 +719,6 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
                 <button disabled={!reassignTarget || (task.status !== 'PENDING' && !reassignReason.trim()) || loading} onClick={handleReassign}
                   className="btn-primary disabled:opacity-50">
                   Reassign
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Block modal ─────────────────────────────────────────────────── */}
-      {showBlock && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-60 p-4">
-          <div className="bg-white rounded-xl shadow-panel w-full max-w-sm">
-            <div className="px-5 py-4 border-b border-tw-border">
-              <h3 className="font-semibold text-tw-text">Mark as Blocked</h3>
-              <p className="text-xs text-tw-text-secondary mt-0.5">Describe what is preventing progress on this task.</p>
-            </div>
-            <div className="px-5 py-4 space-y-3">
-              <textarea className="input resize-none" rows={3}
-                placeholder="What is blocking this task?"
-                value={blockReason} onChange={e => setBlockReason(e.target.value)} autoFocus />
-              <div className="flex gap-2 justify-end">
-                <button onClick={() => { setShowBlock(false); setBlockReason('') }} className="btn-secondary">Cancel</button>
-                <button disabled={!blockReason.trim() || loading} onClick={handleBlock}
-                  className="px-4 py-2 rounded-lg border border-orange-300 text-orange-700 bg-orange-50 hover:bg-orange-100 font-semibold text-sm disabled:opacity-50">
-                  Confirm Block
                 </button>
               </div>
             </div>

@@ -22,7 +22,6 @@ const priorityBar:  Record<string, string> = {
 }
 const statusBadge: Record<string, string> = {
   IN_PROGRESS: 'badge-warning',
-  BLOCKED:     'bg-orange-100 text-orange-700 border border-orange-200',
   SUBMITTED:   'badge-purple',
   RETURNED:    'badge-danger',
   REJECTED:    'badge-danger',
@@ -35,7 +34,6 @@ const subtaskStatusDot: Record<string, string> = {
   PENDING:     'bg-gray-400',
   ASSIGNED:    'bg-gray-400',
   IN_PROGRESS: 'bg-yellow-500',
-  BLOCKED:     'bg-orange-500',
   SUBMITTED:   'bg-purple-500',
   APPROVED:    'bg-green-500',
   RETURNED:    'bg-red-400',
@@ -176,7 +174,7 @@ function ExpandedRow({ task, colSpan, actorId, departmentId, onOpen, onSubtaskCl
           {(task.returnReason || task.cancelReason) && (
             <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm">
               <span className="font-semibold text-tw-danger">
-                {task.status === 'BLOCKED' ? 'Blocked: ' : 'Returned: '}
+                {'Returned: '}
               </span>
               <span className="text-tw-danger italic">{task.returnReason || task.cancelReason}</span>
             </div>
@@ -489,7 +487,7 @@ function MobileExpandedCard({ task, actorId, departmentId, onOpen, onSubtaskClic
 
       {(task.returnReason || task.cancelReason) && (
         <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-sm">
-          <span className="font-semibold text-tw-danger">{task.status === 'BLOCKED' ? 'Blocked: ' : 'Returned: '}</span>
+          <span className="font-semibold text-tw-danger">{'Returned: '}</span>
           <span className="text-tw-danger italic">{task.returnReason || task.cancelReason}</span>
         </div>
       )}

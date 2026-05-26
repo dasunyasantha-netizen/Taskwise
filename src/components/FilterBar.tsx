@@ -337,7 +337,7 @@ interface ExtraGroupProps {
 function ExtraGroup({ filter, personnel, mode, onChange }: ExtraGroupProps) {
   const STATUS_TASK = [
     { value: 'PENDING', label: 'Pending' }, { value: 'ASSIGNED', label: 'Assigned' },
-    { value: 'IN_PROGRESS', label: 'In Progress' }, { value: 'BLOCKED', label: 'Blocked' },
+    { value: 'IN_PROGRESS', label: 'In Progress' },
     { value: 'SUBMITTED', label: 'Submitted' }, { value: 'APPROVED', label: 'Approved' },
     { value: 'RETURNED', label: 'Returned' }, { value: 'CANCELLED', label: 'Cancelled' },
   ]
@@ -474,7 +474,7 @@ function LayerGroupInline({ layer, filter, onChange }: LayerGroupProps) {
 function ExtraGroupInline({ filter, personnel, mode, onChange }: ExtraGroupProps) {
   const STATUS_TASK = [
     { value: 'PENDING', label: 'Pending' }, { value: 'ASSIGNED', label: 'Assigned' },
-    { value: 'IN_PROGRESS', label: 'In Progress' }, { value: 'BLOCKED', label: 'Blocked' },
+    { value: 'IN_PROGRESS', label: 'In Progress' },
     { value: 'SUBMITTED', label: 'Submitted' }, { value: 'APPROVED', label: 'Approved' },
     { value: 'RETURNED', label: 'Returned' }, { value: 'CANCELLED', label: 'Cancelled' },
   ]
@@ -594,7 +594,7 @@ function LayerGroupMobile({ layer, filter, onChange }: LayerGroupProps) {
 function ExtraGroupMobile({ filter, personnel, mode, onChange }: ExtraGroupProps) {
   const STATUS_TASK = [
     { value: 'PENDING', label: 'Pending' }, { value: 'ASSIGNED', label: 'Assigned' },
-    { value: 'IN_PROGRESS', label: 'In Progress' }, { value: 'BLOCKED', label: 'Blocked' },
+    { value: 'IN_PROGRESS', label: 'In Progress' },
     { value: 'SUBMITTED', label: 'Submitted' }, { value: 'APPROVED', label: 'Approved' },
     { value: 'RETURNED', label: 'Returned' }, { value: 'CANCELLED', label: 'Cancelled' },
   ]

@@ -18,7 +18,6 @@ interface Props {
 const COLUMNS = [
   { status: 'NOT_STARTED', label: 'Not Started', color: 'bg-gray-400', statuses: ['PENDING', 'ASSIGNED'] },
   { status: 'IN_PROGRESS', label: 'In Progress', color: 'bg-yellow-400', statuses: ['IN_PROGRESS'] },
-  { status: 'BLOCKED',     label: 'Blocked',     color: 'bg-orange-500', statuses: ['BLOCKED'] },
   { status: 'SUBMITTED',   label: 'Submitted',   color: 'bg-purple-400', statuses: ['SUBMITTED'] },
   { status: 'APPROVED',    label: 'Approved',    color: 'bg-green-400',  statuses: ['APPROVED'] },
   { status: 'RETURNED',    label: 'Returned',    color: 'bg-red-400',    statuses: ['RETURNED'] },
@@ -27,8 +26,7 @@ const COLUMNS = [
 const DRAG_TRANSITIONS: Record<string, string[]> = {
   PENDING:     ['IN_PROGRESS'],
   ASSIGNED:    ['IN_PROGRESS'],
-  IN_PROGRESS: ['BLOCKED', 'SUBMITTED'],
-  BLOCKED:     ['IN_PROGRESS'],
+  IN_PROGRESS: ['SUBMITTED'],
   RETURNED:    ['IN_PROGRESS'],
   REJECTED:    ['IN_PROGRESS'],
 }
@@ -266,8 +264,6 @@ export default function BoardView({ project, isDirector, actorId }: Props) {
     setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: targetStatus as Task['status'] } : t))
     try {
       if (targetStatus === 'IN_PROGRESS' && task.status === 'ASSIGNED') await taskApi.start(task.id)
-      else if (targetStatus === 'BLOCKED'     && task.status === 'IN_PROGRESS') await taskApi.block(task.id, 'Blocked via board drag')
-      else if (targetStatus === 'IN_PROGRESS' && task.status === 'BLOCKED')     await taskApi.unblock(task.id)
       else if (targetStatus === 'IN_PROGRESS' && task.status === 'RETURNED')    await taskApi.reopen(task.id)
       else if (targetStatus === 'IN_PROGRESS' && task.status === 'REJECTED')    await taskApi.reopen(task.id)
       await loadTasks()

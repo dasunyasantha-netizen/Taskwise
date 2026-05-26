@@ -2,7 +2,7 @@ import { Router } from 'express'
 import { authenticateToken } from '../middleware/authMiddleware'
 import {
   listTasks, getTask, createTask, updateTask, deleteTask,
-  assignTask, acceptTask, reassignTask, startTask, submitTask, blockTask, unblockTask,
+  assignTask, acceptTask, reassignTask, startTask, submitTask,
   returnTask, approveTask, rejectTask, reopenTask, cancelTask,
   getSubtasks, getComments, addComment, getTaskHistory,
   getProgressLogs, addProgressLog,
@@ -22,8 +22,6 @@ router.post('/:id/accept',        acceptTask)
 router.post('/:id/reassign',      reassignTask)
 router.post('/:id/start',         startTask)
 router.post('/:id/submit',        submitTask)
-router.post('/:id/block',         blockTask)
-router.post('/:id/unblock',       unblockTask)
 router.post('/:id/return',        returnTask)
 router.post('/:id/approve',       approveTask)
 router.post('/:id/reject',        rejectTask)

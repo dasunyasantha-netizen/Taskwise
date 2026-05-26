@@ -98,7 +98,6 @@ export type TaskStatus =
   | 'PENDING'
   | 'ASSIGNED'
   | 'IN_PROGRESS'
-  | 'BLOCKED'
   | 'SUBMITTED'
   | 'APPROVED'
   | 'RETURNED'

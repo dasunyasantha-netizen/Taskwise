@@ -20,7 +20,6 @@ const priorityColors: Record<string, string> = {
 }
 const statusColors: Record<string, string> = {
   PENDING: 'badge-gray', ASSIGNED: 'badge-primary', IN_PROGRESS: 'badge-warning',
-  BLOCKED: 'bg-orange-100 text-orange-700 border border-orange-200',
   SUBMITTED: 'badge-purple', APPROVED: 'badge-success', RETURNED: 'badge-danger',
   REJECTED: 'badge-danger', CANCELLED: 'badge-gray',
 }
@@ -34,8 +33,6 @@ const eventLabels: Record<string, string> = {
   TASK_APPROVED:   'Task approved',
   TASK_REJECTED:   'Task rejected',
   TASK_RETURNED:   'Task returned',
-  TASK_BLOCKED:    'Task blocked',
-  TASK_UNBLOCKED:  'Task unblocked',
   TASK_CANCELLED:  'Task cancelled',
   TASK_DELETED:    'Task deleted',
   SUBTASK_CREATED: 'Subtask created',
@@ -53,7 +50,7 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
   const [newUpdate, setNewUpdate] = useState('')
   const [addingUpdate, setAddingUpdate] = useState(false)
   const [reason, setReason] = useState('')
-  const [showReasonModal, setShowReasonModal] = useState<'return' | 'reject' | 'cancel' | 'block' | null>(null)
+  const [showReasonModal, setShowReasonModal] = useState<'return' | 'reject' | 'cancel' | null>(null)
   const [showAssignModal, setShowAssignModal] = useState(false)
   const [showSubtaskModal, setShowSubtaskModal] = useState(false)
   const [assignTarget, setAssignTarget] = useState<{ type: string; id: string }>({ type: '', id: '' })
@@ -155,14 +152,12 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
   // Action permissions
   const canEdit    = isDirector && !['APPROVED', 'CANCELLED'].includes(task.status)
   const canSubmit  = !isDirector && task.status === 'IN_PROGRESS'
-  const canBlock   = task.status === 'IN_PROGRESS'
-  const canUnblock = task.status === 'BLOCKED'
   const canReturn  = task.status === 'IN_PROGRESS'
   const canApprove = task.status === 'SUBMITTED' && task.approvalById === actorId
   const canReject  = task.status === 'SUBMITTED' && task.approvalById === actorId
   const canReopen  = task.status === 'REJECTED'
   const canCancel  = isDirector && !['APPROVED', 'CANCELLED'].includes(task.status)
-  const canAssign  = isDirector && ['PENDING', 'RETURNED', 'BLOCKED'].includes(task.status)
+  const canAssign  = isDirector && ['PENDING', 'RETURNED'].includes(task.status)
   const canSubtask = ['IN_PROGRESS', 'ASSIGNED'].includes(task.status)
 
   return (
@@ -245,8 +240,6 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
           {/* Action buttons */}
           <div className="flex flex-wrap gap-2 mt-3">
             {canSubmit  &&<button disabled={actionLoading} onClick={() => doAction(() => taskApi.submit(task.id))} className="btn-primary text-xs py-1.5">✓ Submit for Approval</button>}
-            {canBlock   && <button disabled={actionLoading} onClick={() => setShowReasonModal('block')} className="text-xs py-1.5 px-3 rounded-lg border border-orange-300 text-orange-700 bg-orange-50 hover:bg-orange-100 font-semibold transition-colors">⊘ Mark Blocked</button>}
-            {canUnblock && <button disabled={actionLoading} onClick={() => doAction(() => taskApi.unblock(task.id))} className="btn-secondary text-xs py-1.5">↺ Unblock</button>}
             {canReturn  && <button disabled={actionLoading} onClick={() => setShowReasonModal('return')} className="btn-secondary text-xs py-1.5">↩ Return</button>}
             {canApprove && <button disabled={actionLoading} onClick={() => doAction(() => taskApi.approve(task.id))} className="bg-tw-success hover:opacity-90 text-white font-semibold px-3 py-1.5 rounded-lg text-xs transition-opacity">✓ Approve</button>}
             {canReject  && <button disabled={actionLoading} onClick={() => setShowReasonModal('reject')} className="btn-danger text-xs py-1.5">✕ Reject</button>}
@@ -321,10 +314,8 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
               )}
 
               {(task.returnReason || task.cancelReason) && (
-                <div className={`rounded-xl p-3 ${task.status === 'BLOCKED' ? 'bg-orange-50 border border-orange-200' : 'bg-red-50 border border-red-200'}`}>
-                  <div className={`text-xs font-bold mb-1.5 ${task.status === 'BLOCKED' ? 'text-orange-700' : 'text-tw-danger'}`}>
-                    {task.status === 'BLOCKED' ? 'Blocked reason' : 'Return / Rejection reason'}
-                  </div>
+                <div className="rounded-xl p-3 bg-red-50 border border-red-200">
+                  <div className="text-xs font-bold mb-1.5 text-tw-danger">Return / Rejection reason</div>
                   <p className="text-sm text-tw-text">{task.returnReason || task.cancelReason}</p>
                 </div>
               )}
@@ -430,7 +421,6 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
                   <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${
                     log.event.includes('APPROVED') ? 'bg-tw-success' :
                     log.event.includes('REJECTED') || log.event.includes('CANCELLED') ? 'bg-tw-danger' :
-                    log.event.includes('BLOCKED') ? 'bg-orange-500' :
                     'bg-tw-primary'
                   }`} />
                   <div className="flex-1 min-w-0">
@@ -457,31 +447,24 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
         </div>
       </div>
 
-      {/* Reason Modal (Return / Reject / Cancel / Block) */}
+      {/* Reason Modal (Return / Reject / Cancel) */}
       {showReasonModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-panel w-full max-w-sm">
             <div className="px-5 py-4 border-b border-tw-border">
-              <h3 className="font-semibold text-tw-text capitalize">
-                {showReasonModal === 'block' ? 'Mark as Blocked' : `${showReasonModal} Task`}
-              </h3>
-              {showReasonModal === 'block' && (
-                <p className="text-xs text-tw-text-secondary mt-1">Describe what is blocking this task (e.g. waiting on another team, missing information).</p>
-              )}
+              <h3 className="font-semibold text-tw-text capitalize">{showReasonModal} Task</h3>
             </div>
             <div className="px-5 py-4 space-y-3">
               <textarea className="input resize-none" rows={3}
-                placeholder={showReasonModal === 'block' ? 'What is blocking this task?' : `Reason for ${showReasonModal}...`}
+                placeholder={`Reason for ${showReasonModal}...`}
                 value={reason} onChange={e => setReason(e.target.value)} />
               <div className="flex gap-2 justify-end">
                 <button onClick={() => { setShowReasonModal(null); setReason('') }} className="btn-secondary">Cancel</button>
-                <button disabled={!reason.trim() || actionLoading}
-                  className={showReasonModal === 'block' ? 'text-xs py-1.5 px-3 rounded-lg border border-orange-300 text-orange-700 bg-orange-50 hover:bg-orange-100 font-semibold' : 'btn-danger'}
+                <button disabled={!reason.trim() || actionLoading} className="btn-danger"
                   onClick={() => {
                     const action =
                       showReasonModal === 'return' ? () => taskApi.return(task.id, reason) :
                       showReasonModal === 'reject' ? () => taskApi.reject(task.id, reason) :
-                      showReasonModal === 'block'  ? () => taskApi.block(task.id, reason) :
                       () => taskApi.cancel(task.id, reason)
                     doAction(action)
                     setShowReasonModal(null)
