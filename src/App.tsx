@@ -94,17 +94,6 @@ export default function App() {
     return <Auth onLogin={handleLogin} />
   }
 
-  // First login gate — must change password before entering the app
-  if (user.mustChangePassword) {
-    return (
-      <ForcePasswordChange
-        user={user}
-        onPasswordChanged={handlePasswordChanged}
-        onLogout={handleLogout}
-      />
-    )
-  }
-
   if (user.actorType === 'director') {
     return (
       <DirectorDashboard

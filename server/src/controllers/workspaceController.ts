@@ -129,7 +129,7 @@ export async function createPersonnel(req: Request, res: Response): Promise<void
     }
     const hashed = await bcrypt.hash('Test@123', 12)
     const person = await prisma.personnel.create({
-      data: { name, phone, email, nic, password: hashed, departmentId, workspaceId: req.user!.workspaceId, mustChangePassword: true }
+      data: { name, phone, email, nic, password: hashed, departmentId, workspaceId: req.user!.workspaceId, mustChangePassword: false }
     })
     const { password: _p, ...safe } = person
     res.status(201).json(safe)
