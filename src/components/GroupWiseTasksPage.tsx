@@ -354,7 +354,7 @@ function GroupTaskRow({
 // ─── Group View ───────────────────────────────────────────────────────────────
 
 function GroupCard({
-  group, allPersonnel, layers, onRefresh, onAddMember, onAssignTask, onCreateProject,
+  group, allPersonnel, layers, onRefresh, onAddMember, onAssignTask, onCreateProject, onEdit, onDelete,
 }: {
   group: TaskGroup
   allPersonnel: Personnel[]
@@ -363,10 +363,13 @@ function GroupCard({
   onAddMember: (group: TaskGroup) => void
   onAssignTask: (group: TaskGroup) => void
   onCreateProject: (group: TaskGroup) => void
+  onEdit: (group: TaskGroup) => void
+  onDelete: (group: TaskGroup) => void
 }) {
   const [expanded, setExpanded] = useState(false)
   const [monitor, setMonitor] = useState<MonitorData | null>(null)
   const [loadingMonitor, setLoadingMonitor] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
   const [historyTarget, setHistoryTarget] = useState<{
     taskId: string; memberId: string; memberName: string
   } | null>(null)
@@ -415,6 +418,38 @@ function GroupCard({
             >
               + Task
             </button>
+            {/* Kebab menu */}
+            <div className="relative" onClick={e => e.stopPropagation()}>
+              <button
+                onClick={() => setMenuOpen(o => !o)}
+                className="w-7 h-7 flex items-center justify-center rounded-lg text-tw-text-secondary hover:bg-tw-hover transition-colors"
+              >
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <circle cx="10" cy="4" r="1.5"/><circle cx="10" cy="10" r="1.5"/><circle cx="10" cy="16" r="1.5"/>
+                </svg>
+              </button>
+              {menuOpen && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
+                  <div className="absolute right-0 top-8 z-20 bg-white rounded-xl shadow-panel border border-tw-border py-1 w-36">
+                    <button
+                      onClick={() => { setMenuOpen(false); onEdit(group) }}
+                      className="w-full text-left px-4 py-2 text-sm text-tw-text hover:bg-tw-hover flex items-center gap-2"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => { setMenuOpen(false); onDelete(group) }}
+                      className="w-full text-left px-4 py-2 text-sm text-tw-danger hover:bg-red-50 flex items-center gap-2"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                      Delete
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
             <svg className={`w-4 h-4 text-tw-text-secondary transition-transform ${expanded ? 'rotate-180' : ''}`}
               fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -642,6 +677,64 @@ function SupervisorPickerModal({
               </div>
             ))
           )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Edit Group Modal ─────────────────────────────────────────────────────────
+
+function EditGroupModal({ group, onClose, onSaved }: { group: TaskGroup; onClose: () => void; onSaved: () => void }) {
+  const [name, setName] = useState(group.name)
+  const [description, setDescription] = useState(group.description || '')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  const handleSave = async () => {
+    if (!name.trim()) { setError('Name is required'); return }
+    setSaving(true); setError('')
+    try {
+      await taskGroupApi.update(group.id, { name: name.trim(), description: description.trim() || undefined })
+      onSaved()
+    } catch { setError('Failed to save') }
+    setSaving(false)
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-sm">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-tw-border">
+          <h3 className="font-bold text-tw-text">Edit Group</h3>
+          <button onClick={onClose} className="text-tw-text-secondary hover:text-tw-text text-xl">×</button>
+        </div>
+        <div className="px-5 py-4 space-y-4">
+          <div>
+            <label className="block text-sm font-semibold text-tw-text mb-1.5">Group Name</label>
+            <input
+              autoFocus
+              className="input w-full"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleSave()}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-tw-text mb-1.5">Description <span className="font-normal text-tw-text-secondary">(optional)</span></label>
+            <textarea
+              className="input w-full resize-none"
+              rows={3}
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+            />
+          </div>
+          {error && <p className="text-xs text-tw-danger">{error}</p>}
+        </div>
+        <div className="flex gap-2 px-5 pb-5">
+          <button onClick={onClose} className="btn-secondary flex-1">Cancel</button>
+          <button disabled={saving} onClick={handleSave} className="btn-primary flex-1 disabled:opacity-50">
+            {saving ? 'Saving…' : 'Save Changes'}
+          </button>
         </div>
       </div>
     </div>
@@ -1236,6 +1329,15 @@ export default function GroupWiseTasksPage() {
   const [addMemberTarget, setAddMemberTarget] = useState<TaskGroup | null>(null)
   const [assignTaskTarget, setAssignTaskTarget] = useState<TaskGroup | null>(null)
   const [createProjectTarget, setCreateProjectTarget] = useState<TaskGroup | null>(null)
+  const [editTarget, setEditTarget] = useState<TaskGroup | null>(null)
+
+  const handleDeleteGroup = async (group: TaskGroup) => {
+    if (!confirm(`Delete "${group.name}"? This cannot be undone.`)) return
+    try {
+      await taskGroupApi.delete(group.id)
+      load()
+    } catch { /* silent */ }
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -1347,6 +1449,8 @@ export default function GroupWiseTasksPage() {
                   onAddMember={g => setAddMemberTarget(g)}
                   onAssignTask={g => setAssignTaskTarget(g)}
                   onCreateProject={g => setCreateProjectTarget(g)}
+                  onEdit={g => setEditTarget(g)}
+                  onDelete={handleDeleteGroup}
                 />
               ))}
             </div>
@@ -1418,6 +1522,13 @@ export default function GroupWiseTasksPage() {
         <CreateGroupModal
           onClose={() => setShowCreateGroup(false)}
           onCreate={group => { setShowCreateGroup(false); load() }}
+        />
+      )}
+      {editTarget && (
+        <EditGroupModal
+          group={editTarget}
+          onClose={() => setEditTarget(null)}
+          onSaved={() => { setEditTarget(null); load() }}
         />
       )}
       {addMemberTarget && (
