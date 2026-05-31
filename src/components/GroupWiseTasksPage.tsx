@@ -553,6 +553,7 @@ function AddMemberModal({
   const [supervisorFor, setSupervisorFor] = useState<Personnel | null>(null)
   const [supervisorId, setSupervisorId] = useState('')
   const [savingSupervisor, setSavingSupervisor] = useState(false)
+  // Maps personnelId → assigned supervisorId (tracks in-session supervisor assignments)
   const [supervisorOverrides, setSupervisorOverrides] = useState<Record<string, string>>({})
 
   const existingMemberIds = new Set((group.members || []).map(m => m.personnelId))
@@ -572,6 +573,25 @@ function AddMemberModal({
     return allPersonnel.filter(x => !x.deletedAt && x.id !== p.id && higherDeptIds.includes(x.departmentId))
   }
 
+  // Walk up from p through supervisorOverrides + existing supervisorId/layer data.
+  // Returns the first person in the chain who is missing a supervisor, or null if chain is complete.
+  // Layer-1 people are chain roots — no supervisor needed.
+  const findChainGap = (p: Personnel, overrides: Record<string, string>): Personnel | null => {
+    const layer = getPersonnelLayer(p)
+    const isLayer1 = layer?.number === 1 || layers.reduce((min, l) => Math.min(min, l.number), Infinity) === layer?.number
+    const hasSup = !!p.supervisorId || !!overrides[p.id]
+    if (!hasSup) {
+      // Layer 1 needs no supervisor — chain is complete at this person
+      if (isLayer1) return null
+      return p
+    }
+    // Walk up: find the supervisor in allPersonnel
+    const supId = overrides[p.id] || p.supervisorId
+    const sup = allPersonnel.find(x => x.id === supId)
+    if (!sup) return null // supervisor not in personnel list (may be director) — chain OK
+    return findChainGap(sup, overrides)
+  }
+
   const filtered = allPersonnel.filter(p =>
     !p.deletedAt &&
     !existingMemberIds.has(p.id) &&
@@ -581,8 +601,8 @@ function AddMemberModal({
 
   const hasSupervisor = (p: Personnel) => !!p.supervisorId || !!supervisorOverrides[p.id]
 
-  // People who need a supervisor set before they can be added
-  const selectedNeedingSupervisor = filtered.filter(p => selected.has(p.id) && !hasSupervisor(p))
+  // People who need a supervisor set before they can be added (chain gap check)
+  const selectedNeedingSupervisor = filtered.filter(p => selected.has(p.id) && findChainGap(p, supervisorOverrides) !== null)
 
   const toggleOne = (p: Personnel) => {
     if (supervisorFor) return
@@ -628,7 +648,19 @@ function AddMemberModal({
     for (const personnelId of ids) {
       try {
         await taskGroupApi.addMember(group.id, { personnelId })
-      } catch {
+      } catch (e: unknown) {
+        const err = e as { response?: { data?: { error?: string; needsSupervisor?: { id: string; name: string; department?: { name: string; layer?: { number: number; name: string } } }[] } } }
+        const data = err?.response?.data
+        if (data?.error === 'supervisor_chain_incomplete' && data.needsSupervisor?.length) {
+          // Find the first person in the gap list in allPersonnel and open the picker
+          const gap = allPersonnel.find(x => x.id === data.needsSupervisor![0].id)
+          if (gap) {
+            setSaving(false)
+            setSupervisorFor(gap)
+            setSupervisorId('')
+            return
+          }
+        }
         failed++
       }
     }
@@ -645,9 +677,22 @@ function AddMemberModal({
     setSavingSupervisor(true); setError('')
     try {
       await workspaceApi.setSupervisor(supervisorFor.id, supervisorId)
-      setSupervisorOverrides(prev => ({ ...prev, [supervisorFor.id]: supervisorId }))
-      setSupervisorFor(null)
+      const newOverrides = { ...supervisorOverrides, [supervisorFor.id]: supervisorId }
+      setSupervisorOverrides(newOverrides)
       setSupervisorId('')
+
+      // Check if the newly-assigned supervisor also needs a supervisor (walk the chain up)
+      const chosenSupervisor = allPersonnel.find(x => x.id === supervisorId)
+      if (chosenSupervisor) {
+        const nextGap = findChainGap(chosenSupervisor, newOverrides)
+        if (nextGap) {
+          // Keep the panel open for the next gap in the chain
+          setSupervisorFor(nextGap)
+          setSavingSupervisor(false)
+          return
+        }
+      }
+      setSupervisorFor(null)
     } catch (e: unknown) {
       setError((e as { message?: string }).message || 'Failed to set supervisor')
     }
@@ -673,7 +718,7 @@ function AddMemberModal({
               <Avatar name={supervisorFor.name} size={6} />
               <div>
                 <p className="text-sm font-semibold text-tw-text">{supervisorFor.name}</p>
-                <p className="text-xs text-amber-700">needs a supervisor before being added</p>
+                <p className="text-xs text-amber-700">also needs a supervisor to complete the chain</p>
               </div>
             </div>
             <label className="block text-xs font-semibold text-tw-text mb-1">Assign supervisor</label>
