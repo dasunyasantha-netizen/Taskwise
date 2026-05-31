@@ -11,9 +11,11 @@ function requireDirector(req: Request, res: Response): boolean {
   return true
 }
 
-// Walk up the supervisor chain until we find someone with no supervisor or
-// whose supervisor is the director. Returns a list of personnel IDs that still
-// need a supervisor assigned.
+// Walk up the supervisor chain until we reach a complete chain or find a gap.
+// Chain is complete when:
+//   - The person is in layer 1 (they report directly to the director, no supervisorId needed)
+//   - A supervisor in the chain is in layer 1 with no further supervisor
+// Returns IDs of personnel who are missing a supervisor mid-chain.
 async function findMissingSupervision(
   personnelId: string,
   workspaceId: string,
@@ -25,21 +27,29 @@ async function findMissingSupervision(
 
   const person = await prisma.personnel.findFirst({
     where: { id: personnelId, workspaceId, deletedAt: null },
-    select: { id: true, supervisorId: true },
+    select: {
+      id: true,
+      supervisorId: true,
+      department: { select: { layer: { select: { number: true } } } },
+    },
   })
   if (!person) return []
 
+  const layerNumber = person.department?.layer?.number
+
   if (!person.supervisorId) {
-    // Has no supervisor — needs one
+    // Layer 1 has no supervisor by design — chain terminates here cleanly
+    if (layerNumber === 1) return []
+    // Any other layer without a supervisor is a broken chain
     return [personnelId]
   }
 
-  // Check if the supervisor is the director (they're the chain root)
   const supervisor = await prisma.personnel.findFirst({
     where: { id: person.supervisorId, workspaceId, deletedAt: null },
     select: { id: true, supervisorId: true },
   })
   if (!supervisor) {
+    // Supervisor ID points to a deleted/missing person
     return [personnelId]
   }
 

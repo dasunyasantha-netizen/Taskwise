@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import type { Personnel, Layer, Task } from '../types'
 import { taskGroupApi, workspaceApi, projectApi } from '../services/apiService'
+import Select from './Select'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -651,23 +652,22 @@ function AddMemberModal({
               </div>
             </div>
             <label className="block text-xs font-semibold text-tw-text mb-1">Assign supervisor</label>
-            <select
-              className="input w-full text-sm mb-2"
-              value={supervisorId}
-              onChange={e => setSupervisorId(e.target.value)}
-              autoFocus
-            >
-              <option value="">Select supervisor…</option>
-              {getSupervisorCandidates(supervisorFor).map(c => {
-                const dept = allDepts.find(d => d.id === c.departmentId)
-                const layer = getPersonnelLayer(c)
-                return (
-                  <option key={c.id} value={c.id}>
-                    {c.name} — {layer?.name} · {dept?.name}
-                  </option>
-                )
-              })}
-            </select>
+            <div className="mb-2">
+              <Select
+                value={supervisorId}
+                onChange={val => setSupervisorId(val)}
+                placeholder="Select supervisor…"
+                options={getSupervisorCandidates(supervisorFor).map(c => {
+                  const dept = allDepts.find(d => d.id === c.departmentId)
+                  const layer = getPersonnelLayer(c)
+                  return {
+                    value: c.id,
+                    label: `${c.name} — ${layer?.name} · ${dept?.name}`,
+                    group: layer?.name,
+                  }
+                })}
+              />
+            </div>
             <div className="flex gap-2">
               <button
                 onClick={() => { setSupervisorFor(null); setSupervisorId('') }}
@@ -863,12 +863,16 @@ function AssignTaskModal({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-semibold text-tw-text mb-1.5">Priority</label>
-              <select className="input w-full" value={form.priority} onChange={e => setForm(f => ({ ...f, priority: e.target.value }))}>
-                <option value="LOW">Low</option>
-                <option value="MEDIUM">Medium</option>
-                <option value="HIGH">High</option>
-                <option value="CRITICAL">Critical</option>
-              </select>
+              <Select
+                value={form.priority}
+                onChange={val => setForm(f => ({ ...f, priority: val }))}
+                options={[
+                  { value: 'LOW', label: 'Low' },
+                  { value: 'MEDIUM', label: 'Medium' },
+                  { value: 'HIGH', label: 'High' },
+                  { value: 'CRITICAL', label: 'Critical' },
+                ]}
+              />
             </div>
             <div>
               <label className="block text-sm font-semibold text-tw-text mb-1.5">Deadline <span className="text-tw-text-secondary font-normal">(optional)</span></label>
