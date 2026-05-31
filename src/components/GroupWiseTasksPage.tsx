@@ -1402,7 +1402,7 @@ export default function GroupWiseTasksPage() {
   }
 
   return (
-    <div className="p-4 md:p-6 max-w-5xl">
+    <div className="p-4 md:p-6">
       {/* Page header */}
       <div className="flex items-start justify-between mb-5 gap-4 flex-wrap">
         <div>
