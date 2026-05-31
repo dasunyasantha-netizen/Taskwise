@@ -548,12 +548,32 @@ function AddMemberModal({
   const [search, setSearch] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const [supervisorNeeded, setSupervisorNeeded] = useState<Array<{ id: string; name: string; department?: { name: string } }> | null>(null)
-  const [supervisorAssignments, setSupervisorAssignments] = useState<Record<string, string>>({})
-  const [assigningSupervisors, setAssigningSupervisors] = useState(false)
+  // When a person needs a supervisor set before adding, track which person
+  // and show an inline supervisor picker for them
+  const [supervisorFor, setSupervisorFor] = useState<Personnel | null>(null)
+  const [supervisorId, setSupervisorId] = useState('')
+  const [savingSupervisor, setSavingSupervisor] = useState(false)
+  // Local override map: personnelId → supervisorId (applied after inline save)
+  const [supervisorOverrides, setSupervisorOverrides] = useState<Record<string, string>>({})
 
   const existingMemberIds = new Set((group.members || []).map(m => m.personnelId))
   const allDepts = layers.flatMap(l => l.departments || [])
+
+  const getPersonnelLayer = (p: Personnel) => {
+    const dept = allDepts.find(d => d.id === p.departmentId)
+    return layers.find(l => l.id === dept?.layerId)
+  }
+
+  // Candidates for supervisor: people one layer above in the same branch or any higher layer
+  const getSupervisorCandidates = (p: Personnel) => {
+    const myDept = allDepts.find(d => d.id === p.departmentId)
+    const myLayer = layers.find(l => l.id === myDept?.layerId)
+    if (!myLayer) return allPersonnel.filter(x => !x.deletedAt && x.id !== p.id)
+    // People from layers with a lower number (higher in hierarchy)
+    const higherLayerIds = layers.filter(l => l.number < myLayer.number).map(l => l.id)
+    const higherDeptIds = allDepts.filter(d => higherLayerIds.includes(d.layerId)).map(d => d.id)
+    return allPersonnel.filter(x => !x.deletedAt && x.id !== p.id && higherDeptIds.includes(x.departmentId))
+  }
 
   const filtered = allPersonnel.filter(p =>
     !p.deletedAt &&
@@ -562,33 +582,56 @@ function AddMemberModal({
       (p.department as unknown as { name: string })?.name?.toLowerCase().includes(search.toLowerCase()))
   )
 
+  const hasSupervisor = (p: Personnel) =>
+    !!p.supervisorId || !!supervisorOverrides[p.id]
+
   const addMember = async (personnelId: string) => {
-    setSaving(true); setError(''); setSupervisorNeeded(null)
+    setSaving(true); setError('')
     try {
       await taskGroupApi.addMember(group.id, { personnelId })
       onAdded()
     } catch (e: unknown) {
-      if ((e as { message?: string }).message?.includes('supervisor_chain_incomplete')) {
-        // Parse the error — the API returns JSON in the error message
-        // We need to re-fetch; for now show a friendly message
-        setError(`This person's supervisor chain is incomplete. Assign supervisors first in Team Hierarchy.`)
+      const msg = (e as { message?: string }).message || ''
+      if (msg.includes('supervisor_chain_incomplete')) {
+        setError(`Supervisor chain is still incomplete after saving. Please check the chain in Team Hierarchy.`)
       } else {
-        // Try to parse structured error
-        const msg = (e as { message?: string }).message || 'Failed to add member'
-        setError(msg)
+        setError(msg || 'Failed to add member')
       }
     }
     setSaving(false)
   }
 
-  const getPersonnelLayer = (p: Personnel) => {
-    const dept = allDepts.find(d => d.id === p.departmentId)
-    return layers.find(l => l.id === dept?.layerId)
+  const handleRowClick = (p: Personnel) => {
+    if (hasSupervisor(p)) {
+      addMember(p.id)
+    } else {
+      // Open inline supervisor picker for this person
+      setSupervisorFor(p)
+      setSupervisorId('')
+      setError('')
+    }
+  }
+
+  const saveSupervisorAndAdd = async () => {
+    if (!supervisorFor || !supervisorId) return
+    setSavingSupervisor(true); setError('')
+    try {
+      await workspaceApi.setSupervisor(supervisorFor.id, supervisorId)
+      // Track that we've assigned a supervisor locally
+      setSupervisorOverrides(prev => ({ ...prev, [supervisorFor.id]: supervisorId }))
+      setSupervisorFor(null)
+      setSupervisorId('')
+      // Now add to group
+      await addMember(supervisorFor.id)
+    } catch (e: unknown) {
+      setError((e as { message?: string }).message || 'Failed to set supervisor')
+    }
+    setSavingSupervisor(false)
   }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[80vh] flex flex-col">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[85vh] flex flex-col">
         <div className="flex items-center justify-between px-5 py-4 border-b border-tw-border flex-shrink-0">
           <div>
             <h3 className="font-bold text-tw-text">Add Member — {group.name}</h3>
@@ -596,13 +639,60 @@ function AddMemberModal({
           </div>
           <button onClick={onClose} className="text-tw-text-secondary hover:text-tw-text text-xl">×</button>
         </div>
+
+        {/* Inline supervisor assignment panel */}
+        {supervisorFor && (
+          <div className="px-4 py-3 bg-amber-50 border-b border-amber-200 flex-shrink-0">
+            <div className="flex items-center gap-2 mb-2">
+              <Avatar name={supervisorFor.name} size={6} />
+              <div>
+                <p className="text-sm font-semibold text-tw-text">{supervisorFor.name}</p>
+                <p className="text-xs text-amber-700">needs a supervisor before being added to this group</p>
+              </div>
+            </div>
+            <label className="block text-xs font-semibold text-tw-text mb-1">Assign supervisor</label>
+            <select
+              className="input w-full text-sm mb-2"
+              value={supervisorId}
+              onChange={e => setSupervisorId(e.target.value)}
+              autoFocus
+            >
+              <option value="">Select supervisor…</option>
+              {getSupervisorCandidates(supervisorFor).map(c => {
+                const dept = allDepts.find(d => d.id === c.departmentId)
+                const layer = getPersonnelLayer(c)
+                return (
+                  <option key={c.id} value={c.id}>
+                    {c.name} — {layer?.name} · {dept?.name}
+                  </option>
+                )
+              })}
+            </select>
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setSupervisorFor(null); setSupervisorId('') }}
+                className="btn-secondary text-xs py-1.5 flex-1"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={!supervisorId || savingSupervisor}
+                onClick={saveSupervisorAndAdd}
+                className="btn-primary text-xs py-1.5 flex-1 disabled:opacity-50"
+              >
+                {savingSupervisor ? 'Saving…' : 'Set & Add to Group'}
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="px-4 py-3 border-b border-tw-border flex-shrink-0">
           <input
             className="input w-full"
             placeholder="Search by name or department..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            autoFocus
+            autoFocus={!supervisorFor}
           />
         </div>
         {error && (
@@ -617,12 +707,16 @@ function AddMemberModal({
             filtered.map(p => {
               const dept = allDepts.find(d => d.id === p.departmentId)
               const layer = getPersonnelLayer(p)
+              const hasSuper = hasSupervisor(p)
+              const isTarget = supervisorFor?.id === p.id
               return (
                 <button
                   key={p.id}
-                  disabled={saving}
-                  onClick={() => addMember(p.id)}
-                  className="w-full text-left px-4 py-3 hover:bg-tw-hover transition-colors flex items-center gap-3 border-b border-tw-border last:border-0 disabled:opacity-50"
+                  disabled={saving || savingSupervisor}
+                  onClick={() => handleRowClick(p)}
+                  className={`w-full text-left px-4 py-3 transition-colors flex items-center gap-3 border-b border-tw-border last:border-0 disabled:opacity-50 ${
+                    isTarget ? 'bg-amber-50' : 'hover:bg-tw-hover'
+                  }`}
                 >
                   <Avatar name={p.name} size={8} />
                   <div className="flex-1 min-w-0">
@@ -630,13 +724,27 @@ function AddMemberModal({
                     <div className="text-xs text-tw-text-secondary">
                       {layer?.name} · {dept?.name}
                     </div>
-                    {p.supervisor && (
-                      <div className="text-xs text-green-600 mt-0.5">✓ Supervisor: {(p.supervisor as unknown as { name: string }).name}</div>
-                    )}
-                    {!p.supervisor && (
-                      <div className="text-xs text-amber-600 mt-0.5">⚠ No supervisor assigned</div>
+                    {hasSuper ? (
+                      supervisorOverrides[p.id] ? (
+                        <div className="text-xs text-green-600 mt-0.5">
+                          ✓ Supervisor just assigned
+                        </div>
+                      ) : (
+                        <div className="text-xs text-green-600 mt-0.5">
+                          ✓ Supervisor: {(p.supervisor as unknown as { name: string })?.name}
+                        </div>
+                      )
+                    ) : (
+                      <div className="text-xs text-amber-600 mt-0.5">
+                        ⚠ No supervisor — tap to assign one
+                      </div>
                     )}
                   </div>
+                  {!hasSuper && (
+                    <span className="text-xs px-2 py-1 rounded-lg bg-amber-100 text-amber-700 font-medium flex-shrink-0">
+                      Set supervisor
+                    </span>
+                  )}
                 </button>
               )
             })
