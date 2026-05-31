@@ -702,10 +702,11 @@ function AddMemberModal({
       (p.department as unknown as { name: string })?.name?.toLowerCase().includes(search.toLowerCase()))
   )
 
-  const hasSupervisor = (p: Personnel) => !!p.supervisorId || !!supervisorOverrides[p.id]
+  // Chain is complete only if findChainGap returns null (no gap anywhere up the chain)
+  const hasCompleteChain = (p: Personnel) => findChainGap(p, supervisorOverrides) === null
 
   // People who need a supervisor set before they can be added (chain gap check)
-  const selectedNeedingSupervisor = filtered.filter(p => selected.has(p.id) && findChainGap(p, supervisorOverrides) !== null)
+  const selectedNeedingSupervisor = filtered.filter(p => selected.has(p.id) && !hasCompleteChain(p))
 
   const toggleOne = (p: Personnel) => {
     setSelected(prev => {
@@ -717,7 +718,7 @@ function AddMemberModal({
     setError('')
   }
 
-  const selectableIds = filtered.filter(p => hasSupervisor(p)).map(p => p.id)
+  const selectableIds = filtered.filter(p => hasCompleteChain(p)).map(p => p.id)
   const allSelectableSelected = selectableIds.length > 0 && selectableIds.every(id => selected.has(id))
 
   const toggleAll = () => {
@@ -851,17 +852,18 @@ function AddMemberModal({
               filtered.map(p => {
                 const dept = allDepts.find(d => d.id === p.departmentId)
                 const layer = getPersonnelLayer(p)
-                const hasSuper = hasSupervisor(p)
+                const chainGap = findChainGap(p, supervisorOverrides)
+                const chainOk = chainGap === null
                 const isChecked = selected.has(p.id)
                 return (
                   <div
                     key={p.id}
-                    onClick={() => hasSuper ? toggleOne(p) : (setSupervisorFor(p), setError(''))}
+                    onClick={() => chainOk ? toggleOne(p) : (setSupervisorFor(chainGap!), setError(''))}
                     className={`w-full px-4 py-3 transition-colors flex items-center gap-3 border-b border-tw-border last:border-0 cursor-pointer ${
                       isChecked ? 'bg-blue-50' : 'hover:bg-tw-hover'
                     }`}
                   >
-                    {hasSuper ? (
+                    {chainOk ? (
                       <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
                         isChecked ? 'bg-tw-primary border-tw-primary' : 'border-gray-300'
                       }`}>
@@ -876,16 +878,18 @@ function AddMemberModal({
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-sm text-tw-text">{p.name}</div>
                       <div className="text-xs text-tw-text-secondary">{layer?.name} · {dept?.name}</div>
-                      {hasSuper ? (
-                        <div className="text-xs text-green-600 mt-0.5">
-                          ✓ {supervisorOverrides[p.id] ? 'Supervisor just assigned' : 'Supervisor assigned'}
-                        </div>
-                      ) : (
+                      {chainOk ? (
+                        <div className="text-xs text-green-600 mt-0.5">✓ Chain complete</div>
+                      ) : chainGap?.id === p.id ? (
                         <div className="text-xs text-amber-600 mt-0.5">⚠ No supervisor — tap to assign one</div>
+                      ) : (
+                        <div className="text-xs text-amber-600 mt-0.5">⚠ Supervisor chain incomplete — tap to fix</div>
                       )}
                     </div>
-                    {!hasSuper && (
-                      <span className="text-xs px-2 py-1 rounded-lg bg-amber-100 text-amber-700 font-medium flex-shrink-0">Set supervisor</span>
+                    {!chainOk && (
+                      <span className="text-xs px-2 py-1 rounded-lg bg-amber-100 text-amber-700 font-medium flex-shrink-0">
+                        {chainGap?.id === p.id ? 'Set supervisor' : 'Fix chain'}
+                      </span>
                     )}
                   </div>
                 )
