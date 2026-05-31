@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import type { Task, TaskComment, AuditLog, Layer, Personnel, Group, TaskProgressLog } from '../types'
+import type { Task, TaskComment, AuditLog, Layer, Personnel, TaskProgressLog } from '../types'
 import { taskApi } from '../services/apiService'
 import DatePicker from './DatePicker'
 import Select from './Select'
@@ -10,7 +10,6 @@ interface Props {
   actorId: string
   layers: Layer[]
   personnel: Personnel[]
-  groups: Group[]
   onClose: () => void
   onRefresh: () => Promise<void>
 }
@@ -40,7 +39,7 @@ const eventLabels: Record<string, string> = {
   DEADLINE_CHANGED:'Deadline changed',
 }
 
-export default function TaskDetailPanel({ task, isDirector, actorId, layers, personnel, groups, onClose, onRefresh }: Props) {
+export default function TaskDetailPanel({ task, isDirector, actorId, layers, personnel, onClose, onRefresh }: Props) {
   const [tab, setTab] = useState<'details' | 'subtasks' | 'updates' | 'history'>('details')
   const [comments, setComments] = useState<TaskComment[]>([])
   const [history, setHistory] = useState<AuditLog[]>([])
@@ -281,9 +280,9 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
                     {task.assignments.map(a => (
                       <span key={a.id} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#e8f0ff] border border-[#0073ea]/20 text-sm font-medium text-[#0073ea]">
                         <span className="w-5 h-5 rounded-full bg-[#0073ea] flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                          {(a.personnel?.name || a.group?.name || a.department?.name || '?').charAt(0)}
+                          {(a.personnel?.name || a.department?.name || '?').charAt(0)}
                         </span>
-                        {a.personnel?.name || a.group?.name || a.department?.name}
+                        {a.personnel?.name || a.department?.name}
                       </span>
                     ))}
                   </div>
@@ -490,16 +489,11 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
                 placeholder="Assign type..."
                 options={[
                   { value: 'personnel', label: 'Person' },
-                  { value: 'group', label: 'Group' },
                   { value: 'department', label: 'Department' },
                 ]} />
               {assignTarget.type === 'personnel' && (
                 <Select value={assignTarget.id} onChange={val => setAssignTarget(a => ({ ...a, id: val }))}
                   placeholder="Select person..." options={personnel.map(p => ({ value: p.id, label: p.name }))} />
-              )}
-              {assignTarget.type === 'group' && (
-                <Select value={assignTarget.id} onChange={val => setAssignTarget(a => ({ ...a, id: val }))}
-                  placeholder="Select group..." options={groups.map(g => ({ value: g.id, label: g.name }))} />
               )}
               {assignTarget.type === 'department' && (
                 <Select value={assignTarget.id} onChange={val => setAssignTarget(a => ({ ...a, id: val }))}

@@ -33,13 +33,6 @@ export async function buildTaskVisibilityFilter(
     return {}
   }
 
-  // Groups the actor belongs to
-  const memberships = await prisma.groupMember.findMany({
-    where: { personnelId: actorId },
-    select: { groupId: true }
-  })
-  const myGroupIds = memberships.map(m => m.groupId)
-
   // All personnel in the workspace — used to walk supervisor chains
   const allPersonnel = await prisma.personnel.findMany({
     where: { workspaceId, deletedAt: null },
@@ -75,9 +68,7 @@ export async function buildTaskVisibilityFilter(
     { assignments: { some: { personnelId: actorId } } },
     // 2. Assigned to actor's department
     ...(myDeptIds.length > 0 ? [{ assignments: { some: { departmentId: { in: myDeptIds } } } }] : []),
-    // 3. Assigned to a group actor belongs to
-    ...(myGroupIds.length > 0 ? [{ assignments: { some: { groupId: { in: myGroupIds } } } }] : []),
-    // 4. Assigned to a subordinate (actor is in their supervisor chain)
+    // 3. Assigned to a subordinate (actor is in their supervisor chain)
     ...(subordinateIds.length > 0 ? [{ assignments: { some: { personnelId: { in: subordinateIds } } } }] : []),
     // 5. Actor is the current approval authority
     { approvalById: actorId, approvalByType: 'personnel' },

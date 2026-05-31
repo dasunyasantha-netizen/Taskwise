@@ -297,21 +297,21 @@ export async function assignTask(req: Request, res: Response): Promise<void> {
     const task = await prisma.task.findFirst({ where: { id: req.params.id, workspaceId, deletedAt: null } })
     if (!task) { res.status(404).json({ error: 'Task not found' }); return }
 
-    const { personnelId, groupId, departmentId } = req.body
-    const set = [personnelId, groupId, departmentId].filter(Boolean)
-    if (set.length !== 1) { res.status(400).json({ error: 'Specify exactly one of personnelId, groupId, or departmentId' }); return }
+    const { personnelId, departmentId } = req.body
+    const set = [personnelId, departmentId].filter(Boolean)
+    if (set.length !== 1) { res.status(400).json({ error: 'Specify exactly one of personnelId or departmentId' }); return }
 
     await prisma.$transaction(async tx => {
-      await tx.taskAssignment.create({ data: { taskId: task.id, personnelId, groupId, departmentId } })
+      await tx.taskAssignment.create({ data: { taskId: task.id, personnelId, departmentId } })
       await tx.task.update({ where: { id: task.id }, data: { status: 'ASSIGNED' } })
-      await writeAudit(tx, workspaceId, 'TASK_ASSIGNED', actorType, actorId, task.id, { personnelId, groupId, departmentId })
+      await writeAudit(tx, workspaceId, 'TASK_ASSIGNED', actorType, actorId, task.id, { personnelId, departmentId })
       if (personnelId) {
         await notifyActor(tx, workspaceId, 'personnel', personnelId, 'task_assigned', 'New task assigned', `You have been assigned: "${task.title}"`, task.id)
       }
     })
     res.json({ success: true })
   } catch (err: unknown) {
-    if ((err as { code?: string }).code === 'P2002') { res.status(409).json({ error: 'Already assigned to this person, group, or department' }); return }
+    if ((err as { code?: string }).code === 'P2002') { res.status(409).json({ error: 'Already assigned to this person or department' }); return }
     console.error(err); res.status(500).json({ error: 'Internal server error' })
   }
 }
@@ -636,6 +636,21 @@ export async function approveTask(req: Request, res: Response): Promise<void> {
         await writeAudit(tx, workspaceId, 'TASK_APPROVED', actorType, actorId, task.id)
       }
       await writeAudit(tx, workspaceId, 'TASK_APPROVED', actorType, actorId, task.id)
+
+      // If this is a group task instance, check if all sibling instances are now approved
+      if (task.groupTaskId) {
+        const siblings = await tx.task.findMany({
+          where: { groupTaskId: task.groupTaskId, deletedAt: null },
+          select: { status: true },
+        })
+        const allApproved = siblings.every(s => s.status === 'APPROVED')
+        if (allApproved) {
+          await tx.task.update({
+            where: { id: task.groupTaskId },
+            data: { status: 'APPROVED', approvalById: actorId, approvalByType: actorType },
+          })
+        }
+      }
 
       // If this task has a parent, notify the parent's assignee that one subtask is now approved
       if (task.parentTaskId) {

@@ -76,7 +76,6 @@ model Department {
   deletedAt   DateTime?
 
   personnel       Personnel[]
-  groups          Group[]
   taskAssignments TaskAssignment[]
 
   @@index([layerId])
@@ -102,8 +101,8 @@ model Personnel {
   updatedAt    DateTime   @updatedAt
   deletedAt    DateTime?
 
-  groupMemberships GroupMember[]
-  taskAssignments  TaskAssignment[]
+  taskGroupMemberships TaskGroupMember[]
+  taskAssignments      TaskAssignment[]
   tasksCreated     Task[]           @relation("TaskCreatedByPersonnel")
   auditLogs        AuditLog[]       @relation("AuditActorPersonnel")
   notifications    Notification[]   @relation("NotifRecipientPersonnel")
@@ -115,36 +114,46 @@ model Personnel {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GROUPS
+// TASK GROUPS  (chairman-only cross-department groups for group-wise tasks)
 // ─────────────────────────────────────────────────────────────────────────────
 
-model Group {
-  id           String     @id @default(uuid())
-  workspaceId  String
-  departmentId String
-  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
-  name         String
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
-  deletedAt    DateTime?
+model TaskGroup {
+  id          String    @id @default(uuid())
+  workspaceId String
+  name        String
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
 
-  members         GroupMember[]
-  taskAssignments TaskAssignment[]
+  members      TaskGroupMember[]
+  groupProjects TaskGroupProject[]
 
   @@index([workspaceId])
-  @@index([departmentId])
 }
 
-model GroupMember {
+model TaskGroupMember {
   id          String    @id @default(uuid())
   groupId     String
-  group       Group     @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  group       TaskGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
   personnelId String
   personnel   Personnel @relation(fields: [personnelId], references: [id], onDelete: Cascade)
   createdAt   DateTime  @default(now())
 
   @@unique([groupId, personnelId])
   @@index([personnelId])
+}
+
+// Links a Project to a TaskGroup (group-wise project)
+model TaskGroupProject {
+  id          String    @id @default(uuid())
+  groupId     String
+  group       TaskGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  projectId   String    @unique
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+
+  @@index([groupId])
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -165,7 +174,8 @@ model Project {
   updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
 
-  tasks Task[]
+  tasks        Task[]
+  groupProject TaskGroupProject?
 
   @@index([workspaceId])
   @@index([directorId])
@@ -192,6 +202,11 @@ model Task {
   parentTaskId String?
   parent       Task?   @relation("TaskSubtasks", fields: [parentTaskId], references: [id])
   subtasks     Task[]  @relation("TaskSubtasks")
+
+  // Group-wise task: groupTaskId links per-member instances to the parent group task
+  groupTaskId       String?
+  groupTask         Task?   @relation("GroupTaskInstances", fields: [groupTaskId], references: [id])
+  groupTaskInstances Task[]  @relation("GroupTaskInstances")
 
   title       String
   description String?
@@ -239,26 +254,24 @@ model Task {
   @@index([workspaceId])
   @@index([projectId])
   @@index([parentTaskId])
+  @@index([groupTaskId])
   @@index([status])
   @@index([deadline])
 }
 
-// Polymorphic assignment: exactly one of departmentId / groupId / personnelId is set
+// Polymorphic assignment: exactly one of departmentId / personnelId is set
 model TaskAssignment {
   id           String      @id @default(uuid())
   taskId       String
   task         Task        @relation(fields: [taskId], references: [id], onDelete: Cascade)
   departmentId String?
   department   Department? @relation(fields: [departmentId], references: [id])
-  groupId      String?
-  group        Group?      @relation(fields: [groupId], references: [id])
   personnelId  String?
   personnel    Personnel?  @relation(fields: [personnelId], references: [id])
   assignedAt   DateTime    @default(now())
 
   @@index([taskId])
   @@index([personnelId])
-  @@index([groupId])
   @@index([departmentId])
 }
 
@@ -362,6 +375,35 @@ model Notification {
   @@index([recipientDirectorId, isRead, createdAt])
   @@index([taskId])
   @@index([workspaceId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NOTICES  (director-created banners broadcast to targeted users)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Notice {
+  id          String   @id @default(uuid())
+  workspaceId String
+  message     String
+  audience    String   @default("ALL") // ALL | LAYER
+  layerNumber Int?     // set when audience = LAYER
+  createdAt   DateTime @default(now())
+  expiresAt   DateTime?
+
+  dismissals NoticeDismissal[]
+
+  @@index([workspaceId, createdAt])
+}
+
+model NoticeDismissal {
+  id        String   @id @default(uuid())
+  noticeId  String
+  notice    Notice   @relation(fields: [noticeId], references: [id], onDelete: Cascade)
+  actorId   String
+  actorType String   // "director" | "personnel"
+  createdAt DateTime @default(now())
+
+  @@unique([noticeId, actorId, actorType])
 }
 
 model PushSubscription {

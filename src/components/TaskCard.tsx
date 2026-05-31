@@ -30,7 +30,7 @@ export default function TaskCard({ task, onClick }: Props) {
   const deadlineSoon = task.deadline && !isOverdue && (new Date(task.deadline).getTime() - Date.now()) < 48 * 3600 * 1000
 
   const assigneeNames = task.assignments?.map(a =>
-    a.personnel?.name || a.group?.name || a.department?.name
+    a.personnel?.name || a.department?.name
   ).filter(Boolean).join(', ')
 
   const subtaskCount = task._count?.subtasks || 0

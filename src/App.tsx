@@ -4,7 +4,46 @@ import Auth from './components/Auth'
 import ForcePasswordChange from './components/ForcePasswordChange'
 import DirectorDashboard from './components/DirectorDashboard'
 import PersonnelDashboard from './components/PersonnelDashboard'
-import { authApi } from './services/apiService'
+import { authApi, noticeApi, type Notice } from './services/apiService'
+
+function NoticeBanner({ loggedIn }: { loggedIn: boolean }) {
+  const [notices, setNotices] = useState<Notice[]>([])
+
+  useEffect(() => {
+    if (!loggedIn) return
+    noticeApi.getActive().then(setNotices).catch(() => {})
+  }, [loggedIn])
+
+  const dismiss = async (id: string) => {
+    await noticeApi.dismiss(id).catch(() => {})
+    setNotices(n => n.filter(x => x.id !== id))
+  }
+
+  if (notices.length === 0) return null
+
+  return (
+    <div className="fixed inset-x-0 top-0 z-[9999] space-y-0">
+      {notices.map(notice => (
+        <div key={notice.id} className="bg-amber-50 border-b-2 border-amber-300 shadow-lg">
+          <div className="max-w-3xl mx-auto px-4 py-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <span className="text-amber-500 text-xl flex-shrink-0 mt-0.5">⚠️</span>
+                <p className="text-sm text-amber-900 whitespace-pre-wrap leading-relaxed">{notice.message}</p>
+              </div>
+              <button
+                onClick={() => dismiss(notice.id)}
+                className="flex-shrink-0 bg-amber-400 hover:bg-amber-500 text-white font-bold text-base leading-none rounded-lg w-8 h-8 flex items-center justify-center shadow transition-colors"
+                aria-label="Dismiss">
+                ✕
+              </button>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
 
 const TOKEN_KEY = 'taskwise_token'
 const USER_KEY  = 'taskwise_user'
@@ -96,23 +135,29 @@ export default function App() {
 
   if (user.actorType === 'director') {
     return (
-      <DirectorDashboard
+      <>
+        <NoticeBanner loggedIn={true} />
+        <DirectorDashboard
+          user={user}
+          currentView={view}
+          setView={setView}
+          onLogout={handleLogout}
+          onUserUpdate={handleUserUpdate}
+        />
+      </>
+    )
+  }
+
+  return (
+    <>
+      <NoticeBanner loggedIn={true} />
+      <PersonnelDashboard
         user={user}
         currentView={view}
         setView={setView}
         onLogout={handleLogout}
         onUserUpdate={handleUserUpdate}
       />
-    )
-  }
-
-  return (
-    <PersonnelDashboard
-      user={user}
-      currentView={view}
-      setView={setView}
-      onLogout={handleLogout}
-      onUserUpdate={handleUserUpdate}
-    />
+    </>
   )
 }

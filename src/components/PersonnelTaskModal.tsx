@@ -346,7 +346,7 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
             )}
             {task.assignments?.map(a => (
               <span key={a.id}>
-                👤 {a.personnel?.name || a.department?.name || a.group?.name}
+                👤 {a.personnel?.name || a.department?.name}
                 {a.departmentId && ' (dept)'}
               </span>
             ))}
@@ -456,10 +456,10 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
                     {task.assignments.map(a => (
                       <div key={a.id} className="flex items-center gap-2">
                         <div className="w-7 h-7 rounded-full bg-tw-primary flex items-center justify-center text-white text-xs font-bold">
-                          {(a.personnel?.name || a.group?.name || a.department?.name || '?').charAt(0)}
+                          {(a.personnel?.name || a.department?.name || '?').charAt(0)}
                         </div>
-                        <span className="text-sm text-tw-text font-medium">{a.personnel?.name || a.group?.name || a.department?.name}</span>
-                        <span className="text-xs text-tw-text-secondary">{a.personnel ? 'Person' : a.group ? 'Group' : 'Department'}</span>
+                        <span className="text-sm text-tw-text font-medium">{a.personnel?.name || a.department?.name}</span>
+                        <span className="text-xs text-tw-text-secondary">{a.personnel ? 'Person' : 'Department'}</span>
                       </div>
                     ))}
                   </div>

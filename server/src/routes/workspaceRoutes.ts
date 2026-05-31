@@ -5,7 +5,6 @@ import {
   getDepartments, createDepartment, updateDepartment, deleteDepartment,
   getPersonnel, createPersonnel, updatePersonnel, movePersonnel, deletePersonnel, getPersonnelQueue,
   getPersonnelAboveMe,
-  getGroups, createGroup, updateGroup, deleteGroup, addGroupMember, removeGroupMember,
 } from '../controllers/workspaceController'
 
 const router = Router()
@@ -30,12 +29,5 @@ router.put('/personnel/:id',                       updatePersonnel)
 router.put('/personnel/:id/move',                  requireDirector, movePersonnel)
 router.delete('/personnel/:id',                    requireDirector, deletePersonnel)
 router.get('/personnel/:id/queue',                 getPersonnelQueue)
-
-router.get('/groups',                              getGroups)
-router.post('/groups',                             requireDirector, createGroup)
-router.put('/groups/:id',                          updateGroup)
-router.delete('/groups/:id',                       requireDirector, deleteGroup)
-router.post('/groups/:id/members',                 requireDirector, addGroupMember)
-router.delete('/groups/:id/members/:pid',          requireDirector, removeGroupMember)
 
 export default router

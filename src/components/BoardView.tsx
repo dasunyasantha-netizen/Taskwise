@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import type { Task, Project, Layer, Personnel, Group } from '../types'
+import type { Task, Project, Layer, Personnel } from '../types'
 import { taskApi, workspaceApi } from '../services/apiService'
 import TaskCard from './TaskCard'
 import TaskDetailPanel from './TaskDetailPanel'
@@ -142,14 +142,12 @@ export default function BoardView({ project, isDirector, actorId }: Props) {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [layers, setLayers] = useState<Layer[]>([])
   const [personnel, setPersonnel] = useState<Personnel[]>([])
-  const [groups, setGroups] = useState<Group[]>([])
-
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dragOverCol, setDragOverCol] = useState<string | null>(null)
   const dragTaskRef = useRef<Task | null>(null)
 
   const [form, setForm] = useState({ title: '', description: '', priority: 'MEDIUM', deadline: '' })
-  const [assignTarget, setAssignTarget] = useState<{ type: 'personnel' | 'group' | 'department' | ''; id: string }>({ type: 'personnel', id: '' })
+  const [assignTarget, setAssignTarget] = useState<{ type: 'personnel' | 'department' | ''; id: string }>({ type: 'personnel', id: '' })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [showPersonPicker, setShowPersonPicker] = useState(false)
@@ -176,8 +174,7 @@ export default function BoardView({ project, isDirector, actorId }: Props) {
     Promise.all([
       workspaceApi.getLayers() as Promise<Layer[]>,
       workspaceApi.getPersonnel() as Promise<Personnel[]>,
-      workspaceApi.getGroups() as Promise<Group[]>,
-    ]).then(([l, p, g]) => { setLayers(l); setPersonnel(p); setGroups(g) })
+    ]).then(([l, p]) => { setLayers(l); setPersonnel(p) })
       .catch(() => {})
   }, [project.id])
 
@@ -347,7 +344,7 @@ export default function BoardView({ project, isDirector, actorId }: Props) {
 
       {selectedTask && (
         <TaskDetailPanel task={selectedTask} isDirector={isDirector} actorId={actorId}
-          layers={layers} personnel={personnel} groups={groups}
+          layers={layers} personnel={personnel}
           onClose={() => setSelectedTask(null)}
           onRefresh={async () => {
             await loadTasks()
@@ -423,11 +420,10 @@ export default function BoardView({ project, isDirector, actorId }: Props) {
                   <label className="block text-sm font-semibold text-[#0073ea] mb-2">Assign to</label>
                   <div className="grid grid-cols-2 gap-2">
                     <Select value={assignTarget.type}
-                      onChange={val => setAssignTarget({ type: val as 'personnel' | 'group' | 'department' | '', id: '' })}
+                      onChange={val => setAssignTarget({ type: val as 'personnel' | 'department' | '', id: '' })}
                       placeholder="Assign type..."
                       options={[
                         { value: 'personnel', label: 'Person' },
-                        { value: 'group',     label: 'Group' },
                         { value: 'department',label: 'Department' },
                       ]} />
 
@@ -448,10 +444,6 @@ export default function BoardView({ project, isDirector, actorId }: Props) {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
                         </svg>
                       </button>
-                    )}
-                    {assignTarget.type === 'group' && (
-                      <Select value={assignTarget.id} onChange={val => setAssignTarget(a => ({ ...a, id: val }))}
-                        placeholder="Select group..." options={groups.map(g => ({ value: g.id, label: g.name }))} />
                     )}
                     {assignTarget.type === 'department' && (
                       <Select value={assignTarget.id} onChange={val => setAssignTarget(a => ({ ...a, id: val }))}

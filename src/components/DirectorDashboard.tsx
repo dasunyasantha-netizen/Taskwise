@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import type { AuthUser, ViewMode, Project, Task, AuditLog, TaskComment, Layer, Personnel, Group } from '../types'
+import type { AuthUser, ViewMode, Project, Task, AuditLog, TaskComment, Layer, Personnel } from '../types'
 import ElapsedDays from './ElapsedDays'
 import { projectApi, taskApi, auditApi, workspaceApi } from '../services/apiService'
 import NotificationsMenu from './NotificationsMenu'
@@ -12,6 +12,8 @@ import ProfilePage from './ProfilePage'
 import WorkspaceSettings from './WorkspaceSettings'
 import TaskDetailPanel from './TaskDetailPanel'
 import RecentUpdatesView from './RecentUpdatesView'
+import BroadcastsPage from './BroadcastsPage'
+import GroupWiseTasksPage from './GroupWiseTasksPage'
 
 interface Props {
   user: AuthUser
@@ -153,7 +155,7 @@ function ApprovalTaskRow({
                             <div className="w-4 h-4 rounded-full bg-tw-primary flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
                               {(a.personnel?.name || a.department?.name || '?').charAt(0)}
                             </div>
-                            <span className="text-xs font-medium text-tw-text">{a.personnel?.name || a.department?.name || a.group?.name}</span>
+                            <span className="text-xs font-medium text-tw-text">{a.personnel?.name || a.department?.name}</span>
                             <span className="text-xs text-tw-text-secondary">{a.personnel ? '· person' : a.department ? '· dept' : '· group'}</span>
                           </div>
                         ))}
@@ -211,7 +213,7 @@ function ApprovalTaskRow({
                     <div className="divide-y divide-tw-border">
                       {subtasks.map(s => {
                         const assignee = s.assignments?.[0]
-                        const assigneeName = assignee?.personnel?.name || assignee?.department?.name || assignee?.group?.name || '—'
+                        const assigneeName = assignee?.personnel?.name || assignee?.department?.name || '—'
                         const dl = s.deadline ? Math.ceil((new Date(s.deadline).setHours(0,0,0,0) - new Date().setHours(0,0,0,0)) / 86400000) : null
                         const isOverdue = dl !== null && dl < 0
                         return (
@@ -306,41 +308,134 @@ function ApprovalTaskRow({
   )
 }
 
-function ApprovalQueueView({ tasks, actorId, onRefresh }: { tasks: Task[]; actorId: string; onRefresh: () => void }) {
+function MobileApprovalCard({ task, actorId, onRefresh, onViewTask }: { task: Task; actorId: string; onRefresh: () => void; onViewTask: (t: Task) => void }) {
+  const [expanded,  setExpanded]  = useState(false)
+  const [subtasks,  setSubtasks]  = useState<Task[]>([])
+  const [comments,  setComments]  = useState<TaskComment[]>([])
+  const [loadingS,  setLoadingS]  = useState(false)
+
+  const priorityBar: Record<string, string> = { CRITICAL: 'bg-red-500', HIGH: 'bg-orange-400', MEDIUM: 'bg-yellow-400', LOW: 'bg-gray-300' }
+  const submittedBy = task.actedByName || (task.actedByType === 'director' ? 'Director' : 'Personnel')
+
+  const toggle = async () => {
+    setExpanded(e => !e)
+    if (!expanded && subtasks.length === 0) {
+      setLoadingS(true)
+      try {
+        const [s, c] = await Promise.all([
+          taskApi.subtasks(task.id) as Promise<Task[]>,
+          taskApi.comments(task.id) as Promise<TaskComment[]>,
+        ])
+        setSubtasks(s); setComments(c)
+      } catch { /* no-op */ }
+      setLoadingS(false)
+    }
+  }
+
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold text-tw-text mb-1">Approval Queue</h1>
-      <p className="text-sm text-tw-text-secondary mb-6">
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      {/* Header — always visible */}
+      <div className="flex items-center gap-3 px-4 py-3 cursor-pointer select-none" onClick={toggle}>
+        <div className={`w-1 h-10 rounded-full flex-shrink-0 ${priorityBar[task.priority] || 'bg-gray-300'}`} />
+        <div className="flex-1 min-w-0">
+          <div className="font-semibold text-tw-text text-sm leading-snug">{task.title}</div>
+          <span className="text-xs text-tw-text-secondary mt-0.5">by {submittedBy}</span>
+        </div>
+        <svg className={`w-4 h-4 text-tw-text-secondary flex-shrink-0 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
+          fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </div>
+
+      {/* Expanded details */}
+      {expanded && (
+        <div className="px-4 pb-4 border-t border-gray-100 pt-3 space-y-3">
+          {task.description && <p className="text-xs text-tw-text-secondary leading-relaxed">{task.description}</p>}
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+            {task.project?.name && (
+              <div><div className="text-[10px] font-bold text-tw-text-secondary uppercase tracking-wide">Project</div><div className="text-tw-text font-medium mt-0.5">{task.project.name}</div></div>
+            )}
+            <div><div className="text-[10px] font-bold text-tw-text-secondary uppercase tracking-wide">Submitted</div><div className="text-tw-text font-medium mt-0.5">{new Date(task.updatedAt).toLocaleDateString('en-GB',{day:'numeric',month:'short'})}</div></div>
+            {task.deadline && (
+              <div><div className="text-[10px] font-bold text-tw-text-secondary uppercase tracking-wide">Deadline</div><div className="text-tw-text font-medium mt-0.5">{new Date(task.deadline).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}</div></div>
+            )}
+            <div><div className="text-[10px] font-bold text-tw-text-secondary uppercase tracking-wide">Priority</div><div className="mt-0.5"><span className={`badge ${priorityBadge[task.priority]}`}>{task.priority}</span></div></div>
+          </div>
+          {loadingS && <div className="text-xs text-tw-text-secondary">Loading details…</div>}
+          {subtasks.length > 0 && (
+            <div className="space-y-1">
+              <div className="text-[10px] font-bold text-tw-text-secondary uppercase tracking-wide mb-1">Subtasks ({subtasks.length})</div>
+              {subtasks.map(s => (
+                <div key={s.id} className="flex items-center gap-2 text-xs">
+                  <span className={`badge ${subtaskStatusBadge[s.status] || 'badge-gray'}`}>{s.status.replace('_',' ')}</span>
+                  <span className="text-tw-text truncate">{s.title}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {comments.length > 0 && (
+            <div className="space-y-1">
+              <div className="text-[10px] font-bold text-tw-text-secondary uppercase tracking-wide mb-1">Comments ({comments.length})</div>
+              {comments.slice(-2).map(c => (
+                <div key={c.id} className="bg-gray-50 rounded-lg px-3 py-2 text-xs text-tw-text">{c.content}</div>
+              ))}
+            </div>
+          )}
+          <button onClick={() => onViewTask(task)}
+            className="w-full py-3 rounded-xl bg-tw-primary text-white text-sm font-bold active:opacity-80 flex items-center justify-center gap-2">
+            View Task & Progress →
+          </button>
+        </div>
+      )}
+
+    </div>
+  )
+}
+
+function ApprovalQueueView({ tasks, actorId, onRefresh, onViewTask }: { tasks: Task[]; actorId: string; onRefresh: () => void; onViewTask: (t: Task) => void }) {
+  return (
+    <div className="p-4 md:p-6">
+      <h1 className="hidden md:block text-2xl font-bold text-tw-text mb-1">Approval Queue</h1>
+      <p className="text-sm text-tw-text-secondary mb-4 md:mb-6">
         {tasks.length} task{tasks.length !== 1 ? 's' : ''} waiting for your review
       </p>
-      <div className="card overflow-hidden">
-        {tasks.length === 0 ? (
-          <div className="p-12 text-center">
-            <div className="text-4xl mb-3">🎉</div>
-            <p className="text-tw-text font-semibold">All caught up!</p>
-            <p className="text-tw-text-secondary text-sm mt-1">No tasks waiting for approval.</p>
+      {tasks.length === 0 ? (
+        <div className="card p-12 text-center">
+          <div className="text-4xl mb-3">🎉</div>
+          <p className="text-tw-text font-semibold">All caught up!</p>
+          <p className="text-tw-text-secondary text-sm mt-1">No tasks waiting for approval.</p>
+        </div>
+      ) : (
+        <>
+          {/* Mobile cards */}
+          <div className="md:hidden space-y-3">
+            {tasks.map(t => (
+              <MobileApprovalCard key={t.id} task={t} actorId={actorId} onRefresh={onRefresh} onViewTask={onViewTask} />
+            ))}
           </div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-[#f0f4ff] border-b-2 border-tw-primary/20">
-                <th className="w-px px-3 py-3"></th>
-                <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider">Task</th>
-                <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider">Project</th>
-                <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider">Submitted</th>
-                <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider">Priority</th>
-                <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider">Deadline</th>
-                <th className="w-8 px-2 py-3"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {tasks.map(t => (
-                <ApprovalTaskRow key={t.id} task={t} actorId={actorId} onRefresh={onRefresh} />
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+          {/* Desktop table */}
+          <div className="hidden md:block card overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-[#f0f4ff] border-b-2 border-tw-primary/20">
+                  <th className="w-px px-3 py-3"></th>
+                  <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider">Task</th>
+                  <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider">Project</th>
+                  <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider">Submitted</th>
+                  <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider">Priority</th>
+                  <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider">Deadline</th>
+                  <th className="w-8 px-2 py-3"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {tasks.map(t => (
+                  <ApprovalTaskRow key={t.id} task={t} actorId={actorId} onRefresh={onRefresh} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
     </div>
   )
 }
@@ -405,8 +500,22 @@ function MobileUserMenu({ user, onProfile, onSettings, onLogout }: { user: AuthU
 
 // ─── Director Dashboard ───────────────────────────────────────────────────────
 export default function DirectorDashboard({ user, currentView, setView, onLogout, onUserUpdate }: Props) {
+  const [viewHistory, setViewHistory] = useState<ViewMode[]>([])
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
   const [projectSubView, setProjectSubView]   = useState<ProjectSubView>('board')
+
+  const navigate = (v: ViewMode) => {
+    setViewHistory(h => [...h, currentView])
+    setView(v)
+  }
+  const goBack = () => {
+    const prev = viewHistory[viewHistory.length - 1]
+    if (prev) {
+      setViewHistory(h => h.slice(0, -1))
+      setView(prev)
+      if (prev !== 'project_board') setSelectedProject(null)
+    }
+  }
   const [stats, setStats] = useState({ projects: 0, totalTasks: 0, overdue: 0, pending_approval: 0 })
   const [recentTasks, setRecentTasks] = useState<Task[]>([])
   const [overdueList, setOverdueTasks] = useState<Task[]>([])
@@ -418,7 +527,6 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [panelLayers, setPanelLayers] = useState<Layer[]>([])
   const [panelPersonnel, setPanelPersonnel] = useState<Personnel[]>([])
-  const [panelGroups, setPanelGroups] = useState<Group[]>([])
 
   const loadDashboard = async () => {
     setStatsLoading(true)
@@ -461,15 +569,14 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
       Promise.all([
         workspaceApi.getLayers() as Promise<Layer[]>,
         workspaceApi.getPersonnel() as Promise<Personnel[]>,
-        workspaceApi.getGroups() as Promise<Group[]>,
-      ]).then(([l, p, g]) => { setPanelLayers(l); setPanelPersonnel(p); setPanelGroups(g) }).catch(() => {})
+      ]).then(([l, p]) => { setPanelLayers(l); setPanelPersonnel(p) }).catch(() => {})
     }
   }, [selectedTask])
 
   const handleSelectProject = (p: Project) => {
     setSelectedProject(p)
     setProjectSubView('board')
-    setView('project_board')
+    navigate('project_board')
   }
 
   const navItems = [
@@ -478,6 +585,8 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
     { label: 'Approval Queue', view: 'approval_queue'     as ViewMode, icon: '✅', badge: stats.pending_approval },
     { label: 'Overdue Tasks',   view: 'overdue'          as ViewMode, icon: '⏰', badge: stats.overdue },
     { label: 'Recent Updates',  view: 'recent_updates'   as ViewMode, icon: '🕐' },
+    { label: 'Broadcasts',      view: 'broadcasts'       as ViewMode, icon: '📢' },
+    { label: 'Group Tasks',     view: 'group_tasks'      as ViewMode, icon: '🫂' },
     { label: 'Team Hierarchy',  view: 'hierarchy_manager' as ViewMode, icon: '👥' },
     { label: 'Audit Log',      view: 'audit_log'          as ViewMode, icon: '📜' },
     { label: 'Settings',       view: 'settings'           as ViewMode, icon: '⚙️' },
@@ -531,7 +640,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
         <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
           {navItems.map(item => (
             <button key={item.view}
-              onClick={() => { if (item.view === 'project_board') setSelectedProject(null); setView(item.view) }}
+              onClick={() => { if (item.view === 'project_board') setSelectedProject(null); navigate(item.view) }}
               className={`w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2.5
                 ${activeView === item.view ? 'bg-tw-primary text-white shadow-sm' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}>
               <span className="text-base flex-shrink-0">{item.icon}</span>
@@ -579,6 +688,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
                   : currentView === 'overdue' ? 'Overdue'
                   : currentView === 'hierarchy_manager' ? 'Team Hierarchy'
                   : currentView === 'audit_log' ? 'Audit Log'
+                  : currentView === 'broadcasts' ? 'Broadcasts'
                   : currentView === 'settings' ? 'Settings'
                   : 'My Profile'}
               </div>
@@ -597,14 +707,20 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
                 </button>
               </div>
             )}
-            {currentView === 'project_board' && selectedProject && (
-              <button onClick={() => setSelectedProject(null)}
+            {currentView === 'project_board' && selectedProject ? (
+              <button onClick={() => { setSelectedProject(null); goBack() }}
                 className="md:hidden text-white/70 p-1.5 rounded-lg">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/>
                 </svg>
               </button>
-            )}
+            ) : viewHistory.length > 0 && currentView !== 'director_dashboard' ? (
+              <button onClick={goBack} className="md:hidden text-white/70 p-1.5 rounded-lg">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/>
+                </svg>
+              </button>
+            ) : null}
             {/* Install App button — mobile only, show when not installed */}
             {canInstall && (
               <button onClick={isIOS ? () => setShowIOSGuide(true) : installApp}
@@ -753,7 +869,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
                       ) : stalestList.slice(0, 4).map(t => {
                         const assignedAt = new Date(t.assignments[0].assignedAt)
                         const daysOld = Math.floor((Date.now() - assignedAt.getTime()) / (1000 * 60 * 60 * 24))
-                        const assignee = t.assignments[0].personnel?.name || t.assignments[0].group?.name || t.assignments[0].department?.name || '—'
+                        const assignee = t.assignments[0].personnel?.name || t.assignments[0].department?.name || '—'
                         return (
                           <div key={t.id} onClick={() => setSelectedTask(t)} className="px-4 py-3 border-b border-tw-border last:border-0 flex items-center justify-between cursor-pointer hover:bg-tw-hover transition-colors">
                             <div className="min-w-0 flex-1 mr-3">
@@ -807,6 +923,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
               tasks={approvalQueue}
               actorId={user.actorId}
               onRefresh={loadDashboard}
+              onViewTask={setSelectedTask}
             />
           )}
 
@@ -832,7 +949,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
                           <td className="px-4 py-3 font-medium text-tw-text">{t.title}</td>
                           <td className="px-4 py-3 text-tw-text-secondary">{t.project?.name}</td>
                           <td className="px-4 py-3 text-tw-danger font-medium">{t.deadline ? new Date(t.deadline).toLocaleDateString() : '—'}</td>
-                          <td className="px-4 py-3 text-tw-text-secondary">{t.assignments?.[0] ? (t.assignments[0].personnel?.name || t.assignments[0].group?.name || t.assignments[0].department?.name || '—') : '—'}</td>
+                          <td className="px-4 py-3 text-tw-text-secondary">{t.assignments?.[0] ? (t.assignments[0].personnel?.name || t.assignments[0].department?.name || '—') : '—'}</td>
                           <td className="px-4 py-3"><span className="badge badge-danger">{t.status.replace('_', ' ')}</span></td>
                         </tr>
                       ))}
@@ -845,6 +962,12 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
 
           {/* RECENT UPDATES */}
           {currentView === 'recent_updates' && <RecentUpdatesView />}
+
+          {/* BROADCASTS */}
+          {currentView === 'broadcasts' && <BroadcastsPage />}
+
+          {/* GROUP TASKS */}
+          {currentView === 'group_tasks' && <GroupWiseTasksPage />}
 
           {/* AUDIT LOG */}
           {currentView === 'audit_log' && (
@@ -884,7 +1007,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
         <div className="flex items-stretch">
           {mobileNavItems.map(item => (
             <button key={item.view}
-              onClick={() => { if (item.view === 'project_board') setSelectedProject(null); setView(item.view) }}
+              onClick={() => { if (item.view === 'project_board') setSelectedProject(null); navigate(item.view) }}
               className={`flex-1 flex flex-col items-center justify-center py-4 px-1 gap-1 relative transition-colors
                 ${activeView === item.view ? 'text-tw-primary' : 'text-gray-400'}`}>
               {activeView === item.view && (
@@ -910,7 +1033,6 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
           actorId={user.actorId}
           layers={panelLayers}
           personnel={panelPersonnel}
-          groups={panelGroups}
           onClose={() => setSelectedTask(null)}
           onRefresh={loadDashboard}
         />

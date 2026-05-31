@@ -1,17 +1,16 @@
 import React, { useState, useEffect } from 'react'
-import type { Layer, Department, Personnel, Group } from '../types'
+import type { Layer, Department, Personnel } from '../types'
 import { workspaceApi } from '../services/apiService'
 import Select from './Select'
 
 export default function HierarchyPanel() {
   const [layers, setLayers] = useState<Layer[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'structure' | 'personnel' | 'groups'>('structure')
+  const [activeTab, setActiveTab] = useState<'structure' | 'personnel'>('structure')
 
   // Modals
   const [showDeptModal, setShowDeptModal] = useState(false)
   const [showPersonnelModal, setShowPersonnelModal] = useState(false)
-  const [showGroupModal, setShowGroupModal] = useState(false)
   const [showMoveModal, setShowMoveModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [editingPersonnel, setEditingPersonnel] = useState<Personnel | null>(null)
@@ -21,14 +20,12 @@ export default function HierarchyPanel() {
   const [personnelForm, setPersonnelForm] = useState({ name: '', phone: '', email: '', nic: '', departmentId: '' })
   const [editingLayerId, setEditingLayerId] = useState<string | null>(null)
   const [editingLayerName, setEditingLayerName] = useState('')
-  const [groupForm, setGroupForm] = useState({ name: '', departmentId: '' })
   const [movingPersonnel, setMovingPersonnel] = useState<Personnel | null>(null)
   const [moveTarget, setMoveTarget] = useState('')
   const [settingSupervisorFor, setSettingSupervisorFor] = useState<Personnel | null>(null)
   const [supervisorTarget, setSupervisorTarget] = useState('')
 
   const [allPersonnel, setAllPersonnel] = useState<Personnel[]>([])
-  const [allGroups, setAllGroups] = useState<Group[]>([])
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [personnelSearch, setPersonnelSearch] = useState('')
@@ -36,14 +33,12 @@ export default function HierarchyPanel() {
   const load = async () => {
     setLoading(true)
     try {
-      const [l, p, g] = await Promise.all([
+      const [l, p] = await Promise.all([
         workspaceApi.getLayers() as Promise<Layer[]>,
         workspaceApi.getPersonnel() as Promise<Personnel[]>,
-        workspaceApi.getGroups() as Promise<Group[]>,
       ])
       setLayers(l)
       setAllPersonnel(p)
-      setAllGroups(g)
     } catch { setError('Failed to load workspace data') }
     setLoading(false)
   }
@@ -143,27 +138,6 @@ export default function HierarchyPanel() {
     setSaving(false)
   }
 
-  // ── Groups ───────────────────────────────────────────────
-  const createGroup = async () => {
-    if (!groupForm.name || !groupForm.departmentId) return
-    setSaving(true)
-    try {
-      await workspaceApi.createGroup(groupForm)
-      setShowGroupModal(false); setGroupForm({ name: '', departmentId: '' }); await load()
-    } catch (e: unknown) { setError(e instanceof Error ? e.message : 'Error') }
-    setSaving(false)
-  }
-
-  const removeGroupMember = async (groupId: string, pid: string) => {
-    await workspaceApi.removeGroupMember(groupId, pid); await load()
-  }
-
-  const addGroupMember = async (groupId: string, personnelId: string) => {
-    try {
-      await workspaceApi.addGroupMember(groupId, { personnelId }); await load()
-    } catch (e: unknown) { setError(e instanceof Error ? e.message : 'Error') }
-  }
-
   if (loading) return <div className="p-8 text-tw-text-secondary text-sm">Loading hierarchy...</div>
 
   const layerColors = ['bg-blue-500', 'bg-indigo-500', 'bg-purple-500']
@@ -172,16 +146,13 @@ export default function HierarchyPanel() {
     <div className="p-6">
       <div className="mb-6">
         <h1 className="text-xl font-bold text-tw-text">Team Hierarchy</h1>
-        <p className="text-sm text-tw-text-secondary mt-0.5 mb-4">Manage layers, departments, personnel and groups</p>
+        <p className="text-sm text-tw-text-secondary mt-0.5 mb-4">Manage layers, departments and personnel</p>
         <div className="flex gap-2">
           <button onClick={() => setShowDeptModal(true)} className="flex-1 btn-secondary text-xs py-2.5 flex items-center justify-center gap-1">
             <span className="text-base leading-none">+</span> Department
           </button>
           <button onClick={() => setShowPersonnelModal(true)} className="flex-1 btn-secondary text-xs py-2.5 flex items-center justify-center gap-1">
             <span className="text-base leading-none">+</span> Personnel
-          </button>
-          <button onClick={() => setShowGroupModal(true)} className="flex-1 btn-secondary text-xs py-2.5 flex items-center justify-center gap-1">
-            <span className="text-base leading-none">+</span> Group
           </button>
         </div>
       </div>
@@ -190,7 +161,7 @@ export default function HierarchyPanel() {
 
       {/* Tabs */}
       <div className="flex gap-1 bg-tw-hover rounded-lg p-1 mb-6 w-fit">
-        {(['structure', 'personnel', 'groups'] as const).map(tab => (
+        {(['structure', 'personnel'] as const).map(tab => (
           <button key={tab} onClick={() => setActiveTab(tab)}
             className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors capitalize ${activeTab === tab ? 'bg-white text-tw-primary shadow-card' : 'text-tw-text-secondary hover:text-tw-text'}`}>
             {tab}
@@ -472,49 +443,6 @@ export default function HierarchyPanel() {
         </div>
       )}
 
-      {/* GROUPS TAB */}
-      {activeTab === 'groups' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {allGroups.length === 0 ? (
-            <div className="col-span-3 card p-8 text-center text-tw-text-secondary text-sm">No groups yet. Create one using the button above.</div>
-          ) : allGroups.map(g => {
-            const dept = allDepts.find(d => d.id === g.departmentId)
-            const members = g.members || []
-            const deptPersonnel = allPersonnel.filter(p => p.departmentId === g.departmentId && !members.find(m => m.personnelId === p.id))
-            return (
-              <div key={g.id} className="card p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <div className="font-semibold text-tw-text text-sm">{g.name}</div>
-                    <div className="text-xs text-tw-text-secondary">{dept?.name}</div>
-                  </div>
-                  <span className="badge badge-gray">{members.length} members</span>
-                </div>
-                <div className="space-y-1.5 mb-3">
-                  {members.map(m => (
-                    <div key={m.id} className="flex items-center justify-between bg-tw-hover px-2.5 py-1.5 rounded-lg">
-                      <div className="flex items-center gap-1.5">
-                        <div className="w-5 h-5 rounded-full bg-tw-primary flex items-center justify-center text-white text-xs font-bold">{m.personnel?.name?.charAt(0) || '?'}</div>
-                        <span className="text-xs text-tw-text">{m.personnel?.name}</span>
-                      </div>
-                      <button onClick={() => removeGroupMember(g.id, m.personnelId)} className="text-xs text-tw-danger hover:underline">✕</button>
-                    </div>
-                  ))}
-                </div>
-                {deptPersonnel.length > 0 && (
-                  <Select
-                    value=""
-                    onChange={val => { if (val) addGroupMember(g.id, val) }}
-                    placeholder={`+ Add member from ${dept?.name}...`}
-                    options={deptPersonnel.map(p => ({ value: p.id, label: p.name }))}
-                  />
-                )}
-              </div>
-            )
-          })}
-        </div>
-      )}
-
       {/* MODAL: Create Department */}
       {showDeptModal && (
         <Modal title="Create Department" onClose={() => setShowDeptModal(false)}>
@@ -578,31 +506,6 @@ export default function HierarchyPanel() {
             <div className="flex gap-2 justify-end">
               <button onClick={() => setShowPersonnelModal(false)} className="btn-secondary">Cancel</button>
               <button onClick={createPersonnel} disabled={saving} className="btn-primary">{saving ? 'Adding...' : 'Add Personnel'}</button>
-            </div>
-          </div>
-        </Modal>
-      )}
-
-      {/* MODAL: Create Group */}
-      {showGroupModal && (
-        <Modal title="Create Group" onClose={() => setShowGroupModal(false)}>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-tw-text mb-1">Department</label>
-              <Select
-                value={groupForm.departmentId}
-                onChange={val => setGroupForm(f => ({ ...f, departmentId: val }))}
-                placeholder="Select department..."
-                options={layers.flatMap(l => (l.departments || []).map(d => ({ value: d.id, label: d.name, group: l.name })))}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-tw-text mb-1">Group Name</label>
-              <input className="input" placeholder="e.g. Frontend Team" value={groupForm.name} onChange={e => setGroupForm(f => ({ ...f, name: e.target.value }))} />
-            </div>
-            <div className="flex gap-2 justify-end">
-              <button onClick={() => setShowGroupModal(false)} className="btn-secondary">Cancel</button>
-              <button onClick={createGroup} disabled={saving} className="btn-primary">{saving ? 'Creating...' : 'Create'}</button>
             </div>
           </div>
         </Modal>

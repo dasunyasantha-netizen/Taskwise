@@ -61,21 +61,30 @@ export interface Personnel {
   createdAt: string
 }
 
-export interface Group {
+export interface TaskGroup {
   id: string
   workspaceId: string
-  departmentId: string
-  department?: Department
   name: string
-  members?: GroupMember[]
+  description?: string
+  members?: TaskGroupMember[]
+  groupProjects?: TaskGroupProject[]
   deletedAt: string | null
+  createdAt: string
 }
 
-export interface GroupMember {
+export interface TaskGroupMember {
   id: string
   groupId: string
   personnelId: string
   personnel?: Personnel
+  createdAt: string
+}
+
+export interface TaskGroupProject {
+  id: string
+  groupId: string
+  projectId: string
+  project?: Project
   createdAt: string
 }
 
@@ -111,8 +120,6 @@ export interface TaskAssignment {
   taskId: string
   departmentId?: string
   department?: Department
-  groupId?: string
-  group?: Group
   personnelId?: string
   personnel?: Personnel
   assignedAt: string
@@ -138,6 +145,9 @@ export interface Task {
   actedById?: string
   actedByType?: ActorType
   actedByName?: string
+  groupTaskId?: string
+  groupTask?: Task
+  groupTaskInstances?: Task[]
   startedAt?: string
   returnReason?: string
   returnedAt?: string
@@ -228,5 +238,7 @@ export type ViewMode =
   | 'audit_log'
   | 'overdue'
   | 'recent_updates'
+  | 'broadcasts'
+  | 'group_tasks'
   | 'settings'
   | 'profile'

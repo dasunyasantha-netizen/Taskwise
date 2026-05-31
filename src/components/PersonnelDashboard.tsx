@@ -59,6 +59,7 @@ function ExpandedRow({ task, colSpan, actorId, departmentId, onOpen, onSubtaskCl
   const [loadingS, setLoadingS]           = useState(true)
   const [progressLogs, setProgressLogs]   = useState<TaskProgressLog[]>([])
   const [progressNote, setProgressNote]   = useState('')
+  const [confirmNote, setConfirmNote]     = useState('')
   const [progressLoading, setProgressLoading] = useState(false)
   const [actionLoading, setActionLoading] = useState(false)
   const [actionError, setActionError]     = useState('')
@@ -102,11 +103,11 @@ function ExpandedRow({ task, colSpan, actorId, departmentId, onOpen, onSubtaskCl
   }
 
   const handleAddLog = async () => {
-    if (!progressNote.trim()) return
+    if (!confirmNote.trim()) return
     setProgressLoading(true)
     try {
-      await taskApi.addProgressLog(task.id, progressNote)
-      setProgressNote('')
+      await taskApi.addProgressLog(task.id, confirmNote)
+      setConfirmNote('')
       setProgressLogs(await taskApi.progressLogs(task.id) as TaskProgressLog[])
     } catch { /* no-op */ }
     setProgressLoading(false)
@@ -125,6 +126,27 @@ function ExpandedRow({ task, colSpan, actorId, departmentId, onOpen, onSubtaskCl
   }
 
   return (
+    <>
+    {confirmNote !== '' && (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setConfirmNote('')}>
+        <div className="bg-white rounded-xl shadow-xl w-full max-w-sm mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
+          <div className="px-5 py-4 border-b border-tw-border">
+            <h3 className="font-semibold text-tw-text">Post Progress Update?</h3>
+            <p className="text-xs text-tw-text-secondary mt-0.5">This update will be visible to your director.</p>
+          </div>
+          <div className="px-5 py-4">
+            <p className="text-sm text-tw-text bg-gray-50 rounded-lg px-3 py-2 italic">"{confirmNote}"</p>
+          </div>
+          <div className="px-5 py-4 border-t border-tw-border flex justify-end gap-2">
+            <button className="btn-secondary text-sm" onClick={() => setConfirmNote('')}>Cancel</button>
+            <button disabled={progressLoading} onClick={handleAddLog}
+              className="px-4 py-2 rounded-lg bg-tw-success text-white text-sm font-semibold hover:opacity-90 disabled:opacity-50">
+              {progressLoading ? '…' : 'Post Update'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
     <tr className="border-b-2 border-tw-primary/20" style={{ background: 'linear-gradient(135deg, #f0f4ff 0%, #f8f9ff 100%)' }}>
       <td colSpan={colSpan} className="px-0 py-0">
         <div className="px-6 py-5 space-y-4">
@@ -143,8 +165,8 @@ function ExpandedRow({ task, colSpan, actorId, departmentId, onOpen, onSubtaskCl
                       <div className="w-4 h-4 rounded-full bg-tw-primary flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
                         {(a.personnel?.name || a.department?.name || '?').charAt(0)}
                       </div>
-                      <span className="text-xs font-medium text-tw-text">{a.personnel?.name || a.department?.name || a.group?.name}</span>
-                      <span className="text-tw-text-secondary text-xs">{a.personnel ? '· person' : a.department ? '· dept' : '· group'}</span>
+                      <span className="text-xs font-medium text-tw-text">{a.personnel?.name || a.department?.name}</span>
+                      <span className="text-tw-text-secondary text-xs">{a.personnel ? '· person' : '· dept'}</span>
                     </div>
                   ))}
                 </div>
@@ -197,7 +219,7 @@ function ExpandedRow({ task, colSpan, actorId, departmentId, onOpen, onSubtaskCl
                 <div className="divide-y divide-tw-border">
                   {subtasks.map(s => {
                     const assignee = s.assignments?.[0]
-                    const assigneeName = assignee?.personnel?.name || assignee?.department?.name || assignee?.group?.name || '—'
+                    const assigneeName = assignee?.personnel?.name || assignee?.department?.name || '—'
                     const dl = s.deadline ? Math.ceil((new Date(s.deadline).setHours(0,0,0,0) - new Date().setHours(0,0,0,0)) / 86400000) : null
                     const isOverdue = dl !== null && dl < 0
                     return (
@@ -245,13 +267,13 @@ function ExpandedRow({ task, colSpan, actorId, departmentId, onOpen, onSubtaskCl
                   placeholder="What did you work on today?"
                   value={progressNote}
                   onChange={e => setProgressNote(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleAddLog()}
+                  onKeyDown={e => { if (e.key === 'Enter' && progressNote.trim()) { e.preventDefault(); setConfirmNote(progressNote) } }}
                 />
                 <button
                   disabled={!progressNote.trim() || progressLoading}
-                  onClick={e => { e.stopPropagation(); handleAddLog() }}
+                  onClick={e => { e.stopPropagation(); setConfirmNote(progressNote) }}
                   className="text-sm py-1.5 px-4 rounded-lg bg-tw-success text-white font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity flex-shrink-0">
-                  {progressLoading ? '…' : 'Add'}
+                  Add
                 </button>
               </div>
             )}
@@ -339,6 +361,7 @@ function ExpandedRow({ task, colSpan, actorId, departmentId, onOpen, onSubtaskCl
         </div>
       </td>
     </tr>
+    </>
   )
 }
 
@@ -428,6 +451,7 @@ function MobileExpandedCard({ task, actorId, departmentId, onOpen, onSubtaskClic
   const [subtasks, setSubtasks]         = useState<Task[]>([])
   const [progressLogs, setProgressLogs] = useState<TaskProgressLog[]>([])
   const [progressNote, setProgressNote] = useState('')
+  const [confirmNote, setConfirmNote]   = useState('')
   const [progressLoading, setProgressLoading] = useState(false)
   const [actionLoading, setActionLoading] = useState(false)
   const [actionError, setActionError]   = useState('')
@@ -454,10 +478,11 @@ function MobileExpandedCard({ task, actorId, departmentId, onOpen, onSubtaskClic
   }
 
   const handleAddLog = async () => {
-    if (!progressNote.trim()) return
+    if (!confirmNote.trim()) return
     setProgressLoading(true)
     try {
-      await taskApi.addProgressLog(task.id, progressNote)
+      await taskApi.addProgressLog(task.id, confirmNote)
+      setConfirmNote('')
       setProgressNote('')
       setProgressLogs(await taskApi.progressLogs(task.id) as TaskProgressLog[])
     } catch { /* no-op */ }
@@ -479,7 +504,7 @@ function MobileExpandedCard({ task, actorId, departmentId, onOpen, onSubtaskClic
               <div className="w-5 h-5 rounded-full bg-tw-primary flex items-center justify-center text-white text-xs font-bold">
                 {(a.personnel?.name || a.department?.name || '?').charAt(0)}
               </div>
-              <span className="text-xs font-medium text-tw-text">{a.personnel?.name || a.department?.name || a.group?.name}</span>
+              <span className="text-xs font-medium text-tw-text">{a.personnel?.name || a.department?.name}</span>
             </div>
           ))}
         </div>
@@ -523,11 +548,31 @@ function MobileExpandedCard({ task, actorId, departmentId, onOpen, onSubtaskClic
           <div className="flex gap-2 mb-3">
             <input className="input flex-1 text-sm py-2" placeholder="What did you work on?"
               value={progressNote} onChange={e => setProgressNote(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleAddLog()} />
-            <button disabled={!progressNote.trim() || progressLoading} onClick={e => { e.stopPropagation(); handleAddLog() }}
+              onKeyDown={e => { if (e.key === 'Enter' && progressNote.trim()) { e.preventDefault(); setConfirmNote(progressNote) } }} />
+            <button disabled={!progressNote.trim() || progressLoading} onClick={e => { e.stopPropagation(); setConfirmNote(progressNote) }}
               className="px-4 py-2 rounded-xl bg-tw-success text-white text-sm font-semibold disabled:opacity-50">
-              {progressLoading ? '…' : 'Add'}
+              Add
             </button>
+          </div>
+        )}
+        {confirmNote !== '' && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setConfirmNote('')}>
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-sm mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
+              <div className="px-5 py-4 border-b border-tw-border">
+                <h3 className="font-semibold text-tw-text">Post Progress Update?</h3>
+                <p className="text-xs text-tw-text-secondary mt-0.5">This update will be visible to your director.</p>
+              </div>
+              <div className="px-5 py-4">
+                <p className="text-sm text-tw-text bg-gray-50 rounded-lg px-3 py-2 italic">"{confirmNote}"</p>
+              </div>
+              <div className="px-5 py-4 border-t border-tw-border flex justify-end gap-2">
+                <button className="btn-secondary text-sm" onClick={() => setConfirmNote('')}>Cancel</button>
+                <button disabled={progressLoading} onClick={handleAddLog}
+                  className="px-4 py-2 rounded-lg bg-tw-success text-white text-sm font-semibold hover:opacity-90 disabled:opacity-50">
+                  {progressLoading ? '…' : 'Post Update'}
+                </button>
+              </div>
+            </div>
           </div>
         )}
         {progressLogs.length > 0 && (
@@ -604,6 +649,7 @@ function MobileExpandedCard({ task, actorId, departmentId, onOpen, onSubtaskClic
 
 // ── Mobile approval card ──────────────────────────────────────────────────────
 function MobileApprovalCard({ task, onRefresh, onOpen }: { task: Task; onRefresh: () => void; onOpen: () => void }) {
+  const [expanded, setExpanded]     = useState(false)
   const [loading, setLoading]       = useState(false)
   const [error, setError]           = useState('')
   const [showReject, setShowReject] = useState(false)
@@ -617,35 +663,54 @@ function MobileApprovalCard({ task, onRefresh, onOpen }: { task: Task; onRefresh
   }
 
   const submittedBy = task.actedByName || (task.actedByType === 'director' ? 'Director' : 'Personnel')
-  const priorityColors: Record<string, string> = { CRITICAL: 'border-l-red-500', HIGH: 'border-l-orange-400', MEDIUM: 'border-l-yellow-400', LOW: 'border-l-gray-300' }
+  const priorityBar: Record<string, string> = { CRITICAL: 'bg-red-500', HIGH: 'bg-orange-400', MEDIUM: 'bg-yellow-400', LOW: 'bg-gray-300' }
 
   return (
-    <div className={`bg-white rounded-2xl shadow-sm border border-gray-100 border-l-4 ${priorityColors[task.priority]} overflow-hidden`}>
-      <div className="px-4 py-4">
-        <div className="font-semibold text-tw-text text-sm mb-1">{task.title}</div>
-        {task.description && <p className="text-xs text-tw-text-secondary mb-2 line-clamp-2">{task.description}</p>}
-        <div className="flex flex-wrap gap-2 mb-3 text-xs text-tw-text-secondary">
-          {task.project?.name && <span>📁 {task.project.name}</span>}
-          <span>👤 {submittedBy}</span>
-          {task.deadline && <span>📅 {new Date(task.deadline).toLocaleDateString('en-GB',{day:'numeric',month:'short'})}</span>}
-          <span className={`badge ${priorityBadge[task.priority]}`}>{task.priority}</span>
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      {/* Header row — always visible, tap to expand */}
+      <div className="flex items-center gap-3 px-4 py-3 cursor-pointer select-none" onClick={() => setExpanded(e => !e)}>
+        <div className={`w-1 h-10 rounded-full flex-shrink-0 ${priorityBar[task.priority] || 'bg-gray-300'}`} />
+        <div className="flex-1 min-w-0">
+          <div className="font-semibold text-tw-text text-sm leading-snug">{task.title}</div>
+          <span className={`badge mt-0.5 ${statusBadge['SUBMITTED']}`}>Submitted</span>
         </div>
-        {error && <div className="text-xs text-tw-danger mb-2">{error}</div>}
-        <div className="grid grid-cols-3 gap-2">
-          <button disabled={loading} onClick={() => doAction(() => taskApi.approve(task.id))}
-            className="py-2.5 rounded-xl bg-[#00c875] text-white text-xs font-bold active:opacity-80 disabled:opacity-50">
-            ✓ Approve
-          </button>
-          <button disabled={loading} onClick={() => setShowReject(true)}
-            className="py-2.5 rounded-xl border-2 border-tw-danger text-tw-danger text-xs font-bold active:opacity-80">
-            ↩ Reject
-          </button>
-          <button onClick={onOpen}
-            className="py-2.5 rounded-xl border-2 border-tw-primary text-tw-primary text-xs font-bold active:opacity-80">
-            View →
-          </button>
-        </div>
+        <svg className={`w-4 h-4 text-tw-text-secondary flex-shrink-0 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
       </div>
+
+      {/* Expandable details */}
+      {expanded && (
+        <div className="px-4 pb-4 border-t border-gray-100 pt-3 space-y-3">
+          {task.description && <p className="text-xs text-tw-text-secondary line-clamp-3">{task.description}</p>}
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs text-tw-text-secondary">
+            {task.project?.name && (
+              <div><span className="font-medium text-tw-text-secondary uppercase tracking-wide text-[10px]">Project</span><div className="text-tw-text font-medium mt-0.5">{task.project.name}</div></div>
+            )}
+            <div><span className="font-medium text-tw-text-secondary uppercase tracking-wide text-[10px]">Submitted By</span><div className="text-tw-text font-medium mt-0.5">{submittedBy}</div></div>
+            {task.deadline && (
+              <div><span className="font-medium text-tw-text-secondary uppercase tracking-wide text-[10px]">Deadline</span><div className="text-tw-text font-medium mt-0.5">{new Date(task.deadline).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}</div></div>
+            )}
+            <div><span className="font-medium text-tw-text-secondary uppercase tracking-wide text-[10px]">Priority</span><div className="mt-0.5"><span className={`badge ${priorityBadge[task.priority]}`}>{task.priority}</span></div></div>
+          </div>
+          {error && <div className="text-xs text-tw-danger">{error}</div>}
+          <div className="grid grid-cols-3 gap-2 pt-1">
+            <button disabled={loading} onClick={() => doAction(() => taskApi.approve(task.id))}
+              className="py-2.5 rounded-xl bg-[#00c875] text-white text-xs font-bold active:opacity-80 disabled:opacity-50">
+              ✓ Approve
+            </button>
+            <button disabled={loading} onClick={() => setShowReject(true)}
+              className="py-2.5 rounded-xl border-2 border-tw-danger text-tw-danger text-xs font-bold active:opacity-80">
+              ↩ Reject
+            </button>
+            <button onClick={onOpen}
+              className="py-2.5 rounded-xl border-2 border-tw-primary text-tw-primary text-xs font-bold active:opacity-80">
+              View →
+            </button>
+          </div>
+        </div>
+      )}
+
       {showReject && (
         <div className="fixed inset-0 bg-black/60 flex items-end justify-center z-50">
           <div className="bg-white rounded-t-3xl w-full max-w-lg px-5 py-6 space-y-4">
@@ -1036,8 +1101,8 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
                       <thead>
                         <tr className="bg-[#f0f4ff] border-b-2 border-tw-primary/20">
                           <th className="w-px px-3 py-3"></th>
-                          <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider w-full">Task</th>
-                          <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider whitespace-nowrap">Project</th>
+                          <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider w-[50%]">Task</th>
+                          <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider w-[30%]">Project</th>
                           <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider whitespace-nowrap">Status</th>
                           <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider whitespace-nowrap">Priority</th>
                           <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider whitespace-nowrap">Deadline</th>
@@ -1051,7 +1116,7 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
                           const isDeptPending = t.assignments?.some(a => a.departmentId === user.departmentId) && !t.assignments?.some(a => a.personnelId)
                           const isOverdue = t.deadline && new Date(t.deadline) < new Date()
                           const assigneeName = t.assignments?.[0]
-                            ? (t.assignments[0].personnel?.name || t.assignments[0].department?.name || t.assignments[0].group?.name || '—')
+                            ? (t.assignments[0].personnel?.name || t.assignments[0].department?.name || '—')
                             : '—'
                           return (
                             <React.Fragment key={t.id}>
@@ -1067,11 +1132,11 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
                                     {(t._count?.subtasks ?? 0) > 0 && <span className="text-xs text-tw-indigo font-medium">⊞ {t._count!.subtasks} subtask{t._count!.subtasks !== 1 ? 's' : ''}</span>}
                                   </div>
                                 </td>
-                                <td className="px-4 py-3.5 text-sm text-tw-text-secondary whitespace-nowrap">
+                                <td className="px-4 py-3.5 text-sm text-tw-text-secondary">
                                   {t.parentTaskId
-                                    ? <span className="inline-flex items-center gap-1 text-purple-600"><span className="w-2 h-2 rounded-full bg-purple-400 inline-block" />{t.parent?.title ?? 'Subtask'}</span>
+                                    ? <span className="inline-flex items-center gap-1 text-purple-600"><span className="w-2 h-2 rounded-full bg-purple-400 inline-block flex-shrink-0" />{t.parent?.title ?? 'Subtask'}</span>
                                     : t.project?.name
-                                      ? <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-tw-teal inline-block" />{t.project.name}</span>
+                                      ? <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-tw-teal inline-block flex-shrink-0" />{t.project.name}</span>
                                       : '—'}
                                 </td>
                                 <td className="px-4 py-3.5 whitespace-nowrap">

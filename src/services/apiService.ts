@@ -67,12 +67,6 @@ export const workspaceApi = {
   movePersonnel:     (id: string, data: unknown) => api.put(`/workspace/personnel/${id}/move`, data),
   deletePersonnel:   (id: string)    => api.delete(`/workspace/personnel/${id}`),
   getPersonnelQueue: (id: string)    => api.get(`/workspace/personnel/${id}/queue`),
-  getGroups:         (deptId?: string) => api.get(`/workspace/groups${deptId ? '?departmentId=' + deptId : ''}`),
-  createGroup:       (data: unknown) => api.post('/workspace/groups', data),
-  updateGroup:       (id: string, data: unknown) => api.put(`/workspace/groups/${id}`, data),
-  deleteGroup:       (id: string)    => api.delete(`/workspace/groups/${id}`),
-  addGroupMember:    (groupId: string, data: unknown) => api.post(`/workspace/groups/${groupId}/members`, data),
-  removeGroupMember: (groupId: string, pid: string) => api.delete(`/workspace/groups/${groupId}/members/${pid}`),
 }
 
 // ─── Projects ────────────────────────────────────────────────────────────────
@@ -118,6 +112,47 @@ export const notificationApi = {
   getVapidKey:          () => fetch(`${BASE_URL}/notifications/vapid-public-key`).then(r => r.json()),
   savePushSubscription: (sub: object) => api.post('/notifications/push-subscribe', sub),
   removePushSubscription: (endpoint: string) => request('DELETE', '/notifications/push-subscribe', { endpoint }),
+}
+
+// ─── Notices ─────────────────────────────────────────────────────────────────
+export const noticeApi = {
+  getActive:  () => api.get<Notice[]>('/notices'),
+  getAll:     () => api.get<Notice[]>('/notices/all'),
+  create:     (data: { message: string; audience: string; layerNumber?: number | null; expiresAt?: string | null }) =>
+    api.post<Notice>('/notices', data),
+  delete:     (id: string) => api.delete(`/notices/${id}`),
+  dismiss:    (id: string) => api.post(`/notices/${id}/dismiss`),
+}
+
+export interface Notice {
+  id: string
+  message: string
+  audience: string
+  layerNumber: number | null
+  createdAt: string
+  expiresAt: string | null
+  _count?: { dismissals: number }
+}
+
+// ─── Task Groups ─────────────────────────────────────────────────────────────
+export const taskGroupApi = {
+  list:             () => api.get('/task-groups'),
+  get:              (id: string) => api.get(`/task-groups/${id}`),
+  create:           (data: { name: string; description?: string }) => api.post('/task-groups', data),
+  update:           (id: string, data: { name?: string; description?: string }) => api.put(`/task-groups/${id}`, data),
+  delete:           (id: string) => api.delete(`/task-groups/${id}`),
+  addMember:        (groupId: string, data: { personnelId: string }) => api.post(`/task-groups/${groupId}/members`, data),
+  removeMember:     (groupId: string, pid: string) => api.delete(`/task-groups/${groupId}/members/${pid}`),
+  createProject:    (groupId: string, data: { name: string; description?: string; color?: string }) =>
+    api.post(`/task-groups/${groupId}/projects`, data),
+  assignTask:       (groupId: string, data: {
+    projectId: string; title: string; description?: string; priority?: string;
+    deadline?: string; memberIds?: string[]
+  }) => api.post(`/task-groups/${groupId}/assign-task`, data),
+  getMonitor:       (groupId: string) => api.get(`/task-groups/${groupId}/monitor`),
+  getMemberHistory: (groupId: string, taskId: string, memberId: string) =>
+    api.get(`/task-groups/${groupId}/tasks/${taskId}/members/${memberId}/history`),
+  closeGroupTask:   (taskId: string) => api.post(`/task-groups/tasks/${taskId}/close`),
 }
 
 // ─── Audit / Reports ─────────────────────────────────────────────────────────

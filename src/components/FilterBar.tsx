@@ -47,13 +47,11 @@ export function filterTasks(tasks: Task[], filters: ActiveFilters, layers: Layer
       if (lf.targetType === 'department' && lf.targetId) {
         return assignments.some(a =>
           a.departmentId === lf.targetId ||
-          (a.group?.departmentId === lf.targetId) ||
           (a.personnelId && personnel.find(p => p.id === a.personnelId)?.departmentId === lf.targetId)
         )
       }
       return assignments.some(a =>
         (a.departmentId && layerDeptIds.includes(a.departmentId)) ||
-        (a.group?.departmentId && layerDeptIds.includes(a.group.departmentId)) ||
         (a.personnelId && layerDeptIds.includes(personnel.find(p => p.id === a.personnelId)?.departmentId ?? ''))
       )
     })
