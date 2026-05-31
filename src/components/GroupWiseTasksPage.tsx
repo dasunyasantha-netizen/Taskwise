@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
+import ReactDOM from 'react-dom'
 import type { Personnel, Layer, Task } from '../types'
 import { taskGroupApi, workspaceApi, projectApi } from '../services/apiService'
 import Select from './Select'
@@ -370,6 +371,8 @@ function GroupCard({
   const [monitor, setMonitor] = useState<MonitorData | null>(null)
   const [loadingMonitor, setLoadingMonitor] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [menuPos, setMenuPos] = useState({ top: 0, right: 0 })
+  const menuBtnRef = useRef<HTMLButtonElement>(null)
   const [historyTarget, setHistoryTarget] = useState<{
     taskId: string; memberId: string; memberName: string
   } | null>(null)
@@ -419,36 +422,22 @@ function GroupCard({
               + Task
             </button>
             {/* Kebab menu */}
-            <div className="relative" onClick={e => e.stopPropagation()}>
+            <div onClick={e => e.stopPropagation()}>
               <button
-                onClick={() => setMenuOpen(o => !o)}
+                ref={menuBtnRef}
+                onClick={() => {
+                  if (!menuOpen && menuBtnRef.current) {
+                    const r = menuBtnRef.current.getBoundingClientRect()
+                    setMenuPos({ top: r.bottom + 4, right: window.innerWidth - r.right })
+                  }
+                  setMenuOpen(o => !o)
+                }}
                 className="w-7 h-7 flex items-center justify-center rounded-lg text-tw-text-secondary hover:bg-tw-hover transition-colors"
               >
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                   <circle cx="10" cy="4" r="1.5"/><circle cx="10" cy="10" r="1.5"/><circle cx="10" cy="16" r="1.5"/>
                 </svg>
               </button>
-              {menuOpen && (
-                <>
-                  <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
-                  <div className="absolute right-0 top-8 z-20 bg-white rounded-xl shadow-panel border border-tw-border py-1 w-36">
-                    <button
-                      onClick={() => { setMenuOpen(false); onEdit(group) }}
-                      className="w-full text-left px-4 py-2 text-sm text-tw-text hover:bg-tw-hover flex items-center gap-2"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => { setMenuOpen(false); onDelete(group) }}
-                      className="w-full text-left px-4 py-2 text-sm text-tw-danger hover:bg-red-50 flex items-center gap-2"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                      Delete
-                    </button>
-                  </div>
-                </>
-              )}
             </div>
             <svg className={`w-4 h-4 text-tw-text-secondary transition-transform ${expanded ? 'rotate-180' : ''}`}
               fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -565,6 +554,33 @@ function GroupCard({
           )?.title || ''}
           onClose={() => setHistoryTarget(null)}
         />
+      )}
+
+      {/* Kebab menu — portalled to escape overflow:hidden */}
+      {menuOpen && ReactDOM.createPortal(
+        <>
+          <div className="fixed inset-0 z-[90]" onClick={() => setMenuOpen(false)} />
+          <div
+            className="fixed z-[91] bg-white rounded-xl shadow-panel border border-tw-border py-1 w-36"
+            style={{ top: menuPos.top, right: menuPos.right }}
+          >
+            <button
+              onClick={() => { setMenuOpen(false); onEdit(group) }}
+              className="w-full text-left px-4 py-2 text-sm text-tw-text hover:bg-tw-hover flex items-center gap-2"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+              Edit
+            </button>
+            <button
+              onClick={() => { setMenuOpen(false); onDelete(group) }}
+              className="w-full text-left px-4 py-2 text-sm text-tw-danger hover:bg-red-50 flex items-center gap-2"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+              Delete
+            </button>
+          </div>
+        </>,
+        document.body
       )}
     </>
   )
