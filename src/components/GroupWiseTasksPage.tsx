@@ -535,6 +535,119 @@ function GroupCard({
   )
 }
 
+// ─── Supervisor Picker Modal ──────────────────────────────────────────────────
+
+function SupervisorPickerModal({
+  forPerson,
+  allPersonnel,
+  layers,
+  onSelect,
+  onCancel,
+}: {
+  forPerson: Personnel
+  allPersonnel: Personnel[]
+  layers: Layer[]
+  onSelect: (supervisorId: string) => void
+  onCancel: () => void
+}) {
+  const [search, setSearch] = useState('')
+  const allDepts = layers.flatMap(l => l.departments || [])
+
+  const getPersonnelLayer = (p: Personnel) => {
+    const dept = allDepts.find(d => d.id === p.departmentId)
+    return layers.find(l => l.id === dept?.layerId)
+  }
+
+  // Only show people from layers above forPerson
+  const myDept = allDepts.find(d => d.id === forPerson.departmentId)
+  const myLayer = layers.find(l => l.id === myDept?.layerId)
+  const minLayerNumber = layers.reduce((min, l) => Math.min(min, l.number), Infinity)
+  const higherLayers = myLayer
+    ? layers.filter(l => l.number < myLayer.number).sort((a, b) => a.number - b.number)
+    : layers.filter(l => l.number === minLayerNumber)
+
+  const candidates = allPersonnel.filter(p => {
+    if (p.deletedAt || p.id === forPerson.id) return false
+    const layer = getPersonnelLayer(p)
+    if (!layer) return false
+    return higherLayers.some(l => l.id === layer.id)
+  })
+
+  const filtered = candidates.filter(p =>
+    p.name.toLowerCase().includes(search.toLowerCase()) ||
+    (allDepts.find(d => d.id === p.departmentId)?.name || '').toLowerCase().includes(search.toLowerCase())
+  )
+
+  // Group filtered candidates by layer
+  const grouped = higherLayers.map(layer => ({
+    layer,
+    people: filtered.filter(p => getPersonnelLayer(p)?.id === layer.id),
+  })).filter(g => g.people.length > 0)
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[60] p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[80vh] flex flex-col">
+        {/* Header */}
+        <div className="px-5 py-4 border-b border-tw-border flex-shrink-0">
+          <div className="flex items-center justify-between mb-1">
+            <h3 className="font-bold text-tw-text">Assign Supervisor</h3>
+            <button onClick={onCancel} className="text-tw-text-secondary hover:text-tw-text text-xl leading-none">×</button>
+          </div>
+          <div className="flex items-center gap-2 mb-3">
+            <Avatar name={forPerson.name} size={6} />
+            <div>
+              <span className="text-sm font-medium text-tw-text">{forPerson.name}</span>
+              <span className="text-xs text-amber-600 ml-2">needs a supervisor to complete the chain</span>
+            </div>
+          </div>
+          <input
+            autoFocus
+            className="input w-full"
+            placeholder="Search by name or department…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+        </div>
+
+        {/* Grouped list */}
+        <div className="overflow-y-auto flex-1">
+          {grouped.length === 0 ? (
+            <p className="text-sm text-tw-text-secondary text-center py-8">No candidates found.</p>
+          ) : (
+            grouped.map(({ layer, people }) => (
+              <div key={layer.id}>
+                {/* Layer heading */}
+                <div className="px-4 py-2 bg-gray-50 border-b border-tw-border sticky top-0">
+                  <span className="text-xs font-bold text-tw-text-secondary uppercase tracking-wider">{layer.name}</span>
+                </div>
+                {people.map(p => {
+                  const dept = allDepts.find(d => d.id === p.departmentId)
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => onSelect(p.id)}
+                      className="w-full text-left px-4 py-3 flex items-center gap-3 border-b border-tw-border last:border-0 hover:bg-tw-hover transition-colors"
+                    >
+                      <Avatar name={p.name} size={9} />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm text-tw-text">{p.name}</div>
+                        <div className="text-xs text-tw-text-secondary truncate">{dept?.name}</div>
+                      </div>
+                      <svg className="w-4 h-4 text-tw-text-secondary flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/>
+                      </svg>
+                    </button>
+                  )
+                })}
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Add Member Modal ─────────────────────────────────────────────────────────
 
 function AddMemberModal({
@@ -551,7 +664,6 @@ function AddMemberModal({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [supervisorFor, setSupervisorFor] = useState<Personnel | null>(null)
-  const [supervisorId, setSupervisorId] = useState('')
   const [savingSupervisor, setSavingSupervisor] = useState(false)
   // Maps personnelId → assigned supervisorId (tracks in-session supervisor assignments)
   const [supervisorOverrides, setSupervisorOverrides] = useState<Record<string, string>>({})
@@ -562,15 +674,6 @@ function AddMemberModal({
   const getPersonnelLayer = (p: Personnel) => {
     const dept = allDepts.find(d => d.id === p.departmentId)
     return layers.find(l => l.id === dept?.layerId)
-  }
-
-  const getSupervisorCandidates = (p: Personnel) => {
-    const myDept = allDepts.find(d => d.id === p.departmentId)
-    const myLayer = layers.find(l => l.id === myDept?.layerId)
-    if (!myLayer) return allPersonnel.filter(x => !x.deletedAt && x.id !== p.id)
-    const higherLayerIds = layers.filter(l => l.number < myLayer.number).map(l => l.id)
-    const higherDeptIds = allDepts.filter(d => higherLayerIds.includes(d.layerId)).map(d => d.id)
-    return allPersonnel.filter(x => !x.deletedAt && x.id !== p.id && higherDeptIds.includes(x.departmentId))
   }
 
   // Walk up from p through supervisorOverrides + existing supervisorId/layer data.
@@ -605,7 +708,6 @@ function AddMemberModal({
   const selectedNeedingSupervisor = filtered.filter(p => selected.has(p.id) && findChainGap(p, supervisorOverrides) !== null)
 
   const toggleOne = (p: Personnel) => {
-    if (supervisorFor) return
     setSelected(prev => {
       const next = new Set(prev)
       if (next.has(p.id)) next.delete(p.id)
@@ -638,7 +740,6 @@ function AddMemberModal({
     // If any selected person needs a supervisor, open the picker for the first one
     if (selectedNeedingSupervisor.length > 0) {
       setSupervisorFor(selectedNeedingSupervisor[0])
-      setSupervisorId('')
       return
     }
 
@@ -652,12 +753,10 @@ function AddMemberModal({
         const err = e as { response?: { data?: { error?: string; needsSupervisor?: { id: string; name: string; department?: { name: string; layer?: { number: number; name: string } } }[] } } }
         const data = err?.response?.data
         if (data?.error === 'supervisor_chain_incomplete' && data.needsSupervisor?.length) {
-          // Find the first person in the gap list in allPersonnel and open the picker
           const gap = allPersonnel.find(x => x.id === data.needsSupervisor![0].id)
           if (gap) {
             setSaving(false)
             setSupervisorFor(gap)
-            setSupervisorId('')
             return
           }
         }
@@ -672,21 +771,19 @@ function AddMemberModal({
     }
   }
 
-  const saveSupervisorAndContinue = async () => {
-    if (!supervisorFor || !supervisorId) return
+  const saveSupervisorAndContinue = async (chosenId: string) => {
+    if (!supervisorFor) return
     setSavingSupervisor(true); setError('')
     try {
-      await workspaceApi.setSupervisor(supervisorFor.id, supervisorId)
-      const newOverrides = { ...supervisorOverrides, [supervisorFor.id]: supervisorId }
+      await workspaceApi.setSupervisor(supervisorFor.id, chosenId)
+      const newOverrides = { ...supervisorOverrides, [supervisorFor.id]: chosenId }
       setSupervisorOverrides(newOverrides)
-      setSupervisorId('')
 
       // Check if the newly-assigned supervisor also needs a supervisor (walk the chain up)
-      const chosenSupervisor = allPersonnel.find(x => x.id === supervisorId)
+      const chosenSupervisor = allPersonnel.find(x => x.id === chosenId)
       if (chosenSupervisor) {
         const nextGap = findChainGap(chosenSupervisor, newOverrides)
         if (nextGap) {
-          // Keep the panel open for the next gap in the chain
           setSupervisorFor(nextGap)
           setSavingSupervisor(false)
           return
@@ -700,162 +797,138 @@ function AddMemberModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[85vh] flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-tw-border flex-shrink-0">
-          <div>
-            <h3 className="font-bold text-tw-text">Add Member — {group.name}</h3>
-            <p className="text-xs text-tw-text-secondary mt-0.5">Select any personnel from any level</p>
+    <>
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[85vh] flex flex-col">
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 py-4 border-b border-tw-border flex-shrink-0">
+            <div>
+              <h3 className="font-bold text-tw-text">Add Member — {group.name}</h3>
+              <p className="text-xs text-tw-text-secondary mt-0.5">Select any personnel from any level</p>
+            </div>
+            <button onClick={onClose} className="text-tw-text-secondary hover:text-tw-text text-xl">×</button>
           </div>
-          <button onClick={onClose} className="text-tw-text-secondary hover:text-tw-text text-xl">×</button>
-        </div>
 
-        {/* Inline supervisor assignment panel */}
-        {supervisorFor && (
-          <div className="px-4 py-3 bg-amber-50 border-b border-amber-200 flex-shrink-0">
-            <div className="flex items-center gap-2 mb-2">
-              <Avatar name={supervisorFor.name} size={6} />
-              <div>
-                <p className="text-sm font-semibold text-tw-text">{supervisorFor.name}</p>
-                <p className="text-xs text-amber-700">also needs a supervisor to complete the chain</p>
+          {/* Search */}
+          <div className="px-4 py-3 border-b border-tw-border flex-shrink-0">
+            <input
+              className="input w-full"
+              placeholder="Search by name or department..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              autoFocus
+            />
+          </div>
+
+          {/* Select All row */}
+          {filtered.length > 0 && (
+            <div
+              className="px-4 py-2.5 border-b border-tw-border flex-shrink-0 flex items-center gap-3 cursor-pointer hover:bg-tw-hover"
+              onClick={toggleAll}
+            >
+              <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+                allSelectableSelected ? 'bg-tw-primary border-tw-primary' : 'border-gray-300'
+              }`}>
+                {allSelectableSelected && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>}
               </div>
+              <span className="text-sm font-semibold text-tw-text">
+                Select all with supervisor ({selectableIds.length})
+              </span>
             </div>
-            <label className="block text-xs font-semibold text-tw-text mb-1">Assign supervisor</label>
-            <div className="mb-2">
-              <Select
-                value={supervisorId}
-                onChange={val => setSupervisorId(val)}
-                placeholder="Select supervisor…"
-                options={getSupervisorCandidates(supervisorFor).map(c => {
-                  const dept = allDepts.find(d => d.id === c.departmentId)
-                  const layer = getPersonnelLayer(c)
-                  return { value: c.id, label: `${c.name} — ${layer?.name} · ${dept?.name}`, group: layer?.name }
-                })}
-              />
+          )}
+
+          {error && (
+            <div className="px-4 py-2 bg-red-50 border-b border-red-100 flex-shrink-0">
+              <p className="text-xs text-tw-danger">{error}</p>
             </div>
-            <div className="flex gap-2">
-              <button onClick={() => { setSupervisorFor(null); setSupervisorId('') }} className="btn-secondary text-xs py-1.5 flex-1">
-                Cancel
-              </button>
-              <button
-                disabled={!supervisorId || savingSupervisor}
-                onClick={saveSupervisorAndContinue}
-                className="btn-primary text-xs py-1.5 flex-1 disabled:opacity-50"
-              >
-                {savingSupervisor ? 'Saving…' : 'Set Supervisor'}
-              </button>
-            </div>
-          </div>
-        )}
+          )}
 
-        {/* Search */}
-        <div className="px-4 py-3 border-b border-tw-border flex-shrink-0">
-          <input
-            className="input w-full"
-            placeholder="Search by name or department..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            autoFocus={!supervisorFor}
-          />
-        </div>
-
-        {/* Select All row */}
-        {filtered.length > 0 && !supervisorFor && (
-          <div
-            className="px-4 py-2.5 border-b border-tw-border flex-shrink-0 flex items-center gap-3 cursor-pointer hover:bg-tw-hover"
-            onClick={toggleAll}
-          >
-            <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
-              allSelectableSelected ? 'bg-tw-primary border-tw-primary' : 'border-gray-300'
-            }`}>
-              {allSelectableSelected && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>}
-            </div>
-            <span className="text-sm font-semibold text-tw-text">
-              Select all with supervisor ({selectableIds.length})
-            </span>
-          </div>
-        )}
-
-        {error && (
-          <div className="px-4 py-2 bg-red-50 border-b border-red-100 flex-shrink-0">
-            <p className="text-xs text-tw-danger">{error}</p>
-          </div>
-        )}
-
-        {/* List */}
-        <div className="overflow-y-auto flex-1">
-          {filtered.length === 0 ? (
-            <p className="text-sm text-tw-text-secondary text-center py-8">No personnel found.</p>
-          ) : (
-            filtered.map(p => {
-              const dept = allDepts.find(d => d.id === p.departmentId)
-              const layer = getPersonnelLayer(p)
-              const hasSuper = hasSupervisor(p)
-              const isChecked = selected.has(p.id)
-              const isTarget = supervisorFor?.id === p.id
-              return (
-                <div
-                  key={p.id}
-                  onClick={() => hasSuper ? toggleOne(p) : (supervisorFor ? undefined : (setSupervisorFor(p), setSupervisorId(''), setError('')))}
-                  className={`w-full px-4 py-3 transition-colors flex items-center gap-3 border-b border-tw-border last:border-0 cursor-pointer ${
-                    isTarget ? 'bg-amber-50' : isChecked ? 'bg-blue-50' : 'hover:bg-tw-hover'
-                  }`}
-                >
-                  {/* Checkbox / supervisor warning icon */}
-                  {hasSuper ? (
-                    <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
-                      isChecked ? 'bg-tw-primary border-tw-primary' : 'border-gray-300'
-                    }`}>
-                      {isChecked && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>}
-                    </div>
-                  ) : (
-                    <div className="w-5 h-5 flex items-center justify-center flex-shrink-0 text-amber-500">
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
-                    </div>
-                  )}
-                  <Avatar name={p.name} size={8} />
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-sm text-tw-text">{p.name}</div>
-                    <div className="text-xs text-tw-text-secondary">{layer?.name} · {dept?.name}</div>
+          {/* List */}
+          <div className="overflow-y-auto flex-1">
+            {filtered.length === 0 ? (
+              <p className="text-sm text-tw-text-secondary text-center py-8">No personnel found.</p>
+            ) : (
+              filtered.map(p => {
+                const dept = allDepts.find(d => d.id === p.departmentId)
+                const layer = getPersonnelLayer(p)
+                const hasSuper = hasSupervisor(p)
+                const isChecked = selected.has(p.id)
+                return (
+                  <div
+                    key={p.id}
+                    onClick={() => hasSuper ? toggleOne(p) : (setSupervisorFor(p), setError(''))}
+                    className={`w-full px-4 py-3 transition-colors flex items-center gap-3 border-b border-tw-border last:border-0 cursor-pointer ${
+                      isChecked ? 'bg-blue-50' : 'hover:bg-tw-hover'
+                    }`}
+                  >
                     {hasSuper ? (
-                      <div className="text-xs text-green-600 mt-0.5">
-                        ✓ {supervisorOverrides[p.id] ? 'Supervisor just assigned' : 'Supervisor assigned'}
+                      <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+                        isChecked ? 'bg-tw-primary border-tw-primary' : 'border-gray-300'
+                      }`}>
+                        {isChecked && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>}
                       </div>
                     ) : (
-                      <div className="text-xs text-amber-600 mt-0.5">⚠ No supervisor — tap to assign one</div>
+                      <div className="w-5 h-5 flex items-center justify-center flex-shrink-0 text-amber-500">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+                      </div>
+                    )}
+                    <Avatar name={p.name} size={8} />
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-sm text-tw-text">{p.name}</div>
+                      <div className="text-xs text-tw-text-secondary">{layer?.name} · {dept?.name}</div>
+                      {hasSuper ? (
+                        <div className="text-xs text-green-600 mt-0.5">
+                          ✓ {supervisorOverrides[p.id] ? 'Supervisor just assigned' : 'Supervisor assigned'}
+                        </div>
+                      ) : (
+                        <div className="text-xs text-amber-600 mt-0.5">⚠ No supervisor — tap to assign one</div>
+                      )}
+                    </div>
+                    {!hasSuper && (
+                      <span className="text-xs px-2 py-1 rounded-lg bg-amber-100 text-amber-700 font-medium flex-shrink-0">Set supervisor</span>
                     )}
                   </div>
-                  {!hasSuper && (
-                    <span className="text-xs px-2 py-1 rounded-lg bg-amber-100 text-amber-700 font-medium flex-shrink-0">Set supervisor</span>
-                  )}
-                </div>
-              )
-            })
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="px-4 py-3 border-t border-tw-border flex-shrink-0 flex items-center justify-between gap-3">
-          <span className="text-sm text-tw-text-secondary">
-            {selected.size > 0 ? `${selected.size} selected` : 'None selected'}
-            {selectedNeedingSupervisor.length > 0 && (
-              <span className="text-amber-600 ml-1">· {selectedNeedingSupervisor.length} need supervisor</span>
+                )
+              })
             )}
-          </span>
-          <div className="flex gap-2">
-            <button onClick={onClose} className="btn-secondary text-sm py-1.5 px-4">Cancel</button>
-            <button
-              disabled={selected.size === 0 || saving}
-              onClick={handleAddSelected}
-              className="btn-primary text-sm py-1.5 px-4 disabled:opacity-50"
-            >
-              {saving ? 'Adding…' : `Add ${selected.size > 0 ? selected.size : ''} Member${selected.size !== 1 ? 's' : ''}`}
-            </button>
+          </div>
+
+          {/* Footer */}
+          <div className="px-4 py-3 border-t border-tw-border flex-shrink-0 flex items-center justify-between gap-3">
+            <span className="text-sm text-tw-text-secondary">
+              {selected.size > 0 ? `${selected.size} selected` : 'None selected'}
+              {selectedNeedingSupervisor.length > 0 && (
+                <span className="text-amber-600 ml-1">· {selectedNeedingSupervisor.length} need supervisor</span>
+              )}
+            </span>
+            <div className="flex gap-2">
+              <button onClick={onClose} className="btn-secondary text-sm py-1.5 px-4">Cancel</button>
+              <button
+                disabled={selected.size === 0 || saving}
+                onClick={handleAddSelected}
+                className="btn-primary text-sm py-1.5 px-4 disabled:opacity-50"
+              >
+                {saving ? 'Adding…' : `Add ${selected.size > 0 ? selected.size : ''} Member${selected.size !== 1 ? 's' : ''}`}
+              </button>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+
+      {/* Supervisor picker — renders on top of the add member modal */}
+      {supervisorFor && (
+        <SupervisorPickerModal
+          forPerson={supervisorFor}
+          allPersonnel={allPersonnel}
+          layers={layers}
+          onSelect={chosenId => {
+            if (savingSupervisor) return
+            saveSupervisorAndContinue(chosenId)
+          }}
+          onCancel={() => setSupervisorFor(null)}
+        />
+      )}
+    </>
   )
 }
 
