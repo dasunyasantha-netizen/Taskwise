@@ -775,7 +775,7 @@ function AddMemberModal({
                     <div className="text-xs text-tw-text-secondary">{layer?.name} · {dept?.name}</div>
                     {hasSuper ? (
                       <div className="text-xs text-green-600 mt-0.5">
-                        ✓ {supervisorOverrides[p.id] ? 'Supervisor just assigned' : `Supervisor: ${(p.supervisor as unknown as { name: string })?.name}`}
+                        ✓ {supervisorOverrides[p.id] ? 'Supervisor just assigned' : 'Supervisor assigned'}
                       </div>
                     ) : (
                       <div className="text-xs text-amber-600 mt-0.5">⚠ No supervisor — tap to assign one</div>
