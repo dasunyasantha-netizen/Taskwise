@@ -795,15 +795,20 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
                 <>
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6 md:mb-8">
                     {[
-                      { label: 'Projects', value: stats.projects, color: 'text-tw-primary', bg: 'bg-blue-50', icon: '📋' },
-                      { label: 'Total Tasks', value: stats.totalTasks, color: 'text-tw-text', bg: 'bg-gray-50', icon: '✓' },
-                      { label: 'Pending Approval', value: stats.pending_approval, color: 'text-purple-600', bg: 'bg-purple-50', icon: '⏳' },
-                      { label: 'Overdue', value: stats.overdue, color: 'text-tw-danger', bg: 'bg-red-50', icon: '⚠' },
+                      { label: 'Projects',         value: stats.projects,          color: 'text-tw-primary',   bg: 'bg-blue-50',   icon: '📋', view: 'project_board'   as ViewMode },
+                      { label: 'Total Tasks',       value: stats.totalTasks,        color: 'text-tw-text',      bg: 'bg-gray-50',   icon: '✓',  view: 'project_board'   as ViewMode },
+                      { label: 'Pending Approval',  value: stats.pending_approval,  color: 'text-purple-600',   bg: 'bg-purple-50', icon: '⏳', view: 'approval_queue'  as ViewMode },
+                      { label: 'Overdue',           value: stats.overdue,           color: 'text-tw-danger',    bg: 'bg-red-50',    icon: '⚠',  view: 'overdue'         as ViewMode },
                     ].map(s => (
-                      <div key={s.label} className={`rounded-2xl p-4 ${s.bg} border border-white/50`}>
-                        <div className={`text-2xl md:text-3xl font-bold ${s.color} mb-0.5`}>{s.value}</div>
+                      <button
+                        key={s.label}
+                        onClick={() => navigate(s.view)}
+                        className={`rounded-2xl p-4 ${s.bg} border border-white/50 flex flex-col items-center justify-center text-center gap-1 hover:shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer`}
+                      >
+                        <div className="text-2xl leading-none mb-1">{s.icon}</div>
+                        <div className={`text-2xl md:text-3xl font-bold ${s.color}`}>{s.value}</div>
                         <div className="text-xs md:text-sm text-tw-text-secondary">{s.label}</div>
-                      </div>
+                      </button>
                     ))}
                   </div>
 
