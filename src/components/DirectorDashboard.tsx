@@ -606,8 +606,18 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
     { label: 'Dashboard', view: 'director_dashboard' as ViewMode, icon: '⊞' },
     { label: 'Projects',  view: 'project_board'      as ViewMode, icon: '📋' },
     { label: 'Approvals', view: 'approval_queue'     as ViewMode, icon: '✅', badge: stats.pending_approval },
-    { label: 'Hierarchy', view: 'hierarchy_manager'  as ViewMode, icon: '👥' },
-    { label: 'More',      view: 'profile'            as ViewMode, icon: '👤' },
+    { label: 'Groups',    view: 'group_tasks'        as ViewMode, icon: '🫂' },
+    { label: 'More',      view: null, icon: '☰' },
+  ]
+  const [showMobileMore, setShowMobileMore] = useState(false)
+  const mobileMoreItems = [
+    { label: 'Team Hierarchy',  view: 'hierarchy_manager' as ViewMode, icon: '👥' },
+    { label: 'Recent Updates',  view: 'recent_updates'    as ViewMode, icon: '🕐' },
+    { label: 'Broadcasts',      view: 'broadcasts'        as ViewMode, icon: '📢' },
+    { label: 'Overdue Tasks',   view: 'overdue'           as ViewMode, icon: '⏰', badge: stats.overdue },
+    { label: 'Audit Log',       view: 'audit_log'         as ViewMode, icon: '📜' },
+    { label: 'Settings',        view: 'settings'          as ViewMode, icon: '⚙️' },
+    { label: 'My Profile',      view: 'profile'           as ViewMode, icon: '👤' },
   ]
 
   return (
@@ -1003,14 +1013,47 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
       </div>
 
       {/* ── Mobile bottom tab bar ──────────────────────────────────────── */}
+      {/* Mobile More drawer */}
+      {showMobileMore && (
+        <div className="md:hidden fixed inset-0 z-30 flex flex-col justify-end">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowMobileMore(false)} />
+          <div className="relative bg-white rounded-t-2xl shadow-xl pb-safe">
+            <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mt-3 mb-2" />
+            <div className="px-4 pb-4 grid grid-cols-4 gap-2">
+              {mobileMoreItems.map(item => (
+                <button
+                  key={item.view}
+                  onClick={() => { navigate(item.view); setShowMobileMore(false) }}
+                  className={`flex flex-col items-center justify-center py-3 px-1 gap-1.5 rounded-xl relative transition-colors
+                    ${activeView === item.view ? 'bg-blue-50 text-tw-primary' : 'text-gray-500 hover:bg-gray-50'}`}
+                >
+                  <span className="text-2xl leading-none">{item.icon}</span>
+                  <span className="text-[10px] font-semibold leading-none text-center">{item.label}</span>
+                  {item.badge ? (
+                    <span className="absolute top-1 right-1 bg-red-500 text-white text-[9px] rounded-full w-4 h-4 flex items-center justify-center font-bold">
+                      {item.badge}
+                    </span>
+                  ) : null}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-20 bg-white border-t border-gray-200 shadow-[0_-2px_16px_rgba(0,0,0,0.08)]">
         <div className="flex items-stretch">
           {mobileNavItems.map(item => (
-            <button key={item.view}
-              onClick={() => { if (item.view === 'project_board') setSelectedProject(null); navigate(item.view) }}
+            <button key={item.view ?? 'more'}
+              onClick={() => {
+                if (item.view === null) { setShowMobileMore(o => !o); return }
+                if (item.view === 'project_board') setSelectedProject(null)
+                setShowMobileMore(false)
+                navigate(item.view)
+              }}
               className={`flex-1 flex flex-col items-center justify-center py-4 px-1 gap-1 relative transition-colors
-                ${activeView === item.view ? 'text-tw-primary' : 'text-gray-400'}`}>
-              {activeView === item.view && (
+                ${item.view !== null && activeView === item.view ? 'text-tw-primary' : showMobileMore && item.view === null ? 'text-tw-primary' : 'text-gray-400'}`}>
+              {item.view !== null && activeView === item.view && (
                 <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-tw-primary rounded-full" />
               )}
               <span className="text-lg leading-none">{item.icon}</span>
