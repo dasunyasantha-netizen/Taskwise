@@ -9,7 +9,6 @@ const TASK_INCLUDE = {
   assignments: {
     include: {
       personnel: { select: { id: true, name: true, avatarUrl: true } },
-      group: { select: { id: true, name: true } },
       department: { select: { id: true, name: true } },
     }
   },
