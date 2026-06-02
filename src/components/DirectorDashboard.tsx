@@ -14,6 +14,9 @@ import TaskDetailPanel from './TaskDetailPanel'
 import RecentUpdatesView from './RecentUpdatesView'
 import BroadcastsPage from './BroadcastsPage'
 import GroupWiseTasksPage from './GroupWiseTasksPage'
+import ReportsPage from './ReportsPage'
+import type { ReportsState } from './ReportsPage'
+import { DEFAULT_REPORTS_STATE } from './ReportsPage'
 
 interface Props {
   user: AuthUser
@@ -518,6 +521,9 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
     try { sessionStorage.setItem('tw_pm_filters', JSON.stringify(f)) } catch { /* ignore */ }
   }
 
+  // ── Lifted ReportsPage state ───────────────────────────────────────────────
+  const [reportsState, setReportsState] = useState<ReportsState>(DEFAULT_REPORTS_STATE)
+
   const navigate = (v: ViewMode) => {
     const scrollTop = mainRef.current?.scrollTop ?? 0
     setViewHistory(h => [...h, { view: currentView, scrollTop }])
@@ -607,6 +613,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
     { label: 'Recent Updates',  view: 'recent_updates'   as ViewMode, icon: '🕐' },
     { label: 'Broadcasts',      view: 'broadcasts'       as ViewMode, icon: '📢' },
     { label: 'Group Tasks',     view: 'group_tasks'      as ViewMode, icon: '🫂' },
+    { label: 'Reports',         view: 'reports'           as ViewMode, icon: '📊' },
     { label: 'Team Hierarchy',  view: 'hierarchy_manager' as ViewMode, icon: '👥' },
     { label: 'Audit Log',      view: 'audit_log'          as ViewMode, icon: '📜' },
     { label: 'Settings',       view: 'settings'           as ViewMode, icon: '⚙️' },
@@ -632,6 +639,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
   const [showMobileMore, setShowMobileMore] = useState(false)
   const mobileMoreItems = [
     { label: 'Team Hierarchy',  view: 'hierarchy_manager' as ViewMode, icon: '👥' },
+    { label: 'Reports',         view: 'reports'           as ViewMode, icon: '📊' },
     { label: 'Recent Updates',  view: 'recent_updates'    as ViewMode, icon: '🕐' },
     { label: 'Broadcasts',      view: 'broadcasts'        as ViewMode, icon: '📢' },
     { label: 'Overdue Tasks',   view: 'overdue'           as ViewMode, icon: '⏰', badge: stats.overdue },
@@ -742,6 +750,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
                   : currentView === 'project_board' ? 'Projects'
                   : currentView === 'recent_updates' ? 'Recent Updates'
                   : currentView === 'group_tasks' ? 'Group Tasks'
+                  : currentView === 'reports' ? 'Reports'
                   : 'My Profile'}
               </div>
             </div>
@@ -840,93 +849,24 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
                     ))}
                   </div>
 
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
-                    <div className="card overflow-hidden">
-                      <div className="px-4 py-3 border-b border-tw-border flex items-center justify-between">
-                        <span className="font-semibold text-tw-text text-sm">Pending Approvals</span>
-                        {approvalQueue.length > 0 && <button onClick={() => setView('approval_queue')} className="text-xs text-tw-primary hover:underline">View all</button>}
-                      </div>
-                      {approvalQueue.length === 0 ? (
-                        <div className="p-6 text-center text-tw-text-secondary text-sm">No tasks awaiting approval 🎉</div>
-                      ) : approvalQueue.slice(0, 4).map(t => (
-                        <div key={t.id} className="px-4 py-3 border-b border-tw-border last:border-0 flex items-center justify-between">
-                          <div>
-                            <div className="text-sm font-medium text-tw-text">{t.title}</div>
-                            <div className="text-xs text-tw-text-secondary">{t.project?.name}</div>
-                          </div>
-                          <span className="badge badge-purple text-xs">Submitted</span>
+                  {/* Reports shortcut */}
+                  <button
+                    onClick={() => navigate('reports')}
+                    className="w-full card p-5 flex items-center justify-between hover:shadow-panel transition-shadow group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">📊</span>
+                      <div className="text-left">
+                        <div className="font-semibold text-tw-text text-sm">Reports</div>
+                        <div className="text-xs text-tw-text-secondary mt-0.5">
+                          Overdue · Due soon · Pending approvals · Sitting longest · By officer · By department &amp; more
                         </div>
-                      ))}
-                    </div>
-
-                    <div className="card overflow-hidden">
-                      <div className="px-4 py-3 border-b border-tw-border flex items-center justify-between">
-                        <span className="font-semibold text-tw-text text-sm">Overdue Tasks</span>
-                        {overdueList.length > 0 && <button onClick={() => setView('overdue')} className="text-xs text-tw-danger hover:underline">View all</button>}
                       </div>
-                      {overdueList.length === 0 ? (
-                        <div className="p-6 text-center text-tw-text-secondary text-sm">No overdue tasks 🎉</div>
-                      ) : overdueList.slice(0, 4).map(t => (
-                        <div key={t.id} onClick={() => setSelectedTask(t)} className="px-4 py-3 border-b border-tw-border last:border-0 flex items-center justify-between cursor-pointer hover:bg-tw-hover transition-colors">
-                          <div>
-                            <div className="text-sm font-medium text-tw-text">{t.title}</div>
-                            <div className="text-xs text-tw-danger">{t.deadline ? new Date(t.deadline).toLocaleDateString() : ''}</div>
-                          </div>
-                          <span className="badge badge-danger text-xs">Overdue</span>
-                        </div>
-                      ))}
                     </div>
-
-                    {/* Due in next 7 days */}
-                    <div className="card overflow-hidden">
-                      <div className="px-4 py-3 border-b border-tw-border flex items-center justify-between">
-                        <span className="font-semibold text-tw-text text-sm">Due in Next 7 Days</span>
-                        <span className="text-xs text-tw-text-secondary">{dueSoonList.length} task{dueSoonList.length !== 1 ? 's' : ''}</span>
-                      </div>
-                      {dueSoonList.length === 0 ? (
-                        <div className="p-6 text-center text-tw-text-secondary text-sm">Nothing due in the next 7 days</div>
-                      ) : dueSoonList.slice(0, 4).map(t => {
-                        const daysLeft = Math.ceil((new Date(t.deadline!).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-                        return (
-                          <div key={t.id} onClick={() => setSelectedTask(t)} className="px-4 py-3 border-b border-tw-border last:border-0 flex items-center justify-between cursor-pointer hover:bg-tw-hover transition-colors">
-                            <div className="min-w-0 flex-1 mr-3">
-                              <div className="text-sm font-medium text-tw-text truncate">{t.title}</div>
-                              <div className="text-xs text-tw-text-secondary">{t.project?.name}</div>
-                            </div>
-                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${daysLeft <= 2 ? 'bg-orange-100 text-orange-700' : 'bg-yellow-50 text-yellow-700'}`}>
-                              {daysLeft === 1 ? 'Tomorrow' : `${daysLeft}d left`}
-                            </span>
-                          </div>
-                        )
-                      })}
-                    </div>
-
-                    {/* Stalest assigned tasks */}
-                    <div className="card overflow-hidden">
-                      <div className="px-4 py-3 border-b border-tw-border flex items-center justify-between">
-                        <span className="font-semibold text-tw-text text-sm">Sitting Longest</span>
-                        <span className="text-xs text-tw-text-secondary">Oldest 10 assigned</span>
-                      </div>
-                      {stalestList.length === 0 ? (
-                        <div className="p-6 text-center text-tw-text-secondary text-sm">No assigned tasks</div>
-                      ) : stalestList.slice(0, 4).map(t => {
-                        const assignedAt = new Date(t.assignments[0].assignedAt)
-                        const daysOld = Math.floor((Date.now() - assignedAt.getTime()) / (1000 * 60 * 60 * 24))
-                        const assignee = t.assignments[0].personnel?.name || t.assignments[0].department?.name || '—'
-                        return (
-                          <div key={t.id} onClick={() => setSelectedTask(t)} className="px-4 py-3 border-b border-tw-border last:border-0 flex items-center justify-between cursor-pointer hover:bg-tw-hover transition-colors">
-                            <div className="min-w-0 flex-1 mr-3">
-                              <div className="text-sm font-medium text-tw-text truncate">{t.title}</div>
-                              <div className="text-xs text-tw-text-secondary truncate">{assignee}</div>
-                            </div>
-                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${daysOld >= 14 ? 'bg-red-100 text-red-700' : daysOld >= 7 ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-600'}`}>
-                              {daysOld}d
-                            </span>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
+                    <svg className="w-5 h-5 text-tw-text-secondary group-hover:text-tw-primary transition-colors flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/>
+                    </svg>
+                  </button>
                 </>
               )}
             </div>
@@ -1017,6 +957,11 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
 
           {/* GROUP TASKS */}
           {currentView === 'group_tasks' && <GroupWiseTasksPage />}
+
+          {/* REPORTS */}
+          {currentView === 'reports' && (
+            <ReportsPage savedState={reportsState} onStateChange={setReportsState} scrollContainerRef={mainRef} />
+          )}
 
           {/* AUDIT LOG */}
           {currentView === 'audit_log' && (

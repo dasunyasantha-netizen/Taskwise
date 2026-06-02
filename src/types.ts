@@ -240,5 +240,6 @@ export type ViewMode =
   | 'recent_updates'
   | 'broadcasts'
   | 'group_tasks'
+  | 'reports'
   | 'settings'
   | 'profile'
