@@ -94,6 +94,43 @@ export function buildProjectLayerParams(filters: ActiveFilters): string {
   return parts.join('&')
 }
 
+/**
+ * Build query params for server-side task filtering from project page filters.
+ * Cascades layer filters: picks the most specific (deepest layer) active filter.
+ * Status and priority are included too so filtering is fully server-side.
+ */
+export function buildTaskFilterParams(filters: ActiveFilters): string {
+  const parts: string[] = []
+
+  // Pick the most specific layer filter (highest layer number = deepest)
+  const layerEntries = Object.values(filters.layerFilters).sort((a, b) => b.layerNumber - a.layerNumber)
+  if (layerEntries.length > 0) {
+    const lf = layerEntries[0]
+    if (lf.targetType === 'personnel' && lf.targetId) parts.push(`filterPersonnelId=${lf.targetId}`)
+    else if (lf.targetType === 'department' && lf.targetId) parts.push(`filterDepartmentId=${lf.targetId}`)
+    else parts.push(`filterLayerNumber=${lf.layerNumber}`)
+  }
+
+  const ef = filters.extra
+  if (ef.status)       parts.push(`status=${ef.status}`)
+  if (ef.deadlineFrom) parts.push(`deadlineFrom=${ef.deadlineFrom}`)
+  if (ef.deadlineTo)   parts.push(`deadlineTo=${ef.deadlineTo}`)
+  if (ef.createdFrom)  parts.push(`createdFrom=${ef.createdFrom}`)
+  if (ef.createdTo)    parts.push(`createdTo=${ef.createdTo}`)
+
+  // Only parent tasks (no group task instances) to avoid duplicates
+  parts.push('parentTaskId=null')
+
+  return parts.join('&')
+}
+
+/** Returns true if any filter is active */
+export function hasActiveFilters(filters: ActiveFilters): boolean {
+  const ef = filters.extra
+  return Object.keys(filters.layerFilters).length > 0 ||
+    !!(ef.status || ef.priority || ef.assignedTo || ef.createdFrom || ef.createdTo || ef.deadlineFrom || ef.deadlineTo)
+}
+
 // ─── Styled pill dropdown ─────────────────────────────────────────────────────
 
 interface PillSelectProps {

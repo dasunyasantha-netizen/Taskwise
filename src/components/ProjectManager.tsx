@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import type { Project, Layer, Personnel } from '../types'
-import { projectApi, workspaceApi } from '../services/apiService'
-import FilterBar, { DEFAULT_FILTERS, filterProjects, buildProjectLayerParams } from './FilterBar'
+import type { Project, Task, Layer, Personnel } from '../types'
+import { projectApi, taskApi, workspaceApi } from '../services/apiService'
+import FilterBar, { DEFAULT_FILTERS, filterProjects, buildProjectLayerParams, buildTaskFilterParams, hasActiveFilters } from './FilterBar'
 import type { ActiveFilters } from './FilterBar'
 
 interface Props {
@@ -68,8 +68,86 @@ function ActiveProjectCard({ project: p, onSelect, onEdit, onArchive }: ActivePr
   )
 }
 
+// ─── Status badge ─────────────────────────────────────────────────────────────
+
+const STATUS_STYLES: Record<string, string> = {
+  PENDING:     'bg-gray-100 text-gray-600',
+  ASSIGNED:    'bg-blue-50 text-blue-700',
+  IN_PROGRESS: 'bg-yellow-50 text-yellow-700',
+  SUBMITTED:   'bg-purple-50 text-purple-700',
+  APPROVED:    'bg-green-50 text-green-700',
+  RETURNED:    'bg-orange-50 text-orange-700',
+  CANCELLED:   'bg-red-50 text-red-500',
+}
+
+const STATUS_LABELS: Record<string, string> = {
+  PENDING: 'Pending', ASSIGNED: 'Assigned', IN_PROGRESS: 'In Progress',
+  SUBMITTED: 'Submitted', APPROVED: 'Approved', RETURNED: 'Returned', CANCELLED: 'Cancelled',
+}
+
+const PRIORITY_STYLES: Record<string, string> = {
+  CRITICAL: 'text-red-600', HIGH: 'text-orange-500', MEDIUM: 'text-yellow-600', LOW: 'text-gray-400',
+}
+
+function FilteredTaskCard({ task }: { task: Task }) {
+  const assignee = task.assignments?.[0]?.personnel
+  const dept = task.assignments?.[0]?.department
+  const isOverdue = task.deadline && task.status !== 'APPROVED' && task.status !== 'CANCELLED' && new Date(task.deadline) < new Date()
+
+  return (
+    <div className="card p-4 space-y-2.5">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-start gap-2 min-w-0">
+          <span className={`text-xs font-semibold mt-0.5 flex-shrink-0 ${PRIORITY_STYLES[task.priority] ?? 'text-gray-400'}`}>
+            {task.priority === 'CRITICAL' ? '!!' : task.priority === 'HIGH' ? '!' : task.priority === 'MEDIUM' ? '·' : '–'}
+          </span>
+          <span className="font-medium text-tw-text text-sm leading-snug">{task.title}</span>
+        </div>
+        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${STATUS_STYLES[task.status] ?? 'bg-gray-100 text-gray-600'}`}>
+          {STATUS_LABELS[task.status] ?? task.status}
+        </span>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-tw-text-secondary">
+        {assignee && (
+          <span className="flex items-center gap-1">
+            <span className="w-5 h-5 rounded-full bg-tw-primary/10 text-tw-primary font-bold flex items-center justify-center text-[10px] flex-shrink-0">
+              {assignee.name.charAt(0).toUpperCase()}
+            </span>
+            {assignee.name}
+          </span>
+        )}
+        {!assignee && dept && (
+          <span className="flex items-center gap-1">
+            <span className="text-tw-text-secondary">Dept:</span> {dept.name}
+          </span>
+        )}
+        {task.project && (
+          <span className="flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: task.project.color }} />
+            {task.project.name}
+          </span>
+        )}
+      </div>
+
+      <div className="flex items-center justify-between text-[11px] text-tw-text-secondary pt-0.5">
+        <span>Created {new Date(task.createdAt).toLocaleDateString()}</span>
+        {task.deadline && (
+          <span className={isOverdue ? 'text-tw-danger font-semibold' : ''}>
+            {isOverdue ? 'Overdue · ' : 'Due '}
+            {new Date(task.deadline).toLocaleDateString()}
+          </span>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
+
 export default function ProjectManager({ onSelectProject }: Props) {
   const [projects, setProjects] = useState<Project[]>([])
+  const [filteredTasks, setFilteredTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editingProject, setEditingProject] = useState<Project | null>(null)
@@ -80,13 +158,21 @@ export default function ProjectManager({ onSelectProject }: Props) {
   const [layers, setLayers] = useState<Layer[]>([])
   const [personnel, setPersonnel] = useState<Personnel[]>([])
 
+  const filtersActive = hasActiveFilters(filters)
+
   const load = async (f: ActiveFilters = filters) => {
     setLoading(true)
+    setError('')
     try {
-      const layerParams = buildProjectLayerParams(f)
-      setProjects(await projectApi.list(layerParams || undefined) as Project[])
+      if (hasActiveFilters(f)) {
+        const params = buildTaskFilterParams(f)
+        setFilteredTasks(await taskApi.list(params) as Task[])
+      } else {
+        setProjects(await projectApi.list() as Project[])
+      }
+    } catch {
+      setError(hasActiveFilters(f) ? 'Failed to load tasks' : 'Failed to load projects')
     }
-    catch { setError('Failed to load projects') }
     setLoading(false)
   }
 
@@ -108,7 +194,9 @@ export default function ProjectManager({ onSelectProject }: Props) {
     setSaving(true)
     try {
       await projectApi.create(form)
-      setShowModal(false); setForm({ name: '', description: '', color: '#0073ea' }); await load(filters)
+      setShowModal(false)
+      setForm({ name: '', description: '', color: '#0073ea' })
+      if (!filtersActive) await load(filters)
     } catch (e: unknown) { setError(e instanceof Error ? e.message : 'Error') }
     setSaving(false)
   }
@@ -116,7 +204,8 @@ export default function ProjectManager({ onSelectProject }: Props) {
   const archive = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation()
     if (!confirm('Archive this project?')) return
-    await projectApi.update(id, { status: 'archived' }); await load(filters)
+    await projectApi.update(id, { status: 'archived' })
+    await load(filters)
   }
 
   const openEdit = (p: Project, e: React.MouseEvent) => {
@@ -136,7 +225,7 @@ export default function ProjectManager({ onSelectProject }: Props) {
     setSaving(false)
   }
 
-  // Layer filters are applied server-side; extra filter (status/date) applied client-side
+  // Project view (no filters active)
   const filteredProjects = filterProjects(projects, filters)
   const allActive = projects.filter(p => p.status === 'active')
   const active = filteredProjects.filter(p => p.status === 'active')
@@ -147,9 +236,12 @@ export default function ProjectManager({ onSelectProject }: Props) {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-xl font-bold text-tw-text">Projects</h1>
-          <p className="text-sm text-tw-text-secondary mt-0.5">{active.length}{active.length !== allActive.length ? ` / ${allActive.length}` : ''} active project{allActive.length !== 1 ? 's' : ''}</p>
+          {filtersActive
+            ? <p className="text-sm text-tw-text-secondary mt-0.5">{loading ? '…' : filteredTasks.length} task{filteredTasks.length !== 1 ? 's' : ''} matched</p>
+            : <p className="text-sm text-tw-text-secondary mt-0.5">{active.length}{active.length !== allActive.length ? ` / ${allActive.length}` : ''} active project{allActive.length !== 1 ? 's' : ''}</p>
+          }
         </div>
-        <button onClick={() => setShowModal(true)} className="btn-primary">+ New Project</button>
+        {!filtersActive && <button onClick={() => setShowModal(true)} className="btn-primary">+ New Project</button>}
       </div>
 
       {error && <div className="mb-4 bg-red-50 border border-red-200 text-tw-danger text-sm px-3 py-2 rounded-lg">{error}</div>}
@@ -158,13 +250,27 @@ export default function ProjectManager({ onSelectProject }: Props) {
         filters={filters}
         layers={layers}
         personnel={personnel}
-        mode="project"
+        mode={filtersActive ? 'task' : 'project'}
         onChange={handleFilterChange}
       />
 
       {loading ? (
-        <div className="text-sm text-tw-text-secondary">Loading projects...</div>
+        <div className="text-sm text-tw-text-secondary">{filtersActive ? 'Loading tasks…' : 'Loading projects…'}</div>
+      ) : filtersActive ? (
+        /* ── Filtered task view ── */
+        filteredTasks.length === 0 ? (
+          <div className="card p-12 text-center">
+            <div className="text-3xl mb-3">🔍</div>
+            <p className="text-tw-text font-semibold mb-1">No tasks found</p>
+            <p className="text-tw-text-secondary text-sm">No tasks match the selected filters.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {filteredTasks.map(t => <FilteredTaskCard key={t.id} task={t} />)}
+          </div>
+        )
       ) : (
+        /* ── Default project view ── */
         <>
           {active.length === 0 && archived.length === 0 ? (
             <div className="card p-12 text-center">
@@ -180,7 +286,6 @@ export default function ProjectManager({ onSelectProject }: Props) {
                   <ActiveProjectCard key={p.id} project={p} onSelect={onSelectProject} onEdit={openEdit} onArchive={archive} />
                 ))}
               </div>
-
               {archived.length > 0 && (
                 <div>
                   <h3 className="text-sm font-semibold text-tw-text-secondary uppercase tracking-wide mb-3">Archived</h3>
@@ -237,7 +342,6 @@ export default function ProjectManager({ onSelectProject }: Props) {
         </div>
       )}
 
-      {/* Edit Project Modal */}
       {editingProject && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-panel w-full max-w-md">

@@ -66,7 +66,11 @@ async function notifyActor(db: TxClient | typeof prisma, workspaceId: string, re
 export async function listTasks(req: Request, res: Response): Promise<void> {
   try {
     const { actorId, actorType, workspaceId, layerNumber, departmentId } = req.user!
-    const { projectId, status, parentTaskId, overdue } = req.query as Record<string, string>
+    const {
+      projectId, status, parentTaskId, overdue,
+      filterPersonnelId, filterDepartmentId, filterLayerNumber,
+      deadlineFrom, deadlineTo, createdFrom, createdTo,
+    } = req.query as Record<string, string>
 
     const baseWhere: Record<string, unknown> = { workspaceId, deletedAt: null }
     if (projectId) baseWhere.projectId = projectId
@@ -74,6 +78,42 @@ export async function listTasks(req: Request, res: Response): Promise<void> {
     if (parentTaskId === 'null') baseWhere.parentTaskId = null
     else if (parentTaskId)       baseWhere.parentTaskId = parentTaskId
     if (overdue === 'true') baseWhere.deadline = { lt: new Date() }
+
+    // Cascading filter params sent from the project filter view
+    if (filterPersonnelId) {
+      baseWhere.assignments = { some: { personnelId: filterPersonnelId } }
+    } else if (filterDepartmentId) {
+      baseWhere.assignments = { some: { OR: [
+        { departmentId: filterDepartmentId },
+        { personnel: { departmentId: filterDepartmentId } },
+      ] } }
+    } else if (filterLayerNumber) {
+      const num = parseInt(filterLayerNumber)
+      const layer = await prisma.layer.findFirst({
+        where: { workspaceId, number: num },
+        include: { departments: { select: { id: true } } }
+      })
+      const deptIds = layer?.departments.map(d => d.id) ?? []
+      if (deptIds.length > 0) {
+        baseWhere.assignments = { some: { OR: [
+          { departmentId: { in: deptIds } },
+          { personnel: { departmentId: { in: deptIds } } },
+        ] } }
+      }
+    }
+
+    if (deadlineFrom || deadlineTo) {
+      const df: Record<string, Date> = {}
+      if (deadlineFrom) df.gte = new Date(deadlineFrom)
+      if (deadlineTo)   df.lte = new Date(deadlineTo + 'T23:59:59')
+      baseWhere.deadline = df
+    }
+    if (createdFrom || createdTo) {
+      const cf: Record<string, Date> = {}
+      if (createdFrom) cf.gte = new Date(createdFrom)
+      if (createdTo)   cf.lte = new Date(createdTo + 'T23:59:59')
+      baseWhere.createdAt = cf
+    }
 
     // Apply visibility filter for personnel
     const visibilityFilter = await buildTaskVisibilityFilter(actorType, actorId, workspaceId, layerNumber, departmentId)
