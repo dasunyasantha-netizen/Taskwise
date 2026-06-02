@@ -26,36 +26,43 @@ export interface ActiveFilters {
   extra: ExtraFilter
 }
 
+// Available option IDs derived from currently-filtered task set, per layer number
+export type AvailableOptions = {
+  // layerNumber → set of available dept IDs and personnel IDs for that layer's dropdown
+  layers: Record<number, { deptIds: Set<string>; personnelIds: Set<string> }>
+  statuses: Set<string>
+  priorities: Set<string>
+}
+
 const EMPTY_EXTRA: ExtraFilter = { status: null, priority: null, assignedTo: null, createdFrom: null, createdTo: null, deadlineFrom: null, deadlineTo: null }
 export const DEFAULT_FILTERS: ActiveFilters = { layerFilters: {}, extra: EMPTY_EXTRA }
 
 // ─── Filter logic ─────────────────────────────────────────────────────────────
 
+function applyOneLayerFilter(tasks: Task[], lf: LayerFilter, layers: Layer[], personnel: Personnel[]): Task[] {
+  const layer = layers.find(l => l.number === lf.layerNumber)
+  if (!layer) return tasks
+  const layerDeptIds = (layer.departments ?? []).map(d => d.id)
+  return tasks.filter(task => {
+    const assignments = task.assignments ?? []
+    if (lf.targetType === 'personnel' && lf.targetId)
+      return assignments.some(a => a.personnelId === lf.targetId)
+    if (lf.targetType === 'department' && lf.targetId)
+      return assignments.some(a =>
+        a.departmentId === lf.targetId ||
+        (a.personnelId && personnel.find(p => p.id === a.personnelId)?.departmentId === lf.targetId)
+      )
+    return assignments.some(a =>
+      (a.departmentId && layerDeptIds.includes(a.departmentId)) ||
+      (a.personnelId && layerDeptIds.includes(personnel.find(p => p.id === a.personnelId)?.departmentId ?? ''))
+    )
+  })
+}
+
 export function filterTasks(tasks: Task[], filters: ActiveFilters, layers: Layer[], personnel: Personnel[]): Task[] {
   let result = tasks
-
-  for (const lf of Object.values(filters.layerFilters)) {
-    const layer = layers.find(l => l.number === lf.layerNumber)
-    if (!layer) continue
-    const layerDeptIds = (layer.departments ?? []).map(d => d.id)
-
-    result = result.filter(task => {
-      const assignments = task.assignments ?? []
-      if (lf.targetType === 'personnel' && lf.targetId) {
-        return assignments.some(a => a.personnelId === lf.targetId)
-      }
-      if (lf.targetType === 'department' && lf.targetId) {
-        return assignments.some(a =>
-          a.departmentId === lf.targetId ||
-          (a.personnelId && personnel.find(p => p.id === a.personnelId)?.departmentId === lf.targetId)
-        )
-      }
-      return assignments.some(a =>
-        (a.departmentId && layerDeptIds.includes(a.departmentId)) ||
-        (a.personnelId && layerDeptIds.includes(personnel.find(p => p.id === a.personnelId)?.departmentId ?? ''))
-      )
-    })
-  }
+  const sortedLayers = Object.values(filters.layerFilters).sort((a, b) => a.layerNumber - b.layerNumber)
+  for (const lf of sortedLayers) result = applyOneLayerFilter(result, lf, layers, personnel)
 
   const ef = filters.extra
   if (ef.status)       result = result.filter(t => t.status === ef.status)
@@ -65,6 +72,62 @@ export function filterTasks(tasks: Task[], filters: ActiveFilters, layers: Layer
   if (ef.createdTo)    result = result.filter(t => new Date(t.createdAt) <= new Date(ef.createdTo!))
   if (ef.deadlineFrom) result = result.filter(t => t.deadline && new Date(t.deadline) >= new Date(ef.deadlineFrom!))
   if (ef.deadlineTo)   result = result.filter(t => t.deadline && new Date(t.deadline) <= new Date(ef.deadlineTo!))
+  return result
+}
+
+/** Extract the dept IDs and personnel IDs that appear in a task set's assignments */
+function extractAssignedIds(tasks: Task[], layers: Layer[], personnel: Personnel[], layerNumber: number): { deptIds: Set<string>; personnelIds: Set<string> } {
+  const layer = layers.find(l => l.number === layerNumber)
+  const layerDeptIds = new Set((layer?.departments ?? []).map(d => d.id))
+  const deptIds = new Set<string>()
+  const personnelIds = new Set<string>()
+  for (const task of tasks) {
+    for (const a of task.assignments ?? []) {
+      if (a.departmentId && layerDeptIds.has(a.departmentId)) deptIds.add(a.departmentId)
+      if (a.personnelId) {
+        const p = personnel.find(p => p.id === a.personnelId)
+        if (p && layerDeptIds.has(p.departmentId)) personnelIds.add(a.personnelId)
+        // also track dept via personnel's dept
+        if (p && layerDeptIds.has(p.departmentId)) deptIds.add(p.departmentId)
+      }
+    }
+  }
+  return { deptIds, personnelIds }
+}
+
+/**
+ * Compute available options for each layer dropdown and for status/priority.
+ * For layer N: apply all filters for layers < N, then extract which depts/personnel remain.
+ * For status/priority: apply all layer filters, then extract distinct values.
+ */
+export function computeAvailableOptions(
+  allTasks: Task[],
+  filters: ActiveFilters,
+  layers: Layer[],
+  personnel: Personnel[]
+): AvailableOptions {
+  const sortedLayerNums = layers.map(l => l.number).sort((a, b) => a - b)
+  const result: AvailableOptions = { layers: {}, statuses: new Set(), priorities: new Set() }
+
+  // For each layer's dropdown: apply only the filters from earlier layers
+  for (const layerNum of sortedLayerNums) {
+    let tasksForLayer = allTasks
+    for (const lf of Object.values(filters.layerFilters).sort((a, b) => a.layerNumber - b.layerNumber)) {
+      if (lf.layerNumber >= layerNum) break
+      tasksForLayer = applyOneLayerFilter(tasksForLayer, lf, layers, personnel)
+    }
+    result.layers[layerNum] = extractAssignedIds(tasksForLayer, layers, personnel, layerNum)
+  }
+
+  // For status/priority: apply all layer filters
+  let tasksForExtra = allTasks
+  for (const lf of Object.values(filters.layerFilters).sort((a, b) => a.layerNumber - b.layerNumber)) {
+    tasksForExtra = applyOneLayerFilter(tasksForExtra, lf, layers, personnel)
+  }
+  for (const t of tasksForExtra) {
+    result.statuses.add(t.status)
+    result.priorities.add(t.priority)
+  }
 
   return result
 }
@@ -207,13 +270,66 @@ function ClearPill({ onClick }: { onClick: () => void }) {
 
 // ─── Per-layer filter group (single grouped dropdown) ────────────────────────
 
+type LayerAvailable = { deptIds: Set<string>; personnelIds: Set<string> } | undefined
+
 interface LayerGroupProps {
   layer: Layer
   filter: LayerFilter | undefined
+  available: LayerAvailable
   onChange: (f: LayerFilter | null) => void
 }
 
-function LayerGroup({ layer, filter, onChange }: LayerGroupProps) {
+// Shared dropdown body rendered inside a portal for all three LayerGroup variants
+function LayerDropdown({
+  pos, layer, filter, available, onSelect, onClose,
+}: {
+  pos: { top: number; left: number; w: number }
+  layer: Layer
+  filter: LayerFilter | undefined
+  available: LayerAvailable
+  onSelect: (f: LayerFilter | null) => void
+  onClose: () => void
+}) {
+  const depts = layer.departments ?? []
+
+  // When available is set, filter to only items with matching tasks
+  const visibleDepts = available ? depts.filter(d => available.deptIds.has(d.id)) : depts
+  const visiblePeople = available
+    ? depts.flatMap(d => (d.personnel ?? []).filter(p => available.personnelIds.has(p.id)).map(p => ({ p, dName: d.name })))
+    : depts.flatMap(d => (d.personnel ?? []).map(p => ({ p, dName: d.name })))
+
+  return createPortal(
+    <div style={{ position: 'fixed', top: pos.top, left: pos.left, width: pos.w, zIndex: 9999 }}
+      className="bg-white border border-tw-border rounded-xl shadow-panel overflow-y-auto max-h-72 py-1"
+      onMouseDown={e => e.preventDefault()}>
+      <button onMouseDown={() => { onSelect(null); onClose() }}
+        className={`w-full text-left px-3 py-2 text-xs hover:bg-tw-hover transition-colors ${!filter ? 'text-tw-primary font-semibold bg-[#f0f6ff]' : 'text-tw-text'}`}>
+        All
+      </button>
+      {visibleDepts.length > 0 && <>
+        <div className="px-3 pt-2 pb-1"><span className="text-[10px] font-bold text-tw-text-secondary uppercase tracking-wider">Departments</span></div>
+        {visibleDepts.map(d => (
+          <button key={d.id} onMouseDown={() => { onSelect({ layerNumber: layer.number, targetType: 'department', targetId: d.id }); onClose() }}
+            className={`w-full text-left px-3 py-2 text-xs hover:bg-tw-hover transition-colors ${filter?.targetType === 'department' && filter.targetId === d.id ? 'text-tw-primary font-semibold bg-[#f0f6ff]' : 'text-tw-text'}`}>
+            {d.name}
+          </button>
+        ))}
+      </>}
+      {visiblePeople.length > 0 && <>
+        <div className="px-3 pt-2 pb-1 border-t border-tw-border/30 mt-1"><span className="text-[10px] font-bold text-tw-text-secondary uppercase tracking-wider">People</span></div>
+        {visiblePeople.map(({ p, dName }) => (
+          <button key={p.id} onMouseDown={() => { onSelect({ layerNumber: layer.number, targetType: 'personnel', targetId: p.id }); onClose() }}
+            className={`w-full text-left px-3 py-2 text-xs hover:bg-tw-hover transition-colors ${filter?.targetType === 'personnel' && filter.targetId === p.id ? 'text-tw-primary font-semibold bg-[#f0f6ff]' : 'text-tw-text'}`}>
+            {p.name}<span className="ml-1.5 text-tw-text-secondary text-[10px]">· {dName}</span>
+          </button>
+        ))}
+      </>}
+    </div>,
+    document.body
+  )
+}
+
+function LayerGroup({ layer, filter, available, onChange }: LayerGroupProps) {
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState({ top: 0, left: 0, w: 0 })
   const ref = useRef<HTMLButtonElement>(null)
@@ -233,94 +349,30 @@ function LayerGroup({ layer, filter, onChange }: LayerGroupProps) {
     setOpen(o => !o)
   }
 
-  // Derive display label from current filter
   let displayLabel = 'All'
   if (filter) {
-    if (filter.targetType === 'department' && filter.targetId) {
+    if (filter.targetType === 'department' && filter.targetId)
       displayLabel = depts.find(d => d.id === filter.targetId)?.name ?? 'Dept'
-    } else if (filter.targetType === 'personnel' && filter.targetId) {
-      for (const dept of depts) {
-        const p = dept.personnel?.find(p => p.id === filter.targetId)
-        if (p) { displayLabel = p.name; break }
-      }
+    else if (filter.targetType === 'personnel' && filter.targetId) {
+      for (const dept of depts) { const p = dept.personnel?.find(p => p.id === filter.targetId); if (p) { displayLabel = p.name; break } }
     }
   }
 
-  const isActive = !!filter
-
   return (
     <>
-      <span className="text-[11px] font-semibold text-tw-text-secondary uppercase tracking-wide whitespace-nowrap self-center">
-        {layer.name}
-      </span>
+      <span className="text-[11px] font-semibold text-tw-text-secondary uppercase tracking-wide whitespace-nowrap self-center">{layer.name}</span>
       <div className="flex items-center gap-1.5 min-w-0">
-        <button
-          ref={ref}
-          onMouseDown={e => { e.preventDefault(); handleOpen() }}
+        <button ref={ref} onMouseDown={e => { e.preventDefault(); handleOpen() }}
           className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all whitespace-nowrap ${
-            isActive
-              ? 'bg-[#f0f6ff] border-tw-primary text-tw-primary'
-              : 'bg-white border-tw-border text-tw-text-secondary hover:border-tw-primary/50 hover:text-tw-text'
-          }`}
-        >
+            filter ? 'bg-[#f0f6ff] border-tw-primary text-tw-primary' : 'bg-white border-tw-border text-tw-text-secondary hover:border-tw-primary/50 hover:text-tw-text'
+          }`}>
           {displayLabel}
           <svg className={`w-3 h-3 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
           </svg>
         </button>
-        {isActive && <ClearPill onClick={() => onChange(null)} />}
-
-        {open && createPortal(
-          <div
-            style={{ position: 'fixed', top: pos.top, left: pos.left, width: pos.w, zIndex: 9999 }}
-            className="bg-white border border-tw-border rounded-xl shadow-panel overflow-y-auto max-h-72 py-1"
-            onMouseDown={e => e.preventDefault()}
-          >
-            {/* All option */}
-            <button
-              onMouseDown={() => { onChange(null); setOpen(false) }}
-              className={`w-full text-left px-3 py-2 text-xs hover:bg-tw-hover transition-colors ${!filter ? 'text-tw-primary font-semibold bg-[#f0f6ff]' : 'text-tw-text'}`}
-            >
-              All
-            </button>
-
-            {/* Departments section */}
-            {depts.length > 0 && (
-              <>
-                <div className="px-3 pt-2 pb-1">
-                  <span className="text-[10px] font-bold text-tw-text-secondary uppercase tracking-wider">Departments</span>
-                </div>
-                {depts.map(d => (
-                  <button key={d.id}
-                    onMouseDown={() => { onChange({ layerNumber: layer.number, targetType: 'department', targetId: d.id }); setOpen(false) }}
-                    className={`w-full text-left px-3 py-2 text-xs hover:bg-tw-hover transition-colors ${filter?.targetType === 'department' && filter.targetId === d.id ? 'text-tw-primary font-semibold bg-[#f0f6ff]' : 'text-tw-text'}`}
-                  >
-                    {d.name}
-                  </button>
-                ))}
-              </>
-            )}
-
-            {/* People section */}
-            {depts.some(d => (d.personnel?.length ?? 0) > 0) && (
-              <>
-                <div className="px-3 pt-2 pb-1 border-t border-tw-border/30 mt-1">
-                  <span className="text-[10px] font-bold text-tw-text-secondary uppercase tracking-wider">People</span>
-                </div>
-                {depts.flatMap(d => (d.personnel ?? []).map(p => (
-                  <button key={p.id}
-                    onMouseDown={() => { onChange({ layerNumber: layer.number, targetType: 'personnel', targetId: p.id }); setOpen(false) }}
-                    className={`w-full text-left px-3 py-2 text-xs hover:bg-tw-hover transition-colors ${filter?.targetType === 'personnel' && filter.targetId === p.id ? 'text-tw-primary font-semibold bg-[#f0f6ff]' : 'text-tw-text'}`}
-                  >
-                    <span>{p.name}</span>
-                    <span className="ml-1.5 text-tw-text-secondary text-[10px]">· {d.name}</span>
-                  </button>
-                )))}
-              </>
-            )}
-          </div>,
-          document.body
-        )}
+        {filter && <ClearPill onClick={() => onChange(null)} />}
+        {open && <LayerDropdown pos={pos} layer={layer} filter={filter} available={available} onSelect={onChange} onClose={() => setOpen(false)} />}
       </div>
     </>
   )
@@ -366,6 +418,8 @@ interface ExtraGroupProps {
   filter: ExtraFilter
   personnel: Personnel[]
   mode: 'task' | 'project'
+  availableStatuses?: Set<string>
+  availablePriorities?: Set<string>
   onChange: (f: ExtraFilter) => void
 }
 
@@ -441,9 +495,9 @@ function ExtraGroup({ filter, personnel, mode, onChange }: ExtraGroupProps) {
   )
 }
 
-// ─── Desktop inline variants ─────────────────────────────────────────────────
+// ─── Desktop inline layer dropdown ───────────────────────────────────────────
 
-function LayerGroupInline({ layer, filter, onChange }: LayerGroupProps) {
+function LayerGroupInline({ layer, filter, available, onChange }: LayerGroupProps) {
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState({ top: 0, left: 0, w: 0 })
   const ref = useRef<HTMLButtonElement>(null)
@@ -484,87 +538,14 @@ function LayerGroupInline({ layer, filter, onChange }: LayerGroupProps) {
         </svg>
       </button>
       {filter && <ClearPill onClick={() => onChange(null)} />}
-      {open && createPortal(
-        <div style={{ position: 'fixed', top: pos.top, left: pos.left, width: pos.w, zIndex: 9999 }}
-          className="bg-white border border-tw-border rounded-xl shadow-panel overflow-y-auto max-h-72 py-1" onMouseDown={e => e.preventDefault()}>
-          <button onMouseDown={() => { onChange(null); setOpen(false) }}
-            className={`w-full text-left px-3 py-2 text-xs hover:bg-tw-hover ${!filter ? 'text-tw-primary font-semibold bg-[#f0f6ff]' : 'text-tw-text'}`}>All</button>
-          {depts.length > 0 && <>
-            <div className="px-3 pt-2 pb-1"><span className="text-[10px] font-bold text-tw-text-secondary uppercase tracking-wider">Departments</span></div>
-            {depts.map(d => <button key={d.id} onMouseDown={() => { onChange({ layerNumber: layer.number, targetType: 'department', targetId: d.id }); setOpen(false) }}
-              className={`w-full text-left px-3 py-2 text-xs hover:bg-tw-hover ${filter?.targetType === 'department' && filter.targetId === d.id ? 'text-tw-primary font-semibold bg-[#f0f6ff]' : 'text-tw-text'}`}>{d.name}</button>)}
-          </>}
-          {depts.some(d => (d.personnel?.length ?? 0) > 0) && <>
-            <div className="px-3 pt-2 pb-1 border-t border-tw-border/30 mt-1"><span className="text-[10px] font-bold text-tw-text-secondary uppercase tracking-wider">People</span></div>
-            {depts.flatMap(d => (d.personnel ?? []).map(p => <button key={p.id} onMouseDown={() => { onChange({ layerNumber: layer.number, targetType: 'personnel', targetId: p.id }); setOpen(false) }}
-              className={`w-full text-left px-3 py-2 text-xs hover:bg-tw-hover ${filter?.targetType === 'personnel' && filter.targetId === p.id ? 'text-tw-primary font-semibold bg-[#f0f6ff]' : 'text-tw-text'}`}>
-              {p.name}<span className="ml-1.5 text-tw-text-secondary text-[10px]">· {d.name}</span></button>))}
-          </>}
-        </div>, document.body
-      )}
+      {open && <LayerDropdown pos={pos} layer={layer} filter={filter} available={available} onSelect={onChange} onClose={() => setOpen(false)} />}
     </div>
   )
 }
 
-function ExtraGroupInline({ filter, personnel, mode, onChange }: ExtraGroupProps) {
-  const STATUS_TASK = [
-    { value: 'PENDING', label: 'Pending' }, { value: 'ASSIGNED', label: 'Assigned' },
-    { value: 'IN_PROGRESS', label: 'In Progress' },
-    { value: 'SUBMITTED', label: 'Submitted' }, { value: 'APPROVED', label: 'Approved' },
-    { value: 'RETURNED', label: 'Returned' }, { value: 'CANCELLED', label: 'Cancelled' },
-  ]
-  const STATUS_PROJ = [{ value: 'active', label: 'Active' }, { value: 'archived', label: 'Archived' }]
-  const PRIORITY = [{ value: 'CRITICAL', label: 'Critical' }, { value: 'HIGH', label: 'High' }, { value: 'MEDIUM', label: 'Medium' }, { value: 'LOW', label: 'Low' }]
-  const DC = DATE_PILL
+// ─── Mobile layer dropdown ────────────────────────────────────────────────────
 
-  return (
-    <>
-      {/* Status */}
-      <div className="inline-flex items-center gap-1">
-        <span className="text-[11px] font-semibold text-tw-text-secondary uppercase tracking-wide whitespace-nowrap">Status:</span>
-        <PillSelect value={filter.status ?? ''} options={mode === 'task' ? STATUS_TASK : STATUS_PROJ}
-          placeholder="Any" active={!!filter.status} onChange={v => onChange({ ...filter, status: v || null })} />
-        {filter.status && <ClearPill onClick={() => onChange({ ...filter, status: null })} />}
-      </div>
-      {mode === 'task' && <>
-        <span className="self-stretch w-px bg-tw-border/50 mx-1 rounded-full" />
-        <div className="inline-flex items-center gap-1">
-          <span className="text-[11px] font-semibold text-tw-text-secondary uppercase tracking-wide whitespace-nowrap">Priority:</span>
-          <PillSelect value={filter.priority ?? ''} options={PRIORITY}
-            placeholder="Any" active={!!filter.priority} onChange={v => onChange({ ...filter, priority: v || null })} />
-          {filter.priority && <ClearPill onClick={() => onChange({ ...filter, priority: null })} />}
-        </div>
-        <span className="self-stretch w-px bg-tw-border/50 mx-1 rounded-full" />
-        <div className="inline-flex items-center gap-1">
-          <span className="text-[11px] font-semibold text-tw-text-secondary uppercase tracking-wide whitespace-nowrap">Assigned:</span>
-          <PillSelect value={filter.assignedTo ?? ''} options={personnel.map(p => ({ value: p.id, label: p.name }))}
-            placeholder="Anyone" active={!!filter.assignedTo} width={180} onChange={v => onChange({ ...filter, assignedTo: v || null })} />
-          {filter.assignedTo && <ClearPill onClick={() => onChange({ ...filter, assignedTo: null })} />}
-        </div>
-        <span className="self-stretch w-px bg-tw-border/50 mx-1 rounded-full" />
-      </>}
-      <div className="inline-flex items-center gap-1.5 flex-wrap">
-        <span className="text-[11px] font-semibold text-tw-text-secondary uppercase tracking-wide whitespace-nowrap">Deadline:</span>
-        <DatePicker value={filter.deadlineFrom ?? ''} onChange={v => onChange({ ...filter, deadlineFrom: v || null })} placeholder="From…" triggerClassName={DC(!!filter.deadlineFrom)} />
-        <span className="text-[11px] text-tw-text-secondary">→</span>
-        <DatePicker value={filter.deadlineTo ?? ''} onChange={v => onChange({ ...filter, deadlineTo: v || null })} placeholder="To…" triggerClassName={DC(!!filter.deadlineTo)} />
-        {(filter.deadlineFrom || filter.deadlineTo) && <ClearPill onClick={() => onChange({ ...filter, deadlineFrom: null, deadlineTo: null })} />}
-      </div>
-      <span className="text-tw-border/80 text-base select-none">·</span>
-      <div className="inline-flex items-center gap-1.5 flex-wrap">
-        <span className="text-[11px] font-semibold text-tw-text-secondary uppercase tracking-wide whitespace-nowrap">Created:</span>
-        <DatePicker value={filter.createdFrom ?? ''} onChange={v => onChange({ ...filter, createdFrom: v || null })} placeholder="From…" triggerClassName={DC(!!filter.createdFrom)} />
-        <span className="text-[11px] text-tw-text-secondary">→</span>
-        <DatePicker value={filter.createdTo ?? ''} onChange={v => onChange({ ...filter, createdTo: v || null })} placeholder="To…" triggerClassName={DC(!!filter.createdTo)} />
-        {(filter.createdFrom || filter.createdTo) && <ClearPill onClick={() => onChange({ ...filter, createdFrom: null, createdTo: null })} />}
-      </div>
-    </>
-  )
-}
-
-// ─── Mobile variants (label left, control right) ─────────────────────────────
-
-function LayerGroupMobile({ layer, filter, onChange }: LayerGroupProps) {
+function LayerGroupMobile({ layer, filter, available, onChange }: LayerGroupProps) {
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState({ top: 0, left: 0, w: 0 })
   const ref = useRef<HTMLButtonElement>(null)
@@ -604,38 +585,82 @@ function LayerGroupMobile({ layer, filter, onChange }: LayerGroupProps) {
         </svg>
       </button>
       {filter && <ClearPill onClick={() => onChange(null)} />}
-      {open && createPortal(
-        <div style={{ position: 'fixed', top: pos.top, left: pos.left, width: pos.w, zIndex: 9999 }}
-          className="bg-white border border-tw-border rounded-xl shadow-panel overflow-y-auto max-h-72 py-1" onMouseDown={e => e.preventDefault()}>
-          <button onMouseDown={() => { onChange(null); setOpen(false) }}
-            className={`w-full text-left px-3 py-2 text-xs hover:bg-tw-hover ${!filter ? 'text-tw-primary font-semibold bg-[#f0f6ff]' : 'text-tw-text'}`}>All</button>
-          {depts.length > 0 && <>
-            <div className="px-3 pt-2 pb-1"><span className="text-[10px] font-bold text-tw-text-secondary uppercase tracking-wider">Departments</span></div>
-            {depts.map(d => <button key={d.id} onMouseDown={() => { onChange({ layerNumber: layer.number, targetType: 'department', targetId: d.id }); setOpen(false) }}
-              className={`w-full text-left px-3 py-2 text-xs hover:bg-tw-hover ${filter?.targetType === 'department' && filter.targetId === d.id ? 'text-tw-primary font-semibold bg-[#f0f6ff]' : 'text-tw-text'}`}>{d.name}</button>)}
-          </>}
-          {depts.some(d => (d.personnel?.length ?? 0) > 0) && <>
-            <div className="px-3 pt-2 pb-1 border-t border-tw-border/30 mt-1"><span className="text-[10px] font-bold text-tw-text-secondary uppercase tracking-wider">People</span></div>
-            {depts.flatMap(d => (d.personnel ?? []).map(p => <button key={p.id} onMouseDown={() => { onChange({ layerNumber: layer.number, targetType: 'personnel', targetId: p.id }); setOpen(false) }}
-              className={`w-full text-left px-3 py-2 text-xs hover:bg-tw-hover ${filter?.targetType === 'personnel' && filter.targetId === p.id ? 'text-tw-primary font-semibold bg-[#f0f6ff]' : 'text-tw-text'}`}>
-              {p.name}<span className="ml-1.5 text-tw-text-secondary text-[10px]">· {d.name}</span></button>))}
-          </>}
-        </div>, document.body
-      )}
+      {open && <LayerDropdown pos={pos} layer={layer} filter={filter} available={available} onSelect={onChange} onClose={() => setOpen(false)} />}
     </div>
   )
 }
 
-function ExtraGroupMobile({ filter, personnel, mode, onChange }: ExtraGroupProps) {
-  const STATUS_TASK = [
-    { value: 'PENDING', label: 'Pending' }, { value: 'ASSIGNED', label: 'Assigned' },
-    { value: 'IN_PROGRESS', label: 'In Progress' },
-    { value: 'SUBMITTED', label: 'Submitted' }, { value: 'APPROVED', label: 'Approved' },
-    { value: 'RETURNED', label: 'Returned' }, { value: 'CANCELLED', label: 'Cancelled' },
-  ]
-  const STATUS_PROJ = [{ value: 'active', label: 'Active' }, { value: 'archived', label: 'Archived' }]
-  const PRIORITY = [{ value: 'CRITICAL', label: 'Critical' }, { value: 'HIGH', label: 'High' }, { value: 'MEDIUM', label: 'Medium' }, { value: 'LOW', label: 'Low' }]
+// ─── Extra filter groups (status, priority, dates) ────────────────────────────
+
+const ALL_STATUSES = [
+  { value: 'PENDING', label: 'Pending' }, { value: 'ASSIGNED', label: 'Assigned' },
+  { value: 'IN_PROGRESS', label: 'In Progress' }, { value: 'SUBMITTED', label: 'Submitted' },
+  { value: 'APPROVED', label: 'Approved' }, { value: 'RETURNED', label: 'Returned' },
+  { value: 'CANCELLED', label: 'Cancelled' },
+]
+const ALL_PRIORITIES = [
+  { value: 'CRITICAL', label: 'Critical' }, { value: 'HIGH', label: 'High' },
+  { value: 'MEDIUM', label: 'Medium' }, { value: 'LOW', label: 'Low' },
+]
+const STATUS_PROJ = [{ value: 'active', label: 'Active' }, { value: 'archived', label: 'Archived' }]
+
+function ExtraGroupInline({ filter, personnel, mode, availableStatuses, availablePriorities, onChange }: ExtraGroupProps) {
   const DC = DATE_PILL
+  const statusOpts = mode === 'task'
+    ? (availableStatuses ? ALL_STATUSES.filter(s => availableStatuses.has(s.value)) : ALL_STATUSES)
+    : STATUS_PROJ
+  const priorityOpts = availablePriorities ? ALL_PRIORITIES.filter(p => availablePriorities.has(p.value)) : ALL_PRIORITIES
+
+  return (
+    <>
+      <div className="inline-flex items-center gap-1">
+        <span className="text-[11px] font-semibold text-tw-text-secondary uppercase tracking-wide whitespace-nowrap">Status:</span>
+        <PillSelect value={filter.status ?? ''} options={statusOpts}
+          placeholder="Any" active={!!filter.status} onChange={v => onChange({ ...filter, status: v || null })} />
+        {filter.status && <ClearPill onClick={() => onChange({ ...filter, status: null })} />}
+      </div>
+      {mode === 'task' && <>
+        <span className="self-stretch w-px bg-tw-border/50 mx-1 rounded-full" />
+        <div className="inline-flex items-center gap-1">
+          <span className="text-[11px] font-semibold text-tw-text-secondary uppercase tracking-wide whitespace-nowrap">Priority:</span>
+          <PillSelect value={filter.priority ?? ''} options={priorityOpts}
+            placeholder="Any" active={!!filter.priority} onChange={v => onChange({ ...filter, priority: v || null })} />
+          {filter.priority && <ClearPill onClick={() => onChange({ ...filter, priority: null })} />}
+        </div>
+        <span className="self-stretch w-px bg-tw-border/50 mx-1 rounded-full" />
+        <div className="inline-flex items-center gap-1">
+          <span className="text-[11px] font-semibold text-tw-text-secondary uppercase tracking-wide whitespace-nowrap">Assigned:</span>
+          <PillSelect value={filter.assignedTo ?? ''} options={personnel.map(p => ({ value: p.id, label: p.name }))}
+            placeholder="Anyone" active={!!filter.assignedTo} width={180} onChange={v => onChange({ ...filter, assignedTo: v || null })} />
+          {filter.assignedTo && <ClearPill onClick={() => onChange({ ...filter, assignedTo: null })} />}
+        </div>
+        <span className="self-stretch w-px bg-tw-border/50 mx-1 rounded-full" />
+      </>}
+      <div className="inline-flex items-center gap-1.5 flex-wrap">
+        <span className="text-[11px] font-semibold text-tw-text-secondary uppercase tracking-wide whitespace-nowrap">Deadline:</span>
+        <DatePicker value={filter.deadlineFrom ?? ''} onChange={v => onChange({ ...filter, deadlineFrom: v || null })} placeholder="From…" triggerClassName={DC(!!filter.deadlineFrom)} />
+        <span className="text-[11px] text-tw-text-secondary">→</span>
+        <DatePicker value={filter.deadlineTo ?? ''} onChange={v => onChange({ ...filter, deadlineTo: v || null })} placeholder="To…" triggerClassName={DC(!!filter.deadlineTo)} />
+        {(filter.deadlineFrom || filter.deadlineTo) && <ClearPill onClick={() => onChange({ ...filter, deadlineFrom: null, deadlineTo: null })} />}
+      </div>
+      <span className="text-tw-border/80 text-base select-none">·</span>
+      <div className="inline-flex items-center gap-1.5 flex-wrap">
+        <span className="text-[11px] font-semibold text-tw-text-secondary uppercase tracking-wide whitespace-nowrap">Created:</span>
+        <DatePicker value={filter.createdFrom ?? ''} onChange={v => onChange({ ...filter, createdFrom: v || null })} placeholder="From…" triggerClassName={DC(!!filter.createdFrom)} />
+        <span className="text-[11px] text-tw-text-secondary">→</span>
+        <DatePicker value={filter.createdTo ?? ''} onChange={v => onChange({ ...filter, createdTo: v || null })} placeholder="To…" triggerClassName={DC(!!filter.createdTo)} />
+        {(filter.createdFrom || filter.createdTo) && <ClearPill onClick={() => onChange({ ...filter, createdFrom: null, createdTo: null })} />}
+      </div>
+    </>
+  )
+}
+
+function ExtraGroupMobile({ filter, personnel, mode, availableStatuses, availablePriorities, onChange }: ExtraGroupProps) {
+  const DC = DATE_PILL
+  const statusOpts = mode === 'task'
+    ? (availableStatuses ? ALL_STATUSES.filter(s => availableStatuses.has(s.value)) : ALL_STATUSES)
+    : STATUS_PROJ
+  const priorityOpts = availablePriorities ? ALL_PRIORITIES.filter(p => availablePriorities.has(p.value)) : ALL_PRIORITIES
 
   const Row = ({ label, children }: { label: string; children: React.ReactNode }) => (
     <div className="flex items-center justify-between gap-3">
@@ -647,14 +672,14 @@ function ExtraGroupMobile({ filter, personnel, mode, onChange }: ExtraGroupProps
   return (
     <>
       <Row label="Status">
-        <PillSelect value={filter.status ?? ''} options={mode === 'task' ? STATUS_TASK : STATUS_PROJ}
+        <PillSelect value={filter.status ?? ''} options={statusOpts}
           placeholder="Any" active={!!filter.status} onChange={v => onChange({ ...filter, status: v || null })} />
         {filter.status && <ClearPill onClick={() => onChange({ ...filter, status: null })} />}
       </Row>
       {mode === 'task' && <>
         <div className="border-t border-tw-border/30" />
         <Row label="Priority">
-          <PillSelect value={filter.priority ?? ''} options={PRIORITY}
+          <PillSelect value={filter.priority ?? ''} options={priorityOpts}
             placeholder="Any" active={!!filter.priority} onChange={v => onChange({ ...filter, priority: v || null })} />
           {filter.priority && <ClearPill onClick={() => onChange({ ...filter, priority: null })} />}
         </Row>
@@ -690,10 +715,11 @@ interface FilterBarProps {
   layers: Layer[]
   personnel: Personnel[]
   mode: 'task' | 'project'
+  availableOptions?: AvailableOptions
   onChange: (f: ActiveFilters) => void
 }
 
-export default function FilterBar({ filters, layers, personnel, mode, onChange }: FilterBarProps) {
+export default function FilterBar({ filters, layers, personnel, mode, availableOptions, onChange }: FilterBarProps) {
   const [expanded, setExpanded] = useState(false)
 
   const activeLayerCount = Object.keys(filters.layerFilters).length
@@ -705,69 +731,59 @@ export default function FilterBar({ filters, layers, personnel, mode, onChange }
   const clearAll = () => onChange(DEFAULT_FILTERS)
 
   const setLayerFilter = (layerNumber: number, lf: LayerFilter | null) => {
-    const next = { ...filters.layerFilters }
-    if (lf === null) delete next[layerNumber]
-    else next[layerNumber] = lf
+    // When clearing or changing a layer filter, also clear all deeper layer filters
+    const next: Record<number, LayerFilter> = {}
+    for (const [num, f] of Object.entries(filters.layerFilters)) {
+      if (Number(num) < layerNumber) next[Number(num)] = f
+    }
+    if (lf !== null) next[layerNumber] = lf
     onChange({ ...filters, layerFilters: next })
   }
 
   return (
     <div className="mb-5">
       <div className="flex items-center gap-2">
-        <button
-          onClick={() => setExpanded(e => !e)}
+        <button onClick={() => setExpanded(e => !e)}
           className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
-            isActive
-              ? 'bg-[#f0f6ff] border-tw-primary text-tw-primary'
-              : 'bg-white border-tw-border text-tw-text-secondary hover:border-tw-primary/50 hover:text-tw-text'
-          }`}
-        >
+            isActive ? 'bg-[#f0f6ff] border-tw-primary text-tw-primary' : 'bg-white border-tw-border text-tw-text-secondary hover:border-tw-primary/50 hover:text-tw-text'
+          }`}>
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h18M7 8h10M10 12h4" />
           </svg>
           Filter
-          {isActive && (
-            <span className="bg-tw-primary text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-bold leading-none">
-              {activeCount}
-            </span>
-          )}
+          {isActive && <span className="bg-tw-primary text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-bold leading-none">{activeCount}</span>}
           <svg className={`w-3 h-3 flex-shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
           </svg>
         </button>
-        {isActive && !expanded && (
-          <button onClick={clearAll} className="text-xs text-tw-text-secondary hover:text-tw-danger transition-colors">
-            Clear all
-          </button>
-        )}
+        {isActive && !expanded && <button onClick={clearAll} className="text-xs text-tw-text-secondary hover:text-tw-danger transition-colors">Clear all</button>}
       </div>
 
-      {/* Desktop: horizontal inline chips, wrapping */}
+      {/* Desktop: horizontal inline chips */}
       {expanded && (
         <div className="hidden md:block mt-3 px-4 py-3 bg-[#f8f9ff] border border-tw-border/60 rounded-xl">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
-            {layers.map((layer, i) => (
+            {layers.map(layer => (
               <React.Fragment key={layer.id}>
                 <LayerGroupInline layer={layer} filter={filters.layerFilters[layer.number]}
+                  available={availableOptions?.layers[layer.number]}
                   onChange={lf => setLayerFilter(layer.number, lf)} />
                 <span className="self-stretch w-px bg-tw-border/50 mx-1 rounded-full" />
               </React.Fragment>
             ))}
             <ExtraGroupInline filter={filters.extra} personnel={personnel} mode={mode}
+              availableStatuses={availableOptions?.statuses}
+              availablePriorities={availableOptions?.priorities}
               onChange={f => onChange({ ...filters, extra: f })} />
-            {isActive && (
-              <>
-                <span className="self-stretch w-px bg-tw-border/50 mx-1 rounded-full" />
-                <button onClick={clearAll} className="text-xs text-tw-text-secondary hover:text-tw-danger transition-colors whitespace-nowrap">
-                  Clear all
-                </button>
-              </>
-            )}
+            {isActive && <>
+              <span className="self-stretch w-px bg-tw-border/50 mx-1 rounded-full" />
+              <button onClick={clearAll} className="text-xs text-tw-text-secondary hover:text-tw-danger transition-colors whitespace-nowrap">Clear all</button>
+            </>}
           </div>
         </div>
       )}
 
-      {/* Mobile: bottom sheet via portal */}
+      {/* Mobile: bottom sheet */}
       {expanded && createPortal(
         <div className="md:hidden fixed inset-0 z-50 flex flex-col justify-end">
           <div className="absolute inset-0 bg-black/40" onClick={() => setExpanded(false)} />
@@ -783,11 +799,10 @@ export default function FilterBar({ filters, layers, personnel, mode, onChange }
               {layers.map((layer, i) => (
                 <React.Fragment key={layer.id}>
                   <div className="flex items-center justify-between gap-3">
-                    <span className="text-[11px] font-semibold text-tw-text-secondary uppercase tracking-wide whitespace-nowrap flex-shrink-0">
-                      {layer.name}
-                    </span>
+                    <span className="text-[11px] font-semibold text-tw-text-secondary uppercase tracking-wide whitespace-nowrap flex-shrink-0">{layer.name}</span>
                     <div className="flex justify-end">
                       <LayerGroupMobile layer={layer} filter={filters.layerFilters[layer.number]}
+                        available={availableOptions?.layers[layer.number]}
                         onChange={lf => setLayerFilter(layer.number, lf)} />
                     </div>
                   </div>
@@ -796,6 +811,8 @@ export default function FilterBar({ filters, layers, personnel, mode, onChange }
               ))}
               {layers.length > 0 && <div className="border-t border-tw-border/30" />}
               <ExtraGroupMobile filter={filters.extra} personnel={personnel} mode={mode}
+                availableStatuses={availableOptions?.statuses}
+                availablePriorities={availableOptions?.priorities}
                 onChange={f => onChange({ ...filters, extra: f })} />
             </div>
             <div className="px-4 py-3 border-t border-tw-border flex-shrink-0">

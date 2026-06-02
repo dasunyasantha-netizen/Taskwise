@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import type { Project, Task, Layer, Personnel } from '../types'
 import { projectApi, taskApi, workspaceApi } from '../services/apiService'
-import FilterBar, { DEFAULT_FILTERS, filterProjects, buildProjectLayerParams, buildTaskFilterParams, hasActiveFilters } from './FilterBar'
-import type { ActiveFilters } from './FilterBar'
+import FilterBar, { DEFAULT_FILTERS, filterProjects, filterTasks, computeAvailableOptions, hasActiveFilters } from './FilterBar'
+import type { ActiveFilters, AvailableOptions } from './FilterBar'
 
 interface Props {
   onSelectProject: (project: Project) => void
@@ -147,7 +147,7 @@ function FilteredTaskCard({ task }: { task: Task }) {
 
 export default function ProjectManager({ onSelectProject }: Props) {
   const [projects, setProjects] = useState<Project[]>([])
-  const [filteredTasks, setFilteredTasks] = useState<Task[]>([])
+  const [allTasks, setAllTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editingProject, setEditingProject] = useState<Project | null>(null)
@@ -159,19 +159,21 @@ export default function ProjectManager({ onSelectProject }: Props) {
   const [personnel, setPersonnel] = useState<Personnel[]>([])
 
   const filtersActive = hasActiveFilters(filters)
+  const filteredTasks = filtersActive ? filterTasks(allTasks, filters, layers, personnel) : []
+  const availableOptions: AvailableOptions = computeAvailableOptions(allTasks, filters, layers, personnel)
 
-  const load = async (f: ActiveFilters = filters) => {
+  const load = async () => {
     setLoading(true)
     setError('')
     try {
-      if (hasActiveFilters(f)) {
-        const params = buildTaskFilterParams(f)
-        setFilteredTasks(await taskApi.list(params) as Task[])
-      } else {
-        setProjects(await projectApi.list() as Project[])
-      }
+      const [projs, tasks] = await Promise.all([
+        projectApi.list() as Promise<Project[]>,
+        taskApi.list('parentTaskId=null') as Promise<Task[]>,
+      ])
+      setProjects(projs)
+      setAllTasks(tasks)
     } catch {
-      setError(hasActiveFilters(f) ? 'Failed to load tasks' : 'Failed to load projects')
+      setError('Failed to load projects')
     }
     setLoading(false)
   }
@@ -186,7 +188,6 @@ export default function ProjectManager({ onSelectProject }: Props) {
 
   const handleFilterChange = (f: ActiveFilters) => {
     setFilters(f)
-    load(f)
   }
 
   const create = async () => {
@@ -196,7 +197,7 @@ export default function ProjectManager({ onSelectProject }: Props) {
       await projectApi.create(form)
       setShowModal(false)
       setForm({ name: '', description: '', color: '#0073ea' })
-      if (!filtersActive) await load(filters)
+      await load()
     } catch (e: unknown) { setError(e instanceof Error ? e.message : 'Error') }
     setSaving(false)
   }
@@ -205,7 +206,7 @@ export default function ProjectManager({ onSelectProject }: Props) {
     e.stopPropagation()
     if (!confirm('Archive this project?')) return
     await projectApi.update(id, { status: 'archived' })
-    await load(filters)
+    await load()
   }
 
   const openEdit = (p: Project, e: React.MouseEvent) => {
@@ -220,7 +221,7 @@ export default function ProjectManager({ onSelectProject }: Props) {
     try {
       await projectApi.update(editingProject.id, form)
       setEditingProject(null)
-      await load(filters)
+      await load()
     } catch (e: unknown) { setError(e instanceof Error ? e.message : 'Error') }
     setSaving(false)
   }
@@ -251,6 +252,7 @@ export default function ProjectManager({ onSelectProject }: Props) {
         layers={layers}
         personnel={personnel}
         mode={filtersActive ? 'task' : 'project'}
+        availableOptions={availableOptions}
         onChange={handleFilterChange}
       />
 
