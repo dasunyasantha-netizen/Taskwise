@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import type { AuthUser, ViewMode, Project, Task, AuditLog, TaskComment, Layer, Personnel } from '../types'
 import ElapsedDays from './ElapsedDays'
 import { projectApi, taskApi, auditApi, workspaceApi } from '../services/apiService'
@@ -500,22 +500,42 @@ function MobileUserMenu({ user, onProfile, onSettings, onLogout }: { user: AuthU
 
 // ─── Director Dashboard ───────────────────────────────────────────────────────
 export default function DirectorDashboard({ user, currentView, setView, onLogout, onUserUpdate }: Props) {
-  const [viewHistory, setViewHistory] = useState<ViewMode[]>([])
+  // ── Navigation history (view + scroll position) ───────────────────────────
+  const [viewHistory, setViewHistory] = useState<Array<{ view: ViewMode; scrollTop: number }>>([])
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
   const [projectSubView, setProjectSubView]   = useState<ProjectSubView>('board')
+  const mainRef = useRef<HTMLDivElement>(null)
+
+  // ── Lifted ProjectManager state (survives view switches) ─────────────────
+  const [pmFilters, setPmFilters] = useState<import('./FilterBar').ActiveFilters>(
+    () => { try { const s = sessionStorage.getItem('tw_pm_filters'); return s ? JSON.parse(s) : { layerFilters: {}, extra: { status: null, priority: null, assignedTo: null, createdFrom: null, createdTo: null, deadlineFrom: null, deadlineTo: null } } } catch { return { layerFilters: {}, extra: { status: null, priority: null, assignedTo: null, createdFrom: null, createdTo: null, deadlineFrom: null, deadlineTo: null } } } }
+  )
+  const [pmAllTasks, setPmAllTasks] = useState<Task[]>([])
+  const [pmProjects, setPmProjects] = useState<Project[]>([])
+
+  const handlePmFiltersChange = (f: import('./FilterBar').ActiveFilters) => {
+    setPmFilters(f)
+    try { sessionStorage.setItem('tw_pm_filters', JSON.stringify(f)) } catch { /* ignore */ }
+  }
 
   const navigate = (v: ViewMode) => {
-    setViewHistory(h => [...h, currentView])
+    const scrollTop = mainRef.current?.scrollTop ?? 0
+    setViewHistory(h => [...h, { view: currentView, scrollTop }])
     setView(v)
   }
   const goBack = () => {
-    const prev = viewHistory[viewHistory.length - 1]
-    if (prev) {
+    const entry = viewHistory[viewHistory.length - 1]
+    if (entry) {
       setViewHistory(h => h.slice(0, -1))
-      setView(prev)
-      if (prev !== 'project_board') setSelectedProject(null)
+      setView(entry.view)
+      if (entry.view !== 'project_board') setSelectedProject(null)
+      // Restore scroll position after React re-renders
+      requestAnimationFrame(() => {
+        if (mainRef.current) mainRef.current.scrollTop = entry.scrollTop
+      })
     }
   }
+  const canGoBack = viewHistory.length > 0 && currentView !== 'director_dashboard'
   const [stats, setStats] = useState({ projects: 0, totalTasks: 0, overdue: 0, pending_approval: 0 })
   const [recentTasks, setRecentTasks] = useState<Task[]>([])
   const [overdueList, setOverdueTasks] = useState<Task[]>([])
@@ -682,13 +702,32 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
       <div className="flex-1 flex flex-col min-w-0 relative z-10">
         {/* Top bar */}
         <header className="bg-[#1f2d3d] md:bg-tw-surface border-b border-white/10 md:border-tw-border px-4 md:px-6 py-3 md:py-3.5 flex items-center justify-between flex-shrink-0">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             {user.companyLogo ? (
               <img src={user.companyLogo} alt="Logo" className="w-7 h-7 rounded object-contain md:hidden" />
             ) : (
               <div className="w-7 h-7 bg-tw-primary rounded-lg flex items-center justify-center md:hidden flex-shrink-0">
                 <span className="text-white font-bold text-xs">T</span>
               </div>
+            )}
+            {/* Back button — desktop (left of title) and mobile */}
+            {canGoBack && (
+              <button
+                onClick={() => {
+                  if (currentView === 'project_board' && selectedProject) {
+                    setSelectedProject(null)
+                    goBack()
+                  } else {
+                    goBack()
+                  }
+                }}
+                className="flex items-center gap-1 text-white/70 md:text-tw-text-secondary hover:text-white md:hover:text-tw-primary transition-colors p-1.5 rounded-lg"
+                title="Go back"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/>
+                </svg>
+              </button>
             )}
             <div>
               <div className="font-bold text-white md:text-tw-text text-sm md:text-base">
@@ -700,6 +739,9 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
                   : currentView === 'audit_log' ? 'Audit Log'
                   : currentView === 'broadcasts' ? 'Broadcasts'
                   : currentView === 'settings' ? 'Settings'
+                  : currentView === 'project_board' ? 'Projects'
+                  : currentView === 'recent_updates' ? 'Recent Updates'
+                  : currentView === 'group_tasks' ? 'Group Tasks'
                   : 'My Profile'}
               </div>
             </div>
@@ -717,20 +759,6 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
                 </button>
               </div>
             )}
-            {currentView === 'project_board' && selectedProject ? (
-              <button onClick={() => { setSelectedProject(null); goBack() }}
-                className="md:hidden text-white/70 p-1.5 rounded-lg">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/>
-                </svg>
-              </button>
-            ) : viewHistory.length > 0 && currentView !== 'director_dashboard' ? (
-              <button onClick={goBack} className="md:hidden text-white/70 p-1.5 rounded-lg">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/>
-                </svg>
-              </button>
-            ) : null}
             {/* Install App button — mobile only, show when not installed */}
             {canInstall && (
               <button onClick={isIOS ? () => setShowIOSGuide(true) : installApp}
@@ -783,7 +811,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
           </div>
         </header>
 
-        <main className="flex-1 overflow-auto pb-20 md:pb-0">
+        <main ref={mainRef} className="flex-1 overflow-auto pb-20 md:pb-0">
 
           {/* DASHBOARD */}
           {currentView === 'director_dashboard' && (
@@ -906,7 +934,13 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
 
           {/* PROJECTS */}
           {currentView === 'project_board' && !selectedProject && (
-            <ProjectManager onSelectProject={handleSelectProject} />
+            <ProjectManager
+              onSelectProject={handleSelectProject}
+              filters={pmFilters}
+              onFiltersChange={handlePmFiltersChange}
+              allTasks={pmAllTasks}
+              onAllTasksLoaded={(tasks, projs) => { setPmAllTasks(tasks); setPmProjects(projs) }}
+            />
           )}
           {currentView === 'project_board' && selectedProject && projectSubView === 'board' && (
             <BoardView project={selectedProject} isDirector={true} actorId={user.actorId} />

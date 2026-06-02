@@ -6,6 +6,11 @@ import type { ActiveFilters, AvailableOptions } from './FilterBar'
 
 interface Props {
   onSelectProject: (project: Project) => void
+  // Lifted state — passed from parent so filter/task state survives view changes
+  filters: ActiveFilters
+  onFiltersChange: (f: ActiveFilters) => void
+  allTasks: Task[]
+  onAllTasksLoaded: (tasks: Task[], projects: Project[]) => void
 }
 
 const PROJECT_COLORS = ['#0073ea', '#00c875', '#e2445c', '#fdab3d', '#a358df', '#037f4c', '#bb3354', '#0086c0']
@@ -145,16 +150,14 @@ function FilteredTaskCard({ task }: { task: Task }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function ProjectManager({ onSelectProject }: Props) {
+export default function ProjectManager({ onSelectProject, filters, onFiltersChange, allTasks, onAllTasksLoaded }: Props) {
   const [projects, setProjects] = useState<Project[]>([])
-  const [allTasks, setAllTasks] = useState<Task[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(allTasks.length === 0)
   const [showModal, setShowModal] = useState(false)
   const [editingProject, setEditingProject] = useState<Project | null>(null)
   const [form, setForm] = useState({ name: '', description: '', color: '#0073ea' })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const [filters, setFilters] = useState<ActiveFilters>(DEFAULT_FILTERS)
   const [layers, setLayers] = useState<Layer[]>([])
   const [personnel, setPersonnel] = useState<Personnel[]>([])
 
@@ -171,7 +174,7 @@ export default function ProjectManager({ onSelectProject }: Props) {
         taskApi.list('parentTaskId=null') as Promise<Task[]>,
       ])
       setProjects(projs)
-      setAllTasks(tasks)
+      onAllTasksLoaded(tasks, projs)  // lift tasks+projects to parent for state preservation
     } catch {
       setError('Failed to load projects')
     }
@@ -179,16 +182,14 @@ export default function ProjectManager({ onSelectProject }: Props) {
   }
 
   useEffect(() => {
-    load()
+    if (allTasks.length === 0) load()
     Promise.all([
       workspaceApi.getLayers() as Promise<Layer[]>,
       workspaceApi.getPersonnel() as Promise<Personnel[]>,
     ]).then(([l, p]) => { setLayers(l); setPersonnel(p) }).catch(() => {})
   }, [])
 
-  const handleFilterChange = (f: ActiveFilters) => {
-    setFilters(f)
-  }
+  const handleFilterChange = onFiltersChange
 
   const create = async () => {
     if (!form.name) return

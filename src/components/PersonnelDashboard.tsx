@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import type { AuthUser, ViewMode, Task, Project, Personnel, TaskProgressLog } from '../types'
 import { taskApi, projectApi, workspaceApi } from '../services/apiService'
 import NotificationsMenu from './NotificationsMenu'
@@ -793,11 +793,33 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
   const [personnel, setPersonnel]       = useState<Personnel[]>([])
   const [mySupervisorId, setMySupervisorId] = useState<string | null | undefined>(undefined)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
-  const [taskStack, setTaskStack]       = useState<Task[]>([])  // navigation history for back button
+  const [taskStack, setTaskStack]       = useState<Task[]>([])
   const [expandedId, setExpandedId]     = useState<string | null>(null)
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
   const [loading, setLoading]           = useState(true)
   const [error, setError]               = useState('')
+
+  // ── Navigation history ────────────────────────────────────────────────────
+  const [viewHistory, setViewHistory] = useState<Array<{ view: typeof currentView; scrollTop: number }>>([])
+  const mainRef = useRef<HTMLDivElement>(null)
+
+  const navigate = (v: typeof currentView) => {
+    const scrollTop = mainRef.current?.scrollTop ?? 0
+    setViewHistory(h => [...h, { view: currentView, scrollTop }])
+    setView(v)
+  }
+  const goBack = () => {
+    const entry = viewHistory[viewHistory.length - 1]
+    if (entry) {
+      setViewHistory(h => h.slice(0, -1))
+      setView(entry.view)
+      if (entry.view !== 'project_board') setSelectedProject(null)
+      requestAnimationFrame(() => {
+        if (mainRef.current) mainRef.current.scrollTop = entry.scrollTop
+      })
+    }
+  }
+  const canGoBack = viewHistory.length > 0 && currentView !== 'personnel_queue'
 
   const load = async () => {
     setLoading(true)
@@ -890,7 +912,7 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
 
         <nav className="flex-1 px-3 py-3 space-y-0.5">
           {navItems.map(item => (
-            <button key={item.view} onClick={() => { setView(item.view); setSelectedProject(null) }}
+            <button key={item.view} onClick={() => { navigate(item.view); setSelectedProject(null) }}
               className={`w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2.5
                 ${currentView === item.view
                   ? 'bg-tw-primary text-white shadow-sm'
@@ -907,7 +929,7 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
         </nav>
 
         <div className="px-3 py-3 border-t border-white/10">
-          <button onClick={() => setView('profile' as ViewMode)}
+          <button onClick={() => navigate('profile' as ViewMode)}
             className="flex items-center gap-2.5 px-2 py-2 mb-1 w-full rounded-lg hover:bg-white/10 transition-colors">
             {user.avatarUrl ? (
               <img src={user.avatarUrl} alt="Avatar" className="w-8 h-8 rounded-full object-cover" />
@@ -928,15 +950,34 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
 
       {/* ── Main ────────────────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-w-0 relative z-10">
-        {/* Mobile top bar */}
+        {/* Top bar */}
         <header className="bg-[#1f2d3d] md:bg-tw-surface border-b border-white/10 md:border-tw-border px-4 md:px-6 py-3 md:py-3.5 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             {user.companyLogo ? (
               <img src={user.companyLogo} alt="Logo" className="w-7 h-7 rounded object-contain md:hidden" />
             ) : (
               <div className="w-7 h-7 bg-tw-primary rounded-lg flex items-center justify-center md:hidden flex-shrink-0">
                 <span className="text-white font-bold text-xs">T</span>
               </div>
+            )}
+            {/* Back button */}
+            {canGoBack && (
+              <button
+                onClick={() => {
+                  if (currentView === 'project_board' && selectedProject) {
+                    setSelectedProject(null)
+                    goBack()
+                  } else {
+                    goBack()
+                  }
+                }}
+                className="flex items-center gap-1 text-white/70 md:text-tw-text-secondary hover:text-white md:hover:text-tw-primary transition-colors p-1.5 rounded-lg"
+                title="Go back"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/>
+                </svg>
+              </button>
             )}
             <div>
               <span className="font-bold text-white md:text-tw-text text-sm md:text-base capitalize">
@@ -1001,11 +1042,11 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
               </button>
             )}
             <NotificationsMenu />
-            <MobileUserMenu user={user} onProfile={() => setView('profile' as ViewMode)} onLogout={onLogout} />
+            <MobileUserMenu user={user} onProfile={() => navigate('profile' as ViewMode)} onLogout={onLogout} />
           </div>
         </header>
 
-        <main className="flex-1 overflow-auto pb-20 md:pb-0">
+        <main ref={mainRef} className="flex-1 overflow-auto pb-20 md:pb-0">
           {/* ── MY QUEUE ──────────────────────────────────────────────── */}
           {currentView === 'personnel_queue' && (
             <div className="p-4 md:p-6">
@@ -1240,7 +1281,7 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
                   {projects.filter(p => p.status === 'active').map(p => (
-                    <div key={p.id} onClick={() => setSelectedProject(p)}
+                    <div key={p.id} onClick={() => { const scrollTop = mainRef.current?.scrollTop ?? 0; setViewHistory(h => [...h, { view: currentView, scrollTop }]); setSelectedProject(p) }}
                       className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 cursor-pointer active:scale-[0.98] hover:shadow-md transition-all">
                       <div className="flex items-center gap-3 mb-2">
                         <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: p.color + '22' }}>
@@ -1275,7 +1316,7 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
         <div className="flex items-stretch">
           {navItems.map(item => (
             <button key={item.view}
-              onClick={() => { setView(item.view); setSelectedProject(null) }}
+              onClick={() => { navigate(item.view); setSelectedProject(null) }}
               className={`flex-1 flex flex-col items-center justify-center py-4 px-1 gap-1 relative transition-colors
                 ${currentView === item.view ? 'text-tw-primary' : 'text-gray-400'}`}>
               {/* Active indicator */}
