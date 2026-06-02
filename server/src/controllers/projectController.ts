@@ -17,7 +17,6 @@ export async function listProjects(req: Request, res: Response): Promise<void> {
       taskWhereClauses.push({ assignments: { some: { OR: [
         { departmentId },
         { personnel: { departmentId } },
-        { group: { departmentId } },
       ] } } })
     } else if (layerNumber) {
       const num = parseInt(layerNumber)
@@ -30,7 +29,6 @@ export async function listProjects(req: Request, res: Response): Promise<void> {
         taskWhereClauses.push({ assignments: { some: { OR: [
           { departmentId: { in: deptIds } },
           { personnel: { departmentId: { in: deptIds } } },
-          { group: { departmentId: { in: deptIds } } },
         ] } } })
       }
     }
