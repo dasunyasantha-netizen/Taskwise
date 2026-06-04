@@ -6,6 +6,7 @@ import {
   returnTask, approveTask, rejectTask, reopenTask, cancelTask,
   getSubtasks, getComments, addComment, getTaskHistory,
   getProgressLogs, addProgressLog,
+  extendDeadline, getDeadlineExtensions,
 } from '../controllers/taskController'
 
 const router = Router()
@@ -32,7 +33,9 @@ router.get('/:id/subtasks',        getSubtasks)
 router.get('/:id/comments',        getComments)
 router.post('/:id/comments',       addComment)
 router.get('/:id/history',         getTaskHistory)
-router.get('/:id/progress-logs',   getProgressLogs)
-router.post('/:id/progress-logs',  addProgressLog)
+router.get('/:id/progress-logs',        getProgressLogs)
+router.post('/:id/progress-logs',       addProgressLog)
+router.post('/:id/extend-deadline',     extendDeadline)
+router.get('/:id/deadline-extensions',  getDeadlineExtensions)
 
 export default router

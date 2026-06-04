@@ -17,6 +17,7 @@ import GroupWiseTasksPage from './GroupWiseTasksPage'
 import ReportsPage from './ReportsPage'
 import type { ReportsState } from './ReportsPage'
 import { DEFAULT_REPORTS_STATE } from './ReportsPage'
+import ImpersonationPage from './ImpersonationPage'
 
 interface Props {
   user: AuthUser
@@ -24,6 +25,7 @@ interface Props {
   setView: (v: ViewMode) => void
   onLogout: () => void
   onUserUpdate: (updated: Partial<AuthUser>) => void
+  onImpersonationStart?: (token: string, impersonatedUser: AuthUser) => void
 }
 
 type ProjectSubView = 'board' | 'flowchart'
@@ -502,7 +504,7 @@ function MobileUserMenu({ user, onProfile, onSettings, onLogout }: { user: AuthU
 }
 
 // ─── Director Dashboard ───────────────────────────────────────────────────────
-export default function DirectorDashboard({ user, currentView, setView, onLogout, onUserUpdate }: Props) {
+export default function DirectorDashboard({ user, currentView, setView, onLogout, onUserUpdate, onImpersonationStart }: Props) {
   // ── Navigation history (view + scroll position) ───────────────────────────
   const [viewHistory, setViewHistory] = useState<Array<{ view: ViewMode; scrollTop: number }>>([])
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
@@ -616,6 +618,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
     { label: 'Reports',         view: 'reports'           as ViewMode, icon: '📊' },
     { label: 'Team Hierarchy',  view: 'hierarchy_manager' as ViewMode, icon: '👥' },
     { label: 'Audit Log',      view: 'audit_log'          as ViewMode, icon: '📜' },
+    ...(user.isChairman ? [{ label: 'User Access', view: 'impersonation' as ViewMode, icon: '🔐' }] : []),
     { label: 'Settings',       view: 'settings'           as ViewMode, icon: '⚙️' },
     { label: 'My Profile',     view: 'profile'            as ViewMode, icon: '👤' },
   ]
@@ -644,6 +647,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
     { label: 'Broadcasts',      view: 'broadcasts'        as ViewMode, icon: '📢' },
     { label: 'Overdue Tasks',   view: 'overdue'           as ViewMode, icon: '⏰', badge: stats.overdue },
     { label: 'Audit Log',       view: 'audit_log'         as ViewMode, icon: '📜' },
+    ...(user.isChairman ? [{ label: 'User Access', view: 'impersonation' as ViewMode, icon: '🔐' }] : []),
     { label: 'Settings',        view: 'settings'          as ViewMode, icon: '⚙️' },
     { label: 'My Profile',      view: 'profile'           as ViewMode, icon: '👤' },
   ]
@@ -751,6 +755,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
                   : currentView === 'recent_updates' ? 'Recent Updates'
                   : currentView === 'group_tasks' ? 'Group Tasks'
                   : currentView === 'reports' ? 'Reports'
+                  : currentView === 'impersonation' ? 'User Access'
                   : 'My Profile'}
               </div>
             </div>
@@ -876,6 +881,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
           {currentView === 'project_board' && !selectedProject && (
             <ProjectManager
               onSelectProject={handleSelectProject}
+              onSelectTask={setSelectedTask}
               filters={pmFilters}
               onFiltersChange={handlePmFiltersChange}
               allTasks={pmAllTasks}
@@ -961,6 +967,11 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
           {/* REPORTS */}
           {currentView === 'reports' && (
             <ReportsPage savedState={reportsState} onStateChange={setReportsState} scrollContainerRef={mainRef} />
+          )}
+
+          {/* USER ACCESS / IMPERSONATION — Chairman only */}
+          {currentView === 'impersonation' && user.isChairman && onImpersonationStart && (
+            <ImpersonationPage user={user} onSessionStarted={onImpersonationStart} />
           )}
 
           {/* AUDIT LOG */}

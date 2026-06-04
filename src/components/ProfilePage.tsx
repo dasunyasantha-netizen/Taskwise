@@ -1,6 +1,7 @@
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect, useCallback } from 'react'
 import type { AuthUser } from '../types'
-import { authApi, workspaceApi } from '../services/apiService'
+import { authApi, workspaceApi, webAuthnApi } from '../services/apiService'
+import { startRegistration } from '@simplewebauthn/browser'
 
 interface Props {
   user: AuthUser
@@ -48,6 +49,15 @@ function compressImage(file: File, maxBytes = 650_000): Promise<string> {
   })
 }
 
+interface WebAuthnCred {
+  id: string
+  deviceName?: string
+  deviceType: string
+  backedUp: boolean
+  createdAt: string
+  lastUsedAt?: string
+}
+
 export default function ProfilePage({ user, onUserUpdate }: Props) {
   const [name, setName]       = useState(user.name)
   const [phone, setPhone]     = useState(user.phone || '')
@@ -69,7 +79,27 @@ export default function ProfilePage({ user, onUserUpdate }: Props) {
   const [passwordErr, setPasswordErr] = useState('')
   const [avatarErr, setAvatarErr]     = useState('')
 
+  // WebAuthn / biometric state
+  const [webAuthnCreds, setWebAuthnCreds]   = useState<WebAuthnCred[]>([])
+  const [newDeviceName, setNewDeviceName]   = useState('')
+  const [biometricAdding, setBiometricAdding] = useState(false)
+  const [biometricMsg, setBiometricMsg]     = useState('')
+  const [biometricErr, setBiometricErr]     = useState('')
+  const [webAuthnSupported, setWebAuthnSupported] = useState(false)
+
   const fileRef = useRef<HTMLInputElement>(null)
+
+  const loadCreds = useCallback(async () => {
+    try {
+      const creds = await webAuthnApi.listCredentials()
+      setWebAuthnCreds(creds)
+    } catch { /* silent */ }
+  }, [])
+
+  useEffect(() => {
+    setWebAuthnSupported(typeof window !== 'undefined' && !!window.PublicKeyCredential)
+    loadCreds()
+  }, [loadCreds])
 
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -136,6 +166,38 @@ export default function ProfilePage({ user, onUserUpdate }: Props) {
       setPasswordErr(err instanceof Error ? err.message : 'Failed to change password')
     } finally {
       setPasswordSaving(false)
+    }
+  }
+
+  const handleAddBiometric = async () => {
+    setBiometricErr('')
+    setBiometricMsg('')
+    setBiometricAdding(true)
+    try {
+      const options = await webAuthnApi.getRegistrationOptions()
+      const regResponse = await startRegistration({ optionsJSON: options as Parameters<typeof startRegistration>[0]['optionsJSON'] })
+      await webAuthnApi.verifyRegistration(regResponse, newDeviceName.trim() || undefined)
+      setBiometricMsg('Biometric login set up successfully!')
+      setNewDeviceName('')
+      await loadCreds()
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Registration failed'
+      if (msg.toLowerCase().includes('cancel') || msg.toLowerCase().includes('abort') || msg.toLowerCase().includes('not allowed')) {
+        setBiometricErr('Cancelled')
+      } else {
+        setBiometricErr(msg)
+      }
+    } finally {
+      setBiometricAdding(false)
+    }
+  }
+
+  const handleDeleteCred = async (id: string) => {
+    try {
+      await webAuthnApi.deleteCredential(id)
+      setWebAuthnCreds(prev => prev.filter(c => c.id !== id))
+    } catch (err: unknown) {
+      setBiometricErr(err instanceof Error ? err.message : 'Failed to remove')
     }
   }
 
@@ -244,6 +306,67 @@ export default function ProfilePage({ user, onUserUpdate }: Props) {
           </div>
         </form>
       </div>
+
+      {/* Biometric / Passkey login */}
+      {webAuthnSupported && (
+        <div className="card p-6">
+          <h2 className="text-base font-semibold text-tw-text mb-1">Biometric Login</h2>
+          <p className="text-xs text-tw-text-secondary mb-4">Use your fingerprint or Face ID to sign in without a password.</p>
+
+          {webAuthnCreds.length > 0 && (
+            <div className="space-y-2 mb-4">
+              {webAuthnCreds.map(cred => (
+                <div key={cred.id} className="flex items-center justify-between bg-tw-bg rounded-xl px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <span className="text-lg">
+                      {cred.deviceType === 'multiDevice' ? '☁️' : '📱'}
+                    </span>
+                    <div>
+                      <p className="text-sm font-medium text-tw-text">
+                        {cred.deviceName || (cred.deviceType === 'multiDevice' ? 'Synced passkey' : 'This device')}
+                      </p>
+                      <p className="text-xs text-tw-text-secondary">
+                        Added {new Date(cred.createdAt).toLocaleDateString()}
+                        {cred.lastUsedAt && ` · Last used ${new Date(cred.lastUsedAt).toLocaleDateString()}`}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleDeleteCred(cred.id)}
+                    className="w-7 h-7 rounded-lg bg-red-100 hover:bg-red-200 text-red-600 flex items-center justify-center transition-colors flex-shrink-0"
+                    title="Remove"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="flex items-center gap-2">
+            <input
+              className="input flex-1"
+              placeholder="Device name (optional, e.g. iPhone 15)"
+              value={newDeviceName}
+              onChange={e => setNewDeviceName(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddBiometric() } }}
+            />
+            <button
+              type="button"
+              onClick={handleAddBiometric}
+              disabled={biometricAdding}
+              className="btn-primary whitespace-nowrap"
+            >
+              {biometricAdding ? 'Setting up…' : webAuthnCreds.length === 0 ? 'Set Up Biometrics' : 'Add Another'}
+            </button>
+          </div>
+
+          {biometricMsg && <p className="mt-2 text-sm text-green-600">{biometricMsg}</p>}
+          {biometricErr && <p className="mt-2 text-sm text-tw-danger">{biometricErr}</p>}
+        </div>
+      )}
 
       {/* Role info */}
       <div className="card p-4 flex items-center gap-3">

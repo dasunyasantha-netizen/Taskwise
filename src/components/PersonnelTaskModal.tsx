@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react'
-import type { Task, TaskComment, AuditLog, Personnel, TaskProgressLog } from '../types'
+import type { Task, TaskComment, AuditLog, Personnel, TaskProgressLog, DeadlineExtension } from '../types'
 import { taskApi, workspaceApi } from '../services/apiService'
 import DatePicker from './DatePicker'
 import Select from './Select'
+import ProgressUpdateSheet from './ProgressUpdateSheet'
 
 interface Props {
   task: Task
@@ -28,13 +29,14 @@ const statusColors: Record<string, string> = {
 }
 const displayStatus = (s: string) => s.replace('_', ' ')
 const eventLabels: Record<string, string> = {
-  TASK_CREATED:    'Task created',    TASK_ASSIGNED:   'Task assigned',
-  TASK_ACCEPTED:   'Task accepted',   TASK_REASSIGNED: 'Task reassigned',
-  TASK_UPDATED:    'Task updated',    TASK_STARTED:    'Work started',
-  TASK_SUBMITTED:  'Submitted for approval',
-  TASK_APPROVED:   'Task approved',   TASK_REJECTED:   'Task rejected',
-  TASK_RETURNED:   'Task returned',   TASK_CANCELLED:  'Task cancelled',
-  SUBTASK_CREATED: 'Subtask created', COMMENT_ADDED:   'Comment added',
+  TASK_CREATED:      'Task created',    TASK_ASSIGNED:   'Task assigned',
+  TASK_ACCEPTED:     'Task accepted',   TASK_REASSIGNED: 'Task reassigned',
+  TASK_UPDATED:      'Task updated',    TASK_STARTED:    'Work started',
+  TASK_SUBMITTED:    'Submitted for approval',
+  TASK_APPROVED:     'Task approved',   TASK_REJECTED:   'Task rejected',
+  TASK_RETURNED:     'Task returned',   TASK_CANCELLED:  'Task cancelled',
+  SUBTASK_CREATED:   'Subtask created', COMMENT_ADDED:   'Comment added',
+  DEADLINE_EXTENDED: 'Deadline extended',
 }
 
 type TabKey = 'details' | 'updates' | 'subtasks' | 'history'
@@ -78,6 +80,23 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
   const [loading,      setLoading]      = useState(false)
   const [actionError,  setActionError]  = useState('')
 
+  // Extend deadline state
+  const [showExtendModal,   setShowExtendModal]   = useState(false)
+  const [extendForm,        setExtendForm]        = useState({ newDeadline: '', reason: '', note: '' })
+  const [extendSaving,      setExtendSaving]      = useState(false)
+  const [extendError,       setExtendError]       = useState('')
+  const [deadlineExtensions, setDeadlineExtensions] = useState<DeadlineExtension[]>([])
+
+  const returnBannerKey = `tw_return_banner_${task.id}`
+  const isReturnedByDirector = task.status === 'RETURNED' && task.actedByType === 'director'
+  const [showReturnBanner, setShowReturnBanner] = useState(() =>
+    isReturnedByDirector && !localStorage.getItem(returnBannerKey)
+  )
+  const dismissReturnBanner = () => {
+    localStorage.setItem(returnBannerKey, '1')
+    setShowReturnBanner(false)
+  }
+
   // ── Derived permissions ───────────────────────────────────────────────────
   // Is this task assigned to my department (not yet accepted by anyone)?
   const isDeptPending = task.assignments?.some(a => a.departmentId === departmentId)
@@ -105,7 +124,7 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
   useEffect(() => {
     if (tab === 'subtasks') loadSubtasks()
     if (tab === 'updates')  loadProgressLogs()
-    if (tab === 'history')  loadHistory()
+    if (tab === 'history')  { loadHistory(); loadDeadlineExtensions() }
   }, [tab, task.id])
 
   useEffect(() => {
@@ -132,8 +151,8 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
     }
 
     // Auto-transition to IN_PROGRESS when personnel opens an ASSIGNED task or self-assigns an unassigned subtask
-    if (task.status === 'ASSIGNED' && isMyTask) {
-      taskApi.accept(task.id).then(() => onRefresh()).catch(() => {})
+    if (task.status === 'ASSIGNED' && (isMyTask || isDeptPending)) {
+      taskApi.accept(task.id).then(() => onRefresh()).catch(() => onRefresh())
     } else if (canSelfAssign) {
       taskApi.assign(task.id, { personnelId: actorId })
         .then(() => taskApi.accept(task.id))
@@ -167,6 +186,9 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
   }
   const loadProgressLogs = async () => {
     try { setProgressLogs(await taskApi.progressLogs(task.id) as TaskProgressLog[]) } catch { /* no-op */ }
+  }
+  const loadDeadlineExtensions = async () => {
+    try { setDeadlineExtensions(await taskApi.deadlineExtensions(task.id) as DeadlineExtension[]) } catch { /* no-op */ }
   }
 
   const handleAddProgressLog = async () => {
@@ -292,13 +314,64 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
     })
   }
 
-  const isOverdue = task.deadline && new Date(task.deadline) < new Date() && !['APPROVED', 'CANCELLED'].includes(task.status)
+  const isOverdue       = !!task.deadline && new Date(task.deadline) < new Date() && !['APPROVED', 'CANCELLED'].includes(task.status)
+  const isTaskCreator   = task.createdByPersonnelId === actorId
+  const canExtend       = isTaskCreator && isOverdue
+
+  const handleExtendDeadline = async () => {
+    if (!extendForm.newDeadline || !extendForm.reason.trim()) return
+    setExtendSaving(true)
+    setExtendError('')
+    try {
+      await taskApi.extendDeadline(task.id, {
+        newDeadline: extendForm.newDeadline,
+        reason: extendForm.reason.trim(),
+        note: extendForm.note.trim() || undefined,
+      })
+      setShowExtendModal(false)
+      setExtendForm({ newDeadline: '', reason: '', note: '' })
+      await onRefresh()
+    } catch (e: unknown) {
+      setExtendError(e instanceof Error ? e.message : 'Failed to extend deadline')
+    }
+    setExtendSaving(false)
+  }
+
   const otherPersonnel = personnel.filter(p => p.id !== actorId)
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col overflow-hidden">
+
+        {/* ── Return-from-chairman banner ───────────────────────────────── */}
+        {showReturnBanner && (
+          <div className="bg-red-600 text-white px-5 py-3.5 flex items-start gap-3 flex-shrink-0">
+            <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+            </svg>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold leading-snug">This task has been returned to you by the Chairman's office.</p>
+              <p className="text-xs mt-1 text-red-100 leading-relaxed">
+                If you are unsure why it was returned, review the Progress Updates tab for context or contact the Chairman's office directly.
+              </p>
+              {task.returnReason && (
+                <p className="text-xs mt-1.5 bg-red-700/50 rounded-lg px-3 py-2 leading-relaxed">
+                  <span className="font-semibold">Reason: </span>{task.returnReason}
+                </p>
+              )}
+            </div>
+            <button
+              onClick={dismissReturnBanner}
+              className="flex-shrink-0 w-7 h-7 rounded-lg bg-red-500 hover:bg-red-400 flex items-center justify-center transition-colors mt-0.5"
+              title="Dismiss"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        )}
 
         {/* ── Header ───────────────────────────────────────────────────── */}
         <div className="px-6 py-5 border-b border-tw-border">
@@ -333,7 +406,11 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
                   ✎ Edit
                 </button>
               )}
-              <button onClick={onClose} className="text-tw-text-secondary hover:text-tw-text text-2xl leading-none mt-0.5">×</button>
+              <button onClick={onClose} className="w-8 h-8 rounded-lg bg-red-100 hover:bg-red-200 text-red-600 flex items-center justify-center transition-colors flex-shrink-0" title="Close">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+              </button>
             </div>
           </div>
 
@@ -384,6 +461,12 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
               <button disabled={loading} onClick={() => doAction(() => taskApi.reopen(task.id))}
                 className="btn-secondary text-sm py-2 px-4">
                 ↻ Reopen
+              </button>
+            )}
+            {canExtend && (
+              <button onClick={() => { setExtendForm({ newDeadline: '', reason: '', note: '' }); setExtendError(''); setShowExtendModal(true) }}
+                className="btn-secondary text-sm py-2 px-4 text-amber-700 border-amber-300 hover:bg-amber-50">
+                📅 Extend Deadline
               </button>
             )}
             {canReturn && (
@@ -523,22 +606,14 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
             <div className="space-y-4">
               {/* Add update row */}
               {isMyTask && !['APPROVED', 'CANCELLED'].includes(task.status) && (
-                <div className="flex gap-2 items-start">
-                  <textarea
-                    className="input flex-1 resize-none text-sm"
-                    rows={2}
-                    placeholder="What did you work on today?"
-                    value={progressNote}
-                    onChange={e => setProgressNote(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter' && e.ctrlKey) handleAddProgressLog() }}
-                  />
-                  <button
-                    onClick={handleAddProgressLog}
-                    disabled={!progressNote.trim() || progressLoading}
-                    className="btn-primary text-sm px-4 py-2 disabled:opacity-50 flex-shrink-0">
-                    {progressLoading ? '…' : 'Submit'}
-                  </button>
-                </div>
+                <ProgressUpdateSheet
+                  value={progressNote}
+                  onChange={setProgressNote}
+                  onSubmit={handleAddProgressLog}
+                  loading={progressLoading}
+                  placeholder="What did you work on today?"
+                  label="Progress Update"
+                />
               )}
 
               {/* Progress log table */}
@@ -642,38 +717,126 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
           )}
 
           {/* HISTORY */}
-          {tab === 'history' && (
-            <div className="space-y-0">
-              {history.length === 0 && (
-                <div className="text-center py-10 text-tw-text-secondary text-sm">No history yet.</div>
-              )}
-              {history.map(log => (
-                <div key={log.id} className="flex items-start gap-3 py-3 border-b border-tw-border last:border-0">
-                  <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${
-                    log.event.includes('APPROVED') ? 'bg-tw-success' :
-                    log.event.includes('REJECTED') || log.event.includes('CANCELLED') ? 'bg-tw-danger' :
-                    'bg-tw-primary'
-                  }`} />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs font-semibold text-tw-text">
-                        {eventLabels[log.event] || log.event.replace(/_/g, ' ')}
-                      </span>
-                      <span className="text-xs text-tw-primary font-medium">
-                        {log.actorName || log.actorType}
-                      </span>
+          {tab === 'history' && (() => {
+            type TimelineEntry =
+              | { kind: 'audit'; entry: AuditLog }
+              | { kind: 'extension'; entry: DeadlineExtension }
+            const combined: TimelineEntry[] = [
+              ...history.map(e => ({ kind: 'audit' as const, entry: e })),
+              ...deadlineExtensions.map(e => ({ kind: 'extension' as const, entry: e })),
+            ].sort((a, b) => new Date(a.entry.createdAt).getTime() - new Date(b.entry.createdAt).getTime())
+
+            return (
+              <div className="space-y-0">
+                {combined.length === 0 && (
+                  <div className="text-center py-10 text-tw-text-secondary text-sm">No history yet.</div>
+                )}
+                {combined.map(item => {
+                  if (item.kind === 'extension') {
+                    const ext = item.entry as DeadlineExtension
+                    return (
+                      <div key={`ext-${ext.id}`} className="flex items-start gap-3 py-3 border-b border-tw-border last:border-0">
+                        <div className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0 bg-amber-500" />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs font-semibold text-tw-text">Deadline extended</span>
+                            <span className="text-xs text-amber-700 font-medium">{ext.extendedByName}</span>
+                          </div>
+                          <div className="text-xs text-tw-text-secondary mt-0.5">
+                            {new Date(ext.oldDeadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            {' → '}
+                            {new Date(ext.newDeadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          </div>
+                          <div className="text-xs text-tw-text-secondary mt-0.5 italic">Reason: "{ext.reason}"</div>
+                          {ext.note && <div className="text-xs text-tw-text-secondary mt-0.5">Note: {ext.note}</div>}
+                          <div className="text-xs text-tw-text-secondary mt-0.5">{new Date(ext.createdAt).toLocaleString()}</div>
+                        </div>
+                      </div>
+                    )
+                  }
+                  const log = item.entry as AuditLog
+                  return (
+                    <div key={`log-${log.id}`} className="flex items-start gap-3 py-3 border-b border-tw-border last:border-0">
+                      <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${
+                        log.event.includes('APPROVED') ? 'bg-tw-success' :
+                        log.event.includes('REJECTED') || log.event.includes('CANCELLED') ? 'bg-tw-danger' :
+                        'bg-tw-primary'
+                      }`} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-semibold text-tw-text">
+                            {eventLabels[log.event] || log.event.replace(/_/g, ' ')}
+                          </span>
+                          <span className="text-xs text-tw-primary font-medium">
+                            {log.actorName || log.actorType}
+                          </span>
+                        </div>
+                        {log.payload?.reason && (
+                          <div className="text-xs text-tw-text-secondary mt-0.5 italic">"{log.payload.reason}"</div>
+                        )}
+                        <div className="text-xs text-tw-text-secondary mt-0.5">{new Date(log.createdAt).toLocaleString()}</div>
+                      </div>
                     </div>
-                    {log.payload?.reason && (
-                      <div className="text-xs text-tw-text-secondary mt-0.5 italic">"{log.payload.reason}"</div>
-                    )}
-                    <div className="text-xs text-tw-text-secondary mt-0.5">{new Date(log.createdAt).toLocaleString()}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+                  )
+                })}
+              </div>
+            )
+          })()}
         </div>
       </div>
+
+      {/* ── Extend Deadline modal ───────────────────────────────────────── */}
+      {showExtendModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-60 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+            <div className="px-5 py-4 border-b border-tw-border">
+              <h3 className="font-semibold text-tw-text">Extend Deadline</h3>
+              <p className="text-xs text-tw-text-secondary mt-0.5">
+                Current deadline: <span className="font-medium text-tw-danger">
+                  {task.deadline ? new Date(task.deadline).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }) : '—'}
+                </span>
+              </p>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">New Deadline <span className="text-tw-danger">*</span></label>
+                <DatePicker
+                  value={extendForm.newDeadline}
+                  onChange={val => setExtendForm(f => ({ ...f, newDeadline: val }))}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">Reason <span className="text-tw-danger">*</span></label>
+                <textarea className="input resize-none" rows={2} autoFocus
+                  placeholder="Why is the deadline being extended?"
+                  value={extendForm.reason}
+                  onChange={e => setExtendForm(f => ({ ...f, reason: e.target.value }))} />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">Note <span className="text-tw-text-secondary font-normal">(optional)</span></label>
+                <textarea className="input resize-none" rows={2}
+                  placeholder="Additional context for records…"
+                  value={extendForm.note}
+                  onChange={e => setExtendForm(f => ({ ...f, note: e.target.value }))} />
+              </div>
+              {extendError && (
+                <div className="text-xs text-tw-danger bg-red-50 border border-red-200 rounded-lg px-3 py-2">{extendError}</div>
+              )}
+              <div className="flex gap-2 justify-end pt-1">
+                <button onClick={() => { setShowExtendModal(false); setExtendForm({ newDeadline: '', reason: '', note: '' }); setExtendError('') }} className="btn-secondary">
+                  Cancel
+                </button>
+                <button
+                  disabled={!extendForm.newDeadline || !extendForm.reason.trim() || extendSaving}
+                  onClick={handleExtendDeadline}
+                  className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold disabled:opacity-50 transition-colors">
+                  {extendSaving ? 'Saving…' : 'Extend Deadline'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Return modal ────────────────────────────────────────────────── */}
       {showReturn && (

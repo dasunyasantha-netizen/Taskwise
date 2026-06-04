@@ -785,23 +785,25 @@ function AddMemberModal({
     return layers.find(l => l.id === dept?.layerId)
   }
 
+  const minLayerNum = layers.length > 0 ? layers.reduce((min, l) => Math.min(min, l.number), Infinity) : 1
+
   // Walk up from p through supervisorOverrides + existing supervisorId/layer data.
   // Returns the first person in the chain who is missing a supervisor, or null if chain is complete.
   // Layer-1 people are chain roots — no supervisor needed.
-  const findChainGap = (p: Personnel, overrides: Record<string, string>): Personnel | null => {
+  const findChainGap = (p: Personnel, overrides: Record<string, string>, visited = new Set<string>()): Personnel | null => {
+    if (visited.has(p.id)) return null // cycle protection — treat as complete
+    visited.add(p.id)
     const layer = getPersonnelLayer(p)
-    const isLayer1 = layer?.number === 1 || layers.reduce((min, l) => Math.min(min, l.number), Infinity) === layer?.number
+    const isLayer1 = layer?.number === 1 || layer?.number === minLayerNum
     const hasSup = !!p.supervisorId || !!overrides[p.id]
     if (!hasSup) {
-      // Layer 1 needs no supervisor — chain is complete at this person
       if (isLayer1) return null
       return p
     }
-    // Walk up: find the supervisor in allPersonnel
     const supId = overrides[p.id] || p.supervisorId
     const sup = allPersonnel.find(x => x.id === supId)
     if (!sup) return null // supervisor not in personnel list (may be director) — chain OK
-    return findChainGap(sup, overrides)
+    return findChainGap(sup, overrides, visited)
   }
 
   const filtered = allPersonnel.filter(p =>
@@ -1047,10 +1049,13 @@ function AddMemberModal({
 
 // ─── Assign Task Modal ────────────────────────────────────────────────────────
 
+const PROJECT_COLORS = ['#0073ea', '#6b4fbb', '#00c875', '#e2445c', '#fdab3d', '#0086c0', '#ff7575']
+
 function AssignTaskModal({
   group, onClose, onAssigned,
 }: { group: TaskGroup; onClose: () => void; onAssigned: () => void }) {
   const [projects, setProjects] = useState<Array<{ id: string; name: string; color: string }>>([])
+  const [loadingProjects, setLoadingProjects] = useState(true)
   const [form, setForm] = useState({
     projectId: '',
     title: '',
@@ -1063,14 +1068,25 @@ function AssignTaskModal({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
+  // Inline new-project form
+  const [showNewProject, setShowNewProject] = useState(false)
+  const [newProject, setNewProject] = useState({ name: '', color: '#0073ea' })
+  const [creatingProject, setCreatingProject] = useState(false)
+  const [newProjectError, setNewProjectError] = useState('')
+
   useEffect(() => {
-    // Load group projects
-    const groupProjects = (group.groupProjects || [])
-      .map(gp => gp.project)
-      .filter(Boolean) as Array<{ id: string; name: string; color: string }>
-    setProjects(groupProjects)
-    if (groupProjects.length === 1) setForm(f => ({ ...f, projectId: groupProjects[0].id }))
-  }, [group])
+    // Load all workspace projects (not just group-linked) so user can pick any
+    setLoadingProjects(true)
+    projectApi.list()
+      .then(data => {
+        const all = (data as Array<{ id: string; name: string; color: string; status: string; deletedAt: string | null }>)
+          .filter(p => p.status === 'active' && !p.deletedAt)
+        setProjects(all)
+        if (all.length === 1) setForm(f => ({ ...f, projectId: all[0].id }))
+      })
+      .catch(() => {})
+      .finally(() => setLoadingProjects(false))
+  }, [])
 
   const members = group.members || []
 
@@ -1078,6 +1094,25 @@ function AssignTaskModal({
     setSelectedMembers(prev =>
       prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
     )
+  }
+
+  const handleCreateProject = async () => {
+    if (!newProject.name.trim()) { setNewProjectError('Name is required'); return }
+    setCreatingProject(true); setNewProjectError('')
+    try {
+      const result = await taskGroupApi.createProject(group.id, {
+        name: newProject.name.trim(),
+        color: newProject.color,
+      }) as { project: { id: string; name: string; color: string } }
+      const created = result.project
+      setProjects(prev => [...prev, created])
+      setForm(f => ({ ...f, projectId: created.id }))
+      setNewProject({ name: '', color: '#0073ea' })
+      setShowNewProject(false)
+    } catch (e: unknown) {
+      setNewProjectError((e as { message?: string }).message || 'Failed to create project')
+    }
+    setCreatingProject(false)
   }
 
   const handleSubmit = async () => {
@@ -1101,6 +1136,8 @@ function AssignTaskModal({
     setSaving(false)
   }
 
+  const selectedProject = projects.find(p => p.id === form.projectId)
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col">
@@ -1112,26 +1149,94 @@ function AssignTaskModal({
           <button onClick={onClose} className="text-tw-text-secondary hover:text-tw-text text-xl">×</button>
         </div>
         <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
-          {/* Project selector */}
+
+          {/* ── Project selector ── */}
           <div>
-            <label className="block text-sm font-semibold text-tw-text mb-1.5">Project</label>
-            {projects.length === 0 ? (
-              <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                No projects linked to this group yet. Create a project first.
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-sm font-semibold text-tw-text">Project</label>
+              <button
+                onClick={() => { setShowNewProject(v => !v); setNewProjectError('') }}
+                className="text-xs text-tw-primary hover:underline font-medium flex items-center gap-1"
+              >
+                {showNewProject ? '✕ Cancel' : '+ New project'}
+              </button>
+            </div>
+
+            {/* Dropdown */}
+            {loadingProjects ? (
+              <div className="h-10 input w-full flex items-center gap-2 text-tw-text-secondary text-sm">
+                <div className="w-3.5 h-3.5 border-2 border-tw-primary border-t-transparent rounded-full animate-spin" />
+                Loading…
               </div>
             ) : (
-              <div className="flex flex-wrap gap-2">
-                {projects.map(p => (
-                  <button key={p.id}
-                    onClick={() => setForm(f => ({ ...f, projectId: p.id }))}
-                    className={`px-3 py-1.5 rounded-lg text-sm font-medium border-2 transition-colors ${
-                      form.projectId === p.id ? 'border-tw-primary text-white' : 'border-transparent text-white opacity-70 hover:opacity-100'
-                    }`}
-                    style={{ background: p.color }}>
-                    {p.name}
-                  </button>
-                ))}
+              <div className="relative">
+                <div
+                  className={`input w-full flex items-center gap-2 cursor-pointer select-none ${!form.projectId ? 'text-tw-text-secondary' : 'text-tw-text'}`}
+                  onClick={() => {}}
+                >
+                  {selectedProject ? (
+                    <>
+                      <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: selectedProject.color }} />
+                      <span className="flex-1 text-sm truncate">{selectedProject.name}</span>
+                    </>
+                  ) : (
+                    <span className="flex-1 text-sm">Select a project…</span>
+                  )}
+                </div>
+                <select
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  value={form.projectId}
+                  onChange={e => setForm(f => ({ ...f, projectId: e.target.value }))}
+                >
+                  <option value="">— Select a project —</option>
+                  {projects.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
               </div>
+            )}
+
+            {/* Inline new-project form */}
+            {showNewProject && (
+              <div className="mt-2 border border-tw-border rounded-xl p-3 bg-tw-hover space-y-2.5">
+                <p className="text-xs font-semibold text-tw-text">New project</p>
+                <input
+                  autoFocus
+                  className="input w-full text-sm"
+                  placeholder="Project name…"
+                  value={newProject.name}
+                  onChange={e => setNewProject(p => ({ ...p, name: e.target.value }))}
+                  onKeyDown={e => e.key === 'Enter' && handleCreateProject()}
+                />
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-tw-text-secondary">Color:</span>
+                  <div className="flex gap-1.5">
+                    {PROJECT_COLORS.map(c => (
+                      <button
+                        key={c}
+                        onClick={() => setNewProject(p => ({ ...p, color: c }))}
+                        className={`w-5 h-5 rounded-full border-2 transition-transform ${newProject.color === c ? 'border-white ring-2 ring-tw-primary scale-110' : 'border-transparent'}`}
+                        style={{ background: c }}
+                      />
+                    ))}
+                  </div>
+                </div>
+                {newProjectError && <p className="text-xs text-tw-danger">{newProjectError}</p>}
+                <div className="flex gap-2 justify-end">
+                  <button onClick={() => setShowNewProject(false)} className="btn-secondary text-xs py-1 px-3">Cancel</button>
+                  <button
+                    disabled={creatingProject || !newProject.name.trim()}
+                    onClick={handleCreateProject}
+                    className="btn-primary text-xs py-1 px-3 disabled:opacity-50"
+                  >
+                    {creatingProject ? 'Creating…' : 'Create & Select'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {!loadingProjects && projects.length === 0 && !showNewProject && (
+              <p className="text-xs text-amber-600 mt-1">No projects yet — use "+ New project" to create one.</p>
             )}
           </div>
 
@@ -1139,7 +1244,7 @@ function AssignTaskModal({
           <div>
             <label className="block text-sm font-semibold text-tw-text mb-1.5">Task Title</label>
             <input className="input w-full" placeholder="What needs to be done?"
-              value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} autoFocus />
+              value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />
           </div>
 
           {/* Description */}

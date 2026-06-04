@@ -4,6 +4,8 @@ import Auth from './components/Auth'
 import ForcePasswordChange from './components/ForcePasswordChange'
 import DirectorDashboard from './components/DirectorDashboard'
 import PersonnelDashboard from './components/PersonnelDashboard'
+import ImpersonationBanner from './components/ImpersonationBanner'
+import SetupPrompt from './components/SetupPrompt'
 import { authApi, noticeApi, type Notice } from './services/apiService'
 
 function NoticeBanner({ loggedIn }: { loggedIn: boolean }) {
@@ -45,13 +47,29 @@ function NoticeBanner({ loggedIn }: { loggedIn: boolean }) {
   )
 }
 
-const TOKEN_KEY = 'taskwise_token'
-const USER_KEY  = 'taskwise_user'
+const TOKEN_KEY      = 'taskwise_token'
+const USER_KEY       = 'taskwise_user'
+const VIEW_KEY       = 'taskwise_view'
+// Chairman stores his real session here during impersonation
+const REAL_TOKEN_KEY = 'taskwise_real_token'
+const REAL_USER_KEY  = 'taskwise_real_user'
 
 export default function App() {
   const [user, setUser]         = useState<AuthUser | null>(null)
   const [view, setView]         = useState<ViewMode>('login')
   const [loading, setLoading]   = useState(true)
+  const [showSetup, setShowSetup] = useState(false)
+
+  const persistView = (v: ViewMode) => {
+    setView(v)
+    if (v !== 'login') localStorage.setItem(VIEW_KEY, v)
+  }
+
+  const maybeShowSetup = (actorId: string) => {
+    if (!localStorage.getItem(`taskwise_setup_${actorId}`)) {
+      setShowSetup(true)
+    }
+  }
 
   useEffect(() => {
     const token    = localStorage.getItem(TOKEN_KEY)
@@ -59,18 +77,18 @@ export default function App() {
     if (token && userData) {
       try {
         const parsed = JSON.parse(userData) as AuthUser
-        // Show cached user immediately so the app feels instant
         setUser(parsed)
         if (!parsed.mustChangePassword) {
-          setView(parsed.actorType === 'director' ? 'director_dashboard' : 'personnel_queue')
+          const savedView = localStorage.getItem(VIEW_KEY) as ViewMode | null
+          const defaultView = parsed.actorType === 'director' ? 'director_dashboard' : 'personnel_queue'
+          setView(savedView && savedView !== 'login' ? savedView : defaultView)
+          maybeShowSetup(parsed.actorId)
         }
-        // Refresh from server to pick up any workspace changes (name, logo, etc.)
         authApi.me().then(fresh => {
           const updated = { ...parsed, ...(fresh as Partial<AuthUser>) }
           setUser(updated)
           localStorage.setItem(USER_KEY, JSON.stringify(updated))
         }).catch(() => {
-          // Token invalid/expired — force logout
           localStorage.removeItem(TOKEN_KEY)
           localStorage.removeItem(USER_KEY)
           setUser(null)
@@ -88,26 +106,33 @@ export default function App() {
     localStorage.setItem(TOKEN_KEY, token)
     localStorage.setItem(USER_KEY, JSON.stringify(userData))
     setUser(userData)
-    // Gate on mustChangePassword before allowing into the app
     if (!userData.mustChangePassword) {
-      setView(userData.actorType === 'director' ? 'director_dashboard' : 'personnel_queue')
+      persistView(userData.actorType === 'director' ? 'director_dashboard' : 'personnel_queue')
+      maybeShowSetup(userData.actorId)
     }
   }
 
   const handlePasswordChanged = () => {
-    // Clear the flag and enter the app
     setUser(prev => {
       if (!prev) return prev
       const next = { ...prev, mustChangePassword: false }
       localStorage.setItem(USER_KEY, JSON.stringify(next))
       return next
     })
-    setView('personnel_queue')
+    persistView('personnel_queue')
   }
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    // If in impersonation session, end it on logout
+    const currentUser = user
+    if (currentUser?.impersonation) {
+      try { await authApi.endImpersonation('logout') } catch { /* best-effort */ }
+    }
     localStorage.removeItem(TOKEN_KEY)
     localStorage.removeItem(USER_KEY)
+    localStorage.removeItem(VIEW_KEY)
+    localStorage.removeItem(REAL_TOKEN_KEY)
+    localStorage.removeItem(REAL_USER_KEY)
     setUser(null)
     setView('login')
   }
@@ -119,6 +144,42 @@ export default function App() {
       localStorage.setItem(USER_KEY, JSON.stringify(next))
       return next
     })
+  }
+
+  // Chairman starts impersonation — save real session, swap in impersonation session
+  const handleImpersonationStart = (token: string, impersonatedUser: AuthUser) => {
+    // Back up the real Chairman session
+    const realToken = localStorage.getItem(TOKEN_KEY)
+    const realUser  = localStorage.getItem(USER_KEY)
+    if (realToken) localStorage.setItem(REAL_TOKEN_KEY, realToken)
+    if (realUser)  localStorage.setItem(REAL_USER_KEY, realUser)
+
+    // Activate impersonation session
+    localStorage.setItem(TOKEN_KEY, token)
+    localStorage.setItem(USER_KEY, JSON.stringify(impersonatedUser))
+    setUser(impersonatedUser)
+    persistView('personnel_queue')
+  }
+
+  // Chairman exits impersonation — restore real session
+  const handleImpersonationExit = () => {
+    const realToken = localStorage.getItem(REAL_TOKEN_KEY)
+    const realUser  = localStorage.getItem(REAL_USER_KEY)
+    if (realToken && realUser) {
+      localStorage.setItem(TOKEN_KEY, realToken)
+      localStorage.setItem(USER_KEY, realUser)
+      localStorage.removeItem(REAL_TOKEN_KEY)
+      localStorage.removeItem(REAL_USER_KEY)
+      try {
+        const parsed = JSON.parse(realUser) as AuthUser
+        setUser(parsed)
+        persistView('director_dashboard')
+      } catch {
+        handleLogout()
+      }
+    } else {
+      handleLogout()
+    }
   }
 
   if (loading) {
@@ -133,31 +194,57 @@ export default function App() {
     return <Auth onLogin={handleLogin} />
   }
 
+  if (user.mustChangePassword) {
+    return <ForcePasswordChange user={user} onPasswordChanged={handlePasswordChanged} onLogout={handleLogout} />
+  }
+
+  const isImpersonating = !!user.impersonation
+  // Add top padding when impersonation banner is shown
+  const bannerPad = isImpersonating ? 'pt-11' : ''
+
   if (user.actorType === 'director') {
     return (
       <>
+        {showSetup && !user.impersonation && (
+          <SetupPrompt actorId={user.actorId} onDone={() => setShowSetup(false)} />
+        )}
         <NoticeBanner loggedIn={true} />
-        <DirectorDashboard
-          user={user}
-          currentView={view}
-          setView={setView}
-          onLogout={handleLogout}
-          onUserUpdate={handleUserUpdate}
-        />
+        <div className={bannerPad}>
+          <DirectorDashboard
+            user={user}
+            currentView={view}
+            setView={persistView}
+            onLogout={handleLogout}
+            onUserUpdate={handleUserUpdate}
+            onImpersonationStart={handleImpersonationStart}
+          />
+        </div>
       </>
     )
   }
 
   return (
     <>
+      {showSetup && !user.impersonation && (
+        <SetupPrompt actorId={user.actorId} onDone={() => setShowSetup(false)} />
+      )}
+      {isImpersonating && (
+        <ImpersonationBanner
+          impersonation={user.impersonation!}
+          targetName={user.name}
+          onExit={handleImpersonationExit}
+        />
+      )}
       <NoticeBanner loggedIn={true} />
-      <PersonnelDashboard
-        user={user}
-        currentView={view}
-        setView={setView}
-        onLogout={handleLogout}
-        onUserUpdate={handleUserUpdate}
-      />
+      <div className={bannerPad}>
+        <PersonnelDashboard
+          user={user}
+          currentView={view}
+          setView={persistView}
+          onLogout={handleLogout}
+          onUserUpdate={handleUserUpdate}
+        />
+      </div>
     </>
   )
 }

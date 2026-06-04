@@ -2,6 +2,13 @@
 
 export type ActorType = 'director' | 'personnel'
 
+export interface ImpersonationInfo {
+  sessionId: string
+  chairmanId: string
+  chairmanName: string
+  startedAt: string
+}
+
 export interface AuthUser {
   actorId: string
   actorType: ActorType
@@ -16,6 +23,8 @@ export interface AuthUser {
   companyName?: string
   companyLogo?: string
   mustChangePassword?: boolean
+  isChairman?: boolean
+  impersonation?: ImpersonationInfo
 }
 
 // ─── Workspace & Hierarchy ───────────────────────────────────────────────────
@@ -125,6 +134,20 @@ export interface TaskAssignment {
   assignedAt: string
 }
 
+export interface DeadlineExtension {
+  id: string
+  taskId: string
+  workspaceId: string
+  oldDeadline: string
+  newDeadline: string
+  reason: string
+  note?: string
+  extendedById: string
+  extendedByType: ActorType
+  extendedByName: string
+  createdAt: string
+}
+
 export interface Task {
   id: string
   workspaceId: string
@@ -138,8 +161,11 @@ export interface Task {
   priority: TaskPriority
   status: TaskStatus
   deadline?: string
+  originalDeadline?: string
   deadlineSetById?: string
   deadlineSetByType?: ActorType
+  createdByDirectorId?: string
+  createdByPersonnelId?: string
   approvalById?: string
   approvalByType?: string
   actedById?: string
@@ -241,5 +267,20 @@ export type ViewMode =
   | 'broadcasts'
   | 'group_tasks'
   | 'reports'
+  | 'impersonation'
   | 'settings'
   | 'profile'
+
+export interface ImpersonationSession {
+  id: string
+  chairmanId: string
+  targetActorId: string
+  targetActorType: string
+  targetName: string
+  workspaceId: string
+  startedAt: string
+  endedAt: string | null
+  endReason: string | null
+  ipAddress: string | null
+  userAgent: string | null
+}

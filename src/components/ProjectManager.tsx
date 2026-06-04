@@ -6,6 +6,7 @@ import type { ActiveFilters, AvailableOptions } from './FilterBar'
 
 interface Props {
   onSelectProject: (project: Project) => void
+  onSelectTask?: (task: Task) => void
   // Lifted state — passed from parent so filter/task state survives view changes
   filters: ActiveFilters
   onFiltersChange: (f: ActiveFilters) => void
@@ -94,13 +95,16 @@ const PRIORITY_STYLES: Record<string, string> = {
   CRITICAL: 'text-red-600', HIGH: 'text-orange-500', MEDIUM: 'text-yellow-600', LOW: 'text-gray-400',
 }
 
-function FilteredTaskCard({ task }: { task: Task }) {
+function FilteredTaskCard({ task, onSelect }: { task: Task; onSelect?: (t: Task) => void }) {
   const assignee = task.assignments?.[0]?.personnel
   const dept = task.assignments?.[0]?.department
   const isOverdue = task.deadline && task.status !== 'APPROVED' && task.status !== 'CANCELLED' && new Date(task.deadline) < new Date()
 
   return (
-    <div className="card p-4 space-y-2.5">
+    <div
+      className={`card p-4 space-y-2.5 ${onSelect ? 'cursor-pointer hover:border-tw-primary/40 hover:shadow-md transition-all active:scale-[0.99]' : ''}`}
+      onClick={() => onSelect?.(task)}
+    >
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-start gap-2 min-w-0">
           <span className={`text-xs font-semibold mt-0.5 flex-shrink-0 ${PRIORITY_STYLES[task.priority] ?? 'text-gray-400'}`}>
@@ -150,7 +154,7 @@ function FilteredTaskCard({ task }: { task: Task }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function ProjectManager({ onSelectProject, filters, onFiltersChange, allTasks, onAllTasksLoaded }: Props) {
+export default function ProjectManager({ onSelectProject, onSelectTask, filters, onFiltersChange, allTasks, onAllTasksLoaded }: Props) {
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(allTasks.length === 0)
   const [showModal, setShowModal] = useState(false)
@@ -269,7 +273,7 @@ export default function ProjectManager({ onSelectProject, filters, onFiltersChan
           </div>
         ) : (
           <div className="space-y-3">
-            {filteredTasks.map(t => <FilteredTaskCard key={t.id} task={t} />)}
+            {filteredTasks.map(t => <FilteredTaskCard key={t.id} task={t} onSelect={onSelectTask} />)}
           </div>
         )
       ) : (

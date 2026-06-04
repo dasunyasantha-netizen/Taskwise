@@ -25,6 +25,7 @@ type ReportTab =
   | 'pending_approvals'
   | 'overdue'
   | 'due_soon'
+  | 'unopened'
   | 'sitting_longest'
   | 'completed'
   | 'by_status'
@@ -36,6 +37,7 @@ const TABS: { id: ReportTab; label: string }[] = [
   { id: 'pending_approvals', label: 'Pending Approvals' },
   { id: 'overdue',           label: 'Overdue' },
   { id: 'due_soon',          label: 'Due in 7 Days' },
+  { id: 'unopened',          label: 'Unopened' },
   { id: 'sitting_longest',   label: 'Sitting Longest' },
   { id: 'completed',         label: 'Completed' },
   { id: 'by_status',         label: 'By Status' },
@@ -637,6 +639,55 @@ function ApprovalDelayReport({ tasks, onTaskClick }: { tasks: Task[]; onTaskClic
   )
 }
 
+function UnopenedReport({ tasks, onTaskClick }: { tasks: Task[]; onTaskClick: (t: Task) => void }) {
+  const rows = tasks
+    .filter(t => t.status === 'ASSIGNED')
+    .map(t => ({ ...t, daysSitting: daysSince(t.createdAt) }))
+    .sort((a, b) => b.daysSitting - a.daysSitting)
+  if (rows.length === 0) return <EmptyState message="No unopened tasks — everyone has started their work." />
+  return (
+    <>
+      <SectionHeader title="Unopened Tasks" count={rows.length} />
+      {/* Mobile cards */}
+      {rows.map(t => (
+        <MobileTaskCard key={t.id} task={t} onClick={() => onTaskClick(t)}
+          extra={
+            <>
+              <div>Assigned to: {assigneeName(t)}</div>
+              <div className={t.daysSitting >= 3 ? 'text-tw-danger font-semibold' : 'text-tw-text-secondary'}>
+                {t.daysSitting === 0 ? 'Assigned today' : `Sitting ${t.daysSitting}d since assigned`}
+              </div>
+            </>
+          }
+        />
+      ))}
+      {/* Desktop table */}
+      <ReportTable headers={['', 'Task', 'Project', 'Assigned To', 'Assigned Date', 'Days Sitting', 'Priority']}>
+        {rows.map(t => (
+          <tr key={t.id} onClick={() => onTaskClick(t)}
+            className={`cursor-pointer transition-colors ${t.daysSitting >= 3 ? 'hover:bg-red-50' : 'hover:bg-[#f8f9ff]'}`}>
+            <td className="pl-3 pr-0 py-3 w-1"><div className={`w-1 h-8 rounded-full ${PRIORITY_DOT[t.priority] ?? 'bg-gray-300'}`} /></td>
+            <td className="px-4 py-3 font-medium text-tw-text max-w-xs"><div className="truncate">{t.title}</div></td>
+            <td className="px-4 py-3 text-tw-text-secondary text-xs">{t.project?.name || '—'}</td>
+            <td className="px-4 py-3 text-tw-text-secondary text-xs">{assigneeName(t)}</td>
+            <td className="px-4 py-3 text-tw-text-secondary text-xs whitespace-nowrap">{fmtDate(t.createdAt)}</td>
+            <td className="px-4 py-3">
+              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                t.daysSitting >= 5 ? 'bg-red-100 text-red-700' :
+                t.daysSitting >= 2 ? 'bg-orange-100 text-orange-700' :
+                'bg-gray-100 text-gray-600'
+              }`}>
+                {t.daysSitting}d
+              </span>
+            </td>
+            <td className="px-4 py-3"><span className={`text-xs font-semibold ${PRIORITY_COLORS[t.priority]}`}>{t.priority}</span></td>
+          </tr>
+        ))}
+      </ReportTable>
+    </>
+  )
+}
+
 // ─── Main ReportsPage ─────────────────────────────────────────────────────────
 
 interface Props {
@@ -768,6 +819,7 @@ export default function ReportsPage({ savedState, onStateChange, scrollContainer
         {activeTab === 'pending_approvals' && <PendingApprovalsReport tasks={filteredTasks} onTaskClick={handleTaskClick} />}
         {activeTab === 'overdue'           && <OverdueReport          tasks={filteredTasks} onTaskClick={handleTaskClick} />}
         {activeTab === 'due_soon'          && <DueSoonReport          tasks={filteredTasks} onTaskClick={handleTaskClick} />}
+        {activeTab === 'unopened'          && <UnopenedReport         tasks={filteredTasks} onTaskClick={handleTaskClick} />}
         {activeTab === 'sitting_longest'   && <SittingLongestReport   tasks={filteredTasks} onTaskClick={handleTaskClick} />}
         {activeTab === 'completed'         && <CompletedReport        tasks={filteredTasks} onTaskClick={handleTaskClick} />}
         {activeTab === 'by_status'         && <ByStatusReport         tasks={filteredTasks} />}

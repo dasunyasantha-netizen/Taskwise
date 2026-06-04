@@ -45,6 +45,14 @@ export const authApi = {
   me: () => api.get<unknown>('/auth/me'),
   changePassword: (currentPassword: string, newPassword: string) =>
     api.post('/auth/change-password', { currentPassword, newPassword }),
+  setImpersonationPassword: (currentLoginPassword: string, newImpersonationPassword: string) =>
+    api.post('/auth/impersonation-password', { currentLoginPassword, newImpersonationPassword }),
+  startImpersonation: (targetIdentifier: string, impersonationPassword: string) =>
+    api.post<{ token: string; user: unknown; session: { id: string; startedAt: string } }>('/auth/impersonate', { targetIdentifier, impersonationPassword }),
+  endImpersonation: (reason?: string) =>
+    api.post('/auth/impersonate/end', { reason: reason || 'exit' }),
+  listImpersonationSessions: () =>
+    api.get<unknown[]>('/auth/impersonation/sessions'),
 }
 
 // ─── Workspace ───────────────────────────────────────────────────────────────
@@ -100,8 +108,11 @@ export const taskApi = {
   comments:       (id: string)      => api.get(`/tasks/${id}/comments`),
   addComment:     (id: string, content: string) => api.post(`/tasks/${id}/comments`, { content }),
   history:        (id: string)      => api.get(`/tasks/${id}/history`),
-  progressLogs:   (id: string)      => api.get(`/tasks/${id}/progress-logs`),
-  addProgressLog: (id: string, note: string) => api.post(`/tasks/${id}/progress-logs`, { note }),
+  progressLogs:      (id: string)      => api.get(`/tasks/${id}/progress-logs`),
+  addProgressLog:    (id: string, note: string) => api.post(`/tasks/${id}/progress-logs`, { note }),
+  extendDeadline:    (id: string, data: { newDeadline: string; reason: string; note?: string }) =>
+    api.post(`/tasks/${id}/extend-deadline`, data),
+  deadlineExtensions:(id: string)      => api.get(`/tasks/${id}/deadline-extensions`),
 }
 
 // ─── Notifications ───────────────────────────────────────────────────────────
@@ -153,6 +164,20 @@ export const taskGroupApi = {
   getMemberHistory: (groupId: string, taskId: string, memberId: string) =>
     api.get(`/task-groups/${groupId}/tasks/${taskId}/members/${memberId}/history`),
   closeGroupTask:   (taskId: string) => api.post(`/task-groups/tasks/${taskId}/close`),
+}
+
+// ─── WebAuthn / Biometric ─────────────────────────────────────────────────────
+export const webAuthnApi = {
+  getRegistrationOptions:  () => api.get<unknown>('/auth/webauthn/register/options'),
+  verifyRegistration:      (response: unknown, deviceName?: string) =>
+    api.post<{ verified: boolean }>('/auth/webauthn/register/verify', { response, deviceName }),
+  getAuthOptions:          (phone: string) =>
+    api.post<unknown>('/auth/webauthn/auth/options', { phone }),
+  verifyAuthentication:    (actorId: string, actorType: string, response: unknown) =>
+    api.post<{ token: string; user: unknown; mustChangePassword?: boolean }>('/auth/webauthn/auth/verify', { actorId, actorType, response }),
+  listCredentials:         () =>
+    api.get<Array<{ id: string; deviceName?: string; deviceType: string; backedUp: boolean; createdAt: string; lastUsedAt?: string }>>('/auth/webauthn/credentials'),
+  deleteCredential:        (id: string) => api.delete(`/auth/webauthn/credentials/${id}`),
 }
 
 // ─── Audit / Reports ─────────────────────────────────────────────────────────

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react'
-import type { Task, TaskComment, AuditLog, Layer, Personnel, TaskProgressLog } from '../types'
+import type { Task, TaskComment, AuditLog, Layer, Personnel, TaskProgressLog, DeadlineExtension } from '../types'
 import { taskApi } from '../services/apiService'
 import DatePicker from './DatePicker'
 import Select from './Select'
+import ProgressUpdateSheet from './ProgressUpdateSheet'
 
 interface Props {
   task: Task
@@ -36,7 +37,8 @@ const eventLabels: Record<string, string> = {
   TASK_DELETED:    'Task deleted',
   SUBTASK_CREATED: 'Subtask created',
   COMMENT_ADDED:   'Comment added',
-  DEADLINE_CHANGED:'Deadline changed',
+  DEADLINE_CHANGED:  'Deadline changed',
+  DEADLINE_EXTENDED: 'Deadline extended',
 }
 
 export default function TaskDetailPanel({ task, isDirector, actorId, layers, personnel, onClose, onRefresh }: Props) {
@@ -62,10 +64,17 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
   const [editForm, setEditForm] = useState({ title: task.title, description: task.description || '', priority: task.priority, deadline: task.deadline ? task.deadline.slice(0, 10) : '', assignedTo: currentAssigneeId })
   const [editSaving, setEditSaving] = useState(false)
 
+  // Extend deadline modal state
+  const [showExtendModal, setShowExtendModal] = useState(false)
+  const [extendForm, setExtendForm] = useState({ newDeadline: '', reason: '', note: '' })
+  const [extendSaving, setExtendSaving] = useState(false)
+  const [extendError, setExtendError] = useState('')
+  const [deadlineExtensions, setDeadlineExtensions] = useState<DeadlineExtension[]>([])
+
   const allDepts = layers.flatMap(l => l.departments || [])
 
   useEffect(() => {
-    if (tab === 'history')  loadHistory()
+    if (tab === 'history')  { loadHistory(); loadDeadlineExtensions() }
     if (tab === 'subtasks') loadSubtasks()
     if (tab === 'updates')  loadProgressLogs()
   }, [tab, task.id])
@@ -87,6 +96,10 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
   }
   const loadProgressLogs = async () => {
     try { setProgressLogs(await taskApi.progressLogs(task.id) as TaskProgressLog[]) }
+    catch { /* non-critical */ }
+  }
+  const loadDeadlineExtensions = async () => {
+    try { setDeadlineExtensions(await taskApi.deadlineExtensions(task.id) as DeadlineExtension[]) }
     catch { /* non-critical */ }
   }
 
@@ -148,10 +161,34 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
     setEditSaving(false)
   }
 
+  const handleExtendDeadline = async () => {
+    if (!extendForm.newDeadline || !extendForm.reason.trim()) return
+    setExtendSaving(true)
+    setExtendError('')
+    try {
+      await taskApi.extendDeadline(task.id, {
+        newDeadline: extendForm.newDeadline,
+        reason: extendForm.reason.trim(),
+        note: extendForm.note.trim() || undefined,
+      })
+      setShowExtendModal(false)
+      setExtendForm({ newDeadline: '', reason: '', note: '' })
+      await onRefresh()
+    } catch (e: unknown) {
+      setExtendError(e instanceof Error ? e.message : 'Failed to extend deadline')
+    }
+    setExtendSaving(false)
+  }
+
   // Action permissions
+  const isCreator  = isDirector
+    ? task.createdByDirectorId === actorId
+    : task.createdByPersonnelId === actorId
+  const isOverdue  = !!task.deadline && new Date(task.deadline) < new Date() && !['APPROVED', 'CANCELLED'].includes(task.status)
+  const canExtend  = isCreator && isOverdue
   const canEdit    = isDirector && !['APPROVED', 'CANCELLED'].includes(task.status)
   const canSubmit  = !isDirector && task.status === 'IN_PROGRESS'
-  const canReturn  = task.status === 'IN_PROGRESS'
+  const canReturn  = ['IN_PROGRESS', 'SUBMITTED'].includes(task.status)
   const canApprove = task.status === 'SUBMITTED' && task.approvalById === actorId
   const canReject  = task.status === 'SUBMITTED' && task.approvalById === actorId
   const canReopen  = task.status === 'REJECTED'
@@ -188,7 +225,11 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
                   ✎ Edit
                 </button>
               )}
-              <button onClick={onClose} className="text-tw-text-secondary hover:text-tw-text text-2xl leading-none">×</button>
+              <button onClick={onClose} className="w-8 h-8 rounded-lg bg-red-100 hover:bg-red-200 text-red-600 flex items-center justify-center transition-colors flex-shrink-0" title="Close">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+              </button>
             </div>
           </div>
 
@@ -245,6 +286,12 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
             {canReopen  && <button disabled={actionLoading} onClick={() => doAction(() => taskApi.reopen(task.id))} className="btn-secondary text-xs py-1.5">↻ Reopen</button>}
             {canAssign  && <button disabled={actionLoading} onClick={() => setShowAssignModal(true)} className="btn-secondary text-xs py-1.5">👤 Assign</button>}
             {canSubtask && <button onClick={() => setShowSubtaskModal(true)} className="btn-secondary text-xs py-1.5">+ Subtask</button>}
+            {canExtend  && (
+              <button onClick={() => { setExtendForm({ newDeadline: '', reason: '', note: '' }); setExtendError(''); setShowExtendModal(true) }}
+                className="btn-secondary text-xs py-1.5 text-amber-700 border-amber-300 hover:bg-amber-50">
+                📅 Extend Deadline
+              </button>
+            )}
             {canCancel  && <button disabled={actionLoading} onClick={() => setShowReasonModal('cancel')} className="text-xs text-tw-danger hover:underline py-1.5">Cancel task</button>}
           </div>
         </div>
@@ -389,60 +436,87 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
               </div>
               {/* Add update input */}
               <div className="border-t border-tw-border pt-3 mt-auto">
-                <div className="flex gap-2 items-end">
-                  <textarea
-                    className="input flex-1 text-sm resize-none"
-                    rows={2}
-                    placeholder="Add a progress update..."
-                    value={newUpdate}
-                    onChange={e => setNewUpdate(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitUpdate() } }}
-                  />
-                  <button
-                    onClick={submitUpdate}
-                    disabled={!newUpdate.trim() || addingUpdate}
-                    className="btn-primary text-sm px-4 py-2 h-fit"
-                  >
-                    {addingUpdate ? '...' : 'Add'}
-                  </button>
-                </div>
-                <p className="text-xs text-tw-text-secondary mt-1">Press Enter to submit, Shift+Enter for new line</p>
+                <ProgressUpdateSheet
+                  value={newUpdate}
+                  onChange={setNewUpdate}
+                  onSubmit={submitUpdate}
+                  loading={addingUpdate}
+                  placeholder="Add a progress update…"
+                  label="Progress Update"
+                />
+                <p className="hidden sm:block text-xs text-tw-text-secondary mt-1">Enter to submit · Shift+Enter for new line</p>
               </div>
             </div>
           )}
 
           {/* HISTORY */}
-          {tab === 'history' && (
-            <div className="space-y-1">
-              {history.length === 0 && <div className="text-center py-8 text-tw-text-secondary text-sm">No history yet.</div>}
-              {history.map(log => (
-                <div key={log.id} className="flex items-start gap-3 py-3 border-b border-tw-border last:border-0">
-                  <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${
-                    log.event.includes('APPROVED') ? 'bg-tw-success' :
-                    log.event.includes('REJECTED') || log.event.includes('CANCELLED') ? 'bg-tw-danger' :
-                    'bg-tw-primary'
-                  }`} />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-semibold text-tw-text">
-                        {eventLabels[log.event] || log.event.replace(/_/g, ' ')}
-                      </span>
-                      <span className="text-sm text-tw-primary font-medium">
-                        {log.actorName || `${log.actorType === 'director' ? 'Director' : 'Personnel'}`}
-                      </span>
+          {tab === 'history' && (() => {
+            // Merge audit logs + deadline extensions into one timeline sorted by date
+            type TimelineEntry =
+              | { kind: 'audit'; entry: AuditLog }
+              | { kind: 'extension'; entry: DeadlineExtension }
+            const combined: TimelineEntry[] = [
+              ...history.map(e => ({ kind: 'audit' as const, entry: e })),
+              ...deadlineExtensions.map(e => ({ kind: 'extension' as const, entry: e })),
+            ].sort((a, b) => new Date(a.entry.createdAt).getTime() - new Date(b.entry.createdAt).getTime())
+
+            return (
+              <div className="space-y-1">
+                {combined.length === 0 && <div className="text-center py-8 text-tw-text-secondary text-sm">No history yet.</div>}
+                {combined.map(item => {
+                  if (item.kind === 'extension') {
+                    const ext = item.entry as DeadlineExtension
+                    return (
+                      <div key={`ext-${ext.id}`} className="flex items-start gap-3 py-3 border-b border-tw-border last:border-0">
+                        <div className="w-2 h-2 rounded-full mt-2 flex-shrink-0 bg-amber-500" />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-semibold text-tw-text">Deadline extended</span>
+                            <span className="text-sm text-amber-700 font-medium">{ext.extendedByName}</span>
+                          </div>
+                          <div className="text-xs text-tw-text-secondary mt-0.5">
+                            {new Date(ext.oldDeadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            {' → '}
+                            {new Date(ext.newDeadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          </div>
+                          <div className="text-xs text-tw-text-secondary mt-0.5 italic">Reason: "{ext.reason}"</div>
+                          {ext.note && <div className="text-xs text-tw-text-secondary mt-0.5">Note: {ext.note}</div>}
+                          <div className="text-xs text-tw-text-secondary mt-0.5">{new Date(ext.createdAt).toLocaleString()}</div>
+                        </div>
+                      </div>
+                    )
+                  }
+                  const log = item.entry as AuditLog
+                  return (
+                    <div key={`log-${log.id}`} className="flex items-start gap-3 py-3 border-b border-tw-border last:border-0">
+                      <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${
+                        log.event.includes('APPROVED') ? 'bg-tw-success' :
+                        log.event.includes('REJECTED') || log.event.includes('CANCELLED') ? 'bg-tw-danger' :
+                        'bg-tw-primary'
+                      }`} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-semibold text-tw-text">
+                            {eventLabels[log.event] || log.event.replace(/_/g, ' ')}
+                          </span>
+                          <span className="text-sm text-tw-primary font-medium">
+                            {log.actorName || `${log.actorType === 'director' ? 'Director' : 'Personnel'}`}
+                          </span>
+                        </div>
+                        {log.payload?.reason && (
+                          <div className="text-sm text-tw-text-secondary mt-0.5 italic">"{log.payload.reason}"</div>
+                        )}
+                        {log.payload?.title && log.event === 'TASK_CREATED' && (
+                          <div className="text-sm text-tw-text-secondary mt-0.5">"{log.payload.title}"</div>
+                        )}
+                        <div className="text-xs text-tw-text-secondary mt-0.5">{new Date(log.createdAt).toLocaleString()}</div>
+                      </div>
                     </div>
-                    {log.payload?.reason && (
-                      <div className="text-sm text-tw-text-secondary mt-0.5 italic">"{log.payload.reason}"</div>
-                    )}
-                    {log.payload?.title && log.event === 'TASK_CREATED' && (
-                      <div className="text-sm text-tw-text-secondary mt-0.5">"{log.payload.title}"</div>
-                    )}
-                    <div className="text-xs text-tw-text-secondary mt-0.5">{new Date(log.createdAt).toLocaleString()}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+                  )
+                })}
+              </div>
+            )
+          })()}
         </div>
       </div>
 
@@ -455,11 +529,11 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
             </div>
             <div className="px-5 py-4 space-y-3">
               <textarea className="input resize-none" rows={3}
-                placeholder={`Reason for ${showReasonModal}...`}
+                placeholder={showReasonModal === 'return' ? 'Reason (optional)…' : `Reason for ${showReasonModal}…`}
                 value={reason} onChange={e => setReason(e.target.value)} />
               <div className="flex gap-2 justify-end">
                 <button onClick={() => { setShowReasonModal(null); setReason('') }} className="btn-secondary">Cancel</button>
-                <button disabled={!reason.trim() || actionLoading} className="btn-danger"
+                <button disabled={(showReasonModal !== 'return' && !reason.trim()) || actionLoading} className="btn-danger"
                   onClick={() => {
                     const action =
                       showReasonModal === 'return' ? () => taskApi.return(task.id, reason) :
@@ -470,6 +544,59 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
                     setReason('')
                   }}>
                   Confirm
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Extend Deadline Modal */}
+      {showExtendModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+            <div className="px-5 py-4 border-b border-tw-border">
+              <h3 className="font-semibold text-tw-text">Extend Deadline</h3>
+              <p className="text-xs text-tw-text-secondary mt-0.5">
+                Current deadline: <span className="font-medium text-tw-danger">
+                  {task.deadline ? new Date(task.deadline).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }) : '—'}
+                </span>
+              </p>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">New Deadline <span className="text-tw-danger">*</span></label>
+                <DatePicker
+                  value={extendForm.newDeadline}
+                  onChange={val => setExtendForm(f => ({ ...f, newDeadline: val }))}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">Reason <span className="text-tw-danger">*</span></label>
+                <textarea className="input resize-none" rows={2} autoFocus
+                  placeholder="Why is the deadline being extended?"
+                  value={extendForm.reason}
+                  onChange={e => setExtendForm(f => ({ ...f, reason: e.target.value }))} />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">Note <span className="text-tw-text-secondary font-normal">(optional)</span></label>
+                <textarea className="input resize-none" rows={2}
+                  placeholder="Additional context for records…"
+                  value={extendForm.note}
+                  onChange={e => setExtendForm(f => ({ ...f, note: e.target.value }))} />
+              </div>
+              {extendError && (
+                <div className="text-xs text-tw-danger bg-red-50 border border-red-200 rounded-lg px-3 py-2">{extendError}</div>
+              )}
+              <div className="flex gap-2 justify-end pt-1">
+                <button onClick={() => { setShowExtendModal(false); setExtendForm({ newDeadline: '', reason: '', note: '' }); setExtendError('') }} className="btn-secondary">
+                  Cancel
+                </button>
+                <button
+                  disabled={!extendForm.newDeadline || !extendForm.reason.trim() || extendSaving}
+                  onClick={handleExtendDeadline}
+                  className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold disabled:opacity-50 transition-colors">
+                  {extendSaving ? 'Saving…' : 'Extend Deadline'}
                 </button>
               </div>
             </div>

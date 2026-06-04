@@ -7,6 +7,7 @@ import BoardView from './BoardView'
 import ProfilePage from './ProfilePage'
 import ElapsedDays from './ElapsedDays'
 import { usePWA } from '../hooks/usePWA'
+import ProgressUpdateSheet from './ProgressUpdateSheet'
 
 interface Props {
   user: AuthUser
@@ -261,20 +262,15 @@ function ExpandedRow({ task, colSpan, actorId, departmentId, onOpen, onSubtaskCl
             </div>
 
             {canAddLog && (
-              <div className="flex gap-2 mb-3">
-                <input
-                  className="input flex-1 text-sm py-1.5"
-                  placeholder="What did you work on today?"
+              <div className="mb-3">
+                <ProgressUpdateSheet
                   value={progressNote}
-                  onChange={e => setProgressNote(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter' && progressNote.trim()) { e.preventDefault(); setConfirmNote(progressNote) } }}
+                  onChange={setProgressNote}
+                  onSubmit={() => setConfirmNote(progressNote)}
+                  loading={progressLoading}
+                  placeholder="What did you work on today?"
+                  label="Progress Update"
                 />
-                <button
-                  disabled={!progressNote.trim() || progressLoading}
-                  onClick={e => { e.stopPropagation(); setConfirmNote(progressNote) }}
-                  className="text-sm py-1.5 px-4 rounded-lg bg-tw-success text-white font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity flex-shrink-0">
-                  Add
-                </button>
               </div>
             )}
 
@@ -545,14 +541,15 @@ function MobileExpandedCard({ task, actorId, departmentId, onOpen, onSubtaskClic
           Progress Updates{progressLogs.length > 0 ? ` (${progressLogs.length})` : ''}
         </div>
         {canAddLog && (
-          <div className="flex gap-2 mb-3">
-            <input className="input flex-1 text-sm py-2" placeholder="What did you work on?"
-              value={progressNote} onChange={e => setProgressNote(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter' && progressNote.trim()) { e.preventDefault(); setConfirmNote(progressNote) } }} />
-            <button disabled={!progressNote.trim() || progressLoading} onClick={e => { e.stopPropagation(); setConfirmNote(progressNote) }}
-              className="px-4 py-2 rounded-xl bg-tw-success text-white text-sm font-semibold disabled:opacity-50">
-              Add
-            </button>
+          <div className="mb-3">
+            <ProgressUpdateSheet
+              value={progressNote}
+              onChange={setProgressNote}
+              onSubmit={() => setConfirmNote(progressNote)}
+              loading={progressLoading}
+              placeholder="What did you work on?"
+              label="Progress Update"
+            />
           </div>
         )}
         {confirmNote !== '' && (

@@ -2,6 +2,7 @@ import { Request, Response } from 'express'
 import prisma from '../prisma'
 import { buildTaskVisibilityFilter } from '../helpers/visibility'
 import { sendPushToActor } from '../helpers/push'
+import type { AuthPayload } from '../middleware/authMiddleware'
 
 const TASK_INCLUDE = {
   project: true,
@@ -31,16 +32,30 @@ async function resolveActedByName(task: Record<string, unknown>): Promise<Record
 
 type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 
-async function writeAudit(db: TxClient | typeof prisma, workspaceId: string, event: string, actorType: 'director' | 'personnel', actorId: string, taskId?: string, payload?: object) {
+async function writeAudit(
+  db: TxClient | typeof prisma,
+  workspaceId: string,
+  event: string,
+  actorType: 'director' | 'personnel',
+  actorId: string,
+  taskId?: string,
+  payload?: object,
+  user?: AuthPayload,
+) {
+  const isImp = !!(user?.chairmanId)
+  const impPayload = isImp
+    ? { _impersonatedBy: user!.chairmanName ?? user!.chairmanId, _impersonationSessionId: user!.impersonationSessionId, _viewingAs: actorId }
+    : {}
   await db.auditLog.create({
     data: {
       workspaceId,
       event,
-      actorType,
-      actorDirectorId:  actorType === 'director'  ? actorId : undefined,
-      actorPersonnelId: actorType === 'personnel' ? actorId : undefined,
+      // When impersonating, audit actor is the Chairman (director), not the target user
+      actorType: isImp ? 'director' : actorType,
+      actorDirectorId:  isImp ? user!.chairmanId : (actorType === 'director' ? actorId : undefined),
+      actorPersonnelId: isImp ? undefined         : (actorType === 'personnel' ? actorId : undefined),
       taskId,
-      payload,
+      payload: { ...payload, ...impPayload },
     }
   })
 }
@@ -233,7 +248,8 @@ export async function createTask(req: Request, res: Response): Promise<void> {
           title,
           description,
           priority: priority || 'MEDIUM',
-          deadline: deadline ? new Date(deadline) : undefined,
+          deadline:         deadline ? new Date(deadline) : undefined,
+          originalDeadline: deadline ? new Date(deadline) : undefined,
           deadlineSetById:   deadline ? actorId    : undefined,
           deadlineSetByType: deadline ? actorType  : undefined,
           createdByDirectorId:  actorType === 'director'  ? actorId : undefined,
@@ -242,7 +258,7 @@ export async function createTask(req: Request, res: Response): Promise<void> {
           approvalByType: actorType,
         }
       })
-      await writeAudit(tx, workspaceId, parentTaskId ? 'SUBTASK_CREATED' : 'TASK_CREATED', actorType, actorId, t.id, { title })
+      await writeAudit(tx, workspaceId, parentTaskId ? 'SUBTASK_CREATED' : 'TASK_CREATED', actorType, actorId, t.id, { title }, req.user!)
       return t
     })
     res.status(201).json(task)
@@ -304,7 +320,7 @@ export async function updateTask(req: Request, res: Response): Promise<void> {
         // Notify new assignee
         await notifyActor(tx, workspaceId, 'personnel', reassignPersonnelId, 'task_assigned', 'Task Assigned',
           `You have been assigned: "${t.title}"`, t.id)
-        await writeAudit(tx, workspaceId, 'TASK_REASSIGNED', actorType, actorId, t.id, { reassignedTo: reassignPersonnelId })
+        await writeAudit(tx, workspaceId, 'TASK_REASSIGNED', actorType, actorId, t.id, { reassignedTo: reassignPersonnelId }, req.user!)
       } else {
         // Regular update — notify existing assignees
         const assignments = await tx.taskAssignment.findMany({ where: { taskId: task.id } })
@@ -322,7 +338,7 @@ export async function updateTask(req: Request, res: Response): Promise<void> {
         }
       }
 
-      await writeAudit(tx, workspaceId, 'TASK_UPDATED', actorType, actorId, t.id, req.body)
+      await writeAudit(tx, workspaceId, 'TASK_UPDATED', actorType, actorId, t.id, req.body, req.user!)
       return t
     })
     res.json(updated)
@@ -343,7 +359,7 @@ export async function assignTask(req: Request, res: Response): Promise<void> {
     await prisma.$transaction(async tx => {
       await tx.taskAssignment.create({ data: { taskId: task.id, personnelId, departmentId } })
       await tx.task.update({ where: { id: task.id }, data: { status: 'ASSIGNED' } })
-      await writeAudit(tx, workspaceId, 'TASK_ASSIGNED', actorType, actorId, task.id, { personnelId, departmentId })
+      await writeAudit(tx, workspaceId, 'TASK_ASSIGNED', actorType, actorId, task.id, { personnelId, departmentId }, req.user!)
       if (personnelId) {
         await notifyActor(tx, workspaceId, 'personnel', personnelId, 'task_assigned', 'New task assigned', `You have been assigned: "${task.title}"`, task.id)
       }
@@ -396,7 +412,7 @@ export async function acceptTask(req: Request, res: Response): Promise<void> {
         where: { id: task.id },
         data: { status: 'IN_PROGRESS', actedById: actorId, actedByType: 'personnel', startedAt: new Date() }
       })
-      await writeAudit(tx, workspaceId, 'TASK_ACCEPTED', 'personnel', actorId, task.id, { acceptedBy: actorId })
+      await writeAudit(tx, workspaceId, 'TASK_ACCEPTED', 'personnel', actorId, task.id, { acceptedBy: actorId }, req.user!)
       if (task.approvalById && task.approvalByType) {
         await notifyActor(tx, workspaceId, task.approvalByType as 'director' | 'personnel', task.approvalById, 'task_assigned',
           'Task accepted', `Your task "${task.title}" has been accepted.`, task.id)
@@ -453,7 +469,7 @@ export async function reassignTask(req: Request, res: Response): Promise<void> {
         where: { id: task.id },
         data: { status: 'ASSIGNED', actedById: actorId, actedByType: 'personnel' }
       })
-      await writeAudit(tx, workspaceId, 'TASK_REASSIGNED', 'personnel', actorId, task.id, { reason, reassignedTo: personnelId })
+      await writeAudit(tx, workspaceId, 'TASK_REASSIGNED', 'personnel', actorId, task.id, { reason, reassignedTo: personnelId }, req.user!)
       await notifyActor(tx, workspaceId, 'personnel', personnelId, 'task_assigned',
         'Task assigned to you', `"${task.title}" was reassigned to you.`, task.id)
       // Notify approval authority
@@ -483,7 +499,7 @@ export async function startTask(req: Request, res: Response): Promise<void> {
           startedAt: new Date(),
         }
       })
-      await writeAudit(tx, workspaceId, 'TASK_STARTED', actorType, actorId, task.id, { actedBy: actorId })
+      await writeAudit(tx, workspaceId, 'TASK_STARTED', actorType, actorId, task.id, { actedBy: actorId }, req.user!)
     })
     res.json({ success: true })
   } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
@@ -560,7 +576,7 @@ export async function submitTask(req: Request, res: Response): Promise<void> {
           approvalByType: newApprovalByType,
         }
       })
-      await writeAudit(tx, workspaceId, 'TASK_SUBMITTED', actorType, actorId, task.id, { actedBy: actorId })
+      await writeAudit(tx, workspaceId, 'TASK_SUBMITTED', actorType, actorId, task.id, { actedBy: actorId }, req.user!)
       if (newApprovalById && newApprovalByType) {
         await notifyActor(tx, workspaceId, newApprovalByType as 'director' | 'personnel', newApprovalById, 'task_submitted_for_approval', 'Task ready for approval', `"${task.title}" has been submitted for your approval.`, task.id)
       }
@@ -580,7 +596,7 @@ export async function blockTask(req: Request, res: Response): Promise<void> {
     if (task.status !== 'IN_PROGRESS') { res.status(400).json({ error: 'Task must be IN_PROGRESS to block' }); return }
     await prisma.$transaction(async tx => {
       await tx.task.update({ where: { id: task.id }, data: { status: 'BLOCKED', returnReason: reason } })
-      await writeAudit(tx, workspaceId, 'TASK_BLOCKED', actorType, actorId, task.id, { reason })
+      await writeAudit(tx, workspaceId, 'TASK_BLOCKED', actorType, actorId, task.id, { reason }, req.user!)
       // Notify approval authority that the task is blocked
       if (task.approvalById && task.approvalByType) {
         await notifyActor(tx, workspaceId, task.approvalByType as 'director' | 'personnel', task.approvalById, 'task_returned', 'Task blocked', `"${task.title}" is blocked: ${reason}`, task.id)
@@ -599,7 +615,7 @@ export async function unblockTask(req: Request, res: Response): Promise<void> {
     if (task.status !== 'BLOCKED') { res.status(400).json({ error: 'Task must be BLOCKED to unblock' }); return }
     await prisma.$transaction(async tx => {
       await tx.task.update({ where: { id: task.id }, data: { status: 'IN_PROGRESS', returnReason: null } })
-      await writeAudit(tx, workspaceId, 'TASK_UNBLOCKED', actorType, actorId, task.id)
+      await writeAudit(tx, workspaceId, 'TASK_UNBLOCKED', actorType, actorId, task.id, undefined, req.user!)
     })
     res.json({ success: true })
   } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
@@ -610,24 +626,23 @@ export async function returnTask(req: Request, res: Response): Promise<void> {
   try {
     const { actorId, actorType, workspaceId } = req.user!
     const { reason } = req.body
-    if (!reason) { res.status(400).json({ error: 'reason required' }); return }
     const task = await prisma.task.findFirst({ where: { id: req.params.id, workspaceId, deletedAt: null } })
     if (!task) { res.status(404).json({ error: 'Task not found' }); return }
-    if (!['ASSIGNED', 'IN_PROGRESS'].includes(task.status)) { res.status(400).json({ error: 'Task must be ASSIGNED or IN_PROGRESS to return' }); return }
+    if (!['ASSIGNED', 'IN_PROGRESS', 'SUBMITTED'].includes(task.status)) { res.status(400).json({ error: 'Task cannot be returned in its current status' }); return }
     await prisma.$transaction(async tx => {
       await tx.task.update({
         where: { id: task.id },
         data: {
           status: 'RETURNED',
-          returnReason: reason,
+          returnReason: reason || null,
           returnedAt: new Date(),
           actedById: actorId,
           actedByType: actorType,
         }
       })
-      await writeAudit(tx, workspaceId, 'TASK_RETURNED', actorType, actorId, task.id, { reason, actedBy: actorId })
+      await writeAudit(tx, workspaceId, 'TASK_RETURNED', actorType, actorId, task.id, { reason, actedBy: actorId }, req.user!)
       if (task.approvalById && task.approvalByType) {
-        await notifyActor(tx, workspaceId, task.approvalByType as 'director' | 'personnel', task.approvalById, 'task_returned', 'Task returned', `"${task.title}" was returned: ${reason}`, task.id)
+        await notifyActor(tx, workspaceId, task.approvalByType as 'director' | 'personnel', task.approvalById, 'task_returned', 'Task returned', `"${task.title}" was returned${reason ? ': ' + reason : ''}`, task.id)
       }
     })
     res.json({ success: true })
@@ -666,15 +681,15 @@ export async function approveTask(req: Request, res: Response): Promise<void> {
       if (nextApprovalById && nextApprovalByType) {
         // Route to next level — keep SUBMITTED but change approvalById
         await tx.task.update({ where: { id: task.id }, data: { approvalById: nextApprovalById, approvalByType: nextApprovalByType } })
-        await writeAudit(tx, workspaceId, 'TASK_APPROVED', actorType, actorId, task.id)
+        await writeAudit(tx, workspaceId, 'TASK_APPROVED', actorType, actorId, task.id, undefined, req.user!)
         // Notify the next approver
         await notifyActor(tx, workspaceId, nextApprovalByType as 'director' | 'personnel', nextApprovalById, 'task_submitted_for_approval', 'Task pending your approval', `"${task.title}" has been approved by ${actorType} and is awaiting your approval.`, task.id)
       } else {
         // Director approving or no further chain — fully approve
         await tx.task.update({ where: { id: task.id }, data: { status: 'APPROVED' } })
-        await writeAudit(tx, workspaceId, 'TASK_APPROVED', actorType, actorId, task.id)
+        await writeAudit(tx, workspaceId, 'TASK_APPROVED', actorType, actorId, task.id, undefined, req.user!)
       }
-      await writeAudit(tx, workspaceId, 'TASK_APPROVED', actorType, actorId, task.id)
+      await writeAudit(tx, workspaceId, 'TASK_APPROVED', actorType, actorId, task.id, undefined, req.user!)
 
       // If this is a group task instance, check if all sibling instances are now approved
       if (task.groupTaskId) {
@@ -740,7 +755,7 @@ export async function rejectTask(req: Request, res: Response): Promise<void> {
     }
     await prisma.$transaction(async tx => {
       await tx.task.update({ where: { id: task.id }, data: { status: 'REJECTED', returnReason: reason } })
-      await writeAudit(tx, workspaceId, 'TASK_REJECTED', actorType, actorId, task.id, { reason })
+      await writeAudit(tx, workspaceId, 'TASK_REJECTED', actorType, actorId, task.id, { reason }, req.user!)
       // Notify the person who actually submitted it
       if (task.actedById && task.actedByType && task.actedById !== actorId) {
         await notifyActor(tx, workspaceId, task.actedByType as 'director' | 'personnel', task.actedById, 'task_rejected', 'Task rejected', `"${task.title}" was rejected${reason ? ': ' + reason : ''}.`, task.id)
@@ -767,7 +782,7 @@ export async function reopenTask(req: Request, res: Response): Promise<void> {
           actedByType: actorType,
         }
       })
-      await writeAudit(tx, workspaceId, 'TASK_UPDATED', actorType, actorId, task.id, { action: 'reopened' })
+      await writeAudit(tx, workspaceId, 'TASK_UPDATED', actorType, actorId, task.id, { action: 'reopened' }, req.user!)
     })
     res.json({ success: true })
   } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
@@ -783,7 +798,7 @@ export async function cancelTask(req: Request, res: Response): Promise<void> {
     if (!task) { res.status(404).json({ error: 'Task not found' }); return }
     await prisma.$transaction(async tx => {
       await tx.task.update({ where: { id: task.id }, data: { status: 'CANCELLED', cancelledAt: new Date(), cancelReason: reason } })
-      await writeAudit(tx, workspaceId, 'TASK_CANCELLED', actorType, actorId, task.id, { reason })
+      await writeAudit(tx, workspaceId, 'TASK_CANCELLED', actorType, actorId, task.id, { reason }, req.user!)
     })
     res.json({ success: true })
   } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
@@ -798,7 +813,7 @@ export async function deleteTask(req: Request, res: Response): Promise<void> {
     if (!task) { res.status(404).json({ error: 'Task not found' }); return }
     await prisma.$transaction(async tx => {
       await tx.task.update({ where: { id: task.id }, data: { deletedAt: new Date() } })
-      await writeAudit(tx, workspaceId, 'TASK_DELETED', actorType, actorId, task.id)
+      await writeAudit(tx, workspaceId, 'TASK_DELETED', actorType, actorId, task.id, undefined, req.user!)
     })
     res.json({ success: true })
   } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
@@ -842,7 +857,7 @@ export async function addComment(req: Request, res: Response): Promise<void> {
           authorPersonnelId: actorType === 'personnel' ? actorId : undefined,
         }
       })
-      await writeAudit(tx, workspaceId, 'COMMENT_ADDED', actorType, actorId, task.id, { commentId: c.id })
+      await writeAudit(tx, workspaceId, 'COMMENT_ADDED', actorType, actorId, task.id, { commentId: c.id }, req.user!)
       return c
     })
     res.status(201).json(comment)
@@ -880,6 +895,122 @@ export async function getProgressLogs(req: Request, res: Response): Promise<void
       authorName: l.authorPersonnel?.name || l.authorDirector?.name || l.authorType,
     }))
     res.json(enriched)
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
+}
+
+// POST /api/tasks/:id/extend-deadline
+export async function extendDeadline(req: Request, res: Response): Promise<void> {
+  try {
+    const { actorId, actorType, workspaceId } = req.user!
+    const { newDeadline, reason, note } = req.body as { newDeadline: string; reason: string; note?: string }
+
+    if (!newDeadline || !reason?.trim()) {
+      res.status(400).json({ error: 'newDeadline and reason are required' }); return
+    }
+
+    const task = await prisma.task.findFirst({ where: { id: req.params.id, workspaceId, deletedAt: null } })
+    if (!task) { res.status(404).json({ error: 'Task not found' }); return }
+    if (['APPROVED', 'CANCELLED'].includes(task.status)) {
+      res.status(400).json({ error: 'Cannot extend deadline of an approved or cancelled task' }); return
+    }
+
+    // Only the task creator can extend
+    const isCreator = actorType === 'director'
+      ? task.createdByDirectorId === actorId
+      : task.createdByPersonnelId === actorId
+    if (!isCreator) {
+      res.status(403).json({ error: 'Only the task creator can extend the deadline' }); return
+    }
+
+    const newDate = new Date(newDeadline)
+    if (isNaN(newDate.getTime())) {
+      res.status(400).json({ error: 'Invalid date' }); return
+    }
+    // New deadline must be strictly after current deadline (or in the future if no current deadline)
+    if (task.deadline && newDate <= task.deadline) {
+      res.status(400).json({ error: 'New deadline must be later than the current deadline' }); return
+    }
+    if (!task.deadline && newDate <= new Date()) {
+      res.status(400).json({ error: 'New deadline must be in the future' }); return
+    }
+
+    // Resolve the creator's name for the audit record
+    let extendedByName = 'Unknown'
+    if (actorType === 'director') {
+      const d = await prisma.director.findUnique({ where: { id: actorId }, select: { name: true } })
+      extendedByName = d?.name ?? extendedByName
+    } else {
+      const p = await prisma.personnel.findUnique({ where: { id: actorId }, select: { name: true } })
+      extendedByName = p?.name ?? extendedByName
+    }
+
+    const oldDeadline = task.deadline ?? new Date()
+
+    await prisma.$transaction(async tx => {
+      await tx.task.update({
+        where: { id: task.id },
+        data: {
+          deadline: newDate,
+          // Preserve the very first deadline ever set as originalDeadline
+          originalDeadline: task.originalDeadline ?? task.deadline ?? newDate,
+        }
+      })
+
+      await tx.deadlineExtension.create({
+        data: {
+          taskId:         task.id,
+          workspaceId,
+          oldDeadline,
+          newDeadline:    newDate,
+          reason:         reason.trim(),
+          note:           note?.trim() || null,
+          extendedById:   actorId,
+          extendedByType: actorType,
+          extendedByName,
+        }
+      })
+
+      await writeAudit(tx, workspaceId, 'DEADLINE_EXTENDED', actorType, actorId, task.id, {
+        oldDeadline: oldDeadline.toISOString(),
+        newDeadline: newDate.toISOString(),
+        reason: reason.trim(),
+        note: note?.trim(),
+        extendedBy: extendedByName,
+      }, req.user!)
+
+      // Notify all personnel assigned to this task
+      const assignments = await tx.taskAssignment.findMany({
+        where: { taskId: task.id },
+        select: { personnelId: true }
+      })
+      for (const a of assignments) {
+        if (a.personnelId && a.personnelId !== actorId) {
+          await notifyActor(tx, workspaceId, 'personnel', a.personnelId,
+            'task_deadline_warning',
+            'Deadline Extended',
+            `The deadline for "${task.title}" has been extended to ${newDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}.`,
+            task.id
+          )
+        }
+      }
+    })
+
+    res.json({ success: true })
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
+}
+
+// GET /api/tasks/:id/deadline-extensions
+export async function getDeadlineExtensions(req: Request, res: Response): Promise<void> {
+  try {
+    const { workspaceId } = req.user!
+    const task = await prisma.task.findFirst({ where: { id: req.params.id, workspaceId, deletedAt: null } })
+    if (!task) { res.status(404).json({ error: 'Task not found' }); return }
+
+    const extensions = await prisma.deadlineExtension.findMany({
+      where: { taskId: req.params.id },
+      orderBy: { createdAt: 'asc' },
+    })
+    res.json(extensions)
   } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
 }
 

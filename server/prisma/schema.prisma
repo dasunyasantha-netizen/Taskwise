@@ -22,15 +22,37 @@ model Director {
   avatarUrl   String?
   workspaceId String?    @unique
   workspace   Workspace? @relation(fields: [workspaceId], references: [id])
+  isChairman                Boolean  @default(false)
+  impersonationPasswordHash String?  // bcrypt hash of chairman's second password
+  webAuthnChallenge         String?  // temporary challenge for ongoing WebAuthn ceremony
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
-  projectsCreated   Project[]
-  tasksCreated      Task[]           @relation("TaskCreatedByDirector")
-  auditLogs         AuditLog[]       @relation("AuditActorDirector")
-  notifications     Notification[]   @relation("NotifRecipientDirector")
-  comments          TaskComment[]    @relation("CommentAuthorDirector")
-  progressLogs      TaskProgressLog[] @relation("ProgressLogDirector")
+  projectsCreated       Project[]
+  tasksCreated          Task[]              @relation("TaskCreatedByDirector")
+  auditLogs             AuditLog[]          @relation("AuditActorDirector")
+  notifications         Notification[]      @relation("NotifRecipientDirector")
+  comments              TaskComment[]       @relation("CommentAuthorDirector")
+  progressLogs          TaskProgressLog[]   @relation("ProgressLogDirector")
+  impersonationSessions ImpersonationSession[]
+}
+
+model ImpersonationSession {
+  id              String    @id @default(uuid())
+  chairmanId      String
+  chairman        Director  @relation(fields: [chairmanId], references: [id])
+  targetActorId   String    // Personnel.id being impersonated
+  targetActorType String    // always "personnel" for now
+  targetName      String    // snapshot of name at session start
+  workspaceId     String
+  startedAt       DateTime  @default(now())
+  endedAt         DateTime?
+  endReason       String?   // "exit" | "logout" | "expired"
+  ipAddress       String?
+  userAgent       String?
+
+  @@index([chairmanId])
+  @@index([workspaceId, startedAt])
 }
 
 model Workspace {
@@ -94,6 +116,7 @@ model Personnel {
   name         String
   avatarUrl          String?
   mustChangePassword Boolean  @default(false)
+  webAuthnChallenge  String?  // temporary challenge for ongoing WebAuthn ceremony
   supervisorId String?    // direct supervisor (another Personnel one layer up)
   supervisor   Personnel? @relation("PersonnelSupervisor", fields: [supervisorId], references: [id])
   subordinates Personnel[] @relation("PersonnelSupervisor")
@@ -216,6 +239,7 @@ model Task {
   // BLOCKED: assignee is waiting on information or another team; unblocks back to IN_PROGRESS
 
   deadline         DateTime?
+  originalDeadline DateTime? // snapshot of deadline at task creation — never changed after first set
   deadlineSetById  String?   // Director.id or Personnel.id
   deadlineSetByType String?  // "director" | "personnel"
 
@@ -245,11 +269,12 @@ model Task {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  assignments   TaskAssignment[]
-  comments      TaskComment[]
-  auditLogs     AuditLog[]
-  notifications Notification[]
-  progressLogs  TaskProgressLog[]
+  assignments        TaskAssignment[]
+  comments           TaskComment[]
+  auditLogs          AuditLog[]
+  notifications      Notification[]
+  progressLogs       TaskProgressLog[]
+  deadlineExtensions DeadlineExtension[]
 
   @@index([workspaceId])
   @@index([projectId])
@@ -406,6 +431,28 @@ model NoticeDismissal {
   @@unique([noticeId, actorId, actorType])
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// DEADLINE EXTENSIONS  (full audit trail for rating system)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model DeadlineExtension {
+  id              String    @id @default(uuid())
+  taskId          String
+  task            Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  workspaceId     String
+  oldDeadline     DateTime
+  newDeadline     DateTime
+  reason          String
+  note            String?
+  extendedById    String    // Director.id or Personnel.id
+  extendedByType  String    // "director" | "personnel"
+  extendedByName  String    // snapshot of name at time of extension
+  createdAt       DateTime  @default(now())
+
+  @@index([taskId])
+  @@index([workspaceId])
+}
+
 model PushSubscription {
   id           String   @id @default(uuid())
   actorId      String
@@ -415,6 +462,27 @@ model PushSubscription {
   p256dh       String
   auth         String
   createdAt    DateTime @default(now())
+
+  @@index([actorId, actorType])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WEBAUTHN CREDENTIALS  (biometric / passkey login)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model WebAuthnCredential {
+  id                 String   @id @default(uuid())
+  actorId            String
+  actorType          String   // "director" | "personnel"
+  credentialId       String   @unique  // base64url-encoded credential ID from authenticator
+  publicKey          String   // base64url-encoded COSE public key
+  counter            BigInt   @default(0)
+  deviceType         String   // "singleDevice" | "multiDevice"
+  backedUp           Boolean  @default(false)
+  transports         String?  // JSON array of AuthenticatorTransport strings
+  deviceName         String?  // friendly label set by user ("iPhone 14", "Work Laptop")
+  createdAt          DateTime @default(now())
+  lastUsedAt         DateTime?
 
   @@index([actorId, actorType])
 }

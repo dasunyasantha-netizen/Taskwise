@@ -7,6 +7,10 @@ export interface AuthPayload {
   workspaceId: string
   layerNumber?: number  // Personnel only: which layer they belong to (1, 2, or 3)
   departmentId?: string // Personnel only: their department
+  // Impersonation fields — present only when Chairman is viewing as another user
+  impersonationSessionId?: string
+  chairmanId?: string
+  chairmanName?: string
 }
 
 declare global {
@@ -36,9 +40,21 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
 }
 
 export function requireDirector(req: Request, res: Response, next: NextFunction): void {
-  if (req.user?.actorType !== 'director') {
+  // Allow impersonation tokens where actorType is personnel but real actor is chairman
+  const u = req.user
+  if (!u) { res.status(403).json({ error: 'Director access required' }); return }
+  if (u.actorType !== 'director' && !u.impersonationSessionId) {
     res.status(403).json({ error: 'Director access required' })
     return
   }
+  next()
+}
+
+export function requireChairman(req: Request, res: Response, next: NextFunction): void {
+  if (req.user?.actorType !== 'director') {
+    res.status(403).json({ error: 'Chairman access required' })
+    return
+  }
+  // Actual chairman check done in the controller after DB lookup
   next()
 }
