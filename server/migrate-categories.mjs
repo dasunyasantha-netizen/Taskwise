@@ -311,10 +311,18 @@ async function main() {
 // ─── Fuzzy project finder ─────────────────────────────────────────────────────
 
 function normalize(s) {
-  return (s || '').trim().toLowerCase()
-    .replace(/\s+/g, ' ')          // collapse multiple spaces
-    .replace(/labour/g, 'labor')   // labour/labor variant
-    .replace(/syestem/g, 'system') // known typo
+  return (s || '').trim()
+    .replace(/​|‌|‍|﻿/g, '')  // strip zero-width chars
+    .toLowerCase()
+    .replace(/\s+/g, ' ')              // collapse multiple spaces
+    .replace(/ - /g, ' ')              // "word - word" → "word word" (dash as separator variant)
+    .replace(/labour/g, 'labor')       // labour/labor
+    .replace(/syestem/g, 'system')     // known typo
+    .replace(/cine wave/g, 'cinewave') // spacing variant
+    .replace(/ , /g, ' ')              // " , " → " " (comma as separator variant)
+    .replace(/යින්/g, 'යන්')           // Sinhala spelling variant
+    .replace(/විගණව/g, 'විගණන')        // Sinhala spelling variant
+    .replace(/කොමෂමට/g, 'කොමිෂමට')    // Sinhala spelling variant
 }
 
 function findProjectFuzzy(projectByName, searchName) {
