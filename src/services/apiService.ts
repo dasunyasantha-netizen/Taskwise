@@ -103,6 +103,8 @@ export const taskApi = {
   reject:     (id: string, reason: string) => api.post(`/tasks/${id}/reject`, { reason }),
   reopen:     (id: string)      => api.post(`/tasks/${id}/reopen`),
   cancel:     (id: string, reason: string) => api.post(`/tasks/${id}/cancel`, { reason }),
+  changeAssignees: (id: string, data: { add: string[]; remove: string[]; reason: string }) =>
+    api.post(`/tasks/${id}/change-assignees`, data),
   subtasks:       (id: string, recursive?: boolean) =>
     api.get(`/tasks/${id}/subtasks${recursive ? '?recursive=true' : ''}`),
   comments:       (id: string)      => api.get(`/tasks/${id}/comments`),

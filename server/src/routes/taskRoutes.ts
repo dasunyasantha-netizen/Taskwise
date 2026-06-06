@@ -4,6 +4,7 @@ import {
   listTasks, getTask, createTask, updateTask, deleteTask,
   assignTask, acceptTask, reassignTask, startTask, submitTask,
   returnTask, approveTask, rejectTask, reopenTask, cancelTask,
+  changeAssignees,
   getSubtasks, getComments, addComment, getTaskHistory,
   getProgressLogs, addProgressLog,
   extendDeadline, getDeadlineExtensions,
@@ -28,6 +29,7 @@ router.post('/:id/approve',       approveTask)
 router.post('/:id/reject',        rejectTask)
 router.post('/:id/reopen',        reopenTask)
 router.post('/:id/cancel',        cancelTask)
+router.post('/:id/change-assignees', changeAssignees)
 
 router.get('/:id/subtasks',        getSubtasks)
 router.get('/:id/comments',        getComments)

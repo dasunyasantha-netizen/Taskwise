@@ -804,6 +804,104 @@ export async function cancelTask(req: Request, res: Response): Promise<void> {
   } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
 }
 
+// POST /api/tasks/:id/change-assignees
+// Add/remove assignees. Removing someone cancels their subtasks and writes history.
+export async function changeAssignees(req: Request, res: Response): Promise<void> {
+  try {
+    const { actorId, actorType, workspaceId } = req.user!
+    const { add = [], remove = [], reason } = req.body as { add: string[]; remove: string[]; reason: string }
+
+    if (!reason?.trim()) { res.status(400).json({ error: 'reason required' }); return }
+    if (!Array.isArray(add) || !Array.isArray(remove)) { res.status(400).json({ error: 'add and remove must be arrays' }); return }
+    if (add.length === 0 && remove.length === 0) { res.status(400).json({ error: 'No changes specified' }); return }
+
+    const task = await prisma.task.findFirst({
+      where: { id: req.params.id, workspaceId, deletedAt: null },
+      include: { assignments: true }
+    })
+    if (!task) { res.status(404).json({ error: 'Task not found' }); return }
+    if (['APPROVED', 'CANCELLED'].includes(task.status)) {
+      res.status(400).json({ error: 'Cannot change assignees on a completed task' }); return
+    }
+
+    // Only creator (personnel) or director can change assignees
+    const isCreator = task.approvalById === actorId && task.approvalByType === 'personnel'
+    if (actorType !== 'director' && !isCreator) {
+      res.status(403).json({ error: 'Only the task creator or a director can change assignees' }); return
+    }
+
+    // Verify all added personnel exist
+    if (add.length > 0) {
+      const found = await prisma.personnel.findMany({ where: { id: { in: add }, workspaceId, deletedAt: null }, select: { id: true } })
+      if (found.length !== add.length) { res.status(404).json({ error: 'One or more personnel to add not found' }); return }
+    }
+
+    // Current assignee IDs being removed
+    const removedAssignments = task.assignments.filter(a => a.personnelId && remove.includes(a.personnelId))
+
+    // Resolve names for audit log
+    const addedNames = add.length > 0
+      ? (await prisma.personnel.findMany({ where: { id: { in: add } }, select: { id: true, name: true } })).map(p => p.name)
+      : []
+    const removedNames = removedAssignments.length > 0
+      ? (await prisma.personnel.findMany({ where: { id: { in: removedAssignments.map(a => a.personnelId!).filter(Boolean) } }, select: { id: true, name: true } })).map(p => p.name)
+      : []
+
+    await prisma.$transaction(async tx => {
+      // Cancel subtasks belonging to removed assignees and write history entries
+      for (const assignment of removedAssignments) {
+        if (!assignment.personnelId) continue
+        const theirSubtasks = await tx.task.findMany({
+          where: { parentTaskId: task.id, workspaceId, deletedAt: null, status: { notIn: ['APPROVED', 'CANCELLED'] } },
+          include: { assignments: true }
+        })
+        const owned = theirSubtasks.filter(s => s.assignments.some(a => a.personnelId === assignment.personnelId))
+        for (const sub of owned) {
+          await tx.task.update({
+            where: { id: sub.id },
+            data: { status: 'CANCELLED', cancelledAt: new Date(), cancelReason: `Assignee removed from parent task: ${reason}` }
+          })
+          await tx.auditLog.create({
+            data: {
+              workspaceId,
+              event: 'TASK_CANCELLED',
+              actorType: actorType as 'director' | 'personnel',
+              actorDirectorId:  actorType === 'director'  ? actorId : undefined,
+              actorPersonnelId: actorType === 'personnel' ? actorId : undefined,
+              taskId: sub.id,
+              payload: { reason: `Assignee removed from parent task. ${reason}`, autoCancel: true },
+            }
+          })
+        }
+        await tx.taskAssignment.delete({ where: { id: assignment.id } })
+      }
+
+      // Add new assignees (skip if already assigned)
+      const existingIds = new Set(task.assignments.map(a => a.personnelId).filter(Boolean))
+      for (const pid of add) {
+        if (!existingIds.has(pid)) {
+          await tx.taskAssignment.create({ data: { taskId: task.id, personnelId: pid } })
+        }
+      }
+
+      // Write single audit entry for the parent task change
+      await writeAudit(tx, workspaceId, 'ASSIGNEES_CHANGED', actorType as 'director' | 'personnel', actorId, task.id, {
+        reason,
+        added: addedNames,
+        removed: removedNames,
+      }, req.user!)
+
+      // Notify newly added people
+      for (const pid of add) {
+        await notifyActor(tx, workspaceId, 'personnel', pid, 'task_assigned',
+          'Task assigned to you', `"${task.title}" has been assigned to you.`, task.id)
+      }
+    })
+
+    res.json({ success: true })
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
+}
+
 // DELETE /api/tasks/:id  (soft delete, Director only)
 export async function deleteTask(req: Request, res: Response): Promise<void> {
   try {

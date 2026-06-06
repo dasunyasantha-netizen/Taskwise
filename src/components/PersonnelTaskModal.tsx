@@ -37,6 +37,7 @@ const eventLabels: Record<string, string> = {
   TASK_RETURNED:     'Task returned',   TASK_CANCELLED:  'Task cancelled',
   SUBTASK_CREATED:   'Subtask created', COMMENT_ADDED:   'Comment added',
   DEADLINE_EXTENDED: 'Deadline extended',
+  ASSIGNEES_CHANGED: 'Assignees changed',
 }
 
 type TabKey = 'details' | 'updates' | 'subtasks' | 'history'
@@ -79,6 +80,15 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
 
   const [loading,      setLoading]      = useState(false)
   const [actionError,  setActionError]  = useState('')
+
+  // Change assignees state
+  const [showChangeAssignees, setShowChangeAssignees] = useState(false)
+  const [caAdded,   setCaAdded]   = useState<string[]>([])
+  const [caRemoved, setCaRemoved] = useState<string[]>([])
+  const [caReason,  setCaReason]  = useState('')
+  const [caSaving,  setCaSaving]  = useState(false)
+  const [caError,   setCaError]   = useState('')
+  const [caSubtaskWarning, setCaSubtaskWarning] = useState<{ personnelId: string; name: string; count: number }[]>([])
 
   // Extend deadline state
   const [showExtendModal,   setShowExtendModal]   = useState(false)
@@ -317,6 +327,7 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
   const isOverdue       = !!task.deadline && new Date(task.deadline) < new Date() && !['APPROVED', 'CANCELLED'].includes(task.status)
   const isTaskCreator   = task.createdByPersonnelId === actorId
   const canExtend       = isTaskCreator && isOverdue
+  const canChangeAssignees = isCreator && !['APPROVED', 'CANCELLED'].includes(task.status)
 
   const handleExtendDeadline = async () => {
     if (!extendForm.newDeadline || !extendForm.reason.trim()) return
@@ -335,6 +346,43 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
       setExtendError(e instanceof Error ? e.message : 'Failed to extend deadline')
     }
     setExtendSaving(false)
+  }
+
+  const openChangeAssignees = async () => {
+    setCaAdded([])
+    setCaRemoved([])
+    setCaReason('')
+    setCaError('')
+    // Check which current assignees have subtasks
+    const current = task.assignments?.filter(a => a.personnelId) ?? []
+    if (current.length > 0) {
+      const subs = await taskApi.subtasks(task.id) as Task[]
+      const warnings: { personnelId: string; name: string; count: number }[] = []
+      for (const a of current) {
+        if (!a.personnelId) continue
+        const owned = subs.filter(s => s.assignments?.some(sa => sa.personnelId === a.personnelId) && !['APPROVED','CANCELLED'].includes(s.status))
+        if (owned.length > 0) warnings.push({ personnelId: a.personnelId, name: a.personnel?.name ?? '?', count: owned.length })
+      }
+      setCaSubtaskWarning(warnings)
+    } else {
+      setCaSubtaskWarning([])
+    }
+    setShowChangeAssignees(true)
+  }
+
+  const handleChangeAssignees = async () => {
+    if (!caReason.trim()) { setCaError('Reason is required'); return }
+    if (caAdded.length === 0 && caRemoved.length === 0) { setCaError('No changes made'); return }
+    setCaSaving(true)
+    setCaError('')
+    try {
+      await taskApi.changeAssignees(task.id, { add: caAdded, remove: caRemoved, reason: caReason })
+      setShowChangeAssignees(false)
+      await onRefresh()
+    } catch (e: unknown) {
+      setCaError(e instanceof Error ? e.message : 'Failed to update assignees')
+    }
+    setCaSaving(false)
   }
 
   const otherPersonnel = personnel.filter(p => p.id !== actorId)
@@ -467,6 +515,12 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
               <button onClick={() => { setExtendForm({ newDeadline: '', reason: '', note: '' }); setExtendError(''); setShowExtendModal(true) }}
                 className="btn-secondary text-sm py-2 px-4 text-amber-700 border-amber-300 hover:bg-amber-50">
                 📅 Extend Deadline
+              </button>
+            )}
+            {canChangeAssignees && (
+              <button onClick={openChangeAssignees}
+                className="btn-secondary text-sm py-2 px-4">
+                👥 Change Assignees
               </button>
             )}
             {canReturn && (
@@ -771,7 +825,18 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
                             {log.actorName || log.actorType}
                           </span>
                         </div>
-                        {log.payload?.reason && (
+                        {log.event === 'ASSIGNEES_CHANGED' && (() => {
+                          const added   = Array.isArray(log.payload?.added)   ? (log.payload!.added   as unknown as string[]) : []
+                          const removed = Array.isArray(log.payload?.removed) ? (log.payload!.removed as unknown as string[]) : []
+                          return (
+                            <div className="text-xs text-tw-text-secondary mt-0.5 space-y-0.5">
+                              {added.length   > 0 && <div>+ Added: {added.join(', ')}</div>}
+                              {removed.length > 0 && <div>− Removed: {removed.join(', ')}</div>}
+                              {log.payload?.reason && <div className="italic">Reason: "{log.payload.reason}"</div>}
+                            </div>
+                          )
+                        })()}
+                        {log.event !== 'ASSIGNEES_CHANGED' && log.payload?.reason && (
                           <div className="text-xs text-tw-text-secondary mt-0.5 italic">"{log.payload.reason}"</div>
                         )}
                         <div className="text-xs text-tw-text-secondary mt-0.5">{new Date(log.createdAt).toLocaleString()}</div>
@@ -980,6 +1045,126 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
           </div>
         </div>
       )}
+
+      {/* ── Change Assignees modal ──────────────────────────────────────── */}
+      {showChangeAssignees && (() => {
+        const currentAssignees = task.assignments?.filter(a => a.personnelId) ?? []
+        const currentIds = new Set(currentAssignees.map(a => a.personnelId!))
+        // Personnel not currently assigned and not already queued to add
+        const available = personnel.filter(p => !currentIds.has(p.id) && !caAdded.includes(p.id))
+        // Effective assignee list after pending changes
+        const effectiveAssignees = [
+          ...currentAssignees.filter(a => !caRemoved.includes(a.personnelId!)),
+          ...caAdded.map(id => ({ personnelId: id, personnel: personnel.find(p => p.id === id) }))
+        ]
+        return (
+          <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-60 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+              <div className="px-5 py-4 border-b border-tw-border">
+                <h3 className="font-semibold text-tw-text">Change Assignees</h3>
+                <p className="text-xs text-tw-text-secondary mt-0.5">Add or remove people assigned to this task. Removing someone will cancel their subtasks.</p>
+              </div>
+              <div className="px-5 py-4 space-y-4 max-h-[70vh] overflow-y-auto">
+
+                {/* Subtask warning */}
+                {caSubtaskWarning.length > 0 && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-xs">
+                    <div className="font-semibold text-amber-800 mb-1">⚠ Subtask Warning</div>
+                    {caSubtaskWarning.map(w => (
+                      <div key={w.personnelId} className="text-amber-700">
+                        {w.name} has {w.count} active subtask{w.count !== 1 ? 's' : ''} — removing them will cancel {w.count !== 1 ? 'those subtasks' : 'that subtask'} permanently.
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Current + pending assignees */}
+                <div>
+                  <div className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-2">Current Assignees</div>
+                  {effectiveAssignees.length === 0 ? (
+                    <p className="text-xs text-tw-text-secondary italic">No assignees after changes.</p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {effectiveAssignees.map(a => {
+                        const pid = a.personnelId!
+                        const name = a.personnel?.name ?? pid
+                        const isNew = caAdded.includes(pid)
+                        return (
+                          <div key={pid} className={`flex items-center justify-between gap-2 px-3 py-2 rounded-lg border ${isNew ? 'border-green-300 bg-green-50' : 'border-tw-border bg-tw-hover'}`}>
+                            <div className="flex items-center gap-2">
+                              <div className="w-6 h-6 rounded-full bg-tw-primary flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                                {name.charAt(0)}
+                              </div>
+                              <span className="text-sm text-tw-text font-medium">{name}</span>
+                              {isNew && <span className="text-xs text-green-600 font-medium">+ Adding</span>}
+                            </div>
+                            <button
+                              onClick={() => {
+                                if (isNew) {
+                                  setCaAdded(prev => prev.filter(id => id !== pid))
+                                } else {
+                                  setCaRemoved(prev => [...prev, pid])
+                                }
+                              }}
+                              className="text-xs text-tw-danger hover:bg-red-50 px-2 py-0.5 rounded transition-colors">
+                              Remove
+                            </button>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Add new assignees */}
+                {available.length > 0 && (
+                  <div>
+                    <div className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-2">Add People</div>
+                    <div className="space-y-1 max-h-40 overflow-y-auto">
+                      {available.map(p => (
+                        <button key={p.id}
+                          onClick={() => setCaAdded(prev => [...prev, p.id])}
+                          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-tw-border hover:border-tw-primary hover:bg-blue-50 transition-colors text-left">
+                          <div className="w-6 h-6 rounded-full bg-tw-primary/20 flex items-center justify-center text-tw-primary text-xs font-bold flex-shrink-0">
+                            {p.name.charAt(0)}
+                          </div>
+                          <span className="text-sm text-tw-text">{p.name}</span>
+                          <span className="ml-auto text-xs text-tw-primary font-medium">+ Add</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Reason */}
+                <div>
+                  <label className="block text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">
+                    Reason <span className="text-tw-danger">*</span>
+                  </label>
+                  <textarea className="input resize-none" rows={2}
+                    placeholder="Why are assignees being changed?"
+                    value={caReason}
+                    onChange={e => setCaReason(e.target.value)} />
+                </div>
+
+                {caError && (
+                  <div className="text-xs text-tw-danger bg-red-50 border border-red-200 rounded px-3 py-2">{caError}</div>
+                )}
+
+                <div className="flex gap-2 justify-end pt-1">
+                  <button onClick={() => setShowChangeAssignees(false)} className="btn-secondary">Cancel</button>
+                  <button
+                    disabled={caSaving || (caAdded.length === 0 && caRemoved.length === 0) || !caReason.trim()}
+                    onClick={handleChangeAssignees}
+                    className="btn-primary disabled:opacity-50">
+                    {caSaving ? 'Saving…' : 'Save Changes'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* ── Create subtask modal ─────────────────────────────────────────── */}
       {showSubtask && (
