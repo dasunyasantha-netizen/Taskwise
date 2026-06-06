@@ -28,14 +28,24 @@ function useLongPress(onLongPress: () => void, ms = 500) {
 
   const cancel = useCallback(() => {
     if (timer.current) { clearTimeout(timer.current); timer.current = null }
+    // don't reset fired here — the subsequent onClick needs to see it
   }, [])
+
+  const resetFired = useCallback(() => { fired.current = false }, [])
 
   return {
     onTouchStart: start,
     onTouchEnd: cancel,
     onTouchMove: cancel,
     onTouchCancel: cancel,
-    onClick: (e: React.MouseEvent) => { if (fired.current) { e.stopPropagation(); e.preventDefault() } },
+    onClick: (e: React.MouseEvent) => {
+      if (fired.current) {
+        e.stopPropagation()
+        e.preventDefault()
+        // reset after consuming so next tap works normally
+        resetFired()
+      }
+    },
   }
 }
 
@@ -84,11 +94,11 @@ function ProjectCard({ project: p, onSelect, onEdit, onArchive, canEdit }: Proje
           <span className="font-semibold text-tw-text text-sm truncate">{p.name}</span>
         </div>
         {canEdit && (
-          <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0 ml-2">
+          <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0 ml-2">
             <button onClick={e => { e.stopPropagation(); onEdit(p, e) }}
-              className="text-xs text-tw-primary hover:underline">Edit</button>
+              className="text-xs font-medium px-2.5 py-1 rounded-md bg-tw-primary/10 text-tw-primary hover:bg-tw-primary hover:text-white transition-colors">Edit</button>
             <button onClick={e => onArchive(p.id, e)}
-              className="text-xs text-tw-text-secondary hover:text-tw-danger transition-colors">Archive</button>
+              className="text-xs font-medium px-2.5 py-1 rounded-md bg-gray-100 text-tw-text-secondary hover:bg-tw-danger hover:text-white transition-colors">Archive</button>
           </div>
         )}
       </div>
