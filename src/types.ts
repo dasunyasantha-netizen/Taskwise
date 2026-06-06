@@ -102,6 +102,7 @@ export interface TaskGroupProject {
 export interface ProjectCategory {
   id: string
   workspaceId: string
+  directorId?: string | null
   name: string
   description?: string
   color: string
@@ -121,6 +122,7 @@ export interface Project {
   description?: string
   color: string
   status: 'active' | 'archived'
+  directorId?: string | null
   categoryId?: string
   category?: { id: string; name: string; color: string; status: string }
   _count?: { tasks: number }

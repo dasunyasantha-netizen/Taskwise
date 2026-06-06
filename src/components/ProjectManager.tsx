@@ -12,6 +12,7 @@ interface Props {
   allTasks: Task[]
   onAllTasksLoaded: (tasks: Task[], projects: Project[]) => void
   isDirector: boolean
+  actorId: string
 }
 
 const PROJECT_COLORS = ['#0073ea', '#00c875', '#e2445c', '#fdab3d', '#a358df', '#037f4c', '#bb3354', '#0086c0']
@@ -66,11 +67,11 @@ interface ProjectCardProps {
   onSelect: (p: Project) => void
   onEdit: (p: Project, e: React.MouseEvent) => void
   onArchive: (id: string, e: React.MouseEvent) => void
-  isDirector: boolean
+  canEdit: boolean
 }
 
-function ProjectCard({ project: p, onSelect, onEdit, onArchive, isDirector }: ProjectCardProps) {
-  const { onClick: lpClick, ...longPressProps } = useLongPress(() => onEdit(p, { stopPropagation: () => {} } as React.MouseEvent))
+function ProjectCard({ project: p, onSelect, onEdit, onArchive, canEdit }: ProjectCardProps) {
+  const { onClick: lpClick, ...longPressProps } = useLongPress(() => canEdit && onEdit(p, { stopPropagation: () => {} } as React.MouseEvent))
   return (
     <div
       {...longPressProps}
@@ -82,7 +83,7 @@ function ProjectCard({ project: p, onSelect, onEdit, onArchive, isDirector }: Pr
           <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: p.color }} />
           <span className="font-semibold text-tw-text text-sm truncate">{p.name}</span>
         </div>
-        {isDirector && (
+        {canEdit && (
           <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0 ml-2">
             <button onClick={e => { e.stopPropagation(); onEdit(p, e) }}
               className="text-xs text-tw-primary hover:underline">Edit</button>
@@ -324,16 +325,19 @@ interface CategorySectionProps {
   onArchiveCategory: (c: ProjectCategory) => void
   onUnarchiveCategory: (c: ProjectCategory) => void
   isDirector: boolean
+  actorId: string
 }
 
 function CategorySection({
   category, projects, onSelectProject, onEditProject, onArchiveProject,
-  onEditCategory, onArchiveCategory, onUnarchiveCategory, isDirector,
+  onEditCategory, onArchiveCategory, onUnarchiveCategory, isDirector, actorId,
 }: CategorySectionProps) {
   const [collapsed, setCollapsed] = useState(false)
   const activeProjects = projects.filter(p => p.status === 'active')
   const archivedProjects = projects.filter(p => p.status === 'archived')
   const isArchived = category.status === 'archived'
+  // Creator or (if no creator recorded) any director can edit
+  const canEditCategory = isDirector && !category.isSystem && (!category.directorId || category.directorId === actorId)
 
   return (
     <div className={`mb-8 ${isArchived ? 'opacity-70' : ''}`}>
@@ -355,7 +359,7 @@ function CategorySection({
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
           </svg>
         </button>
-        {isDirector && !category.isSystem && (
+        {canEditCategory && (
           <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all">
             <button onClick={() => onEditCategory(category)}
               className="text-xs text-tw-primary hover:underline">Edit</button>
@@ -378,7 +382,8 @@ function CategorySection({
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {activeProjects.map(p => (
                   <ProjectCard key={p.id} project={p} onSelect={onSelectProject}
-                    onEdit={onEditProject} onArchive={onArchiveProject} isDirector={isDirector} />
+                    onEdit={onEditProject} onArchive={onArchiveProject}
+                    canEdit={isDirector && p.directorId === actorId} />
                 ))}
               </div>
               {archivedProjects.length > 0 && (
@@ -406,7 +411,7 @@ function CategorySection({
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function ProjectManager({ onSelectProject, onSelectTask, filters, onFiltersChange, allTasks, onAllTasksLoaded, isDirector }: Props) {
+export default function ProjectManager({ onSelectProject, onSelectTask, filters, onFiltersChange, allTasks, onAllTasksLoaded, isDirector, actorId }: Props) {
   const [categories, setCategories] = useState<ProjectCategory[]>([])
   const [loading, setLoading] = useState(allTasks.length === 0)
   const [layers, setLayers] = useState<Layer[]>([])
@@ -554,7 +559,9 @@ export default function ProjectManager({ onSelectProject, onSelectTask, filters,
             <p className="text-sm text-tw-text-secondary">No categories yet. Create one to get started.</p>
           ) : (
             <div className="space-y-2">
-              {[...activeCategories, ...archivedCategories].map(cat => (
+              {[...activeCategories, ...archivedCategories].map(cat => {
+                const canEditCat = !cat.directorId || cat.directorId === actorId
+                return (
                 <div key={cat.id} className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-tw-hover transition-colors">
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color }} />
@@ -569,18 +576,21 @@ export default function ProjectManager({ onSelectProject, onSelectTask, filters,
                       {(cat.projects ?? []).filter(p => p.status === 'active').length} projects
                     </span>
                   </div>
-                  <div className="flex items-center gap-2 flex-shrink-0 ml-4">
-                    <button onClick={() => { setEditingCategory(cat); setShowCategoryModal(true) }}
-                      className="text-xs text-tw-primary hover:underline">Edit</button>
-                    {cat.status === 'archived'
-                      ? <button onClick={() => handleUnarchiveCategory(cat)}
-                          className="text-xs text-tw-text-secondary hover:text-tw-primary transition-colors">Unarchive</button>
-                      : <button onClick={() => handleArchiveCategory(cat)}
-                          className="text-xs text-tw-text-secondary hover:text-tw-danger transition-colors">Archive</button>
-                    }
-                  </div>
+                  {canEditCat && (
+                    <div className="flex items-center gap-2 flex-shrink-0 ml-4">
+                      <button onClick={() => { setEditingCategory(cat); setShowCategoryModal(true) }}
+                        className="text-xs text-tw-primary hover:underline">Edit</button>
+                      {cat.status === 'archived'
+                        ? <button onClick={() => handleUnarchiveCategory(cat)}
+                            className="text-xs text-tw-text-secondary hover:text-tw-primary transition-colors">Unarchive</button>
+                        : <button onClick={() => handleArchiveCategory(cat)}
+                            className="text-xs text-tw-text-secondary hover:text-tw-danger transition-colors">Archive</button>
+                      }
+                    </div>
+                  )}
                 </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>
@@ -630,6 +640,7 @@ export default function ProjectManager({ onSelectProject, onSelectTask, filters,
               onArchiveCategory={handleArchiveCategory}
               onUnarchiveCategory={handleUnarchiveCategory}
               isDirector={isDirector}
+              actorId={actorId}
             />
           ))}
 
@@ -644,6 +655,7 @@ export default function ProjectManager({ onSelectProject, onSelectTask, filters,
               onArchiveCategory={handleArchiveCategory}
               onUnarchiveCategory={handleUnarchiveCategory}
               isDirector={isDirector}
+              actorId={actorId}
             />
           )}
 
@@ -659,6 +671,7 @@ export default function ProjectManager({ onSelectProject, onSelectTask, filters,
               onArchiveCategory={() => {}}
               onUnarchiveCategory={() => {}}
               isDirector={isDirector}
+              actorId={actorId}
             />
           )}
         </>
@@ -697,7 +710,7 @@ export default function ProjectManager({ onSelectProject, onSelectTask, filters,
 
 function ArchivedCategoriesGroup({
   categories, onSelectProject, onEditProject, onArchiveProject,
-  onEditCategory, onArchiveCategory, onUnarchiveCategory, isDirector,
+  onEditCategory, onArchiveCategory, onUnarchiveCategory, isDirector, actorId,
 }: {
   categories: ProjectCategory[]
   onSelectProject: (p: Project) => void
@@ -707,6 +720,7 @@ function ArchivedCategoriesGroup({
   onArchiveCategory: (c: ProjectCategory) => void
   onUnarchiveCategory: (c: ProjectCategory) => void
   isDirector: boolean
+  actorId: string
 }) {
   const [open, setOpen] = useState(false)
   return (
@@ -731,6 +745,7 @@ function ArchivedCategoriesGroup({
           onArchiveCategory={onArchiveCategory}
           onUnarchiveCategory={onUnarchiveCategory}
           isDirector={isDirector}
+          actorId={actorId}
         />
       ))}
     </div>

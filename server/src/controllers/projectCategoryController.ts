@@ -53,7 +53,7 @@ export async function createCategory(req: Request, res: Response): Promise<void>
 
     const category = await prisma.$transaction(async tx => {
       const c = await tx.projectCategory.create({
-        data: { workspaceId, name: name.trim(), description: description?.trim() ?? null, color: color || '#0073ea' },
+        data: { workspaceId, directorId: actorId, name: name.trim(), description: description?.trim() ?? null, color: color || '#0073ea' },
       })
       await tx.auditLog.create({ data: { workspaceId, event: 'CATEGORY_CREATED', actorDirectorId: actorId, actorType: 'director', payload: { categoryId: c.id, name: c.name } } })
       return c
@@ -70,6 +70,7 @@ export async function updateCategory(req: Request, res: Response): Promise<void>
     const cat = await prisma.projectCategory.findFirst({ where: { id: req.params.id, workspaceId } })
     if (!cat) { res.status(404).json({ error: 'Category not found' }); return }
     if (cat.isSystem) { res.status(400).json({ error: 'Cannot edit the Uncategorized system category' }); return }
+    if (cat.directorId && cat.directorId !== actorId) { res.status(403).json({ error: 'Only the creator can edit this category' }); return }
 
     const { name, description, color, status } = req.body
     const updated = await prisma.$transaction(async tx => {
@@ -99,10 +100,11 @@ export async function updateCategory(req: Request, res: Response): Promise<void>
 export async function deleteCategory(req: Request, res: Response): Promise<void> {
   try {
     if (req.user!.actorType !== 'director') { res.status(403).json({ error: 'Director only' }); return }
-    const { workspaceId } = req.user!
+    const { workspaceId, actorId } = req.user!
     const cat = await prisma.projectCategory.findFirst({ where: { id: req.params.id, workspaceId } })
     if (!cat) { res.status(404).json({ error: 'Category not found' }); return }
     if (cat.isSystem) { res.status(400).json({ error: 'Cannot delete the Uncategorized system category' }); return }
+    if (cat.directorId && cat.directorId !== actorId) { res.status(403).json({ error: 'Only the creator can delete this category' }); return }
 
     // Move all projects in this category to Uncategorized
     const uncategorized = await prisma.projectCategory.findFirst({ where: { workspaceId, isSystem: true } })

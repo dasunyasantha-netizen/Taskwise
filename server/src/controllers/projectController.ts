@@ -110,6 +110,7 @@ export async function updateProject(req: Request, res: Response): Promise<void> 
     const { workspaceId, actorId } = req.user!
     const project = await prisma.project.findFirst({ where: { id: req.params.id, workspaceId, deletedAt: null } })
     if (!project) { res.status(404).json({ error: 'Project not found' }); return }
+    if (project.directorId !== actorId) { res.status(403).json({ error: 'Only the creator can edit this project' }); return }
 
     const { name, description, color, status, categoryId } = req.body
 
@@ -163,9 +164,10 @@ export async function updateProject(req: Request, res: Response): Promise<void> 
 export async function deleteProject(req: Request, res: Response): Promise<void> {
   try {
     if (req.user!.actorType !== 'director') { res.status(403).json({ error: 'Director only' }); return }
-    const { workspaceId } = req.user!
+    const { workspaceId, actorId } = req.user!
     const project = await prisma.project.findFirst({ where: { id: req.params.id, workspaceId, deletedAt: null } })
     if (!project) { res.status(404).json({ error: 'Project not found' }); return }
+    if (project.directorId !== actorId) { res.status(403).json({ error: 'Only the creator can delete this project' }); return }
     await prisma.project.update({ where: { id: req.params.id }, data: { deletedAt: new Date() } })
     res.json({ success: true })
   } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }

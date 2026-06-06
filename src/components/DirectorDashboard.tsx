@@ -887,6 +887,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
               allTasks={pmAllTasks}
               onAllTasksLoaded={(tasks, projs) => { setPmAllTasks(tasks); setPmProjects(projs) }}
               isDirector={true}
+              actorId={user.actorId}
             />
           )}
           {currentView === 'project_board' && selectedProject && projectSubView === 'board' && (

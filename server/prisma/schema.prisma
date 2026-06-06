@@ -29,6 +29,7 @@ model Director {
   updatedAt   DateTime   @updatedAt
 
   projectsCreated       Project[]
+  categoriesCreated     ProjectCategory[]
   tasksCreated          Task[]              @relation("TaskCreatedByDirector")
   auditLogs             AuditLog[]          @relation("AuditActorDirector")
   notifications         Notification[]      @relation("NotifRecipientDirector")
@@ -186,6 +187,8 @@ model TaskGroupProject {
 model ProjectCategory {
   id          String    @id @default(uuid())
   workspaceId String
+  directorId  String?
+  director    Director? @relation(fields: [directorId], references: [id])
   name        String
   description String?
   color       String    @default("#0073ea")
