@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react'
 import type { AuthUser, ViewMode, Project, Task, AuditLog, TaskComment, Layer, Personnel } from '../types'
 import ElapsedDays from './ElapsedDays'
-import { projectApi, taskApi, auditApi, workspaceApi } from '../services/apiService'
+import { projectApi, taskApi, auditApi, workspaceApi, taskGroupApi } from '../services/apiService'
+import DatePicker from './DatePicker'
+import Select from './Select'
 import NotificationsMenu from './NotificationsMenu'
 import { usePWA } from '../hooks/usePWA'
 import HierarchyPanel from './HierarchyPanel'
@@ -29,6 +31,15 @@ interface Props {
 }
 
 type ProjectSubView = 'board' | 'flowchart'
+
+type NextTaskForm = {
+  title: string; description: string; projectId: string; priority: string
+  deadline: string; isGroupTask: boolean; groupId: string; personnelIds: string[]
+}
+const emptyNextTask = (): NextTaskForm => ({
+  title: '', description: '', projectId: '', priority: 'MEDIUM',
+  deadline: '', isGroupTask: false, groupId: '', personnelIds: [],
+})
 
 // ─── Approval Queue View ──────────────────────────────────────────────────────
 
@@ -58,6 +69,16 @@ function ApprovalTaskRow({
   const [actionLoading, setActionLoading] = useState(false)
   const [actionError,   setActionError]   = useState('')
 
+  // Approve & Assign Next
+  const [showAssignNext,    setShowAssignNext]    = useState(false)
+  const [nextTasks,         setNextTasks]         = useState<NextTaskForm[]>([emptyNextTask()])
+  const [handoverNote,      setHandoverNote]      = useState('')
+  const [allowPrevView,     setAllowPrevView]     = useState(false)
+  const [assignNextSaving,  setAssignNextSaving]  = useState(false)
+  const [assignNextError,   setAssignNextError]   = useState('')
+  const [allGroups,         setAllGroups]         = useState<Array<{ id: string; name: string }>>([])
+  const [allPersonnel,      setAllPersonnel]      = useState<Array<{ id: string; name: string }>>([])
+
   const toggle = async () => {
     setExpanded(e => !e)
     if (!expanded && subtasks.length === 0) {
@@ -86,6 +107,48 @@ function ApprovalTaskRow({
     try { await taskApi.reject(task.id, rejectReason); setShowReject(false); setRejectReason(''); onRefresh() }
     catch (e: unknown) { setActionError(e instanceof Error ? e.message : 'Failed') }
     setActionLoading(false)
+  }
+
+  const openAssignNext = async () => {
+    setNextTasks([emptyNextTask()])
+    setHandoverNote(''); setAllowPrevView(false); setAssignNextError('')
+    try {
+      const [grps, ppl] = await Promise.all([
+        taskGroupApi.list() as Promise<Array<{ id: string; name: string }>>,
+        workspaceApi.getPersonnel() as Promise<Array<{ id: string; name: string }>>,
+      ])
+      setAllGroups(grps)
+      setAllPersonnel(Array.isArray(ppl) ? ppl : (ppl as { items?: Array<{ id: string; name: string }> }).items ?? [])
+    } catch { /* non-critical */ }
+    setShowAssignNext(true)
+  }
+
+  const doAssignNext = async () => {
+    for (const nt of nextTasks) {
+      if (!nt.title.trim()) { setAssignNextError('All tasks must have a title'); return }
+      if (nt.isGroupTask && !nt.groupId) { setAssignNextError('Select a group for each group task'); return }
+      if (!nt.isGroupTask && nt.personnelIds.length === 0) { setAssignNextError('Select at least one person for each task'); return }
+    }
+    setAssignNextSaving(true); setAssignNextError('')
+    try {
+      await taskApi.assignNext(task.id, {
+        nextTasks: nextTasks.map(nt => ({
+          title: nt.title.trim(),
+          description: nt.description.trim() || undefined,
+          projectId: nt.projectId || task.projectId,
+          priority: nt.priority,
+          deadline: nt.deadline || undefined,
+          personnelIds: nt.isGroupTask ? undefined : nt.personnelIds,
+          groupId: nt.isGroupTask ? nt.groupId : undefined,
+          isGroupTask: nt.isGroupTask,
+        })),
+        handoverNote: handoverNote.trim() || undefined,
+        allowPreviousAssigneeView: allowPrevView,
+      })
+      setShowAssignNext(false)
+      onRefresh()
+    } catch (e: unknown) { setAssignNextError(e instanceof Error ? e.message : 'Failed') }
+    setAssignNextSaving(false)
   }
 
   const submittedBy = task.actedByName || (task.actedByType === 'director' ? 'Director' : 'Personnel')
@@ -269,6 +332,13 @@ function ApprovalTaskRow({
                   >
                     ✓ Approve
                   </button>
+                  <button
+                    disabled={actionLoading}
+                    onClick={openAssignNext}
+                    className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                  >
+                    ⛓ Approve & Assign Next
+                  </button>
                 </div>
               </div>
             </div>
@@ -308,6 +378,107 @@ function ApprovalTaskRow({
             )}
           </td>
         </tr>
+      )}
+
+      {/* ── Approve & Assign Next modal ── */}
+      {showAssignNext && (
+        <tr><td colSpan={7} className="p-0">
+          <div className="fixed inset-0 bg-black bg-opacity-60 flex items-start justify-center z-50 p-4 overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg my-4">
+              <div className="px-5 py-4 border-b border-tw-border">
+                <h3 className="font-bold text-tw-text text-base">Approve &amp; Assign Next Task</h3>
+                <p className="text-xs text-tw-text-secondary mt-0.5">The current task will be approved and the following tasks created and assigned.</p>
+              </div>
+              <div className="px-5 py-4 space-y-4 max-h-[70vh] overflow-y-auto">
+                <div>
+                  <label className="block text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">Handover Note <span className="font-normal">(optional)</span></label>
+                  <textarea className="input resize-none text-sm" rows={2} placeholder="Context to pass to the next assignee(s)..."
+                    value={handoverNote} onChange={e => setHandoverNote(e.target.value)} />
+                </div>
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input type="checkbox" checked={allowPrevView} onChange={e => setAllowPrevView(e.target.checked)} className="rounded border-gray-300" />
+                  <span className="text-sm text-tw-text">Allow previous assignee to view next task</span>
+                </label>
+                <div className="space-y-4">
+                  {nextTasks.map((nt, idx) => (
+                    <div key={idx} className="border border-tw-border rounded-xl p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-tw-text-secondary uppercase tracking-wide">Task {idx + 1}</span>
+                        {nextTasks.length > 1 && (
+                          <button onClick={() => setNextTasks(arr => arr.filter((_, i) => i !== idx))}
+                            className="text-xs text-tw-danger hover:underline">Remove</button>
+                        )}
+                      </div>
+                      <input className="input text-sm" placeholder="Task title *" value={nt.title}
+                        onChange={e => setNextTasks(arr => arr.map((t, i) => i === idx ? { ...t, title: e.target.value } : t))} />
+                      <textarea className="input resize-none text-sm" rows={2} placeholder="Description (optional)" value={nt.description}
+                        onChange={e => setNextTasks(arr => arr.map((t, i) => i === idx ? { ...t, description: e.target.value } : t))} />
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs text-tw-text-secondary mb-1">Priority</label>
+                          <Select value={nt.priority}
+                            onChange={val => setNextTasks(arr => arr.map((t, i) => i === idx ? { ...t, priority: val } : t))}
+                            options={[{ value: 'LOW', label: 'Low' }, { value: 'MEDIUM', label: 'Medium' }, { value: 'HIGH', label: 'High' }, { value: 'CRITICAL', label: 'Critical' }]} />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-tw-text-secondary mb-1">Deadline</label>
+                          <DatePicker value={nt.deadline}
+                            onChange={val => setNextTasks(arr => arr.map((t, i) => i === idx ? { ...t, deadline: val } : t))} />
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={() => setNextTasks(arr => arr.map((t, i) => i === idx ? { ...t, isGroupTask: false, groupId: '' } : t))}
+                          className={`flex-1 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${!nt.isGroupTask ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-tw-border text-tw-text-secondary hover:bg-tw-hover'}`}>
+                          👤 Individual(s)
+                        </button>
+                        <button onClick={() => setNextTasks(arr => arr.map((t, i) => i === idx ? { ...t, isGroupTask: true, personnelIds: [] } : t))}
+                          className={`flex-1 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${nt.isGroupTask ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-tw-border text-tw-text-secondary hover:bg-tw-hover'}`}>
+                          👥 Group
+                        </button>
+                      </div>
+                      {nt.isGroupTask ? (
+                        <Select value={nt.groupId} placeholder="Select group..."
+                          onChange={val => setNextTasks(arr => arr.map((t, i) => i === idx ? { ...t, groupId: val } : t))}
+                          options={allGroups.map(g => ({ value: g.id, label: g.name }))} />
+                      ) : (
+                        <div>
+                          <label className="block text-xs text-tw-text-secondary mb-1">Assign to (select one or more)</label>
+                          <div className="border border-tw-border rounded-lg max-h-36 overflow-y-auto divide-y divide-tw-border">
+                            {allPersonnel.map(p => (
+                              <label key={p.id} className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-tw-hover text-sm">
+                                <input type="checkbox" checked={nt.personnelIds.includes(p.id)}
+                                  onChange={e => setNextTasks(arr => arr.map((t, i) => {
+                                    if (i !== idx) return t
+                                    const ids = e.target.checked ? [...t.personnelIds, p.id] : t.personnelIds.filter(id => id !== p.id)
+                                    return { ...t, personnelIds: ids }
+                                  }))}
+                                  className="rounded border-gray-300" />
+                                {p.name}
+                              </label>
+                            ))}
+                          </div>
+                          {nt.personnelIds.length > 0 && <div className="text-xs text-indigo-600 mt-1">{nt.personnelIds.length} selected</div>}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <button onClick={() => setNextTasks(arr => [...arr, emptyNextTask()])}
+                  className="w-full py-2 border-2 border-dashed border-tw-border rounded-xl text-xs font-semibold text-tw-text-secondary hover:border-indigo-400 hover:text-indigo-600 transition-colors">
+                  + Add Another Next Task
+                </button>
+                {assignNextError && <div className="text-xs text-tw-danger bg-red-50 border border-red-200 rounded-lg px-3 py-2">{assignNextError}</div>}
+              </div>
+              <div className="px-5 py-4 border-t border-tw-border flex gap-2 justify-end">
+                <button onClick={() => setShowAssignNext(false)} className="btn-secondary">Cancel</button>
+                <button disabled={assignNextSaving} onClick={doAssignNext}
+                  className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold disabled:opacity-50 transition-colors">
+                  {assignNextSaving ? 'Processing…' : '⛓ Approve & Assign'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </td></tr>
       )}
     </>
   )
