@@ -575,18 +575,18 @@ export default function ProjectManager({ onSelectProject, onSelectTask, filters,
               {[...activeCategories, ...archivedCategories].map(cat => {
                 const canEditCat = !cat.directorId || cat.directorId === actorId
                 return (
-                <div key={cat.id} className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-tw-hover transition-colors">
+                <div key={cat.id} className={`flex items-center justify-between px-4 py-3 rounded-xl border border-tw-border bg-white shadow-sm hover:shadow-md transition-shadow ${cat.status === 'archived' ? 'opacity-60' : ''}`}>
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color }} />
                     <div className="min-w-0">
-                      <span className="text-sm font-medium text-tw-text">{cat.name}</span>
+                      <span className="text-sm font-semibold text-tw-text">{cat.name}</span>
                       {cat.description && <span className="text-xs text-tw-text-secondary ml-2">{cat.description}</span>}
                     </div>
                     {cat.status === 'archived' && (
                       <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 flex-shrink-0">Archived</span>
                     )}
                     <span className="text-xs text-tw-text-secondary flex-shrink-0">
-                      {(cat.projects ?? []).filter(p => p.status === 'active').length} projects
+                      {(cat.projects ?? []).filter(p => p.status === 'active').length} project{(cat.projects ?? []).filter(p => p.status === 'active').length !== 1 ? 's' : ''}
                     </span>
                   </div>
                   {canEditCat && (
