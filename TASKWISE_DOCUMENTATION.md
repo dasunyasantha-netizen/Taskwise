@@ -1,949 +1,876 @@
-# TaskWise — Complete Documentation & User Guide
+# TaskWise — Full System Documentation
 
-> **Live URL:** https://syswise.lk/taskwise/
-> **Last updated:** April 2026
+**Version:** June 2026  
+**Platform:** SysWise Suite (syswise.lk/taskwise)  
+**Stack:** React + TypeScript (Vite) · Node.js + Express · Prisma · PostgreSQL
 
 ---
 
 ## Table of Contents
 
-### Part 1 — User Guide
-1. [What is TaskWise?](#1-what-is-taskwise)
-2. [Logging In](#2-logging-in)
-3. [Director Guide](#3-director-guide)
-   - [Dashboard](#31-dashboard)
-   - [Setting Up Your Workspace](#32-setting-up-your-workspace)
-   - [Managing Projects](#33-managing-projects)
-   - [Creating & Assigning Tasks](#34-creating--assigning-tasks)
-   - [The Kanban Board](#35-the-kanban-board)
-   - [Task Detail Panel](#36-task-detail-panel)
-   - [Approval Queue](#37-approval-queue)
-   - [Overdue Tasks](#38-overdue-tasks)
-   - [Audit Log](#39-audit-log)
-   - [Notifications](#310-notifications)
-4. [Personnel Guide](#4-personnel-guide)
-   - [My Task Queue](#41-my-task-queue)
-   - [Working on a Task](#42-working-on-a-task)
-   - [Creating Subtasks](#43-creating-subtasks)
-   - [Returning a Task](#44-returning-a-task)
-   - [Submitting for Approval](#45-submitting-for-approval)
-5. [Task Lifecycle Reference](#5-task-lifecycle-reference)
-6. [Test Accounts](#6-test-accounts)
-
-### Part 2 — Technical Reference
-7. [Architecture Overview](#7-architecture-overview)
-8. [Directory Structure](#8-directory-structure)
-9. [Ports & URLs](#9-ports--urls)
-10. [Database](#10-database)
-11. [Authentication & JWT](#11-authentication--jwt)
-12. [API Reference](#12-api-reference)
-13. [Git Repository & Branches](#13-git-repository--branches)
-14. [Local Development Setup](#14-local-development-setup)
-15. [Production Server](#15-production-server)
-16. [Deployment Update Guide](#16-deployment-update-guide)
+1. [System Overview](#1-system-overview)
+2. [Architecture](#2-architecture)
+3. [User Roles](#3-user-roles)
+4. [Workspace & Hierarchy Setup](#4-workspace--hierarchy-setup)
+5. [Authentication](#5-authentication)
+6. [Task Lifecycle](#6-task-lifecycle)
+7. [Task Features In Detail](#7-task-features-in-detail)
+8. [Subtasks](#8-subtasks)
+9. [Group-Wise Tasks](#9-group-wise-tasks)
+10. [Projects](#10-projects)
+11. [Reports](#11-reports)
+12. [Notifications & Broadcasts](#12-notifications--broadcasts)
+13. [Audit & History](#13-audit--history)
+14. [Director Capabilities](#14-director-capabilities)
+15. [Personnel Capabilities](#15-personnel-capabilities)
+16. [Chairman Impersonation](#16-chairman-impersonation)
+17. [Views & Navigation](#17-views--navigation)
+18. [API Reference](#18-api-reference)
+19. [Database Schema](#19-database-schema)
+20. [Deployment](#20-deployment)
 
 ---
 
-# Part 1 — User Guide
+## 1. System Overview
+
+TaskWise is a structured task management system designed for organisations with a hierarchical workforce. It sits inside the SysWise platform and is accessed via SSO from the SysWise dashboard.
+
+The core model is: a **Director** creates tasks and assigns them to people or departments. Those people work through the task, log progress, create subtasks if needed, and submit for approval. The director approves or returns the work. Every action is permanently logged.
+
+**Key design principles:**
+- Every task has exactly one approval authority (the director or the personnel who created the subtask).
+- Tasks follow a strict state machine — no skipping steps.
+- The full audit trail is immutable and always visible.
+- PWA-first: works offline-capable as an installed app on any device.
 
 ---
 
-## 1. What is TaskWise?
+## 2. Architecture
 
-TaskWise is a hierarchical task management system inside SysWise. It is built for desktop use and styled after Monday.com — clean card-based boards, soft shadows, and a consistent blue color palette.
+```
+Browser / PWA
+    └── Vite + React + TypeScript (port 3600 local / /taskwise/ on prod)
+            │
+            ▼
+    Express + Node.js API (port 4400 local / /taskwise-api/ on prod)
+            │
+            ▼
+    Prisma ORM
+            │
+            ▼
+    PostgreSQL (taskwise_db on production, taskwise_local locally)
+```
 
-**Core concept:** A Director owns a workspace. Inside that workspace, they set up a 3-layer organizational structure (e.g. Management → Operations → Field). Personnel are placed inside departments within those layers. The Director creates projects and tasks, assigns them down through the hierarchy, and monitors progress from a central dashboard.
+**Production:**
+- Server: Hetzner Cloud Singapore (5.223.76.20)
+- Process manager: PM2 (`taskwise-backend`)
+- Nginx reverse proxy at `syswise.lk/taskwise/` and `syswise.lk/taskwise-api/`
+- SSL via Let's Encrypt
 
-**Key rules:**
-- Only Directors can create top-level tasks
-- Personnel can break tasks into subtasks
-- A task cannot be marked done until the assigning authority approves it
-- A parent task cannot be approved until all its subtasks are approved
-- Deadlines can only be changed by whoever set them
-- Nothing is permanently deleted — everything stays in history
-
----
-
-## 2. Logging In
-
-Go to **https://syswise.lk/taskwise/** or click the **TaskWise** card on the SysWise apps page.
-
-You will see a login screen with two tabs:
-
-### Director Tab
-Enter your Director email and password. Directors have a globally unique email address.
-
-### Personnel Tab
-Enter your email, password, and **Workspace ID**. Personnel are scoped to a workspace, so the Workspace ID is required to identify which organisation you belong to. Your Director will provide this.
-
-> **First time?** A Director account must be registered first. Go to the Director tab and use the Register link (if available), or ask your system administrator to create your account.
+**Frontend:** Vite PWA with `injectManifest` strategy. The service worker caches all hashed assets and self-updates on every deploy via a git SHA injected into `CACHE_VERSION`.
 
 ---
 
-## 3. Director Guide
+## 3. User Roles
 
-### 3.1 Dashboard
+There are two roles in TaskWise:
 
-After logging in as a Director, you land on the **Dashboard**. It shows:
+### Director
+- Full access to the entire system
+- Creates workspaces, layers, departments, and personnel
+- Creates and assigns top-level tasks
+- Approves, rejects, returns, and cancels tasks
+- Views all tasks, reports, and audit logs
+- Can impersonate personnel (Chairman only — see Section 16)
+- Manages broadcasts, notices, and workspace settings
 
-| Card | What it shows |
-|---|---|
-| Projects | Total number of active projects in your workspace |
-| Total Tasks | All tasks across all projects |
-| Pending Approval | Tasks submitted by personnel waiting for your sign-off |
-| Overdue | Tasks whose deadline has passed and are not yet approved |
-
-Below the stat cards are two live panels:
-- **Pending Approvals** — the most recent tasks submitted for your review, with a link to the full queue
-- **Overdue Tasks** — tasks past their deadline, with the date shown in red
-
----
-
-### 3.2 Setting Up Your Workspace
-
-Before creating tasks, set up your hierarchy under **Team Hierarchy** in the sidebar.
-
-#### Step 1 — Rename Your Layers (optional)
-
-Your workspace comes with 3 default layers numbered 1, 2, 3. Layer 1 is the senior layer, Layer 3 is the ground level. You can rename them to match your organisation (e.g. Management, Operations, Field).
-
-#### Step 2 — Create Departments
-
-Click **+ Department** at the top right of the Hierarchy page.
-
-- Select which **Layer** this department belongs to
-- Enter the **Department Name** (e.g. Engineering, Finance, Customer Support)
-- Click **Create**
-
-You can create as many departments as you need across the 3 layers.
-
-#### Step 3 — Add Personnel
-
-Click **+ Personnel** to add a team member.
-
-Fill in:
-- Full name
-- Email address (unique within your workspace)
-- Temporary password (the person uses this to log in)
-- Phone number (optional)
-- Department (select which department they belong to — grouped by layer)
-
-The person can now log in using the **Personnel tab** with your Workspace ID.
-
-#### Step 4 — Create Groups (optional)
-
-Groups are collections of personnel within the same department. A task assigned to a group can be actioned by any group member.
-
-Click **+ Group**, select the department, and give the group a name. Then use the group card to add members from that department.
-
-> A person can belong to multiple groups. Groups are department-scoped — you cannot mix personnel from different departments in one group.
-
-#### Tabs in Team Hierarchy
-
-| Tab | What you see |
-|---|---|
-| **Structure** | Visual layer → department → personnel tree. Click ⇄ on any person to move them to a different department. |
-| **Personnel** | Full table of all personnel with their department, layer, and actions (Move / Remove) |
-| **Groups** | All groups with their members. Add/remove members directly from each group card. |
+### Personnel
+- Sees only tasks assigned to them or their department
+- Accepts tasks, logs progress updates, creates subtasks, and submits work
+- Can reassign their task to another person
+- Can return a task to the director with a reason
+- Manages their own profile and biometric credentials
+- Cannot see other people's tasks or the audit log
 
 ---
 
-### 3.3 Managing Projects
+## 4. Workspace & Hierarchy Setup
 
-Click **Projects** in the sidebar.
+### Workspace
+A TaskWise instance belongs to a single **Workspace**. It has a name, company name, and optional logo. All data (tasks, people, projects) belongs to one workspace.
 
-#### Creating a Project
-Click **+ New Project** and fill in:
-- Project name
-- Description (optional)
-- Color (click a color dot — used as the project's visual identifier on the board)
+### Layers
+The hierarchy has up to **3 layers**, numbered 1–3 from top to bottom:
+- Layer 1 = most senior (e.g. "Senior Management")
+- Layer 2 = middle management (e.g. "Department Heads")
+- Layer 3 = operational staff (e.g. "Officers")
 
-#### Opening a Project
-Click any project card to open its Kanban board.
+Each layer has a name and contains one or more **Departments**.
 
-#### Archiving a Project
-Hover over a project card and click **Archive**. Archived projects are shown in a separate section and cannot receive new tasks.
+### Departments
+Each department belongs to one layer. A department groups personnel together and can receive task assignments as a unit (before any individual accepts it).
+
+### Personnel
+Each person belongs to exactly one department. Personnel fields:
+- Name, phone (used as login), email, NIC, avatar
+- `supervisorId` — the person one level above them in the chain
+- The supervisor chain is used for task routing: when a personnel submits a subtask, it routes to their supervisor for approval, walking the chain upward until it reaches the director.
+
+**Setting up supervisors:**
+The director assigns supervisors via the Hierarchy Manager. If a personnel opens a subtask they have been assigned and they have no supervisor set, TaskWise prompts them to select one before they can proceed.
 
 ---
 
-### 3.4 Creating & Assigning Tasks
+## 5. Authentication
 
-From inside a project board, click **+ New Task**.
+### Password Login
+- Unified login endpoint for both directors and personnel
+- Login with phone number + password
+- JWT returned, stored in `localStorage` as `taskwise_token`
+- Token contains: `actorId`, `actorType`, `workspaceId`, `name`, `layerNumber`, `departmentId`, `isChairman`
 
-Fill in:
+### Force Password Change
+- On first login (or after an admin reset), the user is forced to change their password before accessing anything
+- The force-change screen blocks all other views until complete
+
+### Biometric Login (WebAuthn / FIDO2)
+- Personnel can register a fingerprint or Face ID credential from the Profile page
+- Uses the WebAuthn standard — credentials are device-bound (one passkey per device)
+- On subsequent logins, the user enters their phone number and a biometric prompt replaces the password field
+- Multiple devices can be registered; each appears as a named credential in the Profile page
+- Credentials can be deleted individually from Profile
+
+### First-Login Setup Prompt
+- New users (first login only) see a two-step guided setup:
+  1. **Push notifications** — grants browser/OS permission for task alerts
+  2. **Biometric enrolment** — registers their fingerprint/Face ID
+- Both steps are optional and can be skipped
+
+### SSO from SysWise
+- Users arrive at `/sso?token=<syswiseJWT>` from the SysWise dashboard
+- TaskWise decodes the token, auto-creates or matches the user, and returns a TaskWise-specific JWT
+
+### Session Persistence
+- The last active view is stored in `localStorage` (`taskwise_view`)
+- Refreshing the browser restores the same page the user was on
+- Logging out clears the stored view and token
+
+---
+
+## 6. Task Lifecycle
+
+### Status State Machine
+
+```
+PENDING ──► ASSIGNED ──► IN_PROGRESS ──► SUBMITTED ──► APPROVED
+                │              │
+                │              ▼
+                │           RETURNED   (assignee returns it with optional reason)
+                │              │
+                │              ▼ (re-opened by assignee)
+                │           IN_PROGRESS
+                │
+                └──► REJECTED   (approval authority rejects with reason)
+                          │
+                          ▼ (reopen)
+                       IN_PROGRESS
+
+Any status ──► CANCELLED   (Director only)
+```
+
+### Step-by-Step Flow
+
+#### 1. Task Created — PENDING
+- Director creates a task with title, description, priority, deadline, and project
+- Task starts as `PENDING`
+
+#### 2. Task Assigned — ASSIGNED
+- Director assigns to a specific **person**, a **department**, or a **layer**
+- Status moves to `ASSIGNED`
+- Assignee receives a push notification
+
+#### 3. Task Accepted — IN_PROGRESS
+- When the assigned person opens the task, it **automatically** transitions to `IN_PROGRESS`
+- If assigned to a department (not a specific person), anyone in that department can open and accept it — taking personal ownership
+- `actedById` and `actedByType` are set to the person who accepted
+
+#### 4. Work in Progress
+- Personnel logs **progress updates** — dated notes with timestamps
+- Personnel can create **subtasks** and delegate portions of the work to others
+- Personnel can add **comments**
+- If blocked, personnel can **return** the task to the director with an optional reason
+
+#### 5. Submit for Approval — SUBMITTED
+- Personnel clicks "Complete"
+- A pre-check runs: if any subtasks are not yet APPROVED or SUBMITTED, a warning lists them
+- The user can submit anyway or go back to resolve subtasks first
+- Task moves to `SUBMITTED`
+- The approval authority (director by default, or the personnel who created the subtask) is notified
+
+#### 6. Approved — APPROVED
+- Director (or approval authority) reviews and approves
+- Task moves to `APPROVED` — terminal state
+- If all sibling subtasks are now approved, the parent task's assignee is notified automatically
+
+#### 7. Rejected
+- Director rejects with an optional reason
+- Task moves to `REJECTED`
+- Assignee can **reopen** it → moves back to `IN_PROGRESS`
+
+#### 8. Returned
+- Personnel can return a task (ASSIGNED or IN_PROGRESS) to the director at any time
+- Reason is optional
+- Director sees a notification
+- The assignee sees a red alert banner the next time they open the task if it was returned by the director
+
+#### 9. Cancelled
+- Director only; works on any status
+- Adds `cancelledAt` timestamp and optional reason
+- Soft-delete — task remains visible in history but disappears from active queues
+
+### Priority Levels
+
+`CRITICAL` · `HIGH` · `MEDIUM` · `LOW`
+
+Priority affects visual colour-coding only — it does not change routing or approval rules.
+
+---
+
+## 7. Task Features In Detail
+
+### Progress Updates
+- Personnel logs what they worked on, one entry per session
+- Each entry records: the note text, author name, date, and time
+- Displayed as a sortable table in the Updates tab of the task modal
+- Only the currently assigned person can post new updates
+- Updates from previously removed assignees remain as read-only history
+
+### Comments
+- Separate from progress updates — intended for questions and discussion
+- Visible to all parties who can see the task
+- Not used for formal progress tracking
+
+### Deadline
+- Optional at task creation
+- Shown in red and labelled "OVERDUE" once the deadline passes and the task is not yet approved
+
+### Deadline Extension
+- Available to the **task creator** when a task is overdue and not yet approved
+- Extension modal requires:
+  - New deadline (mandatory)
+  - Reason (mandatory)
+  - Note (optional)
+- Every extension is logged in the History tab with old date → new date, reason, and who extended it
+- Multiple extensions are allowed; all are individually recorded
+- `originalDeadline` is preserved from task creation and is never changed by extensions (reserved for future performance scoring)
+
+### Edit Task
+- Available to the **task creator** while the task is not APPROVED or CANCELLED
+- Can change: title, description, deadline
+- Priority and project cannot be changed after creation
+
+### Change Assignees
+- Available to the **task creator** (not APPROVED or CANCELLED)
+- Can add multiple new assignees and remove existing ones in a single operation
+- **Subtask auto-cancel:** removing an assignee automatically cancels all their active subtasks (not already APPROVED or CANCELLED); each cancelled subtask gets its own audit entry with the reason
+- An inline warning is shown before saving if any person being removed has active subtasks, showing name and count
+- A reason is mandatory
+- History tab records the full diff: who was added, who was removed, and the reason
+
+### Reassign (single person transfer)
+- The currently assigned person can transfer their task to another person
+- Requires a reason (mandatory if the task is not PENDING)
+- Task moves back to ASSIGNED for the new person
+- Both the new assignee and the approval authority are notified
+
+### Return Task
+- The assigned person can return a task (ASSIGNED or IN_PROGRESS) to the director
+- Reason is optional
+- Director receives a notification
+- The person who returned it sees a dismissible red banner on next open
+
+### Subtask Warning on Submit
+- When submitting, if any subtasks are not yet APPROVED or SUBMITTED, a modal lists them by name and status
+- The user can choose to submit anyway (overriding the warning) or go back to resolve them
+
+---
+
+## 8. Subtasks
+
+Subtasks are tasks with a `parentTaskId` set. They have the same structure as top-level tasks but with several differences:
+
+### Who Creates Subtasks
+- The assigned personnel (or task creator) creates subtasks from within the task modal while the parent is ASSIGNED or IN_PROGRESS
+
+### Subtask Assignment
+- When creating a subtask, the creator must immediately choose a person to assign it to
+- The subtask is created and assigned in one action — it has no PENDING state for unassigned work
+
+### Subtask Deadline Constraint
+- A subtask's deadline cannot be later than the parent task's deadline
+- Enforced both client-side and server-side
+
+### Subtask Approval Chain
+- When a personnel submits a subtask, it routes to their **direct supervisor** for approval
+- If the supervisor is at the top layer (Layer 1), it routes to the director
+- This chain is resolved automatically from the `supervisorId` on each personnel record
+- If the submitter has no supervisor set, they are prompted to select one before they can proceed
+
+### Impact on the Parent Task
+- When all sibling subtasks reach APPROVED status, the parent task's assignee is notified
+- The parent task is **not** automatically approved — the assignee must still submit it manually
+- Subtasks in SUBMITTED status (not yet approved) do not block the parent from being submitted, but a warning is shown
+
+### Personnel View of Subtasks
+- Personnel see their subtasks in the Subtasks tab of the parent task modal
+- Clicking a subtask opens it in a nested modal with a Back button returning to the parent
+
+---
+
+## 9. Group-Wise Tasks
+
+Group Tasks let a director assign the **same task to multiple people simultaneously** — each person gets their own independent instance.
+
+### Groups
+- A **Task Group** is a named collection of personnel members
+- Created and managed by the director from the Group Tasks page
+- Members are added individually
+- A group also has **Group Projects** — shared projects used when assigning group tasks
+
+### Assigning a Group Task
+1. Director selects a group from the Group Tasks page
+2. Clicks "Assign Task"
+3. Selects a project from the group's projects (with option to create one inline)
+4. Fills in title, description, priority, and deadline
+5. Submits
+6. TaskWise creates one task instance per group member, all linked by a shared `groupTaskId`
+
+### Group Monitor
+- The director sees a monitor view for each group task showing all member instances
+- Each row shows: member name, task status, days since assigned, last progress update
+- The director can click into any individual instance to view or act on it
+
+### Member Task History
+- Director can view the full audit trail for any individual member's instance
+
+### Close Group Task
+- Director can close a group task — this cancels all non-approved instances at once
+
+### Personnel Experience
+- Each member sees only their own instance in their personal task queue
+- They do not see other members' instances
+- Progress logs, subtasks, comments, and updates are all per-instance and fully independent
+
+---
+
+## 10. Projects
+
+All tasks must belong to a **Project**. Projects provide grouping and filtering across the system.
+
+### Project Properties
+- Name and optional colour for visual identification
+- Workspace-wide by default
+- Group Projects are scoped to a specific Task Group
+
+### Project States
+- **Active** — visible in task creation and filtering
+- **Archived** — hidden from new task creation but all existing tasks remain accessible
+
+### Director Views
+**Project Board:** Kanban-style board for one project with columns: Pending, Assigned, In Progress, Submitted, Approved.
+
+**Project List:** All projects with task counts per status. Clicking a project opens its task list.
+
+### Filter Mode
+When any filter is active (layer, department, person, status, date range), the project list view switches to a **flat task list** showing all matching tasks across all projects. Filter options are pruned dynamically — only values actually present in the currently filtered result set appear in the dropdowns.
+
+---
+
+## 11. Reports
+
+The Reports page is director-only. All 10 tabs share a single FilterBar and update instantly (client-side filtering — no extra API calls).
+
+| Tab | What it shows |
+|-----|--------------|
+| **Pending Approvals** | Tasks in SUBMITTED status, sorted by submission date |
+| **Overdue** | Active tasks past their deadline, sorted oldest-deadline first |
+| **Due in 7 Days** | Active tasks due within the next 7 days, colour-coded by urgency |
+| **Unopened** | Tasks in ASSIGNED status that have never been opened, sorted by how long they have been sitting |
+| **Sitting Longest** | Active (ASSIGNED/IN_PROGRESS) tasks sorted by days since assignment |
+| **Completed** | APPROVED tasks, most recent first |
+| **By Status** | Count and percentage bar chart of all tasks by status |
+| **By Officer** | Each person with total/completed/pending/overdue counts; expandable to show their individual tasks |
+| **By Department** | Same as By Officer but grouped by department and layer |
+| **Approval Delay** | SUBMITTED tasks sorted by how many days they have been waiting for the director's approval |
+
+Every row that contains a task is clickable — opens the full TaskDetailPanel inline where the director can approve, reject, return, or cancel.
+
+Filter state, active tab, and scroll position are all preserved when navigating away and back to the Reports page.
+
+---
+
+## 12. Notifications & Broadcasts
+
+### Push Notifications
+- Browser/OS push notifications via Web Push (VAPID)
+- Users grant permission during the first-login setup prompt or from their Profile page
+- Delivered in the background — works even when the app is closed (PWA service worker handles it)
+
+**Triggers:**
+- Task assigned to you
+- Task reassigned to you
+- Task returned to you
+- Your task was approved
+- Your task was rejected
+- A subtask you created is now complete (all siblings approved)
+
+### In-App Notifications
+- Bell icon in the header shows unread count badge
+- Clicking opens a notification dropdown with recent alerts
+- Each notification links to the relevant task
+
+### Broadcasts (Director)
+- Director posts a workspace-wide announcement from the Broadcasts page
+- Appears as a dismissible notice at the top of every personnel's dashboard
+- Each user can dismiss it individually (stored in `NoticeDismissal` table)
+- Director can delete any broadcast at any time
+
+---
+
+## 13. Audit & History
+
+Every state change, assignment, comment, progress note, deadline extension, and approval produces an immutable `AuditLog` entry. The History tab on every task shows the complete timeline, merged with deadline extension records, sorted chronologically.
+
+### Audit Event Types
+
+| Event | When it fires |
+|-------|--------------|
+| `TASK_CREATED` | Task first saved |
+| `TASK_ASSIGNED` | Assigned to a person or department |
+| `TASK_ACCEPTED` | Person accepted / auto-accepted on open |
+| `TASK_REASSIGNED` | Reassigned to another person |
+| `TASK_STARTED` | Moved to IN_PROGRESS |
+| `TASK_UPDATED` | Title, description, or deadline edited |
+| `TASK_SUBMITTED` | Submitted for approval |
+| `TASK_APPROVED` | Approved by authority |
+| `TASK_REJECTED` | Rejected with reason |
+| `TASK_RETURNED` | Returned by assignee or director |
+| `TASK_CANCELLED` | Cancelled by director |
+| `TASK_DELETED` | Soft-deleted by director |
+| `SUBTASK_CREATED` | Subtask created under this task |
+| `COMMENT_ADDED` | Comment posted |
+| `DEADLINE_EXTENDED` | Deadline extended (old→new dates, reason) |
+| `ASSIGNEES_CHANGED` | Assignees added or removed (full diff, reason) |
+
+### History Tab Rendering
+- Event label + actor name + timestamp on every entry
+- Reason/payload shown where applicable (return reason, rejection reason, assignee diff)
+- Deadline extension entries appear in amber in the same timeline
+- `ASSIGNEES_CHANGED` entries show: "+ Added: [names]", "− Removed: [names]", and the reason
+
+### Impersonation Audit Trail
+- When the Chairman acts while impersonating a personnel, the audit actor is recorded as the **Chairman** (not the target user)
+- The payload includes `_impersonatedBy`, `_viewingAs`, and `_impersonationSessionId` for full traceability
+
+### Director Audit Log Page
+- Directors have a dedicated Audit Log view showing all events across all tasks in the workspace
+- Useful for compliance reviews and investigations
+
+---
+
+## 14. Director Capabilities
+
+### Dashboard
+- Summary cards: total tasks, pending approvals count, overdue count
+- Shortcut card to the Reports page
+- Recent updates feed (latest progress logs across all tasks in the workspace)
+- Quick access to the Approval Queue
+
+### Approval Queue
+- All SUBMITTED tasks in one place
+- Click a row to open the full task detail panel
+- One-click approve or reject (reject requires an optional reason)
+
+### Task Management
+- Create tasks with title, description, priority, deadline, project, and assignment target (person / department / layer)
+- Edit task title, description, and deadline
+- Extend deadlines on overdue tasks (if creator)
+- Change assignees with subtask auto-cancel
+- Reassign tasks
+- Cancel tasks with a reason
+- Soft-delete tasks
+- Return submitted tasks (Chairman only)
+
+### Hierarchy Manager
+- Create, edit, and delete layers (up to 3)
+- Create, edit, and delete departments within layers
+- Add, edit, and delete personnel (name, phone, email, NIC, department)
+- Set and change supervisor relationships
+- View personnel by layer in an expandable tree
+- Mobile: tap-to-expand cards showing contact details, NIC, supervisor, and action buttons
+
+### Group Task Manager
+- Create, edit, and delete groups
+- Manage group membership
+- Manage group projects
+- Assign tasks to all group members at once
+- Monitor all instances from a single view
+- Close group tasks (cancels all non-approved instances)
+
+### Workspace Settings
+- Edit workspace name, company name, and logo
+- Manage director account (name, phone, password)
+
+### Broadcasts
+- Create announcement messages visible to all personnel
+- Messages are dismissible per user
+- Delete broadcasts at any time
+
+### Reports
+- Full access to all 10 report tabs with global filter
+
+### Impersonation (Chairman only)
+- Access the Impersonation page to act as any personnel
+- Full session history log
+
+---
+
+## 15. Personnel Capabilities
+
+### Task Queue (Home)
+- List of all tasks assigned to this person or their department
+- Filter by status and priority
+- Each task card shows: title, status, priority, project, deadline, days elapsed
+
+### Board View
+- Kanban view of personal tasks by status column
+- Same tasks as the queue, different layout
+
+### Within a Task — Available Actions
+
+| Action | When available |
+|--------|---------------|
+| **Accept** | Department-assigned task in ASSIGNED status |
+| **Log Progress Update** | Task is IN_PROGRESS and I am the assignee |
+| **Create Subtask** | Task is ASSIGNED or IN_PROGRESS; I am assignee or creator |
+| **Add Comment** | Any time |
+| **Return** | Task is ASSIGNED or IN_PROGRESS; I am assignee |
+| **Reassign** | Task is PENDING/ASSIGNED/IN_PROGRESS; I am assignee or creator |
+| **Submit / Complete** | Task is PENDING/ASSIGNED/IN_PROGRESS; I am assignee |
+| **Reopen** | Task is REJECTED; I am the assignee |
+| **Extend Deadline** | Task is overdue and not approved; I am the creator |
+| **Change Assignees** | Task is not APPROVED or CANCELLED; I am the creator |
+
+### Personnel Approval Queue
+- Subtasks that this person created and that are now in SUBMITTED status
+- They are the approval authority for subtasks they created
+- Can approve or reject each one
+
+### Profile Page
+- Edit name, email, NIC, avatar
+- Change password
+- Register biometric credentials (fingerprint / Face ID)
+- View and delete registered credential devices
+- Manage push notification subscription
+
+---
+
+## 16. Chairman Impersonation
+
+The **Chairman** is a director with the `isChairman` flag set on their account. Only the Chairman can use impersonation.
+
+### Setup
+The Chairman must first set an **impersonation password** (separate from their login password) from the Impersonation page. This password is required each time a new impersonation session is started.
+
+### Starting a Session
+1. Chairman opens the Impersonation page
+2. Selects a personnel from the list
+3. Enters their impersonation password
+4. A session token is issued for the target person's account
+5. A **yellow banner** appears at the top of every screen: *"Viewing as [Name] — End Session"*
+
+### What the Chairman Can Do While Impersonating
+- Everything the target personnel can do (accept tasks, log progress, submit, create subtasks, etc.)
+- Additionally: return tasks that are in SUBMITTED status (normally not allowed for personnel)
+- All actions are recorded in the audit log under the **Chairman's identity** with impersonation metadata attached
+
+### Ending a Session
+- Click "End Session" in the yellow banner at any time
+- Session ends cleanly and the Chairman is returned to their own account
+
+### Session Log
+- All past impersonation sessions are listed in the Impersonation page
+- Each record shows: target person, start time, end time, end reason, IP address, user agent
+- This is a permanent compliance record
+
+---
+
+## 17. Views & Navigation
+
+### Director Views
+
+| View Key | Description |
+|----------|-------------|
+| `director_dashboard` | Home: summary stats, recent updates feed, approval shortcut |
+| `project_board` | Kanban board for a selected project |
+| `project_list` | All projects with task counts; activating filters switches to flat task list |
+| `hierarchy_manager` | Manage layers, departments, personnel, and supervisors |
+| `approval_queue` | All submitted tasks awaiting approval |
+| `audit_log` | Full workspace audit log |
+| `overdue` | All overdue tasks |
+| `recent_updates` | Latest progress logs across all tasks |
+| `broadcasts` | Create and manage broadcast notices |
+| `group_tasks` | Group task management, assignment, and monitoring |
+| `reports` | 10-tab reports page with global filter |
+| `impersonation` | Chairman only: start/end impersonation sessions |
+| `settings` | Workspace settings |
+| `profile` | Account settings and biometric credential management |
+
+### Personnel Views
+
+| View Key | Description |
+|----------|-------------|
+| `personnel_queue` | Home: personal task list |
+| `personnel_approval_queue` | Subtasks submitted to this person for approval |
+| `group_tasks` | Group task view (member's own instances only) |
+| `profile` | Account settings and biometric credential management |
+
+### Navigation Behaviours
+
+- **Back button** appears in the header on all non-home views; clicking returns to the exact previous view
+- **Scroll position** is restored when navigating back (the scroll area returns to where it was)
+- **View persistence:** the last open view is stored in `localStorage` — a browser refresh restores the same page
+- **Filter persistence:** filter selections are stored in `sessionStorage` — survive soft reloads within the same session
+
+---
+
+## 18. API Reference
+
+All endpoints require `Authorization: Bearer <token>` unless marked **Public**.
+
+### Authentication  `/api/auth/`
+
+| Method | Path | Access | Description |
+|--------|------|--------|-------------|
+| POST | `/login` | Public | Unified login for directors and personnel |
+| POST | `/director/register` | Public | Register the first director for a workspace |
+| GET | `/me` | Auth | Get current user profile |
+| POST | `/change-password` | Auth | Change own password |
+| POST | `/impersonation-password` | Chairman | Set / update impersonation password |
+| POST | `/impersonate` | Chairman | Start impersonation session |
+| POST | `/impersonate/end` | Chairman | End current impersonation session |
+| GET | `/impersonation/sessions` | Chairman | List all impersonation sessions |
+| GET | `/webauthn/register/options` | Auth | Get WebAuthn registration challenge |
+| POST | `/webauthn/register/verify` | Auth | Verify and save biometric credential |
+| POST | `/webauthn/auth/options` | Public | Get authentication challenge (phone in body) |
+| POST | `/webauthn/auth/verify` | Public | Verify biometric response and return JWT |
+| GET | `/webauthn/credentials` | Auth | List registered devices |
+| DELETE | `/webauthn/credentials/:id` | Auth | Delete a registered device |
+
+### Tasks  `/api/tasks/`
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/` | List tasks (filterable — see params below) |
+| POST | `/` | Create a task |
+| GET | `/:id` | Get a single task with full detail |
+| PUT | `/:id` | Update task (title, description, deadline) |
+| DELETE | `/:id` | Soft-delete (Director only) |
+| POST | `/:id/assign` | Assign to a person or department |
+| POST | `/:id/accept` | Accept task (auto-moves to IN_PROGRESS) |
+| POST | `/:id/reassign` | Reassign to another person |
+| POST | `/:id/start` | Explicitly start (ASSIGNED → IN_PROGRESS) |
+| POST | `/:id/submit` | Submit for approval |
+| POST | `/:id/return` | Return with optional reason |
+| POST | `/:id/approve` | Approve (SUBMITTED → APPROVED) |
+| POST | `/:id/reject` | Reject with reason |
+| POST | `/:id/reopen` | Reopen a REJECTED task |
+| POST | `/:id/cancel` | Cancel (Director only) |
+| POST | `/:id/change-assignees` | Add/remove assignees with reason; auto-cancels removed person's subtasks |
+| GET | `/:id/subtasks` | Get direct subtasks (add `?recursive=true` for full tree) |
+| GET | `/:id/comments` | Get comments |
+| POST | `/:id/comments` | Post a comment |
+| GET | `/:id/history` | Get audit log for this task |
+| GET | `/:id/progress-logs` | Get all progress updates |
+| POST | `/:id/progress-logs` | Post a progress update |
+| POST | `/:id/extend-deadline` | Extend deadline (creator, when overdue) |
+| GET | `/:id/deadline-extensions` | List all deadline extensions for this task |
+
+**List tasks query params:**
+
+| Param | Description |
+|-------|-------------|
+| `projectId` | Filter by project |
+| `status` | Filter by status value |
+| `parentTaskId=null` | Top-level tasks only |
+| `parentTaskId=<id>` | Subtasks of a specific task |
+| `overdue=true` | Only overdue tasks |
+| `filterPersonnelId` | Tasks assigned to this person |
+| `filterDepartmentId` | Tasks assigned to this department |
+| `filterLayerNumber` | Tasks in this layer |
+| `deadlineFrom` / `deadlineTo` | Deadline date range (ISO) |
+| `createdFrom` / `createdTo` | Creation date range (ISO) |
+
+### Task Groups  `/api/task-groups/`
+
+| Method | Path | Access | Description |
+|--------|------|--------|-------------|
+| GET | `/` | Auth | List all groups |
+| POST | `/` | Director | Create a group |
+| GET | `/projects` | Auth | List all group projects |
+| GET | `/:id` | Auth | Get group with members and projects |
+| PUT | `/:id` | Director | Update group name/description |
+| DELETE | `/:id` | Director | Delete group |
+| POST | `/:id/members` | Director | Add a member |
+| DELETE | `/:id/members/:pid` | Director | Remove a member |
+| POST | `/:id/projects` | Director | Create a group project |
+| POST | `/:id/assign-task` | Director | Assign task to all members |
+| GET | `/:id/monitor` | Director | Get all instances for monitoring |
+| GET | `/:id/tasks/:taskId/members/:memberId/history` | Director | Member task audit trail |
+| POST | `/tasks/:taskId/close` | Director | Close group task (cancel all instances) |
+
+### Other Endpoints
+
+| Prefix | Purpose |
+|--------|---------|
+| `/api/workspace/` | Layers, departments, personnel CRUD; supervisor management |
+| `/api/projects/` | Project CRUD, archive/unarchive |
+| `/api/notices/` | Broadcasts CRUD, dismiss |
+| `/api/notifications/` | List notifications, mark as read |
+| `/api/audit/` | Workspace-wide audit log (Director only) |
+| `/api/push/` | Register/remove push subscriptions |
+
+---
+
+## 19. Database Schema
+
+### Core Models Summary
+
+#### Director
 | Field | Notes |
-|---|---|
-| **Title** | Short, clear task name |
-| **Description** | Full details of what needs to be done |
-| **Priority** | Critical / High / Medium / Low |
-| **Deadline** | Click the calendar icon — custom date picker with month/year navigation |
-| **Assign to** | Optional at creation time. Select type (Person / Group / Department), then select the target. |
+|-------|-------|
+| `id`, `workspaceId` | Identity |
+| `name`, `phone`, `passwordHash` | Login credentials |
+| `isChairman` | Boolean — only Chairman can impersonate |
+| `impersonationPasswordHash` | Separate password for impersonation sessions |
 
-If you assign at creation, the task immediately moves to **ASSIGNED** status and the assignee receives an in-app notification.
+#### Personnel
+| Field | Notes |
+|-------|-------|
+| `id`, `workspaceId`, `departmentId` | Belongs to one department |
+| `name`, `phone`, `email`, `nic`, `avatarUrl` | Profile data |
+| `supervisorId` | Self-reference → Personnel (direct manager) |
+| `passwordHash`, `mustChangePassword` | Auth fields |
+| `syswiseToken` | SSO token from SysWise platform |
 
-If you skip assignment, the task stays in **PENDING** and you can assign it later from the task detail panel.
+#### Workspace / Layer / Department
+- **Workspace** — top-level container for all data
+- **Layer** — numbered 1–3; belongs to workspace
+- **Department** — belongs to one layer; groups personnel
 
-> **Only Directors can create top-level tasks.** Personnel can only create subtasks under existing tasks.
+#### Task
+| Field | Notes |
+|-------|-------|
+| `projectId` | Must belong to a project |
+| `parentTaskId` | null = top-level; set = subtask |
+| `groupTaskId` | Links all instances of a group task |
+| `title`, `description`, `priority`, `status` | Core fields |
+| `deadline`, `originalDeadline` | `originalDeadline` never changes after creation |
+| `createdByDirectorId` / `createdByPersonnelId` | Who created it |
+| `approvalById` / `approvalByType` | Who approves on submit |
+| `actedById` / `actedByType` | Who last acted (accepted/submitted/etc.) |
+| `startedAt`, `returnedAt`, `cancelledAt`, `deletedAt` | Timestamps |
+| `returnReason`, `cancelReason` | Optional free-text |
 
----
+#### TaskAssignment
+Polymorphic — exactly one of `personnelId` or `departmentId` is set per row. A task can have multiple assignment rows (multi-assignee).
 
-### 3.5 The Kanban Board
+#### AuditLog
+| Field | Notes |
+|-------|-------|
+| `workspaceId`, `taskId` | Scope |
+| `event` | Event type string (see Section 13) |
+| `actorType`, `actorDirectorId`, `actorPersonnelId` | Who did it |
+| `payload` | JSON — event-specific data (reason, names, diff) |
+| `createdAt` | Immutable timestamp |
 
-The board shows 6 columns:
+#### DeadlineExtension
+| Field | Notes |
+|-------|-------|
+| `taskId` | Linked task |
+| `oldDeadline`, `newDeadline` | Before and after |
+| `reason`, `note` | Why and additional context |
+| `extendedById`, `extendedByType`, `extendedByName` | Who extended |
 
-| Column | Meaning |
-|---|---|
-| **Pending** | Task created, not yet assigned |
-| **Assigned** | Assigned to someone, not yet started |
-| **In Progress** | Assignee is actively working on it |
-| **Submitted** | Assignee has submitted for approval |
-| **Approved** | You have approved — task is complete |
-| **Returned** | Assignee sent the task back with a reason |
-
-Each **Task Card** shows:
-- Colored left bar = priority (red = Critical, orange = High, yellow = Medium, grey = Low)
-- Task title
-- Assignee name
-- Status badge
-- Deadline (red if overdue, orange if within 48 hours)
-- Subtask count and comment count
-
-Click any card to open the **Task Detail Panel**.
-
----
-
-### 3.6 Task Detail Panel
-
-A slide-over panel opens from the right when you click a task. It has 4 tabs:
-
-#### Details Tab
-Shows the full task description, who it's assigned to, the deadline, and any return/rejection reason.
-
-**Action buttons** appear at the top based on the task's current state:
-
-| Button | When it appears | What it does |
-|---|---|---|
-| **Assign** | Task is PENDING or RETURNED | Assign to a person, group, or department |
-| **Approve** | Task is SUBMITTED and you are the approving authority | Mark as fully approved |
-| **Reject** | Task is SUBMITTED and you are the approving authority | Reject with a reason — assignee can revise and resubmit |
-| **Cancel task** | Any state except APPROVED/CANCELLED | Cancel the task (requires reason, Director only) |
-
-#### Subtasks Tab
-Lists all direct subtasks under this task, showing their status and deadline.
-
-#### Comments Tab
-Full comment thread. Type a message and press Enter or click Send to add a comment. All comments are timestamped and show whether they came from a Director or Personnel.
-
-#### History Tab
-Complete audit trail for this task — every state change, assignment, comment, and modification with the actor type and exact timestamp.
-
----
-
-### 3.7 Approval Queue
-
-The **Approval Queue** page (sidebar) shows all tasks currently in SUBMITTED status waiting for your sign-off.
-
-For each task you can open it via the board to approve or reject.
-
-The badge number on the sidebar updates in real time.
+#### Other Models
+| Model | Purpose |
+|-------|---------|
+| `TaskProgressLog` | Dated progress notes with author |
+| `TaskComment` | Discussion comments |
+| `Notification` | In-app + push notification records |
+| `Notice` | Broadcast messages from director |
+| `NoticeDismissal` | Per-user dismissal tracking |
+| `PushSubscription` | Web Push subscription objects per device |
+| `WebAuthnCredential` | FIDO2 passkeys per device (public key, counter, device name) |
+| `ImpersonationSession` | Full log of all impersonation sessions |
+| `TaskGroup` / `TaskGroupMember` / `TaskGroupProject` | Group task infrastructure |
+| `Project` | Task grouping container |
 
 ---
 
-### 3.8 Overdue Tasks
-
-The **Overdue Tasks** page shows all tasks where the deadline has passed and the task is not yet APPROVED or CANCELLED.
-
-The table shows: task title, project, deadline (in red), who it's assigned to, and current status.
-
----
-
-### 3.9 Audit Log
-
-The **Audit Log** page (Director only) shows a full chronological log of every action taken in your workspace.
-
-Each entry shows:
-- Event type (e.g. `TASK_ASSIGNED`, `TASK_APPROVED`, `PERSONNEL_MOVED`)
-- Actor type (Director or Personnel)
-- Task ID (if applicable)
-- Date and time
-
-Use this to track accountability and investigate any disputes.
-
----
-
-### 3.10 Notifications
-
-The **bell icon** in the top-right corner shows your unread notification count (red badge).
-
-Click it to open the notification dropdown. Notifications are polled every **15 seconds** and also refresh when you return to the browser tab.
-
-Click any unread notification to mark it as read. Use **Mark all read** to clear everything at once.
-
-**Director notifications include:**
-- A task has been submitted for your approval
-- A task was returned by the assignee
-- A personnel was moved between departments
-
----
-
-## 4. Personnel Guide
-
-### 4.1 My Task Queue
-
-After logging in as Personnel, you land on **My Task Queue**.
-
-Tasks are grouped by status:
-- **Assigned** — tasks waiting for you to start
-- **In Progress** — tasks you are currently working on
-- **Returned** — tasks sent back for correction
-- **Rejected** — tasks rejected after submission
-- **Submitted** — tasks you have submitted, waiting for approval
-
-Each card shows the task title, priority bar, deadline, and status badge. Click any card to open the **Task Detail Panel**.
-
----
-
-### 4.2 Working on a Task
-
-When a task is **ASSIGNED** to you:
-
-1. Click the task card to open the detail panel
-2. Click **▶ Start** — this moves the task to **IN_PROGRESS** and signals you have begun
-3. Work on the task. You can add comments to document progress
-4. If the task has subtasks, all subtasks must be completed and approved before you can submit the parent
-
----
-
-### 4.3 Creating Subtasks
-
-If a task is too large to handle as a single unit, you can break it into subtasks.
-
-From the task detail panel (while the task is IN_PROGRESS or ASSIGNED):
-1. Click **+ Subtask**
-2. Fill in title, description, priority, and deadline
-3. Click **Create Subtask**
-
-The subtask appears in the Subtasks tab. You can assign it to yourself or another person (if you have permission). Subtasks follow the same full lifecycle as regular tasks.
-
-> **Remember:** The parent task cannot be submitted for approval until every subtask is APPROVED.
-
----
-
-### 4.4 Returning a Task
-
-If a task has been assigned to you incorrectly, or is outside your scope, you can send it back.
-
-From the task detail panel (while IN_PROGRESS):
-1. Click **↩ Return**
-2. Type a clear reason explaining why you are returning it
-3. Click **Confirm**
-
-The task moves to **RETURNED** status. The assigning authority receives a notification with your reason. They can then reassign it to the correct person or department.
-
----
-
-### 4.5 Submitting for Approval
-
-When you have completed all the work (and all subtasks are approved):
-
-1. Click **✓ Submit for Approval**
-2. The task moves to **SUBMITTED**
-3. The assigning authority receives an in-app notification to review it
-
-**What happens next:**
-- If **Approved** — the task is marked APPROVED (done). You receive a notification.
-- If **Rejected** — you receive a notification with a reason. Click **↻ Reopen** to move it back to IN_PROGRESS, make corrections, and resubmit.
-
----
-
-## 5. Visibility Rules
-
-TaskWise enforces hierarchy-based visibility. What you can see on the board depends on which layer you belong to.
-
-### Directors
-Directors see **everything** in their workspace — all projects, all tasks, all layers.
-
-### Personnel — Layer-Based Visibility
-
-| Your Layer | Tasks you can see |
-|---|---|
-| **Layer 1** (senior) | All tasks assigned to any Layer 1, 2, or 3 department, group, or person in the workspace — plus tasks you are the approval authority for |
-| **Layer 2** (mid) | Tasks assigned to Layer 2 or Layer 3 departments/groups/personnel — plus tasks you are the approval authority for |
-| **Layer 3** (ground) | Only tasks assigned directly to you, your group, or your department |
-
-### Accountability on Group Tasks
-
-When a task is assigned to a group or department (not a specific person), any eligible member can act on it. The system tracks **who actually clicked "Start", "Submit", or "Return"** — this is stored separately from the assignment and shown in the task's audit history. This makes individual accountability clear even for shared tasks.
-
----
-
-## 6. Task Lifecycle Reference
-
-```
-PENDING
-  │
-  │ Director assigns to person / group / department
-  ▼
-ASSIGNED
-  │
-  │ Assignee clicks Start
-  ▼
-IN_PROGRESS ─────────────────────── Return (with reason) ──► RETURNED
-  │                                                               │
-  │ Assignee clicks Submit                                        │ Director reassigns
-  │ (all subtasks must be APPROVED first)                        ▼
-  ▼                                                           ASSIGNED
-SUBMITTED
-  │
-  ├─ Director clicks Approve ──────────────────────────► APPROVED ✓ (final)
-  │
-  └─ Director clicks Reject (with reason) ─────────────► REJECTED
-                                                              │
-                                                              │ Assignee clicks Reopen
-                                                              ▼
-                                                          IN_PROGRESS
-
-Any state → CANCELLED (Director only, reason required, soft delete)
-```
-
-### Who can do what
-
-| Action | Director | Personnel |
-|---|---|---|
-| Create top-level task | ✅ | ❌ |
-| Create subtask | ✅ | ✅ (on tasks they own) |
-| Assign task | ✅ | ❌ |
-| Start task | ✅ | ✅ |
-| Submit for approval | ✅ | ✅ |
-| Return task | ❌ | ✅ |
-| Approve task | ✅ (if approving authority) | ✅ (if approving authority) |
-| Reject task | ✅ (if approving authority) | ✅ (if approving authority) |
-| Cancel task | ✅ | ❌ |
-| Change deadline | Only the person who set it | Only the person who set it |
-| Move personnel | ✅ | ❌ |
-| Create departments/groups | ✅ | ❌ |
-| View all tasks in workspace | ✅ | ❌ (visibility depends on layer — see below) |
-| View tasks assigned to lower layers | N/A | Layer 1 only |
-| View tasks in same + lower layers | N/A | Layer 1 + Layer 2 |
-| View own tasks only | N/A | Layer 3 |
-
----
-
-## 6. Test Accounts
-
-Test account credentials are kept in the internal ops file on the server at `/var/www/taskwise/server/.env` and are not stored in this document.
-
-To retrieve the Director email or Workspace ID for testing:
-```bash
-# On the production server
-sudo -u postgres psql taskwise_db -c 'SELECT id, name FROM "Workspace";'
-```
-
-Contact the system administrator for current test credentials. Do not store passwords in documentation files.
-
----
-
-# Part 2 — Technical Reference
-
----
-
-## 7. Architecture Overview
-
-| Layer | Technology | Notes |
-|---|---|---|
-| Frontend | Vite + React 18 + TypeScript | Port 3500 (local), `/taskwise/` (production) |
-| Styling | Tailwind CSS 3 | Monday.com color palette, custom components |
-| Backend | Node.js + Express + TypeScript | Port 4300 (local), 4003 (production) |
-| ORM | Prisma 5 | PostgreSQL provider |
-| Database | PostgreSQL 14+ | Separate `taskwise_db` |
-| Process manager | PM2 | `taskwise-backend` (id 17) |
-| Web server | Nginx | Reverse proxy, static file serving |
-| SSL | Let's Encrypt (Certbot) | Auto-renewed, expires ~April 2026 |
-
-Follows the same monorepo pattern as DayWise and CricWise. No SysWise SSO — TaskWise has its own standalone auth.
-
----
-
-## 8. Directory Structure
-
-```
-taskwise-local/
-├── index.html                        # HTML entry point
-├── vite.config.ts                    # Port 3500, base /taskwise/ in prod
-├── tailwind.config.js                # Monday.com palette + custom tokens
-├── .env.production                   # VITE_API_URL=/taskwise-api/api
-├── src/
-│   ├── main.tsx                      # React entry
-│   ├── App.tsx                       # Auth state, routing, localStorage
-│   ├── types.ts                      # All shared TypeScript types
-│   ├── index.css                     # Tailwind base + .btn-*, .card, .input, .badge-* classes
-│   ├── vite-env.d.ts                 # ImportMeta.env type declarations
-│   ├── components/
-│   │   ├── Auth.tsx                  # Director / Personnel login tabs
-│   │   ├── DirectorDashboard.tsx     # Director layout, sidebar, all Director views
-│   │   ├── PersonnelDashboard.tsx    # Personnel layout, queue, board
-│   │   ├── HierarchyPanel.tsx        # Layers / departments / personnel / groups management
-│   │   ├── ProjectManager.tsx        # Project list, create, archive
-│   │   ├── BoardView.tsx             # Kanban board (6 columns), create task modal
-│   │   ├── TaskCard.tsx              # Card component used on board and in queue
-│   │   ├── TaskDetailPanel.tsx       # Slide-over panel: details/subtasks/comments/history
-│   │   ├── NotificationsMenu.tsx     # Bell icon, polling, dropdown
-│   │   ├── DatePicker.tsx            # Custom calendar date picker (no native input)
-│   │   └── Select.tsx                # Custom dropdown (no native select)
-│   └── services/
-│       └── apiService.ts             # All typed API calls (auth, workspace, projects, tasks, notifications, audit)
-└── server/
-    ├── prisma/
-    │   └── schema.prisma             # 12-model PostgreSQL schema
-    ├── src/
-    │   ├── index.ts                  # Express server, CORS, routes
-    │   ├── prisma.ts                 # PrismaClient singleton
-    │   ├── middleware/
-    │   │   └── authMiddleware.ts     # JWT decode → req.user, requireDirector guard
-    │   ├── routes/
-    │   │   ├── authRoutes.ts         # /api/auth/*
-    │   │   ├── workspaceRoutes.ts    # /api/workspace/*
-    │   │   ├── projectRoutes.ts      # /api/projects/*
-    │   │   ├── taskRoutes.ts         # /api/tasks/*
-    │   │   ├── notificationRoutes.ts # /api/notifications/*
-    │   │   └── auditRoutes.ts        # /api/audit/*, /api/reports/*
-    │   └── controllers/
-    │       ├── authController.ts     # register, login (director + personnel), /me
-    │       ├── workspaceController.ts # layers, departments, personnel, groups CRUD
-    │       ├── projectController.ts  # project CRUD
-    │       ├── taskController.ts     # task CRUD + all state transitions + comments
-    │       ├── notificationController.ts # list, mark read, mark all read
-    │       └── auditController.ts    # audit log, overdue report, progress, queue
-    ├── .env                          # Git-ignored — local secrets
-    └── .env.example                  # Template
-```
-
----
-
-## 9. Ports & URLs
-
-| Environment | Frontend | Backend API |
-|---|---|---|
-| Local dev | `http://localhost:3500` | `http://localhost:4300/api` |
-| Production | `https://syswise.lk/taskwise/` | `https://syswise.lk/taskwise-api/api` |
-
-### How production routing works (Nginx)
-
-```
-Browser → syswise.lk/taskwise/        → Nginx serves /var/www/taskwise/dist/index.html
-Browser → syswise.lk/taskwise-api/api → Nginx proxies to localhost:4003
-```
-
-The React app in production has `VITE_API_URL=/taskwise-api/api` baked in at build time via `.env.production`.
-
----
-
-## 10. Database
-
-### Connection Details
-
-| Setting | Local | Production |
-|---|---|---|
-| Engine | PostgreSQL | PostgreSQL |
-| Database | `taskwise_db` | `taskwise_db` |
-| User | `postgres` | `syswise_user` |
-| Password | (see `server/.env`) | (see server `.env` — not in this file) |
-| Host | `localhost:5432` | `localhost:5432` |
-
-### Connection String Format
-
-```
-postgresql://<user>:<password>@localhost:5432/taskwise_db?schema=public
-```
-
-Credentials are stored in `taskwise-local/server/.env` (local, git-ignored) and in the production server's `.env` file at `/var/www/taskwise/server/.env`. They are never committed to the repository.
-
-### Schema — 12 Models
-
-| Model | Purpose | Key fields |
-|---|---|---|
-| `Director` | Director accounts | email (globally unique), password, workspaceId |
-| `Workspace` | One per Director, all data scoped here | name |
-| `Layer` | 3 per workspace (1=senior, 3=ground) | number, name, workspaceId |
-| `Department` | Belongs to a Layer | name, layerId, workspaceId, deletedAt |
-| `Personnel` | Leaf users with login | email (unique per workspace), password, departmentId |
-| `Group` | Named team within one Department | name, departmentId |
-| `GroupMember` | Personnel ↔ Group junction | groupId, personnelId |
-| `Project` | Created by Director | name, color, status, workspaceId, directorId |
-| `Task` | Self-referencing (parentTaskId = subtree) | title, status, priority, deadline, deadlineSetById, approvalById, actedById, parentTaskId |
-| `TaskAssignment` | Polymorphic: dept OR group OR person | taskId + one of: departmentId, groupId, personnelId |
-| `TaskComment` | Comments on tasks | taskId, content, authorType |
-| `AuditLog` | Every action permanently logged | event, actorType, actorId, taskId, payload (JSON) |
-| `Notification` | In-app alerts | recipientType, recipientId, type, isRead |
-
-### Key Schema Decisions
-
-- **Self-referencing Task** — `parentTaskId` handles unlimited subtask depth. Top-level vs subtask is enforced in the controller, not the schema.
-- **Polymorphic TaskAssignment** — one FK per target type, exactly one set at a time. Enforced in the controller.
-- **Soft deletes** — `deletedAt DateTime?` on Task, Department, Personnel, Project, Group, TaskComment. All list queries filter `WHERE deletedAt IS NULL` but history endpoints return everything.
-- **Deadline ownership** — `deadlineSetById` + `deadlineSetByType` stored per task. Controller rejects deadline edits from anyone else.
-- **No cascading auto-approvals** — when all subtasks are APPROVED, the parent's assignee is notified but must manually submit. Keeps human review at each level.
-- **`actedById` / `actedByType`** — updated on every start/submit/return action. For group or department tasks, this field identifies exactly which individual performed each action, maintaining clear accountability even when a task is shared among many people.
-- **Recursive subtask blocking** — `submitTask` uses a PostgreSQL recursive CTE to walk the full subtask tree before allowing submission. A parent task is blocked if any descendant subtask at any depth is not APPROVED. Direct children alone are not sufficient.
-- **Layer-based visibility** — `buildTaskVisibilityFilter()` in `server/src/helpers/visibility.ts` computes which department IDs each personnel member can see based on their `layerNumber`. This filter is applied to every `listTasks` and `getTask` query for non-Director actors.
-
----
-
-## 11. Authentication & JWT
-
-TaskWise has its own standalone auth — no SysWise SSO.
-
-### JWT Payload
-
-**Director token:**
-```json
-{
-  "actorId": "uuid",
-  "actorType": "director",
-  "workspaceId": "uuid",
-  "iat": 1234567890,
-  "exp": 1234567890
-}
-```
-
-**Personnel token** (includes hierarchy context for visibility enforcement):
-```json
-{
-  "actorId": "uuid",
-  "actorType": "personnel",
-  "workspaceId": "uuid",
-  "layerNumber": 2,
-  "departmentId": "uuid",
-  "iat": 1234567890,
-  "exp": 1234567890
-}
-```
-
-Token stored in `localStorage` as `taskwise_token`. User profile stored as `taskwise_user`. Both are read on app load to restore session. Token expiry: **7 days**.
-
-### Director Registration
-`POST /api/auth/director/register`
-- Atomically creates: Director account + Workspace + 3 default Layers
-- Director email must be globally unique across all workspaces
-
-### Personnel Login
-`POST /api/auth/personnel/login`
-- Requires `{ email, password, workspaceId }` — same email can exist in multiple workspaces
-
-### Auth Middleware
-Every protected route runs `authenticateToken` which:
-1. Reads the `Authorization: Bearer <token>` header
-2. Verifies and decodes the JWT
-3. Attaches `req.user = { actorId, actorType, workspaceId }` to the request
-
-`requireDirector` is a secondary middleware applied to Director-only routes.
-
----
-
-## 12. API Reference
-
-All endpoints prefixed `/api`. Require `Authorization: Bearer <token>` unless noted.
-
-### Auth
-```
-POST  /api/auth/director/register    { email, password, name, workspaceName? }
-POST  /api/auth/director/login       { email, password }
-POST  /api/auth/personnel/login      { email, password, workspaceId }
-GET   /api/auth/me                   Returns current actor profile
-```
-
-### Workspace & Hierarchy
-```
-GET    /api/workspace                           Workspace + layers + departments
-GET    /api/workspace/layers                    All 3 layers with departments + personnel
-GET    /api/workspace/departments               All departments (filter: no params)
-POST   /api/workspace/departments               { name, layerId }  [Director]
-PUT    /api/workspace/departments/:id           { name }  [Director]
-DELETE /api/workspace/departments/:id           Soft delete  [Director]
-
-GET    /api/workspace/personnel                 All personnel (filter: ?departmentId= ?layerId=)
-POST   /api/workspace/personnel                 { name, email, password, departmentId, phone? }  [Director]
-PUT    /api/workspace/personnel/:id             { name, phone, avatarUrl }
-PUT    /api/workspace/personnel/:id/move        { departmentId }  [Director]
-DELETE /api/workspace/personnel/:id             Soft delete  [Director]
-GET    /api/workspace/personnel/:id/queue       Active task queue for this person
-
-GET    /api/workspace/groups                    All groups (filter: ?departmentId=)
-POST   /api/workspace/groups                    { name, departmentId }  [Director]
-PUT    /api/workspace/groups/:id                { name }
-DELETE /api/workspace/groups/:id                Soft delete  [Director]
-POST   /api/workspace/groups/:id/members        { personnelId }  [Director]
-DELETE /api/workspace/groups/:id/members/:pid   Remove member  [Director]
-```
-
-### Projects
-```
-GET    /api/projects           All active + archived projects in workspace
-POST   /api/projects           { name, description?, color? }  [Director]
-GET    /api/projects/:id       Project details
-PUT    /api/projects/:id       { name?, description?, color?, status? }  [Director]
-DELETE /api/projects/:id       Soft delete  [Director]
-```
-
-### Tasks
-```
-GET    /api/tasks              List tasks (filter: ?projectId= ?status= ?parentTaskId=null ?overdue=true)
-POST   /api/tasks              { title, description?, projectId, parentTaskId?, priority?, deadline? }
-GET    /api/tasks/:id          Full task with subtasks, assignments, comments
-PUT    /api/tasks/:id          Update fields (deadline edit enforced)
-DELETE /api/tasks/:id          Soft delete  [Director]
-
-POST   /api/tasks/:id/assign   { personnelId } OR { groupId } OR { departmentId }
-POST   /api/tasks/:id/start    ASSIGNED → IN_PROGRESS
-POST   /api/tasks/:id/submit   IN_PROGRESS → SUBMITTED (checks all subtasks APPROVED)
-POST   /api/tasks/:id/return   IN_PROGRESS → RETURNED  { reason }
-POST   /api/tasks/:id/approve  SUBMITTED → APPROVED  [approvalById actor only]
-POST   /api/tasks/:id/reject   SUBMITTED → REJECTED  { reason }  [approvalById actor only]
-POST   /api/tasks/:id/reopen   REJECTED → IN_PROGRESS
-POST   /api/tasks/:id/cancel   Any → CANCELLED  { reason }  [Director]
-
-GET    /api/tasks/:id/subtasks   Direct subtasks only (add ?recursive=true for full deep tree via PostgreSQL CTE)
-GET    /api/tasks/:id/comments   All comments
-POST   /api/tasks/:id/comments   { content }
-GET    /api/tasks/:id/history    AuditLog entries for this task
-```
-
-### Notifications
-```
-GET   /api/notifications             Last 50 notifications for current actor
-POST  /api/notifications/:id/read    Mark one read
-POST  /api/notifications/read-all    Mark all read
-```
-
-### Audit & Reports (Director only)
-```
-GET   /api/audit                         Full workspace audit log (filter: ?event= ?from= ?to= ?actorPersonnelId=)
-GET   /api/reports/overdue               All overdue tasks
-GET   /api/reports/progress              Project-level status count summary
-GET   /api/reports/queue/:personnelId    Active task queue for a specific person
-```
-
----
-
-## 13. Git Repository & Branches
-
-**Repository:** https://github.com/dasunyasantha-netizen/Taskwise.git
-
-| Branch | Purpose |
-|---|---|
-| `main` | Production code — only merge from `develop` |
-| `develop` | Integration branch — test here before promoting to main |
-| `feature/auth` | Director register/login + Personnel login |
-| `feature/tasks` | Task CRUD, state machine, subtasks, approval workflow |
-| `feature/hierarchy` | Layers, departments, personnel CRUD, groups |
-| `feature/ui-board` | Kanban board, TaskCard, TaskDetailPanel, DatePicker, Select |
-| `feature/notifications` | In-app notification polling and bell menu |
-
-### Branch workflow
-```
-feature/xxx  →  develop  →  main  →  deploy to production
-```
-
-Never commit directly to `main`.
-
----
-
-## 14. Local Development Setup
+## 20. Deployment
 
 ### Prerequisites
-- Node.js 20+
-- PostgreSQL running on localhost:5432
-- Database created: `CREATE DATABASE taskwise_db;`
+- SSH alias `syswise-hetzner` configured in `~/.ssh/config`
+- Push access to `github.com/dasunyasantha-netizen/Taskwise`
+- All changes committed and pushed to `main`
 
-### First-time setup
+### Deploy Command
 
-**Terminal 1 — Backend:**
 ```bash
-cd "c:\Users\dasun\Dasun Systems\Syswise\taskwise-local\server"
-npm install
-# Create .env from .env.example and verify values
-npx prisma db push      # Creates all 12 tables
-npm run dev             # Starts on port 4300
+bash deploy.sh
 ```
 
-**Terminal 2 — Frontend:**
+### What deploy.sh Does, Step by Step
+
+| Step | Action |
+|------|--------|
+| 1 | Verify git working tree is clean (no uncommitted changes) |
+| 2 | Verify local `HEAD` matches `origin/main` (nothing unpushed) |
+| 3 | Stamp `public/sw.js` with current git SHA (`__CACHE_VERSION__` → actual SHA) |
+| 4 | Build frontend locally (`npm run build`) — catches errors before touching production |
+| 5 | SSH to server: `git reset --hard origin/main` |
+| 6 | `npm install` (frontend + backend dependencies) |
+| 7 | `npx prisma generate` (rebuild Prisma client binary after any schema changes) |
+| 8 | `npx prisma migrate deploy` (run pending migrations) |
+| 9 | `npm run build` (frontend build on server with stamped SW) |
+| 10 | `pm2 restart taskwise-backend` |
+| 11 | Health check ping to confirm the server responds |
+
+### Mandatory Rules
+1. **Never deploy by SCP or direct file copy.** All deploys must go through GitHub.
+2. **Always commit and push to `main` before deploying.** The script enforces this.
+3. **Never restart PM2 manually** without rebuilding first.
+
+### Cache Strategy
+
+| Resource | Cache-Control | Reason |
+|----------|--------------|--------|
+| `/taskwise/assets/*` | `public, immutable, 1 year` | Content-hashed filenames — safe to cache forever |
+| `index.html`, `sw.js`, `registerSW.js`, `manifest.webmanifest` | `no-cache, no-store` | Always fetched fresh so the new SW is detected immediately |
+
+On every deploy, `sw.js` contains a new git SHA as `CACHE_VERSION`. Since nginx serves it with `no-cache`, every device re-fetches it on the next visit. The new SHA triggers `skipWaiting()` and the activate handler deletes all stale `workbox-*` caches — so users always have the latest build even if they installed the PWA months ago.
+
+### Rollback
+
 ```bash
-cd "c:\Users\dasun\Dasun Systems\Syswise\taskwise-local"
-npm install
-npm run dev             # Starts on port 3500, proxies /api → localhost:4300
-```
+# See recent commits on production
+ssh syswise-hetzner "cd /var/www/taskwise && git log --oneline -5"
 
-Open `http://localhost:3500`
-
-### After first setup — use the start script
-
-The monorepo start script launches TaskWise alongside all other modules:
-```powershell
-# From c:\Users\dasun\Dasun Systems\Syswise\
-.\start-local-dev.ps1
-```
-
-### Local environment variables (`server/.env`)
-```env
-DATABASE_URL="postgresql://postgres:wealthpeshala@localhost:5432/taskwise_db?schema=public"
-JWT_SECRET="taskwise_jwt_secret_local_dev_2026"
-PORT=4300
-NODE_ENV=development
-```
-
-### Useful commands
-```bash
-# Rebuild database after schema change
-npx prisma db push
-
-# Open Prisma Studio (visual DB browser)
-npx prisma db studio
-
-# Build backend for production
-npm run build
-
-# Build frontend for production
-NODE_ENV=production npm run build
+# Roll back to a specific commit
+ssh syswise-hetzner "cd /var/www/taskwise && git reset --hard <sha> && npm run build && pm2 restart taskwise-backend"
 ```
 
 ---
 
-## 15. Production Server
-
-**Provider:** Hetzner Cloud Singapore
-**IP:** `5.223.76.20`
-**SSH alias:** `ssh syswise-hetzner`
-
-### Server Paths
-
-| Component | Path |
-|---|---|
-| Frontend dist (served by Nginx) | `/var/www/taskwise/dist/` |
-| Backend source | `/var/www/taskwise/server/` |
-| Backend compiled JS | `/var/www/taskwise/server/dist/` |
-| Backend env file | `/var/www/taskwise/server/.env` |
-| Nginx config | `/etc/nginx/sites-enabled/syswise` |
-
-### PM2 Processes
-
-| Name | ID | Port | Started |
-|---|---|---|---|
-| `taskwise-backend` | 17 | 4003 | April 2026 |
-
-```bash
-pm2 status               # View all processes
-pm2 logs taskwise-backend  # View live logs
-pm2 restart taskwise-backend
-```
-
-### Nginx Routes for TaskWise
-
-```nginx
-location = /taskwise {
-    return 301 /taskwise/;
-}
-location /taskwise/ {
-    alias /var/www/taskwise/dist/;
-    try_files $uri $uri/ /taskwise/index.html;
-}
-location /taskwise-api/ {
-    proxy_pass http://localhost:4003/;
-    proxy_http_version 1.1;
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-Proto $scheme;
-}
-```
-
-### Production environment variables (`server/.env`)
-```env
-DATABASE_URL="postgresql://syswise_user:SysW1se2026!Secure@localhost:5432/taskwise_db?schema=public"
-JWT_SECRET="<strong random — do not share>"
-PORT=4003
-NODE_ENV=production
-```
-
----
-
-## 16. Deployment Update Guide
-
-Use this every time you push a change to production.
-
-### Full deploy (frontend + backend changed)
-
-```bash
-# 1. Local — commit and push to main
-cd "c:\Users\dasun\Dasun Systems\Syswise\taskwise-local"
-git add .
-git commit -m "feat: ..."
-git push origin main
-
-# 2. SSH into server
-ssh syswise-hetzner
-
-# 3. Pull latest code
-cd /var/www/taskwise
-git pull
-
-# 4. If Prisma schema changed
-cd server
-npx prisma db push
-
-# 5. Rebuild backend
-cd /var/www/taskwise/server
-npm run build
-pm2 restart taskwise-backend
-
-# 6. Rebuild frontend
-cd /var/www/taskwise
-NODE_ENV=production npm run build
-
-# No Nginx restart needed unless config changed
-```
-
-### Frontend only (no backend changes)
-```bash
-ssh syswise-hetzner
-cd /var/www/taskwise && git pull
-NODE_ENV=production npm run build
-```
-
-### Backend only (no frontend changes)
-```bash
-ssh syswise-hetzner
-cd /var/www/taskwise && git pull
-cd server && npm run build
-pm2 restart taskwise-backend
-```
-
-### Check deployment is healthy
-```bash
-# Check PM2 is running
-pm2 status
-
-# Check backend is responding
-curl https://syswise.lk/taskwise-api/api/health
-
-# Check frontend loads
-curl -sI https://syswise.lk/taskwise/ | head -3
-```
-
----
-
-## Implementation Status
-
-| Phase | Status | Scope |
-|---|---|---|
-| Phase 1 | ✅ Complete | Auth, workspace hierarchy, projects, full Kanban board, task detail panel, notifications, audit log, Director + Personnel dashboards |
-| Phase 2 | 🔄 Partial | Groups, subtasks, return/reject workflow, deadline ownership — all implemented in backend, UI complete |
-| Phase 3 | Pending | Layer-based visibility enforcement (currently all tasks visible to everyone in workspace), recursive subtask CTE queries, drag-drop status change on board |
-| Phase 4 | ✅ Complete | Production deployment, Nginx, PM2, PostgreSQL, SSL |
-
-### Known current limitations
-- **Visibility** — Phase 3 layer-scoped filtering not yet applied. All personnel can currently see all tasks in the workspace. This is safe for single-org use but should be addressed before multi-tenant rollout.
-- **Recursive subtask tree** — the `/subtasks?recursive=true` endpoint returns only direct children. Deep tree traversal via PostgreSQL CTE is a Phase 3 item.
-- **No drag-and-drop** — task status changes require opening the detail panel and clicking an action button. Board drag-to-column is Phase 3.
-
----
-
-*Documentation maintained in `/var/www/taskwise/TASKWISE_DOCUMENTATION.md` on the server and in the GitHub repo.*
+*Documentation written June 2026. For changes after this date, see `git log` in the `taskwise-local` repository.*
