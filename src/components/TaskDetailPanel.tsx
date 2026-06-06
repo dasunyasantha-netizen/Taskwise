@@ -54,11 +54,12 @@ type NextTaskForm = {
   isGroupTask: boolean
   groupId: string
   personnelIds: string[]
+  personnelSearch: string
 }
 
 const emptyNextTask = (): NextTaskForm => ({
   title: '', description: '', projectId: '', priority: 'MEDIUM',
-  deadline: '', isGroupTask: false, groupId: '', personnelIds: [],
+  deadline: '', isGroupTask: false, groupId: '', personnelIds: [], personnelSearch: '',
 })
 
 export default function TaskDetailPanel({ task, isDirector, actorId, layers, personnel, onClose, onRefresh }: Props) {
@@ -928,8 +929,14 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
                     ) : (
                       <div>
                         <label className="block text-xs text-tw-text-secondary mb-1">Assign to (select one or more)</label>
+                        <input
+                          className="input text-sm mb-1"
+                          placeholder="Search personnel..."
+                          value={nt.personnelSearch}
+                          onChange={e => setNextTasks(arr => arr.map((t, i) => i === idx ? { ...t, personnelSearch: e.target.value } : t))}
+                        />
                         <div className="border border-tw-border rounded-lg max-h-36 overflow-y-auto divide-y divide-tw-border">
-                          {allPersonnel.map(p => (
+                          {allPersonnel.filter(p => p.name.toLowerCase().includes(nt.personnelSearch.toLowerCase())).map(p => (
                             <label key={p.id} className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-tw-hover text-sm">
                               <input type="checkbox"
                                 checked={nt.personnelIds.includes(p.id)}
