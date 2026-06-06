@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import type { Task, TaskComment, AuditLog, Layer, Personnel, TaskProgressLog, DeadlineExtension } from '../types'
-import { taskApi } from '../services/apiService'
+import { taskApi, workspaceApi, taskGroupApi } from '../services/apiService'
 import DatePicker from './DatePicker'
 import Select from './Select'
 import ProgressUpdateSheet from './ProgressUpdateSheet'
@@ -27,6 +27,7 @@ const statusColors: Record<string, string> = {
 const eventLabels: Record<string, string> = {
   TASK_CREATED:    'Task created',
   TASK_ASSIGNED:   'Task assigned',
+  TASK_ACCEPTED:   'Task accepted',
   TASK_UPDATED:    'Task updated',
   TASK_STARTED:    'Work started',
   TASK_SUBMITTED:  'Submitted for approval',
@@ -39,10 +40,29 @@ const eventLabels: Record<string, string> = {
   COMMENT_ADDED:   'Comment added',
   DEADLINE_CHANGED:  'Deadline changed',
   DEADLINE_EXTENDED: 'Deadline extended',
+  ASSIGNEES_CHANGED: 'Assignees changed',
+  TASK_CHAIN_HANDOVER:        'Chained to next task',
+  TASK_AUTO_APPROVED_HANDOVER:'Auto-approved (chain handover)',
 }
 
+type NextTaskForm = {
+  title: string
+  description: string
+  projectId: string
+  priority: string
+  deadline: string
+  isGroupTask: boolean
+  groupId: string
+  personnelIds: string[]
+}
+
+const emptyNextTask = (): NextTaskForm => ({
+  title: '', description: '', projectId: '', priority: 'MEDIUM',
+  deadline: '', isGroupTask: false, groupId: '', personnelIds: [],
+})
+
 export default function TaskDetailPanel({ task, isDirector, actorId, layers, personnel, onClose, onRefresh }: Props) {
-  const [tab, setTab] = useState<'details' | 'subtasks' | 'updates' | 'history'>('details')
+  const [tab, setTab] = useState<'details' | 'subtasks' | 'updates' | 'history' | 'chain'>('details')
   const [comments, setComments] = useState<TaskComment[]>([])
   const [history, setHistory] = useState<AuditLog[]>([])
   const [subtasks, setSubtasks] = useState<Task[]>([])
@@ -64,6 +84,20 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
   const [editForm, setEditForm] = useState({ title: task.title, description: task.description || '', priority: task.priority, deadline: task.deadline ? task.deadline.slice(0, 10) : '', assignedTo: currentAssigneeId })
   const [editSaving, setEditSaving] = useState(false)
 
+  // Chain / assign-next state
+  const [showAssignNextModal, setShowAssignNextModal] = useState(false)
+  const [nextTasks, setNextTasks] = useState<NextTaskForm[]>([emptyNextTask()])
+  const [handoverNote, setHandoverNote] = useState('')
+  const [allowPrevView, setAllowPrevView] = useState(false)
+  const [assignNextSaving, setAssignNextSaving] = useState(false)
+  const [assignNextError, setAssignNextError] = useState('')
+  type ChainTaskItem = { id: string; title: string; status: string; chainStepNumber: number; isCurrentTask: boolean; assignments?: Array<{ personnel?: { name: string } | null; department?: { name: string } | null }> }
+  type PrevHistoryLog = { id: string; note: string; logDate: string; authorName?: string; authorType?: string }
+  const [chainData, setChainData] = useState<{ chainId: string | null; chain: ChainTaskItem[]; links: unknown[] } | null>(null)
+  const [prevHistory, setPrevHistory] = useState<{ parentTask: { title: string; status: string } | null; progressLogs: PrevHistoryLog[]; history: unknown[]; handoverNote?: string; chainStepNumber?: number } | null>(null)
+  const [allGroups, setAllGroups] = useState<Array<{ id: string; name: string }>>([])
+  const [allPersonnel, setAllPersonnel] = useState<Array<{ id: string; name: string }>>([])
+
   // Extend deadline modal state
   const [showExtendModal, setShowExtendModal] = useState(false)
   const [extendForm, setExtendForm] = useState({ newDeadline: '', reason: '', note: '' })
@@ -77,6 +111,7 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
     if (tab === 'history')  { loadHistory(); loadDeadlineExtensions() }
     if (tab === 'subtasks') loadSubtasks()
     if (tab === 'updates')  loadProgressLogs()
+    if (tab === 'chain')    { loadChainData(); loadPrevHistory() }
   }, [tab, task.id])
 
   // Reset tab when task changes
@@ -100,6 +135,14 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
   }
   const loadDeadlineExtensions = async () => {
     try { setDeadlineExtensions(await taskApi.deadlineExtensions(task.id) as DeadlineExtension[]) }
+    catch { /* non-critical */ }
+  }
+  const loadChainData = async () => {
+    try { setChainData(await taskApi.getChain(task.id) as NonNullable<typeof chainData>) }
+    catch { /* non-critical */ }
+  }
+  const loadPrevHistory = async () => {
+    try { setPrevHistory(await taskApi.previousHistory(task.id) as NonNullable<typeof prevHistory>) }
     catch { /* non-critical */ }
   }
 
@@ -180,6 +223,54 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
     setExtendSaving(false)
   }
 
+  const openAssignNext = async () => {
+    setNextTasks([emptyNextTask()])
+    setHandoverNote('')
+    setAllowPrevView(false)
+    setAssignNextError('')
+    // Load groups and personnel for the modal
+    try {
+      const [grps, ppl] = await Promise.all([
+        taskGroupApi.list() as Promise<Array<{ id: string; name: string }>>,
+        workspaceApi.getPersonnel() as Promise<Array<{ id: string; name: string }>>,
+      ])
+      setAllGroups(grps)
+      setAllPersonnel(Array.isArray(ppl) ? ppl : (ppl as { items?: Array<{ id: string; name: string }> }).items ?? [])
+    } catch { /* non-critical */ }
+    setShowAssignNextModal(true)
+  }
+
+  const handleAssignNext = async () => {
+    for (const nt of nextTasks) {
+      if (!nt.title.trim()) { setAssignNextError('All tasks must have a title'); return }
+      if (nt.isGroupTask && !nt.groupId) { setAssignNextError('Select a group for each group task'); return }
+      if (!nt.isGroupTask && nt.personnelIds.length === 0) { setAssignNextError('Select at least one person for each task'); return }
+    }
+    setAssignNextSaving(true)
+    setAssignNextError('')
+    try {
+      await taskApi.assignNext(task.id, {
+        nextTasks: nextTasks.map(nt => ({
+          title: nt.title.trim(),
+          description: nt.description.trim() || undefined,
+          projectId: nt.projectId || task.projectId,
+          priority: nt.priority,
+          deadline: nt.deadline || undefined,
+          personnelIds: nt.isGroupTask ? undefined : nt.personnelIds,
+          groupId: nt.isGroupTask ? nt.groupId : undefined,
+          isGroupTask: nt.isGroupTask,
+        })),
+        handoverNote: handoverNote.trim() || undefined,
+        allowPreviousAssigneeView: allowPrevView,
+      })
+      setShowAssignNextModal(false)
+      await onRefresh()
+    } catch (e: unknown) {
+      setAssignNextError(e instanceof Error ? e.message : 'Failed to assign next task')
+    }
+    setAssignNextSaving(false)
+  }
+
   // Action permissions
   const isCreator  = isDirector
     ? task.createdByDirectorId === actorId
@@ -192,9 +283,10 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
   const canApprove = task.status === 'SUBMITTED' && task.approvalById === actorId
   const canReject  = task.status === 'SUBMITTED' && task.approvalById === actorId
   const canReopen  = task.status === 'REJECTED'
-  const canCancel  = isDirector && !['APPROVED', 'CANCELLED'].includes(task.status)
-  const canAssign  = isDirector && ['PENDING', 'RETURNED'].includes(task.status)
-  const canSubtask = ['IN_PROGRESS', 'ASSIGNED'].includes(task.status)
+  const canCancel   = isDirector && !['APPROVED', 'CANCELLED'].includes(task.status)
+  const canAssign   = isDirector && ['PENDING', 'RETURNED'].includes(task.status)
+  const canSubtask  = ['IN_PROGRESS', 'ASSIGNED'].includes(task.status)
+  const canHandOver = isDirector && task.status === 'SUBMITTED' && task.approvalById === actorId
 
   return (
     <div className="fixed inset-0 z-40 flex justify-end">
@@ -208,7 +300,17 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
               <div className="flex items-center gap-2 mb-2 flex-wrap">
                 <span className={`badge ${statusColors[task.status]}`}>{task.status.replace('_', ' ')}</span>
                 <span className={`badge ${priorityColors[task.priority]}`}>{task.priority}</span>
-                {task.project && <span className="text-xs text-tw-text-secondary font-medium">📋 {task.project.name}</span>}
+                {task.project && (
+                  <span className="text-xs text-tw-text-secondary font-medium flex items-center gap-1">
+                    {task.project.category && (
+                      <>
+                        <span style={{ color: task.project.category.color }}>{task.project.category.name}</span>
+                        <span className="text-tw-text-secondary/50">›</span>
+                      </>
+                    )}
+                    <span>📋 {task.project.name}</span>
+                  </span>
+                )}
                 {task.parentTaskId && <span className="text-xs text-tw-text-secondary bg-tw-hover px-1.5 py-0.5 rounded font-medium">Subtask</span>}
               </div>
               {editing ? (
@@ -279,13 +381,14 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
 
           {/* Action buttons */}
           <div className="flex flex-wrap gap-2 mt-3">
-            {canSubmit  &&<button disabled={actionLoading} onClick={() => doAction(() => taskApi.submit(task.id))} className="btn-primary text-xs py-1.5">✓ Submit for Approval</button>}
-            {canReturn  && <button disabled={actionLoading} onClick={() => setShowReasonModal('return')} className="btn-secondary text-xs py-1.5">↩ Return</button>}
-            {canApprove && <button disabled={actionLoading} onClick={() => doAction(() => taskApi.approve(task.id))} className="bg-tw-success hover:opacity-90 text-white font-semibold px-3 py-1.5 rounded-lg text-xs transition-opacity">✓ Approve</button>}
-            {canReject  && <button disabled={actionLoading} onClick={() => setShowReasonModal('reject')} className="btn-danger text-xs py-1.5">✕ Reject</button>}
-            {canReopen  && <button disabled={actionLoading} onClick={() => doAction(() => taskApi.reopen(task.id))} className="btn-secondary text-xs py-1.5">↻ Reopen</button>}
-            {canAssign  && <button disabled={actionLoading} onClick={() => setShowAssignModal(true)} className="btn-secondary text-xs py-1.5">👤 Assign</button>}
-            {canSubtask && <button onClick={() => setShowSubtaskModal(true)} className="btn-secondary text-xs py-1.5">+ Subtask</button>}
+            {canSubmit    && <button disabled={actionLoading} onClick={() => doAction(() => taskApi.submit(task.id))} className="btn-primary text-xs py-1.5">✓ Submit for Approval</button>}
+            {canReturn    && <button disabled={actionLoading} onClick={() => setShowReasonModal('return')} className="btn-secondary text-xs py-1.5">↩ Return</button>}
+            {canApprove   && <button disabled={actionLoading} onClick={() => doAction(() => taskApi.approve(task.id))} className="bg-tw-success hover:opacity-90 text-white font-semibold px-3 py-1.5 rounded-lg text-xs transition-opacity">✓ Approve</button>}
+            {canHandOver  && <button disabled={actionLoading} onClick={openAssignNext} className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-3 py-1.5 rounded-lg text-xs transition-colors">⛓ Approve & Assign Next</button>}
+            {canReject    && <button disabled={actionLoading} onClick={() => setShowReasonModal('reject')} className="btn-danger text-xs py-1.5">✕ Reject</button>}
+            {canReopen    && <button disabled={actionLoading} onClick={() => doAction(() => taskApi.reopen(task.id))} className="btn-secondary text-xs py-1.5">↻ Reopen</button>}
+            {canAssign    && <button disabled={actionLoading} onClick={() => setShowAssignModal(true)} className="btn-secondary text-xs py-1.5">👤 Assign</button>}
+            {canSubtask   && <button onClick={() => setShowSubtaskModal(true)} className="btn-secondary text-xs py-1.5">+ Subtask</button>}
             {canExtend  && (
               <button onClick={() => { setExtendForm({ newDeadline: '', reason: '', note: '' }); setExtendError(''); setShowExtendModal(true) }}
                 className="btn-secondary text-xs py-1.5 text-amber-700 border-amber-300 hover:bg-amber-50">
@@ -297,11 +400,12 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-tw-border px-5 bg-white">
-          {(['details', 'updates', 'subtasks', 'history'] as const).map(t => (
+        <div className="flex border-b border-tw-border px-5 bg-white overflow-x-auto">
+          {(['details', 'updates', 'subtasks', 'history', 'chain'] as const).map(t => (
             <button key={t} onClick={() => setTab(t)}
-              className={`py-2.5 px-3 text-sm font-medium border-b-2 transition-colors capitalize ${tab === t ? 'border-tw-primary text-tw-primary' : 'border-transparent text-tw-text-secondary hover:text-tw-text'}`}>
-              {t === 'updates' ? `Updates${progressLogs.length > 0 ? ` (${progressLogs.length})` : ''}` : t}
+              className={`py-2.5 px-3 text-sm font-medium border-b-2 transition-colors capitalize whitespace-nowrap ${tab === t ? 'border-tw-primary text-tw-primary' : 'border-transparent text-tw-text-secondary hover:text-tw-text'}`}>
+              {t === 'updates' ? `Updates${progressLogs.length > 0 ? ` (${progressLogs.length})` : ''}` :
+               t === 'chain'   ? '⛓ Chain' : t}
               {t === 'subtasks' && task._count?.subtasks ? ` (${task._count.subtasks})` : ''}
             </button>
           ))}
@@ -448,6 +552,115 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
               </div>
             </div>
           )}
+
+          {/* CHAIN */}
+          {tab === 'chain' && (() => {
+            const STATUS_COLORS: Record<string, string> = {
+              PENDING: 'bg-gray-100 text-gray-600', ASSIGNED: 'bg-blue-100 text-blue-700',
+              IN_PROGRESS: 'bg-amber-100 text-amber-700', SUBMITTED: 'bg-purple-100 text-purple-700',
+              APPROVED: 'bg-green-100 text-green-700', RETURNED: 'bg-orange-100 text-orange-700',
+              REJECTED: 'bg-red-100 text-red-700', CANCELLED: 'bg-gray-100 text-gray-500',
+            }
+            const chainTasks = chainData?.chain ?? []
+
+            return (
+              <div className="space-y-4">
+                {/* Chain Timeline */}
+                {chainTasks.length === 0 ? (
+                  <div className="text-center py-6 text-tw-text-secondary text-sm">
+                    This task is not part of a chain yet.
+                    {isDirector && task.status === 'SUBMITTED' && (
+                      <div className="mt-2">
+                        <button onClick={openAssignNext} className="text-indigo-600 hover:underline font-medium text-sm">
+                          Approve &amp; Assign Next Task →
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div>
+                    <div className="text-xs font-bold text-tw-text-secondary uppercase tracking-wide mb-3">Chain Timeline</div>
+                    <div className="relative">
+                      {chainTasks.map((ct, idx) => (
+                        <div key={ct.id} className="flex items-start gap-3 mb-4 last:mb-0">
+                          {/* Step indicator */}
+                          <div className="flex flex-col items-center flex-shrink-0">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 ${ct.isCurrentTask ? 'border-indigo-500 bg-indigo-100 text-indigo-700' : 'border-gray-300 bg-white text-gray-500'}`}>
+                              {idx + 1}
+                            </div>
+                            {idx < chainTasks.length - 1 && <div className="w-0.5 h-6 bg-gray-200 mt-1" />}
+                          </div>
+                          {/* Task card */}
+                          <div className={`flex-1 rounded-xl p-3 border ${ct.isCurrentTask ? 'border-indigo-300 bg-indigo-50' : 'border-tw-border bg-white'}`}>
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <div className="text-sm font-semibold text-tw-text">{ct.title}</div>
+                                {ct.isCurrentTask && <span className="text-xs text-indigo-600 font-medium">← Current task</span>}
+                              </div>
+                              <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${STATUS_COLORS[ct.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                                {ct.status.replace('_', ' ')}
+                              </span>
+                            </div>
+                            {ct.assignments && ct.assignments.length > 0 && (
+                              <div className="text-xs text-tw-text-secondary mt-1">
+                                Assigned to: {ct.assignments.map(a => a.personnel?.name || a.department?.name || '—').join(', ')}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Previous Task History */}
+                {prevHistory?.parentTask && (() => {
+                  const pt = prevHistory.parentTask!
+                  const logs = prevHistory.progressLogs
+                  return (
+                    <div className="border-t border-tw-border pt-4">
+                      <div className="text-xs font-bold text-tw-text-secondary uppercase tracking-wide mb-2">Previous Task History</div>
+                      {prevHistory.handoverNote && (
+                        <div className="rounded-xl bg-indigo-50 border border-indigo-200 px-3 py-2 mb-3">
+                          <div className="text-xs font-semibold text-indigo-600 mb-0.5">Handover note from director</div>
+                          <p className="text-sm text-tw-text italic">"{prevHistory.handoverNote}"</p>
+                        </div>
+                      )}
+                      <div className="rounded-xl border border-tw-border bg-gray-50 px-3 py-2 mb-3">
+                        <div className="text-xs text-tw-text-secondary">Continued from: <span className="font-semibold text-tw-text">{pt.title}</span></div>
+                        <div className="text-xs text-tw-text-secondary mt-0.5">
+                          Status when handed over: <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${STATUS_COLORS[pt.status] ?? ''}`}>{pt.status.replace('_', ' ')}</span>
+                        </div>
+                      </div>
+                      {logs.length === 0 ? (
+                        <div className="text-sm text-tw-text-secondary text-center py-2">No progress logs from the previous task.</div>
+                      ) : (
+                        <div className="space-y-2">
+                          {logs.map((log, idx) => {
+                            const colors = ['bg-[#0073ea]', 'bg-[#9c27b0]', 'bg-[#00a693]', 'bg-[#ff7575]']
+                            return (
+                              <div key={log.id} className="rounded-xl border border-tw-border bg-white px-3 py-2.5">
+                                <div className="flex items-center justify-between mb-1">
+                                  <div className="flex items-center gap-1.5">
+                                    <div className={`w-5 h-5 rounded-full ${colors[idx % colors.length]} flex items-center justify-center text-white text-xs font-bold`}>
+                                      {(log.authorName || '?').charAt(0).toUpperCase()}
+                                    </div>
+                                    <span className="text-xs font-semibold text-tw-text">{log.authorName || log.authorType}</span>
+                                  </div>
+                                  <span className="text-xs text-tw-text-secondary">{new Date(log.logDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                                </div>
+                                <p className="text-sm text-tw-text pl-6.5 leading-relaxed">{log.note}</p>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })()}
+              </div>
+            )
+          })()}
 
           {/* HISTORY */}
           {tab === 'history' && (() => {
@@ -636,6 +849,126 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
                   Assign
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Assign Next Task Modal */}
+      {showAssignNextModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-start justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg my-4">
+            <div className="px-5 py-4 border-b border-tw-border">
+              <h3 className="font-bold text-tw-text text-base">Approve &amp; Assign Next Task</h3>
+              <p className="text-xs text-tw-text-secondary mt-0.5">
+                The current task will be automatically approved and the following tasks will be created and assigned.
+              </p>
+            </div>
+            <div className="px-5 py-4 space-y-4 max-h-[70vh] overflow-y-auto">
+              {/* Handover note */}
+              <div>
+                <label className="block text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">Handover Note <span className="text-tw-text-secondary font-normal">(optional)</span></label>
+                <textarea className="input resize-none text-sm" rows={2}
+                  placeholder="Context to pass to the next assignee(s)..."
+                  value={handoverNote} onChange={e => setHandoverNote(e.target.value)} />
+              </div>
+
+              {/* Allow previous assignee to view */}
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input type="checkbox" checked={allowPrevView} onChange={e => setAllowPrevView(e.target.checked)} className="rounded border-gray-300" />
+                <span className="text-sm text-tw-text">Allow previous assignee to view next task</span>
+              </label>
+
+              {/* Next tasks */}
+              <div className="space-y-4">
+                {nextTasks.map((nt, idx) => (
+                  <div key={idx} className="border border-tw-border rounded-xl p-4 space-y-3 relative">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-tw-text-secondary uppercase tracking-wide">Task {idx + 1}</span>
+                      {nextTasks.length > 1 && (
+                        <button onClick={() => setNextTasks(arr => arr.filter((_, i) => i !== idx))}
+                          className="text-xs text-tw-danger hover:underline">Remove</button>
+                      )}
+                    </div>
+                    <input className="input text-sm" placeholder="Task title *" value={nt.title}
+                      onChange={e => setNextTasks(arr => arr.map((t, i) => i === idx ? { ...t, title: e.target.value } : t))} />
+                    <textarea className="input resize-none text-sm" rows={2} placeholder="Description (optional)"
+                      value={nt.description}
+                      onChange={e => setNextTasks(arr => arr.map((t, i) => i === idx ? { ...t, description: e.target.value } : t))} />
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs text-tw-text-secondary mb-1">Priority</label>
+                        <Select value={nt.priority}
+                          onChange={val => setNextTasks(arr => arr.map((t, i) => i === idx ? { ...t, priority: val } : t))}
+                          options={[{ value: 'LOW', label: 'Low' }, { value: 'MEDIUM', label: 'Medium' }, { value: 'HIGH', label: 'High' }, { value: 'CRITICAL', label: 'Critical' }]} />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-tw-text-secondary mb-1">Deadline</label>
+                        <DatePicker value={nt.deadline}
+                          onChange={val => setNextTasks(arr => arr.map((t, i) => i === idx ? { ...t, deadline: val } : t))} />
+                      </div>
+                    </div>
+                    {/* Assign type toggle */}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setNextTasks(arr => arr.map((t, i) => i === idx ? { ...t, isGroupTask: false, groupId: '' } : t))}
+                        className={`flex-1 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${!nt.isGroupTask ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-tw-border text-tw-text-secondary hover:bg-tw-hover'}`}>
+                        👤 Individual(s)
+                      </button>
+                      <button
+                        onClick={() => setNextTasks(arr => arr.map((t, i) => i === idx ? { ...t, isGroupTask: true, personnelIds: [] } : t))}
+                        className={`flex-1 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${nt.isGroupTask ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-tw-border text-tw-text-secondary hover:bg-tw-hover'}`}>
+                        👥 Group
+                      </button>
+                    </div>
+                    {nt.isGroupTask ? (
+                      <Select value={nt.groupId} placeholder="Select group..."
+                        onChange={val => setNextTasks(arr => arr.map((t, i) => i === idx ? { ...t, groupId: val } : t))}
+                        options={allGroups.map(g => ({ value: g.id, label: g.name }))} />
+                    ) : (
+                      <div>
+                        <label className="block text-xs text-tw-text-secondary mb-1">Assign to (select one or more)</label>
+                        <div className="border border-tw-border rounded-lg max-h-36 overflow-y-auto divide-y divide-tw-border">
+                          {allPersonnel.map(p => (
+                            <label key={p.id} className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-tw-hover text-sm">
+                              <input type="checkbox"
+                                checked={nt.personnelIds.includes(p.id)}
+                                onChange={e => setNextTasks(arr => arr.map((t, i) => {
+                                  if (i !== idx) return t
+                                  const ids = e.target.checked ? [...t.personnelIds, p.id] : t.personnelIds.filter(id => id !== p.id)
+                                  return { ...t, personnelIds: ids }
+                                }))}
+                                className="rounded border-gray-300" />
+                              {p.name}
+                            </label>
+                          ))}
+                        </div>
+                        {nt.personnelIds.length > 0 && (
+                          <div className="text-xs text-indigo-600 mt-1">{nt.personnelIds.length} selected</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <button onClick={() => setNextTasks(arr => [...arr, emptyNextTask()])}
+                className="w-full py-2 border-2 border-dashed border-tw-border rounded-xl text-xs font-semibold text-tw-text-secondary hover:border-indigo-400 hover:text-indigo-600 transition-colors">
+                + Add Another Next Task
+              </button>
+
+              {assignNextError && (
+                <div className="text-xs text-tw-danger bg-red-50 border border-red-200 rounded-lg px-3 py-2">{assignNextError}</div>
+              )}
+            </div>
+            <div className="px-5 py-4 border-t border-tw-border flex gap-2 justify-end">
+              <button onClick={() => setShowAssignNextModal(false)} className="btn-secondary">Cancel</button>
+              <button
+                disabled={assignNextSaving}
+                onClick={handleAssignNext}
+                className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold disabled:opacity-50 transition-colors">
+                {assignNextSaving ? 'Processing…' : '⛓ Approve & Assign'}
+              </button>
             </div>
           </div>
         </div>

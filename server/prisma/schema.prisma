@@ -180,6 +180,27 @@ model TaskGroupProject {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// PROJECT CATEGORIES
+// ─────────────────────────────────────────────────────────────────────────────
+
+model ProjectCategory {
+  id          String    @id @default(uuid())
+  workspaceId String
+  name        String
+  description String?
+  color       String    @default("#0073ea")
+  status      String    @default("active") // active | archived
+  isSystem    Boolean   @default(false)    // true for "Uncategorized" — not selectable in UI
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  projects Project[]
+
+  @@index([workspaceId])
+  @@index([workspaceId, status])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // PROJECTS
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -189,6 +210,8 @@ model Project {
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   directorId  String
   director    Director  @relation(fields: [directorId], references: [id])
+  categoryId  String?
+  category    ProjectCategory? @relation(fields: [categoryId], references: [id])
   name        String
   description String?
   color       String    @default("#0073ea")
@@ -202,6 +225,7 @@ model Project {
 
   @@index([workspaceId])
   @@index([directorId])
+  @@index([categoryId])
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -276,12 +300,40 @@ model Task {
   progressLogs       TaskProgressLog[]
   deadlineExtensions DeadlineExtension[]
 
+  // Chain relations
+  chainAsParent TaskChain[] @relation("ChainParentTask")
+  chainAsChild  TaskChain[] @relation("ChainChildTask")
+
   @@index([workspaceId])
   @@index([projectId])
   @@index([parentTaskId])
   @@index([groupTaskId])
   @@index([status])
   @@index([deadline])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TASK CHAINS  (sequential task handover workflow)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model TaskChain {
+  id                      String   @id @default(uuid())
+  chainId                 String   // UUID shared across all steps in one chain
+  workspaceId             String
+  parentTaskId            String   // the approved task
+  parentTask              Task     @relation("ChainParentTask", fields: [parentTaskId], references: [id])
+  childTaskId             String   // the newly created next task
+  childTask               Task     @relation("ChainChildTask", fields: [childTaskId], references: [id])
+  chainStepNumber         Int      // 1-based step within this chain
+  createdByChairmanId     String   // Director.id who set up the handover
+  handoverNote            String?  // optional note from chairman to next assignee
+  allowPreviousAssigneeView Boolean @default(false) // can previous assignee see next task?
+  createdAt               DateTime @default(now())
+
+  @@index([chainId])
+  @@index([parentTaskId])
+  @@index([childTaskId])
+  @@index([workspaceId])
 }
 
 // Polymorphic assignment: exactly one of departmentId / personnelId is set

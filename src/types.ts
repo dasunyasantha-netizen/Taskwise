@@ -97,6 +97,21 @@ export interface TaskGroupProject {
   createdAt: string
 }
 
+// ─── Project Categories ──────────────────────────────────────────────────────
+
+export interface ProjectCategory {
+  id: string
+  workspaceId: string
+  name: string
+  description?: string
+  color: string
+  status: 'active' | 'archived'
+  isSystem: boolean
+  createdAt: string
+  updatedAt: string
+  projects?: Project[]
+}
+
 // ─── Projects ────────────────────────────────────────────────────────────────
 
 export interface Project {
@@ -106,6 +121,9 @@ export interface Project {
   description?: string
   color: string
   status: 'active' | 'archived'
+  categoryId?: string
+  category?: { id: string; name: string; color: string; status: string }
+  _count?: { tasks: number }
   deletedAt: string | null
   createdAt: string
 }

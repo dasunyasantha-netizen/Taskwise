@@ -5,7 +5,7 @@ import { sendPushToActor } from '../helpers/push'
 import type { AuthPayload } from '../middleware/authMiddleware'
 
 const TASK_INCLUDE = {
-  project: true,
+  project: { include: { category: { select: { id: true, name: true, color: true, status: true } } } },
   parent: { select: { id: true, title: true } },
   assignments: {
     include: {
@@ -1109,6 +1109,308 @@ export async function getDeadlineExtensions(req: Request, res: Response): Promis
       orderBy: { createdAt: 'asc' },
     })
     res.json(extensions)
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
+}
+
+// POST /api/tasks/:id/assign-next
+// Chairman approves the current task and hands it off to one or more new tasks in one atomic transaction.
+export async function assignNextTasks(req: Request, res: Response): Promise<void> {
+  try {
+    const { actorId, actorType, workspaceId } = req.user!
+    if (actorType !== 'director') { res.status(403).json({ error: 'Only directors can use chained handover' }); return }
+
+    const { nextTasks, handoverNote, allowPreviousAssigneeView = false } = req.body as {
+      nextTasks: Array<{
+        title: string
+        description?: string
+        projectId?: string
+        priority?: string
+        deadline?: string
+        personnelIds?: string[]       // individual assignees
+        groupId?: string              // assign to an entire group
+        isGroupTask?: boolean
+      }>
+      handoverNote?: string
+      allowPreviousAssigneeView?: boolean
+    }
+
+    if (!Array.isArray(nextTasks) || nextTasks.length === 0) {
+      res.status(400).json({ error: 'nextTasks array is required and must have at least one task' }); return
+    }
+
+    const task = await prisma.task.findFirst({ where: { id: req.params.id, workspaceId, deletedAt: null } })
+    if (!task) { res.status(404).json({ error: 'Task not found' }); return }
+    if (task.status !== 'SUBMITTED') { res.status(400).json({ error: 'Task must be SUBMITTED to hand over' }); return }
+
+    // Determine chainId: inherit if this task is already in a chain, else start a new one
+    const existingChainLink = await prisma.taskChain.findFirst({ where: { childTaskId: task.id } })
+    const chainId = existingChainLink?.chainId ?? crypto.randomUUID()
+    const chainStepNumber = existingChainLink ? existingChainLink.chainStepNumber + 1 : 1
+
+    // Validate all next task inputs
+    for (const nt of nextTasks) {
+      if (!nt.title?.trim()) { res.status(400).json({ error: 'Each next task must have a title' }); return }
+      const projectId = nt.projectId ?? task.projectId
+      const proj = await prisma.project.findFirst({ where: { id: projectId, workspaceId } })
+      if (!proj) { res.status(400).json({ error: `Project not found: ${projectId}` }); return }
+    }
+
+    // Collect all assignee IDs to notify later
+    const createdTaskIds: string[] = []
+
+    await prisma.$transaction(async tx => {
+      // 1. Approve the current task
+      await tx.task.update({ where: { id: task.id }, data: { status: 'APPROVED' } })
+      await writeAudit(tx, workspaceId, 'TASK_AUTO_APPROVED_HANDOVER', 'director', actorId, task.id, {
+        handoverNote,
+        nextTaskCount: nextTasks.length,
+      }, req.user!)
+
+      // If this is a group task instance, check if all siblings are now approved
+      if (task.groupTaskId) {
+        const siblings = await tx.task.findMany({
+          where: { groupTaskId: task.groupTaskId, deletedAt: null },
+          select: { id: true, status: true },
+        })
+        const allApproved = siblings.every(s => s.id === task.id || s.status === 'APPROVED')
+        if (allApproved) {
+          await tx.task.update({
+            where: { id: task.groupTaskId },
+            data: { status: 'APPROVED', approvalById: actorId, approvalByType: 'director' },
+          })
+        }
+      }
+
+      // 2. Create each next task + TaskChain record
+      for (const nt of nextTasks) {
+        const projectId = nt.projectId ?? task.projectId
+
+        const newTask = await tx.task.create({
+          data: {
+            workspaceId,
+            projectId,
+            title: nt.title.trim(),
+            description: nt.description?.trim() ?? null,
+            priority: nt.priority ?? 'MEDIUM',
+            deadline: nt.deadline ? new Date(nt.deadline) : null,
+            originalDeadline: nt.deadline ? new Date(nt.deadline) : null,
+            deadlineSetById: nt.deadline ? actorId : undefined,
+            deadlineSetByType: nt.deadline ? 'director' : undefined,
+            createdByDirectorId: actorId,
+            approvalById: actorId,
+            approvalByType: 'director',
+            status: 'PENDING',
+          }
+        })
+        createdTaskIds.push(newTask.id)
+
+        // Create TaskChain link
+        await tx.taskChain.create({
+          data: {
+            chainId,
+            workspaceId,
+            parentTaskId: task.id,
+            childTaskId: newTask.id,
+            chainStepNumber,
+            createdByChairmanId: actorId,
+            handoverNote: handoverNote?.trim() ?? null,
+            allowPreviousAssigneeView,
+          }
+        })
+
+        await writeAudit(tx, workspaceId, 'TASK_CREATED', 'director', actorId, newTask.id, {
+          title: newTask.title,
+          chainedFrom: task.id,
+          chainStepNumber,
+        }, req.user!)
+
+        // Assign to personnel or group
+        if (nt.isGroupTask && nt.groupId) {
+          // Group task: create per-member child instances
+          const members = await tx.taskGroupMember.findMany({
+            where: { groupId: nt.groupId },
+            include: { personnel: { select: { id: true, name: true } } },
+          })
+
+          for (const member of members) {
+            const memberTask = await tx.task.create({
+              data: {
+                workspaceId,
+                projectId,
+                title: nt.title.trim(),
+                description: nt.description?.trim() ?? null,
+                priority: nt.priority ?? 'MEDIUM',
+                deadline: nt.deadline ? new Date(nt.deadline) : null,
+                originalDeadline: nt.deadline ? new Date(nt.deadline) : null,
+                createdByDirectorId: actorId,
+                approvalById: actorId,
+                approvalByType: 'director',
+                status: 'ASSIGNED',
+                groupTaskId: newTask.id,
+              }
+            })
+            await tx.taskAssignment.create({ data: { taskId: memberTask.id, personnelId: member.personnelId } })
+            await notifyActor(tx, workspaceId, 'personnel', member.personnelId, 'task_assigned',
+              'New chained task assigned',
+              `"${newTask.title}" has been assigned to you as a continuation of a completed task.`,
+              memberTask.id
+            )
+          }
+          // Set parent group task to ASSIGNED
+          await tx.task.update({ where: { id: newTask.id }, data: { status: 'ASSIGNED' } })
+        } else if (nt.personnelIds && nt.personnelIds.length > 0) {
+          // Individual assignees
+          for (const pid of nt.personnelIds) {
+            await tx.taskAssignment.create({ data: { taskId: newTask.id, personnelId: pid } })
+            await notifyActor(tx, workspaceId, 'personnel', pid, 'task_assigned',
+              'New chained task assigned',
+              `"${newTask.title}" has been assigned to you as a continuation of a completed task${handoverNote ? ': ' + handoverNote : ''}.`,
+              newTask.id
+            )
+          }
+          await tx.task.update({ where: { id: newTask.id }, data: { status: 'ASSIGNED' } })
+        }
+
+        await writeAudit(tx, workspaceId, 'TASK_CHAIN_HANDOVER', 'director', actorId, newTask.id, {
+          parentTaskId: task.id,
+          chainId,
+          chainStepNumber,
+          handoverNote,
+        }, req.user!)
+      }
+    })
+
+    res.status(201).json({ success: true, chainId, createdTaskIds })
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
+}
+
+// GET /api/tasks/:id/chain
+// Returns the full chain this task belongs to (all steps, in order)
+export async function getTaskChain(req: Request, res: Response): Promise<void> {
+  try {
+    const { workspaceId } = req.user!
+    const taskId = req.params.id
+
+    // Find which chain this task is in (as parent or child)
+    const chainLink = await prisma.taskChain.findFirst({
+      where: { OR: [{ parentTaskId: taskId }, { childTaskId: taskId }], workspaceId }
+    })
+    if (!chainLink) { res.json({ chain: [], chainId: null }); return }
+
+    const { chainId } = chainLink
+
+    // Get all links in the chain
+    const links = await prisma.taskChain.findMany({
+      where: { chainId, workspaceId },
+      orderBy: { chainStepNumber: 'asc' },
+      include: {
+        parentTask: {
+          include: {
+            assignments: {
+              include: {
+                personnel: { select: { id: true, name: true, avatarUrl: true } },
+                department: { select: { id: true, name: true } },
+              }
+            }
+          }
+        },
+        childTask: {
+          include: {
+            assignments: {
+              include: {
+                personnel: { select: { id: true, name: true, avatarUrl: true } },
+                department: { select: { id: true, name: true } },
+              }
+            }
+          }
+        },
+      }
+    })
+
+    // Build ordered list of unique tasks in the chain
+    const seen = new Set<string>()
+    const orderedTasks: unknown[] = []
+    for (const link of links) {
+      if (!seen.has(link.parentTaskId)) {
+        seen.add(link.parentTaskId)
+        orderedTasks.push({ ...link.parentTask, chainStepNumber: link.chainStepNumber, isCurrentTask: link.parentTaskId === taskId })
+      }
+      if (!seen.has(link.childTaskId)) {
+        seen.add(link.childTaskId)
+        orderedTasks.push({ ...link.childTask, chainStepNumber: link.chainStepNumber + 1, isCurrentTask: link.childTaskId === taskId })
+      }
+    }
+
+    res.json({ chainId, chain: orderedTasks, links })
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
+}
+
+// GET /api/tasks/:id/previous-history
+// Returns progress logs + history of the parent task in the chain, for read-only display
+export async function getPreviousHistory(req: Request, res: Response): Promise<void> {
+  try {
+    const { actorId, actorType, workspaceId } = req.user!
+    const taskId = req.params.id
+
+    // Find the chain link where this task is the child
+    const chainLink = await prisma.taskChain.findFirst({
+      where: { childTaskId: taskId, workspaceId },
+    })
+    if (!chainLink) { res.json({ progressLogs: [], history: [], parentTask: null }); return }
+
+    // If allowPreviousAssigneeView is false and the caller is not a director, check if they're assigned to the parent
+    if (!chainLink.allowPreviousAssigneeView && actorType !== 'director') {
+      // Personnel can only see it if they're assigned to the current task
+      const assignment = await prisma.taskAssignment.findFirst({
+        where: { taskId, personnelId: actorId }
+      })
+      if (!assignment) { res.status(403).json({ error: 'Access denied' }); return }
+    }
+
+    const parentTaskId = chainLink.parentTaskId
+
+    const [parentTask, progressLogs, history] = await Promise.all([
+      prisma.task.findUnique({
+        where: { id: parentTaskId },
+        include: {
+          assignments: {
+            include: {
+              personnel: { select: { id: true, name: true } },
+              department: { select: { id: true, name: true } },
+            }
+          }
+        }
+      }),
+      prisma.taskProgressLog.findMany({
+        where: { taskId: parentTaskId, workspaceId },
+        include: {
+          authorPersonnel: { select: { id: true, name: true } },
+          authorDirector:  { select: { id: true, name: true } },
+        },
+        orderBy: { logDate: 'asc' }
+      }),
+      prisma.auditLog.findMany({
+        where: { taskId: parentTaskId, workspaceId },
+        include: {
+          actorDirector:  { select: { id: true, name: true } },
+          actorPersonnel: { select: { id: true, name: true } },
+        },
+        orderBy: { createdAt: 'asc' }
+      })
+    ])
+
+    const enrichedLogs = progressLogs.map(l => ({
+      ...l,
+      authorName: l.authorPersonnel?.name || l.authorDirector?.name || l.authorType,
+    }))
+
+    res.json({
+      parentTask,
+      progressLogs: enrichedLogs,
+      history,
+      handoverNote: chainLink.handoverNote,
+      chainStepNumber: chainLink.chainStepNumber,
+    })
   } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
 }
 

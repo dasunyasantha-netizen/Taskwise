@@ -115,6 +115,16 @@ export const taskApi = {
   extendDeadline:    (id: string, data: { newDeadline: string; reason: string; note?: string }) =>
     api.post(`/tasks/${id}/extend-deadline`, data),
   deadlineExtensions:(id: string)      => api.get(`/tasks/${id}/deadline-extensions`),
+  assignNext: (id: string, data: {
+    nextTasks: Array<{
+      title: string; description?: string; projectId?: string; priority?: string;
+      deadline?: string; personnelIds?: string[]; groupId?: string; isGroupTask?: boolean
+    }>
+    handoverNote?: string
+    allowPreviousAssigneeView?: boolean
+  }) => api.post(`/tasks/${id}/assign-next`, data),
+  getChain:         (id: string)      => api.get(`/tasks/${id}/chain`),
+  previousHistory:  (id: string)      => api.get(`/tasks/${id}/previous-history`),
 }
 
 // ─── Notifications ───────────────────────────────────────────────────────────
@@ -145,6 +155,16 @@ export interface Notice {
   createdAt: string
   expiresAt: string | null
   _count?: { dismissals: number }
+}
+
+// ─── Project Categories ──────────────────────────────────────────────────────
+export const projectCategoryApi = {
+  list:   () => api.get('/project-categories'),
+  create: (data: { name: string; description?: string; color?: string }) =>
+    api.post('/project-categories', data),
+  update: (id: string, data: { name?: string; description?: string; color?: string; status?: string }) =>
+    api.put(`/project-categories/${id}`, data),
+  delete: (id: string) => api.delete(`/project-categories/${id}`),
 }
 
 // ─── Task Groups ─────────────────────────────────────────────────────────────

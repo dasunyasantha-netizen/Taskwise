@@ -5,6 +5,7 @@ import {
   assignTask, acceptTask, reassignTask, startTask, submitTask,
   returnTask, approveTask, rejectTask, reopenTask, cancelTask,
   changeAssignees,
+  assignNextTasks, getTaskChain, getPreviousHistory,
   getSubtasks, getComments, addComment, getTaskHistory,
   getProgressLogs, addProgressLog,
   extendDeadline, getDeadlineExtensions,
@@ -39,5 +40,8 @@ router.get('/:id/progress-logs',        getProgressLogs)
 router.post('/:id/progress-logs',       addProgressLog)
 router.post('/:id/extend-deadline',     extendDeadline)
 router.get('/:id/deadline-extensions',  getDeadlineExtensions)
+router.post('/:id/assign-next',         assignNextTasks)
+router.get('/:id/chain',                getTaskChain)
+router.get('/:id/previous-history',     getPreviousHistory)
 
 export default router
