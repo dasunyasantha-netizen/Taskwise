@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import type { AuthUser, ViewMode } from './types'
+import { VersionBanner } from './components/VersionBanner'
 import Auth from './components/Auth'
 import ForcePasswordChange from './components/ForcePasswordChange'
 import DirectorDashboard from './components/DirectorDashboard'
@@ -245,6 +246,7 @@ export default function App() {
           onUserUpdate={handleUserUpdate}
         />
       </div>
+      <VersionBanner />
     </>
   )
 }
