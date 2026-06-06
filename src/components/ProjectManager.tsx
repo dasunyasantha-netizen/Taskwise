@@ -342,54 +342,57 @@ function CategorySection({
   category, projects, onSelectProject, onEditProject, onArchiveProject,
   onEditCategory, onArchiveCategory, onUnarchiveCategory, isDirector, actorId,
 }: CategorySectionProps) {
-  const [collapsed, setCollapsed] = useState(false)
+  const [expanded, setExpanded] = useState(false)
   const activeProjects = projects.filter(p => p.status === 'active')
   const archivedProjects = projects.filter(p => p.status === 'archived')
+  const totalProjects = activeProjects.length + archivedProjects.length
   const isArchived = category.status === 'archived'
-  // Creator or (if no creator recorded) any director can edit
   const canEditCategory = isDirector && !category.isSystem && (!category.directorId || category.directorId === actorId)
 
   return (
-    <div className={`mb-8 ${isArchived ? 'opacity-70' : ''}`}>
-      <div className="flex items-center justify-between mb-3 group">
-        <button
-          className="flex items-center gap-2 text-left hover:opacity-80 transition-opacity"
-          onClick={() => setCollapsed(c => !c)}
-        >
+    <div className={`mb-3 rounded-xl border border-tw-border bg-white shadow-sm overflow-hidden ${isArchived ? 'opacity-70' : ''}`}>
+      {/* Card header — always visible, click to expand */}
+      <div className="group flex items-center justify-between px-4 py-3 cursor-pointer select-none hover:bg-tw-hover transition-colors"
+        onClick={() => setExpanded(e => !e)}>
+        <div className="flex items-center gap-3 min-w-0">
           <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: category.color }} />
-          <h2 className="text-base font-bold text-tw-text">{category.name}</h2>
+          <span className="font-semibold text-tw-text text-sm">{category.name}</span>
           {isArchived && (
-            <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">Archived</span>
+            <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 flex-shrink-0">Archived</span>
           )}
-          <span className="text-sm text-tw-text-secondary font-normal">
-            ({activeProjects.length} project{activeProjects.length !== 1 ? 's' : ''})
+          <span className="text-xs text-tw-text-secondary font-normal flex-shrink-0">
+            {totalProjects} project{totalProjects !== 1 ? 's' : ''}
           </span>
-          <svg className={`w-4 h-4 text-tw-text-secondary transition-transform ${collapsed ? '-rotate-90' : ''}`}
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+          {canEditCategory && (
+            <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-all"
+              onClick={e => e.stopPropagation()}>
+              <button onClick={() => onEditCategory(category)}
+                className="text-xs font-medium px-2.5 py-1 rounded-md bg-tw-primary/10 text-tw-primary hover:bg-tw-primary hover:text-white transition-colors">Edit</button>
+              {isArchived
+                ? <button onClick={() => onUnarchiveCategory(category)}
+                    className="text-xs font-medium px-2.5 py-1 rounded-md bg-gray-100 text-tw-text-secondary hover:bg-tw-primary hover:text-white transition-colors">Unarchive</button>
+                : <button onClick={() => onArchiveCategory(category)}
+                    className="text-xs font-medium px-2.5 py-1 rounded-md bg-gray-100 text-tw-text-secondary hover:bg-tw-danger hover:text-white transition-colors">Archive</button>
+              }
+            </div>
+          )}
+          <svg className={`w-4 h-4 text-tw-text-secondary transition-transform flex-shrink-0 ${expanded ? '' : '-rotate-90'}`}
             fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
           </svg>
-        </button>
-        {canEditCategory && (
-          <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all">
-            <button onClick={() => onEditCategory(category)}
-              className="text-xs text-tw-primary hover:underline">Edit</button>
-            {isArchived
-              ? <button onClick={() => onUnarchiveCategory(category)}
-                  className="text-xs text-tw-text-secondary hover:text-tw-primary transition-colors">Unarchive</button>
-              : <button onClick={() => onArchiveCategory(category)}
-                  className="text-xs text-tw-text-secondary hover:text-tw-danger transition-colors">Archive</button>
-            }
-          </div>
-        )}
+        </div>
       </div>
 
-      {!collapsed && (
-        <>
-          {activeProjects.length === 0 && archivedProjects.length === 0 ? (
-            <p className="text-sm text-tw-text-secondary pl-5">No projects in this category.</p>
+      {/* Card body — projects */}
+      {expanded && (
+        <div className="px-4 pb-4 pt-1 border-t border-tw-border/60">
+          {totalProjects === 0 ? (
+            <p className="text-sm text-tw-text-secondary py-3">No projects in this category.</p>
           ) : (
             <>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-3">
                 {activeProjects.map(p => (
                   <ProjectCard key={p.id} project={p} onSelect={onSelectProject}
                     onEdit={onEditProject} onArchive={onArchiveProject}
@@ -398,7 +401,7 @@ function CategorySection({
               </div>
               {archivedProjects.length > 0 && (
                 <div className="mt-4">
-                  <h4 className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-2 pl-1">Archived</h4>
+                  <h4 className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-2">Archived</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {archivedProjects.map(p => (
                       <div key={p.id} className="card p-4 opacity-60">
@@ -413,7 +416,7 @@ function CategorySection({
               )}
             </>
           )}
-        </>
+        </div>
       )}
     </div>
   )
@@ -639,6 +642,7 @@ export default function ProjectManager({ onSelectProject, onSelectTask, filters,
       ) : (
         <>
           {/* Active categories */}
+          <div className="space-y-3">
           {activeCategories.map(cat => (
             <CategorySection key={cat.id}
               category={cat}
@@ -653,6 +657,7 @@ export default function ProjectManager({ onSelectProject, onSelectTask, filters,
               actorId={actorId}
             />
           ))}
+          </div>
 
           {/* Archived categories — collapsed under a disclosure */}
           {archivedCategories.length > 0 && (
@@ -671,18 +676,20 @@ export default function ProjectManager({ onSelectProject, onSelectTask, filters,
 
           {/* Uncategorized (system) */}
           {uncategorized && (uncategorized.projects ?? []).length > 0 && (
-            <CategorySection key={uncategorized.id}
-              category={uncategorized}
-              projects={uncategorized.projects ?? []}
-              onSelectProject={onSelectProject}
-              onEditProject={openEditProject}
-              onArchiveProject={handleArchiveProject}
-              onEditCategory={() => {}}
-              onArchiveCategory={() => {}}
-              onUnarchiveCategory={() => {}}
-              isDirector={isDirector}
-              actorId={actorId}
-            />
+            <div className="mt-3">
+              <CategorySection key={uncategorized.id}
+                category={uncategorized}
+                projects={uncategorized.projects ?? []}
+                onSelectProject={onSelectProject}
+                onEditProject={openEditProject}
+                onArchiveProject={handleArchiveProject}
+                onEditCategory={() => {}}
+                onArchiveCategory={() => {}}
+                onUnarchiveCategory={() => {}}
+                isDirector={isDirector}
+                actorId={actorId}
+              />
+            </div>
           )}
         </>
       )}
@@ -734,30 +741,34 @@ function ArchivedCategoriesGroup({
 }) {
   const [open, setOpen] = useState(false)
   return (
-    <div className="mb-8">
+    <div className="mt-6">
       <button
-        className="flex items-center gap-2 text-sm font-semibold text-tw-text-secondary hover:text-tw-text transition-colors mb-3"
+        className="flex items-center gap-2 text-xs font-semibold text-tw-text-secondary uppercase tracking-wide hover:text-tw-text transition-colors mb-3"
         onClick={() => setOpen(o => !o)}
       >
-        <svg className={`w-4 h-4 transition-transform ${open ? '' : '-rotate-90'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className={`w-3.5 h-3.5 transition-transform ${open ? '' : '-rotate-90'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
         Archived Categories ({categories.length})
       </button>
-      {open && categories.map(cat => (
-        <CategorySection key={cat.id}
-          category={cat}
-          projects={cat.projects ?? []}
-          onSelectProject={onSelectProject}
-          onEditProject={onEditProject}
-          onArchiveProject={onArchiveProject}
-          onEditCategory={onEditCategory}
-          onArchiveCategory={onArchiveCategory}
-          onUnarchiveCategory={onUnarchiveCategory}
-          isDirector={isDirector}
-          actorId={actorId}
-        />
-      ))}
+      {open && (
+        <div className="space-y-3">
+          {categories.map(cat => (
+            <CategorySection key={cat.id}
+              category={cat}
+              projects={cat.projects ?? []}
+              onSelectProject={onSelectProject}
+              onEditProject={onEditProject}
+              onArchiveProject={onArchiveProject}
+              onEditCategory={onEditCategory}
+              onArchiveCategory={onArchiveCategory}
+              onUnarchiveCategory={onUnarchiveCategory}
+              isDirector={isDirector}
+              actorId={actorId}
+            />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
