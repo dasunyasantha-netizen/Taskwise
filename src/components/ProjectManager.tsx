@@ -590,14 +590,14 @@ export default function ProjectManager({ onSelectProject, onSelectTask, filters,
                     </span>
                   </div>
                   {canEditCat && (
-                    <div className="flex items-center gap-2 flex-shrink-0 ml-4">
+                    <div className="flex items-center gap-1.5 flex-shrink-0 ml-4">
                       <button onClick={() => { setEditingCategory(cat); setShowCategoryModal(true) }}
-                        className="text-xs text-tw-primary hover:underline">Edit</button>
+                        className="text-xs font-medium px-2.5 py-1 rounded-md bg-tw-primary/10 text-tw-primary hover:bg-tw-primary hover:text-white transition-colors">Edit</button>
                       {cat.status === 'archived'
                         ? <button onClick={() => handleUnarchiveCategory(cat)}
-                            className="text-xs text-tw-text-secondary hover:text-tw-primary transition-colors">Unarchive</button>
+                            className="text-xs font-medium px-2.5 py-1 rounded-md bg-gray-100 text-tw-text-secondary hover:bg-tw-primary hover:text-white transition-colors">Unarchive</button>
                         : <button onClick={() => handleArchiveCategory(cat)}
-                            className="text-xs text-tw-text-secondary hover:text-tw-danger transition-colors">Archive</button>
+                            className="text-xs font-medium px-2.5 py-1 rounded-md bg-gray-100 text-tw-text-secondary hover:bg-tw-danger hover:text-white transition-colors">Archive</button>
                       }
                     </div>
                   )}
