@@ -281,13 +281,13 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
   const canEdit    = isDirector && !['APPROVED', 'CANCELLED'].includes(task.status)
   const canSubmit  = !isDirector && task.status === 'IN_PROGRESS'
   const canReturn  = ['IN_PROGRESS', 'SUBMITTED'].includes(task.status)
-  const canApprove = task.status === 'SUBMITTED' && task.approvalById === actorId
-  const canReject  = task.status === 'SUBMITTED' && task.approvalById === actorId
+  const canApprove = task.status === 'SUBMITTED' && (isDirector || task.approvalById === actorId)
+  const canReject  = task.status === 'SUBMITTED' && (isDirector || task.approvalById === actorId)
   const canReopen  = task.status === 'REJECTED'
   const canCancel   = isDirector && !['APPROVED', 'CANCELLED'].includes(task.status)
   const canAssign   = isDirector && ['PENDING', 'RETURNED'].includes(task.status)
   const canSubtask  = ['IN_PROGRESS', 'ASSIGNED'].includes(task.status)
-  const canHandOver = isDirector && task.status === 'SUBMITTED' && task.approvalById === actorId
+  const canHandOver = isDirector && task.status === 'SUBMITTED'
 
   return (
     <div className="fixed inset-0 z-40 flex justify-end">
