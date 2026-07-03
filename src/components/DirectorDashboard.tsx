@@ -623,6 +623,102 @@ function ApprovalQueueView({ tasks, actorId, onRefresh, onViewTask }: { tasks: T
   )
 }
 
+// ─── Deadline & Verification Report ──────────────────────────────────────────
+
+type DeadlineTone = 'danger' | 'warning' | 'info'
+
+const deadlineToneStyles: Record<DeadlineTone, { bar: string; badge: string; dot: string; text: string }> = {
+  danger:  { bar: 'bg-red-500',     badge: 'badge-danger',  dot: 'bg-red-500',     text: 'text-tw-danger' },
+  warning: { bar: 'bg-orange-400',  badge: 'badge-warning', dot: 'bg-orange-400',  text: 'text-orange-600' },
+  info:    { bar: 'bg-emerald-500', badge: 'badge-success', dot: 'bg-emerald-500', text: 'text-emerald-600' },
+}
+
+function DeadlineReportCard({
+  title, indicator, tone, tasks, showSubmitted, emptyText, onSelectTask,
+}: {
+  title: string
+  indicator: string
+  tone: DeadlineTone
+  tasks: Task[]
+  showSubmitted?: boolean
+  emptyText: string
+  onSelectTask: (t: Task) => void
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const s = deadlineToneStyles[tone]
+  const headers = showSubmitted
+    ? ['Task', 'Project', 'Deadline', 'Submitted', 'Assigned To', 'Status']
+    : ['Task', 'Project', 'Deadline', 'Assigned To', 'Status']
+  return (
+    <div className="card overflow-hidden">
+      <button onClick={() => setExpanded(e => !e)}
+        className="w-full flex items-center gap-3 px-4 md:px-5 py-4 text-left hover:bg-tw-hover transition-colors">
+        <div className={`w-1 h-10 rounded-full flex-shrink-0 ${s.bar}`} />
+        <div className="flex-1 min-w-0">
+          <div className="font-semibold text-tw-text text-sm md:text-base">{title}</div>
+          <div className={`flex items-center gap-1.5 mt-0.5 text-xs font-medium ${s.text}`}>
+            <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${s.dot}`} />
+            {indicator}
+          </div>
+        </div>
+        <span className={`badge ${s.badge} flex-shrink-0`}>{tasks.length}</span>
+        <svg className={`w-4 h-4 text-tw-text-secondary flex-shrink-0 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
+          fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {expanded && (
+        <div className="border-t border-tw-border">
+          {tasks.length === 0 ? (
+            <div className="p-8 text-center text-tw-text-secondary text-sm">{emptyText}</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-[#f0f4ff] border-b-2 border-tw-primary/20">
+                    {headers.map(h => (
+                      <th key={h} className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider whitespace-nowrap">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-tw-border">
+                  {tasks.map(t => (
+                    <tr key={t.id} onClick={() => onSelectTask(t)} className="hover:bg-tw-hover cursor-pointer">
+                      <td className="px-4 py-3 font-medium text-tw-text">{t.title}</td>
+                      <td className="px-4 py-3 text-tw-text-secondary">{t.project?.name || '—'}</td>
+                      <td className={`px-4 py-3 font-medium whitespace-nowrap ${tone === 'danger' ? 'text-tw-danger' : 'text-tw-text-secondary'}`}>
+                        {t.deadline ? new Date(t.deadline).toLocaleDateString() : '—'}
+                      </td>
+                      {showSubmitted && (
+                        <td className={`px-4 py-3 font-medium whitespace-nowrap ${s.text}`}>
+                          {new Date(t.updatedAt).toLocaleDateString()}
+                        </td>
+                      )}
+                      <td className="px-4 py-3 text-tw-text-secondary">
+                        {t.assignments?.[0] ? (t.assignments[0].personnel?.name || t.assignments[0].department?.name || '—') : '—'}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`badge ${subtaskStatusBadge[t.status] || 'badge-gray'}`}>{t.status.replace('_', ' ')}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// A task submitted on the deadline day itself counts as within deadline (day granularity).
+const submittedAfterDeadline = (t: Task) =>
+  !!t.deadline && new Date(t.updatedAt).getTime() > new Date(t.deadline).setHours(23, 59, 59, 999)
+
+const byDeadlineAsc = (a: Task, b: Task) =>
+  new Date(a.deadline ?? 8640000000000000).getTime() - new Date(b.deadline ?? 8640000000000000).getTime()
+
 // ─── Mobile User Menu ────────────────────────────────────────────────────────
 function MobileUserMenu({ user, onProfile, onSettings, onLogout }: { user: AuthUser; onProfile: () => void; onSettings: () => void; onLogout: () => void }) {
   const [open, setOpen] = useState(false)
@@ -753,7 +849,9 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
         .filter(t => activeStatuses.includes(t.status) && t.assignments?.length > 0 && t.assignments[0].assignedAt)
         .sort((a, b) => new Date(a.assignments[0].assignedAt).getTime() - new Date(b.assignments[0].assignedAt).getTime())
         .slice(0, 10)
-      setStats({ projects: projects.length, totalTasks: allTasks.length, overdue: overdue.length, pending_approval: submitted.length })
+      // Submitted-late tasks are shown under "Needs Verification" in the deadline report, not as overdue
+      const trueOverdueCount = overdue.filter(t => t.status !== 'SUBMITTED').length
+      setStats({ projects: projects.length, totalTasks: allTasks.length, overdue: trueOverdueCount, pending_approval: submitted.length })
       setRecentTasks(allTasks.slice(0, 5))
       setOverdueTasks(overdue)
       setApprovalQueue(submitted)
@@ -924,7 +1022,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
                 {currentView === 'project_board' && selectedProject ? selectedProject.name
                   : currentView === 'director_dashboard' ? 'Dashboard'
                   : currentView === 'approval_queue' ? 'Approvals'
-                  : currentView === 'overdue' ? 'Overdue'
+                  : currentView === 'overdue' ? 'Deadline & Verification'
                   : currentView === 'hierarchy_manager' ? 'Team Hierarchy'
                   : currentView === 'audit_log' ? 'Audit Log'
                   : currentView === 'broadcasts' ? 'Broadcasts'
@@ -1102,38 +1200,48 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
             />
           )}
 
-          {/* OVERDUE */}
-          {currentView === 'overdue' && (
-            <div className="p-6">
-              <h1 className="text-2xl font-bold text-tw-text mb-6">Overdue Tasks</h1>
-              <div className="card overflow-hidden">
-                {overdueList.length === 0 ? (
-                  <div className="p-12 text-center text-tw-text-secondary text-sm">No overdue tasks. Great work!</div>
-                ) : (
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="bg-[#f0f4ff] border-b-2 border-tw-primary/20">
-                        {['Task', 'Project', 'Deadline', 'Assigned To', 'Status'].map(h => (
-                          <th key={h} className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider">{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-tw-border">
-                      {overdueList.map(t => (
-                        <tr key={t.id} onClick={() => setSelectedTask(t)} className="hover:bg-tw-hover cursor-pointer">
-                          <td className="px-4 py-3 font-medium text-tw-text">{t.title}</td>
-                          <td className="px-4 py-3 text-tw-text-secondary">{t.project?.name}</td>
-                          <td className="px-4 py-3 text-tw-danger font-medium">{t.deadline ? new Date(t.deadline).toLocaleDateString() : '—'}</td>
-                          <td className="px-4 py-3 text-tw-text-secondary">{t.assignments?.[0] ? (t.assignments[0].personnel?.name || t.assignments[0].department?.name || '—') : '—'}</td>
-                          <td className="px-4 py-3"><span className="badge badge-danger">{t.status.replace('_', ' ')}</span></td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
+          {/* OVERDUE / DEADLINE & VERIFICATION REPORT */}
+          {currentView === 'overdue' && (() => {
+            const trueOverdue     = overdueList.filter(t => t.status !== 'SUBMITTED').sort(byDeadlineAsc)
+            const submittedLate   = approvalQueue.filter(t => submittedAfterDeadline(t)).sort(byDeadlineAsc)
+            const submittedOnTime = approvalQueue.filter(t => !submittedAfterDeadline(t)).sort(byDeadlineAsc)
+            return (
+              <div className="p-4 md:p-6">
+                <h1 className="text-xl md:text-2xl font-bold text-tw-text mb-1">Task Deadline &amp; Verification Report</h1>
+                <p className="text-sm text-tw-text-secondary mb-4 md:mb-6">
+                  Overdue work and submissions awaiting verification, grouped by deadline outcome.
+                </p>
+                <div className="space-y-3 md:space-y-4">
+                  <DeadlineReportCard
+                    title="Task Overdue"
+                    indicator="Deadline passed — action required"
+                    tone="danger"
+                    tasks={trueOverdue}
+                    emptyText="No overdue tasks. Great work!"
+                    onSelectTask={setSelectedTask}
+                  />
+                  <DeadlineReportCard
+                    title="Task Submitted After Deadline — Needs Verification"
+                    indicator="Submitted late — awaiting review"
+                    tone="warning"
+                    tasks={submittedLate}
+                    showSubmitted
+                    emptyText="No late submissions awaiting verification."
+                    onSelectTask={setSelectedTask}
+                  />
+                  <DeadlineReportCard
+                    title="Task Submitted Within Deadline — Needs Verification"
+                    indicator="On time — awaiting review"
+                    tone="info"
+                    tasks={submittedOnTime}
+                    showSubmitted
+                    emptyText="No on-time submissions awaiting verification."
+                    onSelectTask={setSelectedTask}
+                  />
+                </div>
               </div>
-            </div>
-          )}
+            )
+          })()}
 
           {/* RECENT UPDATES */}
           {currentView === 'recent_updates' && <RecentUpdatesView />}
