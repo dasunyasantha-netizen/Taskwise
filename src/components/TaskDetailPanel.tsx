@@ -280,7 +280,7 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
   const canExtend  = isCreator && isOverdue
   const canEdit    = isDirector && !['APPROVED', 'CANCELLED'].includes(task.status)
   const canSubmit  = !isDirector && task.status === 'IN_PROGRESS'
-  const canReturn  = ['IN_PROGRESS', 'SUBMITTED'].includes(task.status)
+  const canReturn  = task.status === 'IN_PROGRESS'
   const canApprove = task.status === 'SUBMITTED' && (isDirector || task.approvalById === actorId)
   const canReject  = task.status === 'SUBMITTED' && (isDirector || task.approvalById === actorId)
   const canReopen  = task.status === 'REJECTED'
@@ -386,7 +386,7 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
             {canReturn    && <button disabled={actionLoading} onClick={() => setShowReasonModal('return')} className="btn-secondary text-xs py-1.5">↩ Return</button>}
             {canApprove   && <button disabled={actionLoading} onClick={() => doAction(() => taskApi.approve(task.id))} className="bg-tw-success hover:opacity-90 text-white font-semibold px-3 py-1.5 rounded-lg text-xs transition-opacity">✓ Approve</button>}
             {canHandOver  && <button disabled={actionLoading} onClick={openAssignNext} className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-3 py-1.5 rounded-lg text-xs transition-colors">⛓ Approve & Assign Next</button>}
-            {canReject    && <button disabled={actionLoading} onClick={() => setShowReasonModal('reject')} className="btn-danger text-xs py-1.5">✕ Reject</button>}
+            {canReject    && <button disabled={actionLoading} onClick={() => setShowReasonModal('reject')} className="btn-danger text-xs py-1.5">↩ Send Back</button>}
             {canReopen    && <button disabled={actionLoading} onClick={() => doAction(() => taskApi.reopen(task.id))} className="btn-secondary text-xs py-1.5">↻ Reopen</button>}
             {canAssign    && <button disabled={actionLoading} onClick={() => setShowAssignModal(true)} className="btn-secondary text-xs py-1.5">👤 Assign</button>}
             {canSubtask   && <button onClick={() => setShowSubtaskModal(true)} className="btn-secondary text-xs py-1.5">+ Subtask</button>}
@@ -734,16 +734,22 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
         </div>
       </div>
 
-      {/* Reason Modal (Return / Reject / Cancel) */}
+      {/* Reason Modal (Return / Send Back / Cancel) */}
       {showReasonModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-panel w-full max-w-sm">
             <div className="px-5 py-4 border-b border-tw-border">
-              <h3 className="font-semibold text-tw-text capitalize">{showReasonModal} Task</h3>
+              <h3 className="font-semibold text-tw-text">
+                {showReasonModal === 'reject' ? 'Send Back Task' : `${showReasonModal.charAt(0).toUpperCase()}${showReasonModal.slice(1)} Task`}
+              </h3>
             </div>
             <div className="px-5 py-4 space-y-3">
               <textarea className="input resize-none" rows={3}
-                placeholder={showReasonModal === 'return' ? 'Reason (optional)…' : `Reason for ${showReasonModal}…`}
+                placeholder={
+                  showReasonModal === 'return' ? 'Reason (optional)…' :
+                  showReasonModal === 'reject' ? 'Reason for sending back…' :
+                  `Reason for ${showReasonModal}…`
+                }
                 value={reason} onChange={e => setReason(e.target.value)} />
               <div className="flex gap-2 justify-end">
                 <button onClick={() => { setShowReasonModal(null); setReason('') }} className="btn-secondary">Cancel</button>
@@ -757,7 +763,7 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
                     setShowReasonModal(null)
                     setReason('')
                   }}>
-                  Confirm
+                  {showReasonModal === 'reject' ? 'Send Back' : 'Confirm'}
                 </button>
               </div>
             </div>
