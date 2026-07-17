@@ -151,7 +151,7 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
     setActionLoading(true)
     setActionError('')
     try { await action(); await onRefresh() }
-    catch (e: unknown) { setActionError(e instanceof Error ? e.message : 'Action failed') }
+    catch (e: unknown) { setActionError(e instanceof Error ? e.message : 'Action failed'); await onRefresh().catch(() => {}) }
     setActionLoading(false)
   }
 

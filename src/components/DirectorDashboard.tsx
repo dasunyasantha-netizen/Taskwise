@@ -1360,7 +1360,12 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
           layers={panelLayers}
           personnel={panelPersonnel}
           onClose={() => setSelectedTask(null)}
-          onRefresh={loadDashboard}
+          onRefresh={async () => {
+            await loadDashboard()
+            if (selectedTask) {
+              try { setSelectedTask(await taskApi.get(selectedTask.id) as Task) } catch { /* panel will close on 404 */ }
+            }
+          }}
         />
       )}
     </div>
