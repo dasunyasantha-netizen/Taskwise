@@ -204,9 +204,12 @@ export const webAuthnApi = {
 
 // ─── Audit / Reports ─────────────────────────────────────────────────────────
 export const auditApi = {
-  list:           (params?: string) => api.get(`/audit${params ? '?' + params : ''}`),
-  overdue:        () => api.get('/reports/overdue'),
-  progress:       () => api.get('/reports/progress'),
-  queue:          (personnelId: string) => api.get(`/reports/queue/${personnelId}`),
-  recentUpdates:  (date: string) => api.get(`/reports/recent-updates?date=${date}`),
+  list:                (params?: string) => api.get(`/audit${params ? '?' + params : ''}`),
+  overdue:             () => api.get('/reports/overdue'),
+  progress:            () => api.get('/reports/progress'),
+  queue:               (personnelId: string) => api.get(`/reports/queue/${personnelId}`),
+  recentUpdates:       (date: string) => api.get(`/reports/recent-updates?date=${date}`),
+  userAnalyticsOverview: () => api.get('/reports/user-analytics/overview'),
+  userLoginHistory:    (actorId: string, actorType = 'personnel') =>
+    api.get(`/reports/user-analytics/logins/${actorId}?actorType=${actorType}`),
 }

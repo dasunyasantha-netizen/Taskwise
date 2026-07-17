@@ -508,6 +508,24 @@ model DeadlineExtension {
   @@index([workspaceId])
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// LOGIN LOG  (successful logins per actor — for director analytics)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model LoginLog {
+  id          String   @id @default(uuid())
+  workspaceId String
+  actorId     String   // Director.id or Personnel.id
+  actorType   String   // "director" | "personnel"
+  actorName   String   // snapshot of name at login time
+  loggedInAt  DateTime @default(now())
+  ipAddress   String?
+  userAgent   String?
+
+  @@index([workspaceId, actorId, loggedInAt])
+  @@index([workspaceId, loggedInAt])
+}
+
 model PushSubscription {
   id           String   @id @default(uuid())
   actorId      String

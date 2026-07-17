@@ -288,6 +288,7 @@ export type ViewMode =
   | 'group_tasks'
   | 'reports'
   | 'impersonation'
+  | 'user_analytics'
   | 'settings'
   | 'profile'
 

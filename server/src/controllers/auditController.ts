@@ -110,3 +110,87 @@ export async function getPersonnelQueueReport(req: Request, res: Response): Prom
     res.json(tasks)
   } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
 }
+
+// GET /api/reports/user-analytics/logins/:actorId?actorType=personnel
+// Returns login history for a specific user
+export async function getUserLoginHistory(req: Request, res: Response): Promise<void> {
+  try {
+    if (req.user!.actorType !== 'director') { res.status(403).json({ error: 'Director only' }); return }
+    const { actorId } = req.params
+    const actorType = (req.query.actorType as string) || 'personnel'
+    const logs = await prisma.loginLog.findMany({
+      where: { workspaceId: req.user!.workspaceId, actorId, actorType },
+      orderBy: { loggedInAt: 'desc' },
+      take: 100,
+    })
+    res.json(logs)
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
+}
+
+// GET /api/reports/user-analytics/overview
+// Returns aggregate login stats for all personnel in the workspace
+export async function getUserAnalyticsOverview(req: Request, res: Response): Promise<void> {
+  try {
+    if (req.user!.actorType !== 'director') { res.status(403).json({ error: 'Director only' }); return }
+    const { workspaceId } = req.user!
+
+    const [personnel, loginStats, taskStats] = await Promise.all([
+      // All active personnel
+      prisma.personnel.findMany({
+        where: { workspaceId, deletedAt: null },
+        select: { id: true, name: true, department: { select: { name: true } } },
+        orderBy: { name: 'asc' },
+      }),
+      // Login counts and last login per personnel (last 90 days)
+      prisma.loginLog.groupBy({
+        by: ['actorId'],
+        where: {
+          workspaceId,
+          actorType: 'personnel',
+          loggedInAt: { gte: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) },
+        },
+        _count: { _all: true },
+        _max: { loggedInAt: true },
+      }),
+      // Task counts per personnel
+      prisma.taskAssignment.groupBy({
+        by: ['personnelId'],
+        where: { task: { workspaceId, deletedAt: null }, personnelId: { not: null } },
+        _count: { _all: true },
+      }),
+    ])
+
+    const loginMap = new Map(loginStats.map(l => [l.actorId, { count: l._count._all, lastLogin: l._max.loggedInAt }]))
+    const taskMap  = new Map(taskStats.map(t => [t.personnelId!, t._count._all]))
+
+    // Daily login activity for the whole workspace (last 30 days)
+    const dailyLogins = await prisma.loginLog.groupBy({
+      by: ['actorType'],
+      where: { workspaceId, loggedInAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } },
+      _count: { _all: true },
+    })
+
+    // Login trend: logins per day for last 30 days
+    const loginTrend = await prisma.$queryRaw<Array<{ day: string; count: bigint }>>`
+      SELECT DATE_TRUNC('day', "loggedInAt") AS day, COUNT(*) AS count
+      FROM "LoginLog"
+      WHERE "workspaceId" = ${workspaceId}
+        AND "loggedInAt" >= NOW() - INTERVAL '30 days'
+      GROUP BY DATE_TRUNC('day', "loggedInAt")
+      ORDER BY day ASC
+    `
+
+    res.json({
+      personnel: personnel.map(p => ({
+        id: p.id,
+        name: p.name,
+        department: p.department.name,
+        loginCount90d: loginMap.get(p.id)?.count ?? 0,
+        lastLogin:     loginMap.get(p.id)?.lastLogin ?? null,
+        taskCount:     taskMap.get(p.id) ?? 0,
+      })),
+      totalLoginsLast30d: dailyLogins.reduce((s, r) => s + r._count._all, 0),
+      loginTrend: loginTrend.map(r => ({ day: r.day, count: Number(r.count) })),
+    })
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
+}

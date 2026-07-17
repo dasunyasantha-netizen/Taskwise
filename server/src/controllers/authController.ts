@@ -37,6 +37,14 @@ export async function unifiedLogin(req: Request, res: Response): Promise<void> {
           })
         : null
 
+      // Log login event (fire-and-forget — don't block the response)
+      prisma.loginLog.create({ data: {
+        workspaceId: director.workspaceId!,
+        actorId: director.id, actorType: 'director', actorName: director.name,
+        ipAddress: req.ip || req.headers['x-forwarded-for']?.toString(),
+        userAgent: req.headers['user-agent'],
+      }}).catch(() => {})
+
       res.json({
         token,
         user: {
@@ -80,6 +88,14 @@ export async function unifiedLogin(req: Request, res: Response): Promise<void> {
         where: { id: personnel.workspaceId },
         select: { companyName: true, companyLogo: true }
       })
+
+      // Log login event (fire-and-forget)
+      prisma.loginLog.create({ data: {
+        workspaceId: personnel.workspaceId,
+        actorId: personnel.id, actorType: 'personnel', actorName: personnel.name,
+        ipAddress: req.ip || req.headers['x-forwarded-for']?.toString(),
+        userAgent: req.headers['user-agent'],
+      }}).catch(() => {})
 
       res.json({
         token,

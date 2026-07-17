@@ -20,6 +20,7 @@ import ReportsPage from './ReportsPage'
 import type { ReportsState } from './ReportsPage'
 import { DEFAULT_REPORTS_STATE } from './ReportsPage'
 import ImpersonationPage from './ImpersonationPage'
+import UserAnalyticsPage from './UserAnalyticsPage'
 
 interface Props {
   user: AuthUser
@@ -893,7 +894,8 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
     { label: 'Group Tasks',     view: 'group_tasks'      as ViewMode, icon: '🫂' },
     { label: 'Reports',         view: 'reports'           as ViewMode, icon: '📊' },
     { label: 'Team Hierarchy',  view: 'hierarchy_manager' as ViewMode, icon: '👥' },
-    { label: 'Audit Log',      view: 'audit_log'          as ViewMode, icon: '📜' },
+    { label: 'Audit Log',       view: 'audit_log'       as ViewMode, icon: '📜' },
+    { label: 'User Analytics',  view: 'user_analytics'  as ViewMode, icon: '📈' },
     ...(user.isChairman ? [{ label: 'User Access', view: 'impersonation' as ViewMode, icon: '🔐' }] : []),
     { label: 'Settings',       view: 'settings'           as ViewMode, icon: '⚙️' },
     { label: 'My Profile',     view: 'profile'            as ViewMode, icon: '👤' },
@@ -1032,6 +1034,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
                   : currentView === 'group_tasks' ? 'Group Tasks'
                   : currentView === 'reports' ? 'Reports'
                   : currentView === 'impersonation' ? 'User Access'
+                  : currentView === 'user_analytics' ? 'User Analytics'
                   : 'My Profile'}
               </div>
             </div>
@@ -1260,6 +1263,11 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
           {/* USER ACCESS / IMPERSONATION — Chairman only */}
           {currentView === 'impersonation' && user.isChairman && onImpersonationStart && (
             <ImpersonationPage user={user} onSessionStarted={onImpersonationStart} />
+          )}
+
+          {/* USER ANALYTICS */}
+          {currentView === 'user_analytics' && (
+            <UserAnalyticsPage />
           )}
 
           {/* AUDIT LOG */}
