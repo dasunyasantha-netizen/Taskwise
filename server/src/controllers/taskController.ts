@@ -275,7 +275,11 @@ export async function updateTask(req: Request, res: Response): Promise<void> {
     const { title, description, priority, deadline, reassignPersonnelId } = req.body
 
     // Deadline edit: only allowed by whoever set it
-    if (deadline !== undefined && task.deadline?.toISOString() !== new Date(deadline).toISOString()) {
+    // Compare date-only (YYYY-MM-DD) to avoid false positives from time/timezone differences
+    const existingDeadlineDate = task.deadline ? task.deadline.toISOString().slice(0, 10) : null
+    const incomingDeadlineDate = deadline ? new Date(deadline).toISOString().slice(0, 10) : null
+    const deadlineChanged = deadline !== undefined && existingDeadlineDate !== incomingDeadlineDate
+    if (deadlineChanged) {
       if (task.deadlineSetById && (task.deadlineSetById !== actorId || task.deadlineSetByType !== actorType)) {
         res.status(403).json({ error: 'Only the assigning authority can change the deadline' }); return
       }
