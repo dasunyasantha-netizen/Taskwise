@@ -85,6 +85,21 @@ function assigneeName(t: Task): string {
   return a?.personnel?.name || a?.department?.name || '—'
 }
 
+// A task submitted on the deadline day itself counts as within deadline (day granularity).
+function submittedAfterDeadline(t: Task): boolean {
+  return !!t.deadline && new Date(t.updatedAt).getTime() > new Date(t.deadline).setHours(23, 59, 59, 999)
+}
+function byDeadlineAsc(a: Task, b: Task): number {
+  return new Date(a.deadline ?? 8640000000000000).getTime() - new Date(b.deadline ?? 8640000000000000).getTime()
+}
+
+type OverdueTone = 'danger' | 'warning' | 'info'
+const OVERDUE_TONE: Record<OverdueTone, { bar: string; badge: string; dot: string; text: string; hover: string }> = {
+  danger:  { bar: 'bg-red-500',     badge: 'bg-red-100 text-red-700',         dot: 'bg-red-500',     text: 'text-tw-danger',   hover: 'hover:bg-red-50' },
+  warning: { bar: 'bg-orange-400',  badge: 'bg-orange-100 text-orange-700',   dot: 'bg-orange-400',  text: 'text-orange-600',  hover: 'hover:bg-orange-50' },
+  info:    { bar: 'bg-emerald-500', badge: 'bg-emerald-100 text-emerald-700', dot: 'bg-emerald-500', text: 'text-emerald-600', hover: 'hover:bg-emerald-50' },
+}
+
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function EmptyState({ message }: { message: string }) {
@@ -177,45 +192,152 @@ function PendingApprovalsReport({ tasks, onTaskClick }: { tasks: Task[]; onTaskC
   )
 }
 
+function OverdueCategoryCard({
+  title, indicator, tone, tasks, variant, onTaskClick, emptyText,
+}: {
+  title: string
+  indicator: string
+  tone: OverdueTone
+  tasks: Task[]
+  variant: 'overdue' | 'submitted'
+  onTaskClick: (t: Task) => void
+  emptyText: string
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const s = OVERDUE_TONE[tone]
+  const headers = variant === 'overdue'
+    ? ['', 'Task', 'Project', 'Assignee', 'Deadline', 'Days Overdue', 'Status']
+    : ['', 'Task', 'Project', 'Assignee', 'Deadline', 'Submitted', 'Status']
+  return (
+    <div className="card overflow-hidden">
+      <button onClick={() => setExpanded(e => !e)}
+        className="w-full flex items-center gap-3 px-4 md:px-5 py-4 text-left hover:bg-tw-hover transition-colors">
+        <div className={`w-1 h-10 rounded-full flex-shrink-0 ${s.bar}`} />
+        <div className="flex-1 min-w-0">
+          <div className="font-semibold text-tw-text text-sm md:text-base">{title}</div>
+          <div className={`flex items-center gap-1.5 mt-0.5 text-xs font-medium ${s.text}`}>
+            <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${s.dot}`} />
+            {indicator}
+          </div>
+        </div>
+        <span className={`text-xs font-bold px-2.5 py-1 rounded-full flex-shrink-0 ${s.badge}`}>{tasks.length}</span>
+        <svg className={`w-4 h-4 text-tw-text-secondary flex-shrink-0 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
+          fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {expanded && (
+        <div className="border-t border-tw-border">
+          {tasks.length === 0 ? (
+            <div className="py-10 text-center text-tw-text-secondary text-sm">{emptyText}</div>
+          ) : (
+            <>
+              {/* Mobile list */}
+              <div className="sm:hidden divide-y divide-tw-border">
+                {tasks.map(t => (
+                  <div key={t.id} onClick={() => onTaskClick(t)} className="flex items-start gap-2.5 px-4 py-3 cursor-pointer active:bg-tw-hover">
+                    <span className={`w-2 h-2 rounded-full flex-shrink-0 mt-1.5 ${PRIORITY_DOT[t.priority] ?? 'bg-gray-300'}`} />
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-tw-text text-sm leading-snug">{t.title}</div>
+                      <div className="text-xs text-tw-text-secondary mt-0.5">{t.project?.name || '—'} · {assigneeName(t)}</div>
+                      <div className={`text-xs mt-0.5 font-medium ${s.text}`}>
+                        {variant === 'overdue'
+                          ? `${daysSince(t.deadline!)}d overdue · Due ${fmtDate(t.deadline)}`
+                          : `Due ${fmtDate(t.deadline)} · Submitted ${fmtDate(t.updatedAt)}`}
+                      </div>
+                    </div>
+                    <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${STATUS_COLORS[t.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                      {STATUS_LABELS[t.status] ?? t.status}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              {/* Desktop table */}
+              <div className="hidden sm:block overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-[#f0f4ff] border-b-2 border-tw-primary/20">
+                      {headers.map(h => (
+                        <th key={h} className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider whitespace-nowrap">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-tw-border">
+                    {tasks.map(t => (
+                      <tr key={t.id} onClick={() => onTaskClick(t)} className={`cursor-pointer transition-colors ${s.hover}`}>
+                        <td className="pl-3 pr-0 py-3 w-1"><div className={`w-1 h-8 rounded-full ${PRIORITY_DOT[t.priority] ?? 'bg-gray-300'}`} /></td>
+                        <td className="px-4 py-3 font-medium text-tw-text max-w-xs"><div className="truncate">{t.title}</div></td>
+                        <td className="px-4 py-3 text-tw-text-secondary text-xs">{t.project?.name || '—'}</td>
+                        <td className="px-4 py-3 text-tw-text-secondary text-xs">{assigneeName(t)}</td>
+                        <td className={`px-4 py-3 text-xs font-medium whitespace-nowrap ${variant === 'overdue' ? 'text-tw-danger' : 'text-tw-text-secondary'}`}>{fmtDate(t.deadline)}</td>
+                        {variant === 'overdue' ? (
+                          <td className="px-4 py-3">
+                            <span className="text-xs font-bold text-white bg-tw-danger px-2 py-0.5 rounded-full">{daysSince(t.deadline!)}d</span>
+                          </td>
+                        ) : (
+                          <td className={`px-4 py-3 text-xs font-medium whitespace-nowrap ${s.text}`}>
+                            {fmtDate(t.updatedAt)}
+                            {tone === 'warning' && t.deadline && (
+                              <span className="text-tw-text-secondary font-normal"> · {Math.max(0, Math.floor((new Date(t.updatedAt).getTime() - new Date(t.deadline).getTime()) / 86400000))}d late</span>
+                            )}
+                          </td>
+                        )}
+                        <td className="px-4 py-3">
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${STATUS_COLORS[t.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                            {STATUS_LABELS[t.status] ?? t.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function OverdueReport({ tasks, onTaskClick }: { tasks: Task[]; onTaskClick: (t: Task) => void }) {
   const now = new Date()
-  const rows = tasks
-    .filter(t => t.deadline && !['APPROVED', 'CANCELLED'].includes(t.status) && new Date(t.deadline) < now)
-    .sort((a, b) => new Date(a.deadline!).getTime() - new Date(b.deadline!).getTime())
-  if (rows.length === 0) return <EmptyState message="No overdue tasks in this filter." />
+  const trueOverdue = tasks
+    .filter(t => t.deadline && t.status !== 'SUBMITTED' && !['APPROVED', 'CANCELLED'].includes(t.status) && new Date(t.deadline) < now)
+    .sort(byDeadlineAsc)
+  const submitted = tasks.filter(t => t.status === 'SUBMITTED')
+  const submittedLate   = submitted.filter(t => submittedAfterDeadline(t)).sort(byDeadlineAsc)
+  const submittedOnTime = submitted.filter(t => !submittedAfterDeadline(t)).sort(byDeadlineAsc)
   return (
-    <>
-      <SectionHeader title="Overdue Tasks" count={rows.length} />
-      {rows.map(t => {
-        const days = daysSince(t.deadline!)
-        return (
-          <MobileTaskCard key={t.id} task={t} onClick={() => onTaskClick(t)}
-            extra={<><div>Assignee: {assigneeName(t)}</div><div className="text-tw-danger font-semibold">{days}d overdue · Due {fmtDate(t.deadline)}</div></>} />
-        )
-      })}
-      <ReportTable headers={['', 'Task', 'Project', 'Assignee', 'Deadline', 'Days Overdue', 'Status']}>
-        {rows.map(t => {
-          const days = daysSince(t.deadline!)
-          return (
-            <tr key={t.id} onClick={() => onTaskClick(t)} className="hover:bg-red-50 cursor-pointer transition-colors">
-              <td className="pl-3 pr-0 py-3 w-1"><div className={`w-1 h-8 rounded-full ${PRIORITY_DOT[t.priority] ?? 'bg-gray-300'}`} /></td>
-              <td className="px-4 py-3 font-medium text-tw-text max-w-xs"><div className="truncate">{t.title}</div></td>
-              <td className="px-4 py-3 text-tw-text-secondary text-xs">{t.project?.name || '—'}</td>
-              <td className="px-4 py-3 text-tw-text-secondary text-xs">{assigneeName(t)}</td>
-              <td className="px-4 py-3 text-tw-danger text-xs font-medium whitespace-nowrap">{fmtDate(t.deadline)}</td>
-              <td className="px-4 py-3">
-                <span className="text-xs font-bold text-white bg-tw-danger px-2 py-0.5 rounded-full">{days}d</span>
-              </td>
-              <td className="px-4 py-3">
-                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${STATUS_COLORS[t.status]}`}>
-                  {STATUS_LABELS[t.status] ?? t.status}
-                </span>
-              </td>
-            </tr>
-          )
-        })}
-      </ReportTable>
-    </>
+    <div className="space-y-3 md:space-y-4">
+      <OverdueCategoryCard
+        title="Task Overdue"
+        indicator="Deadline passed — action required"
+        tone="danger"
+        variant="overdue"
+        tasks={trueOverdue}
+        emptyText="No overdue tasks in this filter."
+        onTaskClick={onTaskClick}
+      />
+      <OverdueCategoryCard
+        title="Task Submitted After Deadline — Needs Verification"
+        indicator="Submitted late — awaiting review"
+        tone="warning"
+        variant="submitted"
+        tasks={submittedLate}
+        emptyText="No late submissions awaiting verification."
+        onTaskClick={onTaskClick}
+      />
+      <OverdueCategoryCard
+        title="Task Submitted Within Deadline — Needs Verification"
+        indicator="On time — awaiting review"
+        tone="info"
+        variant="submitted"
+        tasks={submittedOnTime}
+        emptyText="No on-time submissions awaiting verification."
+        onTaskClick={onTaskClick}
+      />
+    </div>
   )
 }
 
