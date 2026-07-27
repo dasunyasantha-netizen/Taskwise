@@ -202,6 +202,60 @@ export const webAuthnApi = {
   deleteCredential:        (id: string) => api.delete(`/auth/webauthn/credentials/${id}`),
 }
 
+export interface CompanyRequestSubmission {
+  company: Record<string, unknown>
+  applicant: Record<string, unknown>
+}
+
+export const companyApi = {
+  submitRequest: (data: CompanyRequestSubmission) =>
+    api.post<{ reference: string; status: string; statusToken: string; message: string }>('/company/requests', data),
+  status: (data: { reference: string; statusToken?: string; phoneOrEmail?: string }) =>
+    api.post<{ reference: string; status: string; moreInfoInstructions?: string; rejectionReason?: string; suggestedPrefix?: string }>('/company/requests/status', data),
+  resubmit: (data: { reference: string; statusToken: string; additionalInfo: string }) =>
+    api.post('/company/requests/resubmit', data),
+  listRequests: (params?: string) =>
+    api.get<{ pendingCount: number; requests: CompanyRequestSummary[] }>(`/company/admin/requests${params ? '?' + params : ''}`),
+  getRequest: (id: string) => api.get<CompanyRequestDetail>(`/company/admin/requests/${id}`),
+  document: (id: string) => api.get<{ name?: string; mimeType: string; data: string }>(`/company/admin/requests/${id}/document`),
+  action: (id: string, data: { action: string; reason?: string; instructions?: string; note?: string; prefix?: string }) =>
+    api.post(`/company/admin/requests/${id}/actions`, data),
+}
+
+export interface CompanyRequestSummary {
+  id: string
+  reference: string
+  status: string
+  legalName: string
+  displayName?: string | null
+  registrationNumber: string
+  applicantName: string
+  applicantPhone: string
+  applicantEmail: string
+  suggestedPrefix: string
+  finalPrefix?: string | null
+  createdAt: string
+}
+
+export interface CompanyRequestDetail extends CompanyRequestSummary {
+  address: string
+  industry: string
+  website?: string | null
+  expectedUsers?: number | null
+  reason: string
+  supportingDocumentName?: string | null
+  supportingDocumentMime?: string | null
+  hasSupportingDocument?: boolean
+  applicantFirstName: string
+  applicantMiddleName?: string | null
+  applicantLastName: string
+  moreInfoInstructions?: string | null
+  rejectionReason?: string | null
+  internalNote?: string | null
+  approvedAt?: string | null
+  actions?: Array<{ id: string; action: string; note?: string | null; createdAt: string; actorDirector?: { name: string } | null }>
+}
+
 // ─── Audit / Reports ─────────────────────────────────────────────────────────
 export const auditApi = {
   list:                (params?: string) => api.get(`/audit${params ? '?' + params : ''}`),

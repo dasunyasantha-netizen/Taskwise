@@ -14,15 +14,22 @@ datasource db {
 
 model Director {
   id          String     @id @default(uuid())
-  email       String?    @unique  // optional — phone is now the login credential
-  phone       String     @unique  // primary login username
+  email       String?    @unique
+  phone       String
+  normalizedPhone String?
+  loginId     String?    @unique
   nic         String?    @unique  // National Identity Card — globally unique
   password    String
   name        String
   avatarUrl   String?
   workspaceId String?    @unique
   workspace   Workspace? @relation(fields: [workspaceId], references: [id])
+  companyId   String?
+  company     Company?   @relation("CompanyDirectors", fields: [companyId], references: [id])
   isChairman                Boolean  @default(false)
+  isSyswiseAdmin            Boolean  @default(false)
+  isCompanyAdmin            Boolean  @default(false)
+  isActive                  Boolean  @default(true)
   impersonationPasswordHash String?  // bcrypt hash of chairman's second password
   webAuthnChallenge         String?  // temporary challenge for ongoing WebAuthn ceremony
   createdAt   DateTime   @default(now())
@@ -36,6 +43,11 @@ model Director {
   comments              TaskComment[]       @relation("CommentAuthorDirector")
   progressLogs          TaskProgressLog[]   @relation("ProgressLogDirector")
   impersonationSessions ImpersonationSession[]
+  approvedCompanyRequests CompanyRequest[] @relation("CompanyRequestApprovedBy")
+  reviewedCompanyActions  CompanyRequestAction[] @relation("CompanyRequestActionDirector")
+
+  @@index([companyId])
+  @@index([normalizedPhone])
 }
 
 model ImpersonationSession {
@@ -61,12 +73,95 @@ model Workspace {
   name        String
   companyName String?  // branding: displayed in sidebar/login
   companyLogo String?  // branding: base64 or URL of company logo
+  companyId   String?  @unique
+  company     Company? @relation(fields: [companyId], references: [id])
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   director Director?
   layers   Layer[]
   projects Project[]
+}
+
+model Company {
+  id                 String   @id @default(uuid())
+  legalName          String
+  displayName        String?
+  registrationNumber String   @unique
+  prefix             String   @unique
+  status             String   @default("ACTIVE") // ACTIVE | SUSPENDED | INACTIVE
+  allowUnprefixedLogin Boolean @default(false)
+  workspaceId        String?  @unique
+  workspace          Workspace?
+  createdFromRequestId String? @unique
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  directors Director[] @relation("CompanyDirectors")
+  personnel Personnel[]
+  requests  CompanyRequest[]
+
+  @@index([status])
+}
+
+model CompanyRequest {
+  id                    String   @id @default(uuid())
+  reference             String   @unique
+  status                String   @default("PENDING") // PENDING | MORE_INFORMATION_REQUIRED | APPROVED | REJECTED | CANCELLED
+  legalName             String
+  displayName           String?
+  registrationNumber    String
+  address               String
+  industry              String
+  website               String?
+  expectedUsers         Int?
+  reason                String
+  supportingDocumentName String?
+  supportingDocumentMime String?
+  supportingDocumentData String?
+  applicantFirstName    String
+  applicantMiddleName   String?
+  applicantLastName     String
+  applicantName         String
+  applicantPhone        String
+  applicantNormalizedPhone String
+  applicantEmail        String
+  applicantPasswordHash String
+  suggestedPrefix       String
+  finalPrefix           String?
+  publicStatusTokenHash String
+  moreInfoInstructions  String?
+  rejectionReason       String?
+  internalNote          String?
+  approvedByDirectorId  String?
+  approvedByDirector    Director? @relation("CompanyRequestApprovedBy", fields: [approvedByDirectorId], references: [id])
+  approvedAt            DateTime?
+  companyId             String?
+  company               Company?  @relation(fields: [companyId], references: [id])
+  administratorDirectorId String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  actions CompanyRequestAction[]
+
+  @@index([status, createdAt])
+  @@index([registrationNumber])
+  @@index([applicantNormalizedPhone])
+}
+
+model CompanyRequestAction {
+  id          String   @id @default(uuid())
+  requestId   String
+  request     CompanyRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  actorDirectorId String?
+  actorDirector   Director? @relation("CompanyRequestActionDirector", fields: [actorDirectorId], references: [id])
+  action      String
+  note        String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([requestId, createdAt])
+  @@index([actorDirectorId])
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -108,15 +203,20 @@ model Department {
 model Personnel {
   id           String     @id @default(uuid())
   workspaceId  String
+  companyId    String?
+  company      Company?   @relation(fields: [companyId], references: [id])
   departmentId String
   department   Department @relation(fields: [departmentId], references: [id])
   email        String?    // optional — phone is the login credential
-  phone        String     @unique  // globally unique — used as login across all workspaces
+  phone        String
+  normalizedPhone String?
+  loginId      String?    @unique
   nic          String?    @unique  // globally unique — one real person across all workspaces
   password     String
   name         String
   avatarUrl          String?
   mustChangePassword Boolean  @default(false)
+  isActive            Boolean  @default(true)
   webAuthnChallenge  String?  // temporary challenge for ongoing WebAuthn ceremony
   supervisorId String?    // direct supervisor (another Personnel one layer up)
   supervisor   Personnel? @relation("PersonnelSupervisor", fields: [supervisorId], references: [id])
@@ -133,8 +233,11 @@ model Personnel {
   comments         TaskComment[]    @relation("CommentAuthorPersonnel")
   progressLogs     TaskProgressLog[] @relation("ProgressLogAuthor")
   @@index([workspaceId])
+  @@index([companyId])
+  @@index([normalizedPhone])
   @@index([departmentId])
   @@index([supervisorId])
+  @@unique([companyId, normalizedPhone])
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -4,6 +4,7 @@ import { authApi, webAuthnApi } from '../services/apiService'
 import {
   startAuthentication,
 } from '@simplewebauthn/browser'
+import CompanyRequestModal from './CompanyRequestModal'
 
 interface Props {
   onLogin: (token: string, user: AuthUser) => void
@@ -35,6 +36,7 @@ export default function Auth({ onLogin }: Props) {
   const [biometricError, setBiometricError] = useState('')
   const [biometricLoading, setBiometricLoading] = useState(false)
   const [showBiometric, setShowBiometric] = useState(false)
+  const [showCompanyRequest, setShowCompanyRequest] = useState(false)
 
   // Show biometric button if WebAuthn is supported
   const [webAuthnSupported, setWebAuthnSupported] = useState(false)
@@ -119,11 +121,11 @@ export default function Auth({ onLogin }: Props) {
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-tw-text mb-1">Phone Number</label>
+                <label className="block text-sm font-medium text-tw-text mb-1">Login ID</label>
                 <input
-                  type="tel"
+                  type="text"
                   className="input"
-                  placeholder="07X XXXXXXX"
+                  placeholder="0712345678 or FF0712345678"
                   value={phone}
                   onChange={e => setPhone(e.target.value)}
                   required
@@ -167,6 +169,14 @@ export default function Auth({ onLogin }: Props) {
                 Sign in with Biometrics
               </button>
             )}
+
+            <button
+              type="button"
+              onClick={() => setShowCompanyRequest(true)}
+              className="mt-4 w-full py-3 rounded-2xl bg-green-600 text-white text-sm font-bold hover:bg-green-700 transition-colors"
+            >
+              Create a New Company
+            </button>
           </>
         ) : (
           <>
@@ -226,12 +236,12 @@ export default function Auth({ onLogin }: Props) {
         )}
 
         <div className="mt-5 p-3 bg-[#f0f4ff] rounded-2xl text-center">
-          <p className="text-tw-text-secondary text-xs">New to TaskWise? Contact us to set up your workspace.</p>
-          <p className="text-tw-primary font-bold text-sm mt-0.5">0741 008 484</p>
+          <p className="text-tw-text-secondary text-xs">Company access is activated only after Syswise approval.</p>
         </div>
       </div>
 
       <p className="mt-5 text-white/40 text-xs relative z-10">Created by SysWise</p>
+      {showCompanyRequest && <CompanyRequestModal onClose={() => setShowCompanyRequest(false)} />}
     </div>
   )
 }

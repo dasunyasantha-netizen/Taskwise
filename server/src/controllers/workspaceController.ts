@@ -1,6 +1,7 @@
 import { Request, Response } from 'express'
 import bcrypt from 'bcryptjs'
 import prisma from '../prisma'
+import { makeLoginId, normalizeSriLankanPhone, companyLoginPrefix } from '../helpers/phone'
 
 // GET /api/workspace
 export async function getWorkspace(req: Request, res: Response): Promise<void> {
@@ -111,15 +112,27 @@ export async function getPersonnel(req: Request, res: Response): Promise<void> {
 // POST /api/workspace/personnel
 export async function createPersonnel(req: Request, res: Response): Promise<void> {
   try {
-    const { name, phone, email, nic, departmentId } = req.body
+    const { name, phone, email, nic, departmentId, password, mustChangePassword, isActive } = req.body
     if (!name || !phone || !departmentId) { res.status(400).json({ error: 'name, phone, departmentId required' }); return }
     const dept = await prisma.department.findFirst({ where: { id: departmentId, workspaceId: req.user!.workspaceId, deletedAt: null } })
     if (!dept) { res.status(404).json({ error: 'Department not found' }); return }
-    // Phone is globally unique — check across all workspaces
-    const existingPhone = await prisma.personnel.findUnique({ where: { phone } })
-    if (existingPhone) { res.status(409).json({ error: 'Phone number already registered' }); return }
-    const directorPhone = await prisma.director.findUnique({ where: { phone } })
-    if (directorPhone) { res.status(409).json({ error: 'Phone number already registered' }); return }
+    const normalized = normalizeSriLankanPhone(phone)
+    const director = req.user!.actorType === 'director'
+      ? await prisma.director.findUnique({ where: { id: req.user!.actorId }, include: { company: true } })
+      : null
+    const companyId = director?.companyId || null
+    const companyPrefix = companyLoginPrefix(director?.company)
+    const loginId = makeLoginId(companyPrefix, normalized.local)
+
+    if (companyId) {
+      const sameCompanyPhone = await prisma.personnel.findFirst({ where: { companyId, normalizedPhone: normalized.canonical, deletedAt: null } })
+      if (sameCompanyPhone) { res.status(409).json({ error: 'Phone number already registered in this company' }); return }
+    } else {
+      const existingPhone = await prisma.personnel.findFirst({ where: { OR: [{ loginId }, { phone: normalized.local }] } })
+      if (existingPhone) { res.status(409).json({ error: 'Phone number already registered' }); return }
+      const directorPhone = await prisma.director.findFirst({ where: { OR: [{ loginId }, { phone: normalized.local }] } })
+      if (directorPhone) { res.status(409).json({ error: 'Phone number already registered' }); return }
+    }
     if (nic) {
       // NIC is globally unique — check across all workspaces and directors
       const nicPersonnel = await prisma.personnel.findUnique({ where: { nic } })
@@ -127,9 +140,22 @@ export async function createPersonnel(req: Request, res: Response): Promise<void
       const nicDirector = await prisma.director.findUnique({ where: { nic } })
       if (nicDirector) { res.status(409).json({ error: 'NIC already registered' }); return }
     }
-    const hashed = await bcrypt.hash('Test@123', 12)
+    const hashed = await bcrypt.hash(String(password || 'Test@123'), 12)
     const person = await prisma.personnel.create({
-      data: { name, phone, email, nic, password: hashed, departmentId, workspaceId: req.user!.workspaceId, mustChangePassword: false }
+      data: {
+        name,
+        phone: normalized.local,
+        normalizedPhone: normalized.canonical,
+        loginId,
+        email,
+        nic,
+        password: hashed,
+        departmentId,
+        workspaceId: req.user!.workspaceId,
+        companyId,
+        mustChangePassword: mustChangePassword ?? !password,
+        isActive: isActive ?? true,
+      }
     })
     const { password: _p, ...safe } = person
     res.status(201).json(safe)
@@ -152,11 +178,17 @@ export async function updateProfile(req: Request, res: Response): Promise<void> 
     const { actorId, actorType } = req.user!
     const { name, phone, nic, email } = req.body
     if (!name || !phone) { res.status(400).json({ error: 'name and phone are required' }); return }
+    const normalized = normalizeSriLankanPhone(phone)
 
-    // Check phone globally unique (excluding self)
-    const dirPhoneConflict = await prisma.director.findFirst({ where: { phone, NOT: actorType === 'director' ? { id: actorId } : undefined } })
+    const currentDirector = actorType === 'director' ? await prisma.director.findUnique({ where: { id: actorId }, include: { company: true } }) : null
+    const currentPersonnel = actorType === 'personnel' ? await prisma.personnel.findUnique({ where: { id: actorId }, include: { company: true } }) : null
+    const companyId = currentDirector?.companyId || currentPersonnel?.companyId || null
+    const prefix = companyLoginPrefix(currentDirector?.company ?? currentPersonnel?.company)
+    const loginId = makeLoginId(prefix, normalized.local)
+
+    const dirPhoneConflict = await prisma.director.findFirst({ where: { loginId, NOT: actorType === 'director' ? { id: actorId } : undefined } })
     if (dirPhoneConflict) { res.status(409).json({ error: 'Phone number already in use' }); return }
-    const perPhoneConflict = await prisma.personnel.findFirst({ where: { phone, NOT: actorType === 'personnel' ? { id: actorId } : undefined } })
+    const perPhoneConflict = await prisma.personnel.findFirst({ where: { ...(companyId ? { companyId, normalizedPhone: normalized.canonical } : { loginId }), NOT: actorType === 'personnel' ? { id: actorId } : undefined } })
     if (perPhoneConflict) { res.status(409).json({ error: 'Phone number already in use' }); return }
 
     // Check NIC globally unique (excluding self)
@@ -168,11 +200,11 @@ export async function updateProfile(req: Request, res: Response): Promise<void> 
     }
 
     if (actorType === 'director') {
-      const updated = await prisma.director.update({ where: { id: actorId }, data: { name, phone, nic: nic || null, email: email || null } })
+      const updated = await prisma.director.update({ where: { id: actorId }, data: { name, phone: normalized.local, normalizedPhone: normalized.canonical, loginId, nic: nic || null, email: email || null } })
       const { password: _p, ...safe } = updated
       res.json(safe)
     } else {
-      const updated = await prisma.personnel.update({ where: { id: actorId }, data: { name, phone, nic: nic || null, email: email || null } })
+      const updated = await prisma.personnel.update({ where: { id: actorId }, data: { name, phone: normalized.local, normalizedPhone: normalized.canonical, loginId, nic: nic || null, email: email || null } })
       const { password: _p, ...safe } = updated
       res.json(safe)
     }
@@ -213,15 +245,22 @@ export async function updatePersonnel(req: Request, res: Response): Promise<void
     if (actorType === 'personnel' && actorId !== req.params.id) {
       res.status(403).json({ error: 'You can only update your own profile' }); return
     }
-    const person = await prisma.personnel.findFirst({ where: { id: req.params.id, workspaceId, deletedAt: null } })
+    const person = await prisma.personnel.findFirst({ where: { id: req.params.id, workspaceId, deletedAt: null }, include: { company: true } })
     if (!person) { res.status(404).json({ error: 'Personnel not found' }); return }
     const { name, phone, nic, email, supervisorId, departmentId } = req.body
 
     // If phone is changing, check uniqueness globally
     if (phone && phone !== person.phone) {
-      const phoneConflictPersonnel = await prisma.personnel.findFirst({ where: { phone, NOT: { id: req.params.id } } })
+      const normalized = normalizeSriLankanPhone(phone)
+      const director = req.user!.actorType === 'director'
+        ? await prisma.director.findUnique({ where: { id: req.user!.actorId }, include: { company: true } })
+        : null
+      const targetCompanyId = director?.companyId || person.companyId
+      const targetPrefix = companyLoginPrefix(director?.company ?? person.company)
+      const loginId = makeLoginId(targetPrefix, normalized.local)
+      const phoneConflictPersonnel = await prisma.personnel.findFirst({ where: { ...(targetCompanyId ? { companyId: targetCompanyId, normalizedPhone: normalized.canonical } : { loginId }), NOT: { id: req.params.id } } })
       if (phoneConflictPersonnel) { res.status(409).json({ error: 'Phone number is already in use' }); return }
-      const phoneConflictDirector = await prisma.director.findFirst({ where: { phone } })
+      const phoneConflictDirector = await prisma.director.findFirst({ where: { loginId } })
       if (phoneConflictDirector) { res.status(409).json({ error: 'Phone number is already in use' }); return }
     }
 
@@ -237,9 +276,25 @@ export async function updatePersonnel(req: Request, res: Response): Promise<void
     const supervisorUpdate = supervisorId !== undefined ? { supervisorId: supervisorId || null } : {}
     const deptUpdate = actorType === 'director' && departmentId ? { departmentId } : {}
 
+    const normalizedUpdate = phone ? normalizeSriLankanPhone(phone) : null
+    const directorForLogin = req.user!.actorType === 'director'
+      ? await prisma.director.findUnique({ where: { id: req.user!.actorId }, include: { company: true } })
+      : null
+    const updatePrefix = companyLoginPrefix(directorForLogin?.company ?? person.company)
     const updated = await prisma.personnel.update({
       where: { id: req.params.id },
-      data: { name, phone, nic: nic || null, email: email || null, ...supervisorUpdate, ...deptUpdate }
+      data: {
+        name,
+        ...(normalizedUpdate ? {
+          phone: normalizedUpdate.local,
+          normalizedPhone: normalizedUpdate.canonical,
+          loginId: makeLoginId(updatePrefix, normalizedUpdate.local),
+        } : {}),
+        nic: nic || null,
+        email: email || null,
+        ...supervisorUpdate,
+        ...deptUpdate,
+      }
     })
     const { password: _p, ...safe } = updated
     res.json(safe)
@@ -350,4 +405,3 @@ export async function getPersonnelQueue(req: Request, res: Response): Promise<vo
     res.json(tasks)
   } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
 }
-

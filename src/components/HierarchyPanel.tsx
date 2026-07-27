@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react'
-import type { Layer, Department, Personnel } from '../types'
+import type { AuthUser, Layer, Department, Personnel } from '../types'
 import { workspaceApi } from '../services/apiService'
 import Select from './Select'
 
-export default function HierarchyPanel() {
+export default function HierarchyPanel({ user }: { user: AuthUser }) {
   const [layers, setLayers] = useState<Layer[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'structure' | 'personnel'>('structure')
@@ -17,7 +17,7 @@ export default function HierarchyPanel() {
   const [editForm, setEditForm] = useState({ name: '', phone: '', email: '', nic: '', departmentId: '', supervisorId: '' })
 
   const [deptForm, setDeptForm] = useState({ name: '', layerId: '' })
-  const [personnelForm, setPersonnelForm] = useState({ name: '', phone: '', email: '', nic: '', departmentId: '' })
+  const [personnelForm, setPersonnelForm] = useState({ name: '', phone: '', email: '', nic: '', departmentId: '', password: '', isActive: true })
   const [editingLayerId, setEditingLayerId] = useState<string | null>(null)
   const [editingLayerName, setEditingLayerName] = useState('')
   const [movingPersonnel, setMovingPersonnel] = useState<Personnel | null>(null)
@@ -85,7 +85,7 @@ export default function HierarchyPanel() {
     setSaving(true)
     try {
       await workspaceApi.createPersonnel(personnelForm)
-      setShowPersonnelModal(false); setPersonnelForm({ name: '', phone: '', email: '', nic: '', departmentId: '' }); await load()
+      setShowPersonnelModal(false); setPersonnelForm({ name: '', phone: '', email: '', nic: '', departmentId: '', password: '', isActive: true }); await load()
     } catch (e: unknown) { setError(e instanceof Error ? e.message : 'Error') }
     setSaving(false)
   }
@@ -141,6 +141,8 @@ export default function HierarchyPanel() {
   if (loading) return <div className="p-8 text-tw-text-secondary text-sm">Loading hierarchy...</div>
 
   const layerColors = ['bg-blue-500', 'bg-indigo-500', 'bg-purple-500']
+  const localPhonePreview = personnelForm.phone.replace(/\D/g, '').replace(/^94/, '0').replace(/^([^0])/, '0$1').slice(0, 10)
+  const loginPreview = personnelForm.phone ? `${user.companyPrefix || ''}${localPhonePreview}` : `${user.companyPrefix || ''}0712345678`
 
   return (
     <div className="p-6">
@@ -288,7 +290,7 @@ export default function HierarchyPanel() {
             <div>
               <label className="block text-sm font-medium text-tw-text mb-1">Phone Number <span className="text-tw-danger">*</span></label>
               <input className="input" type="tel" placeholder="07X XXXXXXX" value={personnelForm.phone} onChange={e => setPersonnelForm(f => ({ ...f, phone: e.target.value }))} />
-              <p className="text-xs text-tw-text-secondary mt-0.5">Used as login username. Must be unique in this workspace.</p>
+              <p className="text-xs text-tw-text-secondary mt-0.5">Login ID preview: <span className="font-mono font-semibold text-tw-primary">{loginPreview}</span></p>
             </div>
             <div>
               <label className="block text-sm font-medium text-tw-text mb-1">Email <span className="text-tw-text-secondary font-normal">(optional)</span></label>
@@ -298,6 +300,14 @@ export default function HierarchyPanel() {
               <label className="block text-sm font-medium text-tw-text mb-1">NIC <span className="text-tw-text-secondary font-normal">(optional)</span></label>
               <input className="input" placeholder="XXXXXXXXXV" value={personnelForm.nic} onChange={e => setPersonnelForm(f => ({ ...f, nic: e.target.value }))} />
             </div>
+            <div>
+              <label className="block text-sm font-medium text-tw-text mb-1">Temporary Password</label>
+              <input className="input" type="password" placeholder="Leave blank for default" value={personnelForm.password} onChange={e => setPersonnelForm(f => ({ ...f, password: e.target.value }))} />
+            </div>
+            <label className="flex items-center gap-2 text-sm text-tw-text">
+              <input type="checkbox" checked={personnelForm.isActive} onChange={e => setPersonnelForm(f => ({ ...f, isActive: e.target.checked }))} />
+              Active user
+            </label>
             <div>
               <label className="block text-sm font-medium text-tw-text mb-1">Department <span className="text-tw-danger">*</span></label>
               <Select
@@ -309,7 +319,7 @@ export default function HierarchyPanel() {
             </div>
             <div className="bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
               <p className="text-xs text-blue-700">
-                <strong>Auto login:</strong> Their password will be set to the last 6 digits of their phone number. They will be asked to change it on first login.
+                <strong>Login ID:</strong> The backend generates the login ID from the company prefix and normalized phone number.
               </p>
             </div>
             <div className="flex gap-2 justify-end">

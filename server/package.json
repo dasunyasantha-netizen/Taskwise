@@ -8,7 +8,10 @@
     "start": "node dist/index.js",
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "test": "tsx src/tests/companyHelpers.test.ts && tsx src/tests/companyOnboarding.test.ts",
+    "test:helpers": "tsx src/tests/companyHelpers.test.ts",
+    "test:integration": "tsx src/tests/companyOnboarding.test.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.8.0",
@@ -31,6 +34,7 @@
     "exceljs": "^4.4.0",
     "prisma": "^5.8.0",
     "ts-node-dev": "^2.0.0",
+    "tsx": "^4.23.1",
     "typescript": "^5.3.3"
   }
 }

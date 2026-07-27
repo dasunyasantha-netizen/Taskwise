@@ -13,6 +13,7 @@ import auditRoutes       from './routes/auditRoutes'
 import noticeRoutes      from './routes/noticeRoutes'
 import taskGroupRoutes        from './routes/taskGroupRoutes'
 import projectCategoryRoutes  from './routes/projectCategoryRoutes'
+import companyRequestRoutes   from './routes/companyRequestRoutes'
 
 const app  = express()
 const PORT = process.env.PORT || 4300
@@ -39,6 +40,7 @@ app.use('/api/reports',       auditRoutes)
 app.use('/api/notices',       noticeRoutes)
 app.use('/api/task-groups',        taskGroupRoutes)
 app.use('/api/project-categories', projectCategoryRoutes)
+app.use('/api/company',            companyRequestRoutes)
 
 // Health check
 app.get('/api/health', (_req, res) => {

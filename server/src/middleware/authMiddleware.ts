@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express'
 import jwt from 'jsonwebtoken'
+import prisma from '../prisma'
 
 export interface AuthPayload {
   actorId: string
@@ -57,4 +58,24 @@ export function requireChairman(req: Request, res: Response, next: NextFunction)
   }
   // Actual chairman check done in the controller after DB lookup
   next()
+}
+
+export async function requireSyswiseAdmin(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    if (req.user?.actorType !== 'director') {
+      res.status(403).json({ error: 'System administrator access required' })
+      return
+    }
+    const director = await prisma.director.findUnique({
+      where: { id: req.user.actorId },
+      select: { isSyswiseAdmin: true, isActive: true },
+    })
+    if (!director?.isSyswiseAdmin || !director.isActive) {
+      res.status(403).json({ error: 'System administrator access required' })
+      return
+    }
+    next()
+  } catch {
+    res.status(500).json({ error: 'Internal server error' })
+  }
 }

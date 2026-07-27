@@ -11,6 +11,7 @@ import type {
 } from '@simplewebauthn/server'
 import jwt from 'jsonwebtoken'
 import prisma from '../prisma'
+import { resolveLoginLookup } from '../helpers/phone'
 
 const RP_NAME = 'TaskWise'
 // On production this must be the actual domain; locally it's localhost
@@ -155,14 +156,22 @@ export async function authenticationOptions(req: Request, res: Response): Promis
     const { phone } = req.body
     if (!phone) { res.status(400).json({ error: 'phone is required' }); return }
 
-    // Find actor by phone
+    const { loginId, lookupPhone } = resolveLoginLookup(phone)
+
+    // Find actor by login ID (legacy raw codes and prefixed mobile logins both supported)
     let actorId: string, actorType: string
-    const director = await prisma.director.findUnique({ where: { phone } })
+    const director = await prisma.director.findFirst({ where: { OR: [{ loginId }, { phone: lookupPhone }], isActive: true }, include: { company: true } })
     if (director) {
+      if (director.company && director.company.status !== 'ACTIVE') {
+        res.status(404).json({ error: 'User not found' }); return
+      }
       actorId = director.id; actorType = 'director'
     } else {
-      const personnel = await prisma.personnel.findUnique({ where: { phone } })
+      const personnel = await prisma.personnel.findFirst({ where: { OR: [{ loginId }, { phone: lookupPhone }], isActive: true }, include: { company: true } })
       if (!personnel || personnel.deletedAt) {
+        res.status(404).json({ error: 'User not found' }); return
+      }
+      if (personnel.company && personnel.company.status !== 'ACTIVE') {
         res.status(404).json({ error: 'User not found' }); return
       }
       actorId = personnel.id; actorType = 'personnel'

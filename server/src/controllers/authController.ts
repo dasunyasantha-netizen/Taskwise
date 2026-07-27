@@ -2,6 +2,7 @@ import { Request, Response } from 'express'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import prisma from '../prisma'
+import { normalizeSriLankanPhone, resolveLoginLookup } from '../helpers/phone'
 
 function signToken(actorId: string, actorType: 'director' | 'personnel', workspaceId: string, extra?: object) {
   return jwt.sign(
@@ -9,6 +10,36 @@ function signToken(actorId: string, actorType: 'director' | 'personnel', workspa
     process.env.JWT_SECRET!,
     { expiresIn: '7d' }
   )
+}
+
+type LoginAccount = {
+  loginId: string | null
+  companyId: string | null
+  company: { prefix: string; allowUnprefixedLogin: boolean; status: string } | null
+}
+
+/**
+ * Deterministically resolve which account a login ID refers to.
+ *
+ * The same phone number may legitimately exist in multiple companies, so a
+ * lookup by phone can return several candidates. This picks the correct one:
+ *  - Prefixed login (e.g. FF0712345678): only an account whose company prefix
+ *    matches exactly. A company user can never be resolved via another
+ *    company's prefix, nor via the bare phone.
+ *  - Unprefixed login (e.g. 0712345678): only a legacy account (no company) or
+ *    a company that explicitly allows unprefixed login (Youth Council). This
+ *    prevents a prefixed-company user who shares the phone from shadowing — and
+ *    thereby breaking — an existing unprefixed Youth Council login.
+ */
+export function selectAccountByLogin<T extends LoginAccount>(
+  candidates: T[],
+  parsed: { prefix: string | null; localPhone: string },
+): T | null {
+  if (parsed.prefix) {
+    return candidates.find(c => c.company?.prefix?.toUpperCase() === parsed.prefix) || null
+  }
+  const legacy = candidates.filter(c => !c.companyId || c.company?.allowUnprefixedLogin)
+  return legacy.find(c => c.loginId === parsed.localPhone) || legacy[0] || null
 }
 
 // POST /api/auth/login  — unified phone-based login (Director first, then Personnel)
@@ -19,13 +50,24 @@ export async function unifiedLogin(req: Request, res: Response): Promise<void> {
       res.status(400).json({ error: 'phone and password are required' })
       return
     }
+    const invalid = () => res.status(401).json({ error: 'Invalid login ID or password.' })
+    const { loginId, lookupPhone, selector } = resolveLoginLookup(phone)
 
     // 1. Try Director
-    const director = await prisma.director.findUnique({ where: { phone } })
+    const directorCandidates = await prisma.director.findMany({
+      where: { OR: [{ loginId }, { phone: lookupPhone }] },
+      include: { company: true },
+    })
+    const director = selectAccountByLogin(directorCandidates, selector)
     if (director) {
+      if (!director.isActive) {
+        invalid(); return
+      }
+      if (director.company && director.company.status !== 'ACTIVE') {
+        invalid(); return
+      }
       if (!(await bcrypt.compare(password, director.password))) {
-        res.status(401).json({ error: 'Invalid credentials' })
-        return
+        invalid(); return
       }
       const token = signToken(director.id, 'director', director.workspaceId!)
 
@@ -56,6 +98,11 @@ export async function unifiedLogin(req: Request, res: Response): Promise<void> {
           email: director.email,
           avatarUrl: director.avatarUrl,
           isChairman: director.isChairman,
+          isSyswiseAdmin: director.isSyswiseAdmin,
+          isCompanyAdmin: director.isCompanyAdmin,
+          loginId: director.loginId || director.phone,
+          companyId: director.companyId,
+          companyPrefix: director.company?.prefix,
           companyName: workspace?.companyName,
           companyLogo: workspace?.companyLogo,
         }
@@ -63,19 +110,21 @@ export async function unifiedLogin(req: Request, res: Response): Promise<void> {
       return
     }
 
-    // 2. Try Personnel (phone globally unique)
-    const personnel = await prisma.personnel.findUnique({
-      where: { phone },
-      include: { department: { include: { layer: true } } }
+    // 2. Try Personnel
+    const personnelCandidates = await prisma.personnel.findMany({
+      where: { deletedAt: null, OR: [{ loginId }, { phone: lookupPhone }] },
+      include: { department: { include: { layer: true } }, company: true }
     })
-    if (personnel?.deletedAt) {
-      res.status(401).json({ error: 'Invalid credentials' })
-      return
-    }
+    const personnel = selectAccountByLogin(personnelCandidates, selector)
     if (personnel) {
+      if (!personnel.isActive) {
+        invalid(); return
+      }
+      if (personnel.company && personnel.company.status !== 'ACTIVE') {
+        invalid(); return
+      }
       if (!(await bcrypt.compare(password, personnel.password))) {
-        res.status(401).json({ error: 'Invalid credentials' })
-        return
+        invalid(); return
       }
       const layerNumber = personnel.department.layer.number
       const token = signToken(personnel.id, 'personnel', personnel.workspaceId, {
@@ -108,6 +157,9 @@ export async function unifiedLogin(req: Request, res: Response): Promise<void> {
           phone: personnel.phone,
           email: personnel.email,
           avatarUrl: personnel.avatarUrl,
+          loginId: personnel.loginId || personnel.phone,
+          companyId: personnel.companyId,
+          companyPrefix: personnel.company?.prefix,
           layerNumber,
           departmentId: personnel.departmentId,
           companyName: workspace?.companyName,
@@ -118,7 +170,7 @@ export async function unifiedLogin(req: Request, res: Response): Promise<void> {
       return
     }
 
-    res.status(401).json({ error: 'Invalid credentials' })
+    invalid()
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Internal server error' })
@@ -133,7 +185,8 @@ export async function directorRegister(req: Request, res: Response): Promise<voi
       res.status(400).json({ error: 'phone, password, and name are required' })
       return
     }
-    const existing = await prisma.director.findUnique({ where: { phone } })
+    const normalized = normalizeSriLankanPhone(phone)
+    const existing = await prisma.director.findFirst({ where: { OR: [{ loginId: normalized.local }, { phone: normalized.local }] } })
     if (existing) {
       res.status(409).json({ error: 'Phone already registered' })
       return
@@ -151,7 +204,7 @@ export async function directorRegister(req: Request, res: Response): Promise<voi
         ]
       })
       const dir = await tx.director.create({
-        data: { phone, password: hashed, name, workspaceId: workspace.id }
+        data: { phone: normalized.local, normalizedPhone: normalized.canonical, loginId: normalized.local, password: hashed, name, workspaceId: workspace.id }
       })
       return dir
     })
@@ -215,7 +268,7 @@ export async function getMe(req: Request, res: Response): Promise<void> {
     if (actorType === 'director') {
       const director = await prisma.director.findUnique({
         where: { id: actorId },
-        select: { id: true, phone: true, email: true, nic: true, name: true, avatarUrl: true, workspaceId: true, isChairman: true }
+        select: { id: true, phone: true, email: true, nic: true, name: true, avatarUrl: true, workspaceId: true, isChairman: true, isSyswiseAdmin: true, isCompanyAdmin: true, loginId: true, companyId: true, company: { select: { prefix: true } } }
       })
       const workspace = workspaceId
         ? await prisma.workspace.findUnique({
@@ -223,11 +276,11 @@ export async function getMe(req: Request, res: Response): Promise<void> {
             select: { companyName: true, companyLogo: true }
           })
         : null
-      res.json({ actorId, actorType, workspaceId, ...director, companyName: workspace?.companyName, companyLogo: workspace?.companyLogo })
+      res.json({ actorId, actorType, workspaceId, ...director, companyPrefix: director?.company?.prefix, companyName: workspace?.companyName, companyLogo: workspace?.companyLogo })
     } else {
       const personnel = await prisma.personnel.findUnique({
         where: { id: actorId },
-        select: { id: true, phone: true, email: true, nic: true, name: true, avatarUrl: true, departmentId: true, workspaceId: true }
+        select: { id: true, phone: true, email: true, nic: true, name: true, avatarUrl: true, departmentId: true, workspaceId: true, loginId: true, companyId: true, company: { select: { prefix: true } } }
       })
       const workspace = workspaceId
         ? await prisma.workspace.findUnique({
@@ -235,7 +288,7 @@ export async function getMe(req: Request, res: Response): Promise<void> {
             select: { companyName: true, companyLogo: true }
           })
         : null
-      res.json({ actorId, actorType, workspaceId, ...personnel, companyName: workspace?.companyName, companyLogo: workspace?.companyLogo })
+      res.json({ actorId, actorType, workspaceId, ...personnel, companyPrefix: personnel?.company?.prefix, companyName: workspace?.companyName, companyLogo: workspace?.companyLogo })
     }
   } catch (err) {
     console.error(err)

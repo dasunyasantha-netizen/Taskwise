@@ -21,6 +21,7 @@ import type { ReportsState } from './ReportsPage'
 import { DEFAULT_REPORTS_STATE } from './ReportsPage'
 import ImpersonationPage from './ImpersonationPage'
 import UserAnalyticsPage from './UserAnalyticsPage'
+import CompanyRequestsPage from './CompanyRequestsPage'
 
 interface Props {
   user: AuthUser
@@ -898,6 +899,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
     { label: 'User Analytics',  view: 'user_analytics'  as ViewMode, icon: '📈' },
     ...(user.isChairman ? [{ label: 'User Access', view: 'impersonation' as ViewMode, icon: '🔐' }] : []),
     { label: 'Settings',       view: 'settings'           as ViewMode, icon: '⚙️' },
+    ...(user.isSyswiseAdmin ? [{ label: 'Company Requests', view: 'company_requests' as ViewMode, icon: 'C' }] : []),
     { label: 'My Profile',     view: 'profile'            as ViewMode, icon: '👤' },
   ]
 
@@ -927,6 +929,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
     { label: 'Audit Log',       view: 'audit_log'         as ViewMode, icon: '📜' },
     ...(user.isChairman ? [{ label: 'User Access', view: 'impersonation' as ViewMode, icon: '🔐' }] : []),
     { label: 'Settings',        view: 'settings'          as ViewMode, icon: '⚙️' },
+    ...(user.isSyswiseAdmin ? [{ label: 'Company Requests', view: 'company_requests' as ViewMode, icon: 'C' }] : []),
     { label: 'My Profile',      view: 'profile'           as ViewMode, icon: '👤' },
   ]
 
@@ -1035,6 +1038,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
                   : currentView === 'reports' ? 'Reports'
                   : currentView === 'impersonation' ? 'User Access'
                   : currentView === 'user_analytics' ? 'User Analytics'
+                  : currentView === 'company_requests' ? 'Company Requests'
                   : 'My Profile'}
               </div>
             </div>
@@ -1181,7 +1185,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
           )}
 
           {/* HIERARCHY */}
-          {currentView === 'hierarchy_manager' && <HierarchyPanel />}
+          {currentView === 'hierarchy_manager' && <HierarchyPanel user={user} />}
 
           {/* SETTINGS */}
           {currentView === 'settings' && (
@@ -1268,6 +1272,10 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
           {/* USER ANALYTICS */}
           {currentView === 'user_analytics' && (
             <UserAnalyticsPage />
+          )}
+
+          {currentView === 'company_requests' && user.isSyswiseAdmin && (
+            <CompanyRequestsPage />
           )}
 
           {/* AUDIT LOG */}

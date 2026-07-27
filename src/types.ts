@@ -24,6 +24,11 @@ export interface AuthUser {
   companyLogo?: string
   mustChangePassword?: boolean
   isChairman?: boolean
+  isSyswiseAdmin?: boolean
+  isCompanyAdmin?: boolean
+  loginId?: string
+  companyId?: string
+  companyPrefix?: string
   impersonation?: ImpersonationInfo
 }
 
@@ -289,6 +294,7 @@ export type ViewMode =
   | 'reports'
   | 'impersonation'
   | 'user_analytics'
+  | 'company_requests'
   | 'settings'
   | 'profile'
 
