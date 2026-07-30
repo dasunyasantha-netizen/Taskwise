@@ -250,6 +250,7 @@ export type NotificationType =
   | 'subtask_all_approved'
   | 'comment_added'
   | 'personnel_moved'
+  | 'company_request_submitted'
 
 export interface Notification {
   id: string
@@ -257,6 +258,7 @@ export interface Notification {
   title: string
   message: string
   taskId?: string
+  payload?: { reference?: string; [key: string]: unknown }
   isRead: boolean
   readAt?: string
   createdAt: string

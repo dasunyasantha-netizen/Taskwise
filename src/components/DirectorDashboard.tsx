@@ -1103,7 +1103,16 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
                 <span className="hidden xs:inline">Notify</span>
               </button>
             )}
-            <NotificationsMenu />
+            <NotificationsMenu
+              onOpenTask={async taskId => {
+                try {
+                  setSelectedTask(await taskApi.get(taskId) as Task)
+                } catch {
+                  await loadDashboard()
+                }
+              }}
+              onOpenCompanyRequests={() => navigate('company_requests')}
+            />
             {/* Mobile user menu */}
             <MobileUserMenu user={user} onProfile={() => setView('profile' as ViewMode)} onSettings={() => setView('settings' as ViewMode)} onLogout={onLogout} />
           </div>

@@ -112,7 +112,7 @@ UPDATE "Personnel" p SET
 FROM "Workspace" w
 WHERE p."workspaceId" = w."id";
 
-UPDATE "Director" SET "isSyswiseAdmin" = true WHERE regexp_replace("phone", '\D', '', 'g') IN ('0706786776', '706786776', '94706786776');
+UPDATE "Director" SET "isSyswiseAdmin" = true WHERE regexp_replace("phone", '\D', '', 'g') IN ('0760786776', '760786776', '94760786776');
 
 -- Phone is no longer globally unique: the same phone may exist in different
 -- companies (distinguished by prefix). Prisma's @unique creates a unique INDEX,

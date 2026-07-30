@@ -2,7 +2,12 @@ import React, { useState, useEffect, useRef } from 'react'
 import type { Notification } from '../types'
 import { notificationApi } from '../services/apiService'
 
-export default function NotificationsMenu() {
+type Props = {
+  onOpenTask?: (taskId: string) => void | Promise<void>
+  onOpenCompanyRequests?: () => void
+}
+
+export default function NotificationsMenu({ onOpenTask, onOpenCompanyRequests }: Props) {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -40,6 +45,20 @@ export default function NotificationsMenu() {
   const markAll = async () => {
     await notificationApi.readAll()
     setNotifications(prev => prev.map(n => ({ ...n, isRead: true })))
+  }
+
+  const handleNotificationClick = async (notification: Notification) => {
+    if (!notification.isRead) await markRead(notification.id)
+    setOpen(false)
+
+    if (notification.type === 'company_request_submitted') {
+      onOpenCompanyRequests?.()
+      return
+    }
+
+    if (notification.taskId) {
+      await onOpenTask?.(notification.taskId)
+    }
   }
 
   const typeIcon: Record<string, string> = {
@@ -89,7 +108,7 @@ export default function NotificationsMenu() {
               notifications.map(n => (
                 <div
                   key={n.id}
-                  onClick={() => !n.isRead && markRead(n.id)}
+                  onClick={() => handleNotificationClick(n)}
                   className={`px-4 py-3 border-b border-tw-border last:border-0 cursor-pointer hover:bg-tw-hover transition-colors ${!n.isRead ? 'bg-blue-50' : ''}`}
                 >
                   <div className="flex items-start gap-2">
@@ -112,3 +131,4 @@ export default function NotificationsMenu() {
     </div>
   )
 }
+

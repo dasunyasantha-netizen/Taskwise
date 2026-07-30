@@ -42,8 +42,59 @@ export async function listNotifications(req: Request, res: Response): Promise<vo
       where,
       orderBy: { createdAt: 'desc' },
       take: 50,
+      include: {
+        task: { select: { id: true, status: true, approvalById: true, approvalByType: true } },
+      },
     })
-    res.json(notifications)
+
+    const companyRequestRefs = notifications
+      .filter(n => n.type === 'company_request_submitted')
+      .map(n => (n.payload as { reference?: string } | null)?.reference)
+      .filter((ref): ref is string => !!ref)
+
+    const companyRequests = companyRequestRefs.length > 0
+      ? await prisma.companyRequest.findMany({
+          where: { reference: { in: companyRequestRefs } },
+          select: { reference: true, status: true },
+        })
+      : []
+    const companyRequestStatus = new Map(companyRequests.map(r => [r.reference, r.status]))
+
+    const staleIds: string[] = []
+    const visible = notifications.filter(notification => {
+      if (notification.type === 'task_submitted_for_approval') {
+        const task = notification.task
+        const isCurrentApprover = task?.approvalById === actorId && task?.approvalByType === actorType
+        const isActionable = !!task && task.status === 'SUBMITTED' && isCurrentApprover
+        if (!isActionable) staleIds.push(notification.id)
+        return isActionable
+      }
+
+      if (['task_assigned', 'subtask_created'].includes(notification.type)) {
+        const isActionable = !!notification.task && !['APPROVED', 'CANCELLED'].includes(notification.task.status)
+        if (!isActionable) staleIds.push(notification.id)
+        return isActionable
+      }
+
+      if (notification.type === 'company_request_submitted') {
+        const reference = (notification.payload as { reference?: string } | null)?.reference
+        const status = reference ? companyRequestStatus.get(reference) : null
+        const isActionable = status === 'PENDING' || status === 'MORE_INFORMATION_REQUIRED'
+        if (!isActionable) staleIds.push(notification.id)
+        return isActionable
+      }
+
+      return true
+    })
+
+    if (staleIds.length > 0) {
+      await prisma.notification.updateMany({
+        where: { id: { in: staleIds }, isRead: false },
+        data: { isRead: true, readAt: new Date() },
+      })
+    }
+
+    res.json(visible.map(({ task, ...notification }) => notification))
   } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
 }
 

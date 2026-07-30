@@ -1038,7 +1038,16 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
                 <span className="hidden xs:inline">Notify</span>
               </button>
             )}
-            <NotificationsMenu />
+            <NotificationsMenu
+              onOpenTask={async taskId => {
+                try {
+                  setTaskStack([])
+                  setSelectedTask(await taskApi.get(taskId) as Task)
+                } catch {
+                  await load()
+                }
+              }}
+            />
             <MobileUserMenu user={user} onProfile={() => navigate('profile' as ViewMode)} onLogout={onLogout} />
           </div>
         </header>

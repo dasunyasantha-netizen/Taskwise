@@ -693,7 +693,6 @@ export async function approveTask(req: Request, res: Response): Promise<void> {
         await tx.task.update({ where: { id: task.id }, data: { status: 'APPROVED' } })
         await writeAudit(tx, workspaceId, 'TASK_APPROVED', actorType, actorId, task.id, undefined, req.user!)
       }
-      await writeAudit(tx, workspaceId, 'TASK_APPROVED', actorType, actorId, task.id, undefined, req.user!)
 
       // If this is a group task instance, check if all sibling instances are now approved
       if (task.groupTaskId) {
@@ -715,7 +714,7 @@ export async function approveTask(req: Request, res: Response): Promise<void> {
         const parent = await tx.task.findUnique({ where: { id: task.parentTaskId } })
         if (parent?.approvalById && parent?.approvalByType) {
           // Check if all sibling subtasks are now approved
-          const stillBlocking = await prisma.$queryRaw<Array<{ id: string }>>`
+          const stillBlocking = await tx.$queryRaw<Array<{ id: string }>>`
             WITH RECURSIVE subtree AS (
               SELECT id, status FROM "Task"
               WHERE "parentTaskId" = ${parent.id}
