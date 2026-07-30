@@ -397,7 +397,7 @@ function PersonnelApprovalRow({ task, onRefresh, onOpen }: { task: Task; onRefre
         </td>
         <td className="px-4 py-3.5">
           <div className="flex items-center gap-2">
-            <button disabled={loading} onClick={() => doAction(() => taskApi.approve(task.id))}
+            <button disabled={loading} onClick={() => { if (confirm(`Approve "${task.title}"?\n\nThis marks the task as approved.`)) doAction(() => taskApi.approve(task.id)) }}
               className="px-3 py-1.5 rounded-lg bg-tw-success text-white text-xs font-semibold hover:opacity-90 disabled:opacity-50">
               ✓ Approve
             </button>
@@ -692,7 +692,7 @@ function MobileApprovalCard({ task, onRefresh, onOpen }: { task: Task; onRefresh
           </div>
           {error && <div className="text-xs text-tw-danger">{error}</div>}
           <div className="grid grid-cols-3 gap-2 pt-1">
-            <button disabled={loading} onClick={() => doAction(() => taskApi.approve(task.id))}
+            <button disabled={loading} onClick={() => { if (confirm(`Approve "${task.title}"?\n\nThis marks the task as approved.`)) doAction(() => taskApi.approve(task.id)) }}
               className="py-2.5 rounded-xl bg-[#00c875] text-white text-xs font-bold active:opacity-80 disabled:opacity-50">
               ✓ Approve
             </button>

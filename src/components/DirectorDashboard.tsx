@@ -98,6 +98,7 @@ function ApprovalTaskRow({
   }
 
   const doApprove = async () => {
+    if (!confirm(`Approve "${task.title}"?\n\nThis marks the task as approved.`)) return
     setActionLoading(true); setActionError('')
     try { await taskApi.approve(task.id); onRefresh() }
     catch (e: unknown) { setActionError(e instanceof Error ? e.message : 'Failed') }

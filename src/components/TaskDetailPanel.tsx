@@ -382,7 +382,7 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
           {/* Action buttons */}
           <div className="flex flex-wrap gap-2 mt-3">
             {canSubmit    && <button disabled={actionLoading} onClick={() => doAction(() => taskApi.submit(task.id))} className="btn-primary text-xs py-1.5">✓ Submit for Approval</button>}
-            {canApprove   && <button disabled={actionLoading} onClick={() => doAction(() => taskApi.approve(task.id))} className="bg-tw-success hover:opacity-90 text-white font-semibold px-3 py-1.5 rounded-lg text-xs transition-opacity">✓ Approve</button>}
+            {canApprove   && <button disabled={actionLoading} onClick={() => { if (confirm(`Approve "${task.title}"?\n\nThis marks the task as approved.`)) doAction(() => taskApi.approve(task.id)) }} className="bg-tw-success hover:opacity-90 text-white font-semibold px-3 py-1.5 rounded-lg text-xs transition-opacity">✓ Approve</button>}
             {canHandOver  && <button disabled={actionLoading} onClick={openAssignNext} className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-3 py-1.5 rounded-lg text-xs transition-colors">⛓ Approve & Assign Next</button>}
             {canReject    && <button disabled={actionLoading} onClick={() => setShowReasonModal('reject')} className="btn-danger text-xs py-1.5">↩ Send Back</button>}
             {canReopen    && <button disabled={actionLoading} onClick={() => doAction(() => taskApi.reopen(task.id))} className="btn-secondary text-xs py-1.5">↻ Reopen</button>}
