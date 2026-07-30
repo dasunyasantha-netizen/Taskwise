@@ -296,6 +296,7 @@ export type ViewMode =
   | 'reports'
   | 'impersonation'
   | 'user_analytics'
+  | 'leaderboard'
   | 'company_requests'
   | 'settings'
   | 'profile'

@@ -10,6 +10,7 @@ interface PersonnelStat {
   loginCount90d: number
   lastLogin: string | null
   taskCount: number
+  points: number
 }
 
 interface LoginLogEntry {
@@ -178,7 +179,7 @@ export default function UserAnalyticsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
-  const [sortBy, setSortBy] = useState<'name' | 'loginCount90d' | 'lastLogin' | 'taskCount'>('loginCount90d')
+  const [sortBy, setSortBy] = useState<'name' | 'loginCount90d' | 'lastLogin' | 'taskCount' | 'points'>('loginCount90d')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [selectedPerson, setSelectedPerson] = useState<PersonnelStat | null>(null)
 
@@ -305,7 +306,7 @@ export default function UserAnalyticsPage() {
                   <div className="font-medium text-tw-text text-sm truncate">{p.name}</div>
                   <div className="text-xs text-tw-text-secondary">{p.department}</div>
                   <div className="text-xs text-tw-text-secondary mt-0.5">
-                    {p.loginCount90d} login{p.loginCount90d !== 1 ? 's' : ''} · Last {ds === null ? 'never' : ds === 0 ? 'today' : `${ds}d ago`}
+                    <span className={`font-bold ${p.points < 0 ? 'text-tw-danger' : 'text-tw-primary'}`}>{p.points} pts</span> · {p.loginCount90d} login{p.loginCount90d !== 1 ? 's' : ''} · Last {ds === null ? 'never' : ds === 0 ? 'today' : `${ds}d ago`}
                   </div>
                 </div>
                 <span className={`text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${badge.cls}`}>{badge.label}</span>
@@ -325,6 +326,7 @@ export default function UserAnalyticsPage() {
                   { label: 'Logins (90d)', col: 'loginCount90d' as const },
                   { label: 'Last Login', col: 'lastLogin' as const },
                   { label: 'Tasks Assigned', col: 'taskCount' as const },
+                  { label: 'Points', col: 'points' as const },
                   { label: 'Activity', col: null },
                 ].map(h => (
                   <th key={h.label}
@@ -339,7 +341,7 @@ export default function UserAnalyticsPage() {
             </thead>
             <tbody className="divide-y divide-tw-border">
               {filtered.length === 0 ? (
-                <tr><td colSpan={7} className="py-10 text-center text-tw-text-secondary">No users found</td></tr>
+                <tr><td colSpan={8} className="py-10 text-center text-tw-text-secondary">No users found</td></tr>
               ) : filtered.map(p => {
                 const badge = activityBadge(p.loginCount90d)
                 const ds = daysSince(p.lastLogin)
@@ -365,6 +367,9 @@ export default function UserAnalyticsPage() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-tw-text-secondary text-xs">{p.taskCount}</td>
+                    <td className="px-4 py-3">
+                      <span className={`font-bold ${p.points < 0 ? 'text-tw-danger' : 'text-tw-primary'}`}>{p.points}</span>
+                    </td>
                     <td className="px-4 py-3">
                       <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${badge.cls}`}>{badge.label}</span>
                     </td>

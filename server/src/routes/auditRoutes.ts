@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { authenticateToken } from '../middleware/authMiddleware'
-import { listAuditLogs, getOverdue, getProgress, getPersonnelQueueReport, getRecentUpdates, getUserLoginHistory, getUserAnalyticsOverview } from '../controllers/auditController'
+import { listAuditLogs, getOverdue, getProgress, getPersonnelQueueReport, getRecentUpdates, getUserLoginHistory, getUserAnalyticsOverview, getLeaderboard, getMyScore } from '../controllers/auditController'
 
 const router = Router()
 router.use(authenticateToken)
@@ -12,5 +12,7 @@ router.get('/recent-updates',                    getRecentUpdates)
 router.get('/queue/:personnelId',                getPersonnelQueueReport)
 router.get('/user-analytics/overview',           getUserAnalyticsOverview)
 router.get('/user-analytics/logins/:actorId',   getUserLoginHistory)
+router.get('/leaderboard',                       getLeaderboard)
+router.get('/my-score',                          getMyScore)
 
 export default router

@@ -1,5 +1,6 @@
 import { Request, Response } from 'express'
 import prisma from '../prisma'
+import { computeWorkspaceScores, POINTS, SCORING_EPOCH } from '../helpers/scoring'
 
 // GET /api/audit
 export async function listAuditLogs(req: Request, res: Response): Promise<void> {
@@ -134,7 +135,7 @@ export async function getUserAnalyticsOverview(req: Request, res: Response): Pro
     if (req.user!.actorType !== 'director') { res.status(403).json({ error: 'Director only' }); return }
     const { workspaceId } = req.user!
 
-    const [personnel, loginStats, taskStats] = await Promise.all([
+    const [personnel, loginStats, taskStats, scores] = await Promise.all([
       // All active personnel
       prisma.personnel.findMany({
         where: { workspaceId, deletedAt: null },
@@ -158,10 +159,13 @@ export async function getUserAnalyticsOverview(req: Request, res: Response): Pro
         where: { task: { workspaceId, deletedAt: null }, personnelId: { not: null } },
         _count: { _all: true },
       }),
+      // Derived gamification points per personnel
+      computeWorkspaceScores(workspaceId),
     ])
 
     const loginMap = new Map(loginStats.map(l => [l.actorId, { count: l._count._all, lastLogin: l._max.loggedInAt }]))
     const taskMap  = new Map(taskStats.map(t => [t.personnelId!, t._count._all]))
+    const pointsMap = new Map(scores.map(s => [s.id, s.totalPoints]))
 
     // Daily login activity for the whole workspace (last 30 days)
     const dailyLogins = await prisma.loginLog.groupBy({
@@ -188,9 +192,65 @@ export async function getUserAnalyticsOverview(req: Request, res: Response): Pro
         loginCount90d: loginMap.get(p.id)?.count ?? 0,
         lastLogin:     loginMap.get(p.id)?.lastLogin ?? null,
         taskCount:     taskMap.get(p.id) ?? 0,
+        points:        pointsMap.get(p.id) ?? 0,
       })),
       totalLoginsLast30d: dailyLogins.reduce((s, r) => s + r._count._all, 0),
       loginTrend: loginTrend.map(r => ({ day: r.day, count: Number(r.count) })),
+    })
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
+}
+
+// GET /api/reports/leaderboard
+// Director-only: full ranked leaderboard + summary cards for the workspace.
+export async function getLeaderboard(req: Request, res: Response): Promise<void> {
+  try {
+    if (req.user!.actorType !== 'director') { res.status(403).json({ error: 'Director only' }); return }
+    const { workspaceId } = req.user!
+
+    const scores = await computeWorkspaceScores(workspaceId)   // already sorted desc
+
+    // Summary cards
+    const totalPointsEarned = scores.reduce((s, u) => s + u.totalPoints, 0)
+    const scored            = scores.filter(u => u.totalPoints !== 0)
+    const avgScore          = scores.length ? Math.round(totalPointsEarned / scores.length) : 0
+    const topPerformer      = scores[0] && scores[0].totalPoints > 0 ? scores[0] : null
+
+    // Most active department = highest summed points among departments
+    const deptTotals = new Map<string, number>()
+    for (const u of scores) deptTotals.set(u.department, (deptTotals.get(u.department) ?? 0) + u.totalPoints)
+    let mostActiveDept: { name: string; points: number } | null = null
+    for (const [name, points] of deptTotals) {
+      if (!mostActiveDept || points > mostActiveDept.points) mostActiveDept = { name, points }
+    }
+
+    res.json({
+      leaderboard: scores.map((u, i) => ({ ...u, rank: i + 1 })),
+      summary: {
+        topPerformer: topPerformer && { id: topPerformer.id, name: topPerformer.name, department: topPerformer.department, points: topPerformer.totalPoints },
+        totalPointsEarned,
+        avgScore,
+        scoredUserCount: scored.length,
+        mostActiveDept,
+      },
+      config: { epoch: SCORING_EPOCH, points: POINTS },
+    })
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
+}
+
+// GET /api/reports/my-score
+// The signed-in user's own score + breakdown (personnel or director).
+export async function getMyScore(req: Request, res: Response): Promise<void> {
+  try {
+    const { workspaceId, actorId, actorType } = req.user!
+    const scores = await computeWorkspaceScores(workspaceId)
+    const sorted = scores  // already sorted desc
+    const idx = sorted.findIndex(s => s.id === actorId)
+    const mine = idx >= 0 ? { ...sorted[idx], rank: idx + 1 } : null
+    res.json({
+      score: mine,
+      totalUsers: sorted.length,
+      actorType,
+      config: { epoch: SCORING_EPOCH, points: POINTS },
     })
   } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
 }

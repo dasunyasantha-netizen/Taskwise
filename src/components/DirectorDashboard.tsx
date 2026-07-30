@@ -21,6 +21,7 @@ import type { ReportsState } from './ReportsPage'
 import { DEFAULT_REPORTS_STATE } from './ReportsPage'
 import ImpersonationPage from './ImpersonationPage'
 import UserAnalyticsPage from './UserAnalyticsPage'
+import LeaderboardPage from './LeaderboardPage'
 import CompanyRequestsPage from './CompanyRequestsPage'
 
 interface Props {
@@ -1039,6 +1040,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
                   : currentView === 'reports' ? 'Reports'
                   : currentView === 'impersonation' ? 'User Access'
                   : currentView === 'user_analytics' ? 'User Analytics'
+                  : currentView === 'leaderboard' ? 'Leaderboard'
                   : currentView === 'company_requests' ? 'Company Requests'
                   : 'My Profile'}
               </div>
@@ -1165,6 +1167,25 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/>
                     </svg>
                   </button>
+
+                  {/* Leaderboard shortcut */}
+                  <button
+                    onClick={() => navigate('leaderboard')}
+                    className="w-full card p-5 flex items-center justify-between hover:shadow-panel transition-shadow group mt-3"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">🏆</span>
+                      <div className="text-left">
+                        <div className="font-semibold text-tw-text text-sm">Leaderboard</div>
+                        <div className="text-xs text-tw-text-secondary mt-0.5">
+                          See who's earning points — daily logins, task updates, on-time submissions &amp; more
+                        </div>
+                      </div>
+                    </div>
+                    <svg className="w-5 h-5 text-tw-text-secondary group-hover:text-tw-primary transition-colors flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/>
+                    </svg>
+                  </button>
                 </>
               )}
             </div>
@@ -1282,6 +1303,11 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
           {/* USER ANALYTICS */}
           {currentView === 'user_analytics' && (
             <UserAnalyticsPage />
+          )}
+
+          {/* LEADERBOARD */}
+          {currentView === 'leaderboard' && (
+            <LeaderboardPage />
           )}
 
           {currentView === 'company_requests' && user.isSyswiseAdmin && (
