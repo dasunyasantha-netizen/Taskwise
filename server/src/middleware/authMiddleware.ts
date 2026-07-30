@@ -6,6 +6,8 @@ export interface AuthPayload {
   actorId: string
   actorType: 'director' | 'personnel'
   workspaceId: string
+  iat?: number
+  exp?: number
   layerNumber?: number  // Personnel only: which layer they belong to (1, 2, or 3)
   departmentId?: string // Personnel only: their department
   // Impersonation fields — present only when Chairman is viewing as another user
@@ -22,6 +24,18 @@ declare global {
   }
 }
 
+const SRI_LANKA_UTC_OFFSET_MS = 5.5 * 60 * 60 * 1000
+
+function startOfTodayInSriLankaUtcMs(now = new Date()): number {
+  const sriLankaNow = new Date(now.getTime() + SRI_LANKA_UTC_OFFSET_MS)
+  const sriLankaDayStart = Date.UTC(
+    sriLankaNow.getUTCFullYear(),
+    sriLankaNow.getUTCMonth(),
+    sriLankaNow.getUTCDate(),
+  )
+  return sriLankaDayStart - SRI_LANKA_UTC_OFFSET_MS
+}
+
 export function authenticateToken(req: Request, res: Response, next: NextFunction): void {
   const authHeader = req.headers['authorization']
   const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null
@@ -33,6 +47,10 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
 
   try {
     const payload = jwt.verify(token, process.env.JWT_SECRET!) as AuthPayload
+    if (!payload.iat || payload.iat * 1000 < startOfTodayInSriLankaUtcMs()) {
+      res.status(401).json({ error: 'Session expired. Please sign in again.' })
+      return
+    }
     req.user = payload
     next()
   } catch {

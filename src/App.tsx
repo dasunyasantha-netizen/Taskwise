@@ -103,6 +103,20 @@ export default function App() {
     setLoading(false)
   }, [])
 
+  useEffect(() => {
+    const handleSessionExpired = () => {
+      localStorage.removeItem(TOKEN_KEY)
+      localStorage.removeItem(USER_KEY)
+      localStorage.removeItem(VIEW_KEY)
+      localStorage.removeItem(REAL_TOKEN_KEY)
+      localStorage.removeItem(REAL_USER_KEY)
+      setUser(null)
+      setView('login')
+    }
+    window.addEventListener('taskwise:session-expired', handleSessionExpired)
+    return () => window.removeEventListener('taskwise:session-expired', handleSessionExpired)
+  }, [])
+
   const handleLogin = (token: string, userData: AuthUser) => {
     localStorage.setItem(TOKEN_KEY, token)
     localStorage.setItem(USER_KEY, JSON.stringify(userData))
