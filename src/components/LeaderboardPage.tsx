@@ -61,6 +61,80 @@ function RankBadge({ rank }: { rank: number }) {
   return <span className="inline-flex w-7 h-7 items-center justify-center text-tw-text-secondary font-semibold text-sm">{rank}</span>
 }
 
+// ─── Points Breakdown Modal ─────────────────────────────────────────────────
+
+function BreakdownModal({ row, points, onClose }: {
+  row: ScoreRow
+  points: Record<string, number>
+  onClose: () => void
+}) {
+  // Each category: count × per-unit points = subtotal
+  const lines = [
+    { label: 'Daily logins',        icon: '📅', count: row.loginDays,      unit: points.DAILY_LOGIN,        sub: `${row.loginDays} day${row.loginDays !== 1 ? 's' : ''}` },
+    { label: 'Task updates',        icon: '✏️', count: row.taskUpdates,    unit: points.TASK_UPDATE,        sub: `${row.taskUpdates} update${row.taskUpdates !== 1 ? 's' : ''} (max 1/task/day)` },
+    { label: 'On-time submissions', icon: '✅', count: row.onTimeCount,    unit: points.ON_TIME_SUBMISSION, sub: `${row.onTimeCount} task${row.onTimeCount !== 1 ? 's' : ''}` },
+    { label: 'Overdue days',        icon: '⏰', count: row.overdueDays,    unit: points.OVERDUE_PER_DAY,    sub: `${row.overdueDays} day${row.overdueDays !== 1 ? 's' : ''} late` },
+    { label: 'Rejections',          icon: '↩️', count: row.rejectionCount, unit: points.REJECTION,          sub: `${row.rejectionCount} rejected` },
+  ].map(l => ({ ...l, subtotal: l.count * l.unit }))
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-tw-border">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-11 h-11 rounded-full bg-tw-primary/10 text-tw-primary font-bold flex items-center justify-center flex-shrink-0">
+              {initials(row.name)}
+            </div>
+            <div className="min-w-0">
+              <div className="font-bold text-tw-text truncate">{row.name}</div>
+              <div className="text-xs text-tw-text-secondary truncate">{row.department} · Rank #{row.rank}</div>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-tw-text-secondary hover:text-tw-text text-xl leading-none px-1 flex-shrink-0">×</button>
+        </div>
+
+        {/* Total banner */}
+        <div className="px-5 py-3 bg-tw-hover border-b border-tw-border flex items-center justify-between">
+          <span className="text-sm text-tw-text-secondary">Total points</span>
+          <span className={`text-2xl font-bold ${row.totalPoints < 0 ? 'text-tw-danger' : 'text-tw-text'}`}>{row.totalPoints}</span>
+        </div>
+
+        {/* Category breakdown */}
+        <div className="flex-1 overflow-y-auto px-5 py-3">
+          <div className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-2">Points by category</div>
+          <div className="divide-y divide-tw-border">
+            {lines.map(l => (
+              <div key={l.label} className="flex items-center justify-between py-2.5">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="text-base flex-shrink-0">{l.icon}</span>
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium text-tw-text">{l.label}</div>
+                    <div className="text-xs text-tw-text-secondary">
+                      {l.sub} <span className="opacity-70">· {l.unit > 0 ? '+' : ''}{l.unit} each</span>
+                    </div>
+                  </div>
+                </div>
+                <span className={`text-sm font-bold flex-shrink-0 ml-3 ${
+                  l.subtotal > 0 ? 'text-emerald-600' : l.subtotal < 0 ? 'text-tw-danger' : 'text-tw-text-secondary'
+                }`}>
+                  {l.subtotal > 0 ? '+' : ''}{l.subtotal}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* Sum row */}
+          <div className="flex items-center justify-between pt-3 mt-1 border-t-2 border-tw-border">
+            <span className="text-sm font-semibold text-tw-text">Net total</span>
+            <span className={`text-lg font-bold ${row.totalPoints < 0 ? 'text-tw-danger' : 'text-tw-text'}`}>{row.totalPoints}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function LeaderboardPage() {
@@ -69,6 +143,7 @@ export default function LeaderboardPage() {
   const [error, setError]     = useState('')
   const [search, setSearch]   = useState('')
   const [dept, setDept]       = useState('')
+  const [selected, setSelected] = useState<ScoreRow | null>(null)
 
   useEffect(() => {
     auditApi.leaderboard()
@@ -182,7 +257,7 @@ export default function LeaderboardPage() {
           ) : filtered.map(r => {
             const lvl = activityLevel(r)
             return (
-              <div key={r.id} className="flex items-center gap-3 px-4 py-3">
+              <div key={r.id} onClick={() => setSelected(r)} className="flex items-center gap-3 px-4 py-3 cursor-pointer active:bg-tw-hover">
                 <div className="w-8 flex-shrink-0 flex justify-center"><RankBadge rank={r.rank} /></div>
                 <div className="w-9 h-9 rounded-full bg-tw-primary/10 text-tw-primary font-bold text-sm flex items-center justify-center flex-shrink-0">
                   {initials(r.name)}
@@ -219,7 +294,7 @@ export default function LeaderboardPage() {
               ) : filtered.map(r => {
                 const lvl = activityLevel(r)
                 return (
-                  <tr key={r.id} className="hover:bg-tw-hover transition-colors">
+                  <tr key={r.id} onClick={() => setSelected(r)} className="hover:bg-tw-hover transition-colors cursor-pointer">
                     <td className="px-4 py-3"><RankBadge rank={r.rank} /></td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2.5">
@@ -249,6 +324,11 @@ export default function LeaderboardPage() {
           </table>
         </div>
       </div>
+
+      {/* Per-user points breakdown */}
+      {selected && (
+        <BreakdownModal row={selected} points={config.points} onClose={() => setSelected(null)} />
+      )}
     </div>
   )
 }
