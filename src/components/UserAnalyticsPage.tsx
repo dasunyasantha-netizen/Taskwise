@@ -174,7 +174,7 @@ function LoginHistoryPanel({ person, onClose }: { person: PersonnelStat; onClose
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
-export default function UserAnalyticsPage() {
+export default function UserAnalyticsPage({ onOpenLeaderboard }: { onOpenLeaderboard?: () => void }) {
   const [overview, setOverview] = useState<OverviewData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -233,9 +233,19 @@ export default function UserAnalyticsPage() {
 
   return (
     <div className="p-4 md:p-6 space-y-5">
-      <div>
-        <h1 className="text-xl md:text-2xl font-bold text-tw-text">User Analytics</h1>
-        <p className="text-sm text-tw-text-secondary mt-0.5">Login activity and user engagement across the workspace</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl md:text-2xl font-bold text-tw-text">User Analytics</h1>
+          <p className="text-sm text-tw-text-secondary mt-0.5">Login activity and user engagement across the workspace</p>
+        </div>
+        {onOpenLeaderboard && (
+          <button
+            onClick={onOpenLeaderboard}
+            className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-tw-primary text-white text-sm font-semibold hover:opacity-90 transition-opacity"
+          >
+            🏆 <span className="hidden sm:inline">View</span> Leaderboard
+          </button>
+        )}
       </div>
 
       {/* Summary cards */}

@@ -1302,7 +1302,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
 
           {/* USER ANALYTICS */}
           {currentView === 'user_analytics' && (
-            <UserAnalyticsPage />
+            <UserAnalyticsPage onOpenLeaderboard={() => navigate('leaderboard')} />
           )}
 
           {/* LEADERBOARD */}
