@@ -2,7 +2,7 @@ import { Request, Response } from 'express'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import prisma from '../prisma'
-import { normalizeSriLankanPhone, resolveLoginLookup } from '../helpers/phone'
+import { companyLoginPrefix, normalizeSriLankanPhone, resolveLoginLookup } from '../helpers/phone'
 
 function signToken(
   actorId: string,
@@ -517,6 +517,8 @@ export async function startImpersonation(req: Request, res: Response): Promise<v
             }),
         companyName: workspace?.companyName,
         companyLogo: workspace?.companyLogo,
+        companyId: target.companyId,
+        companyPrefix: companyLoginPrefix(target.company),
         impersonation: {
           sessionId: session.id,
           adminId,

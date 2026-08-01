@@ -1,5 +1,6 @@
 import { Request, Response } from 'express'
 import bcrypt from 'bcryptjs'
+import { randomBytes } from 'crypto'
 import prisma from '../prisma'
 import { makeLoginId, normalizeSriLankanPhone, companyLoginPrefix } from '../helpers/phone'
 
@@ -140,7 +141,10 @@ export async function createPersonnel(req: Request, res: Response): Promise<void
       const nicDirector = await prisma.director.findUnique({ where: { nic } })
       if (nicDirector) { res.status(409).json({ error: 'NIC already registered' }); return }
     }
-    const hashed = await bcrypt.hash(String(password || 'Test@123'), 12)
+    // Generate a unique password when the creator leaves the temporary-password
+    // field blank. It is returned only in this response and never stored in plain text.
+    const temporaryPassword = password ? String(password) : `Tw!7${randomBytes(6).toString('base64url')}`
+    const hashed = await bcrypt.hash(temporaryPassword, 12)
     const person = await prisma.personnel.create({
       data: {
         name,
@@ -158,7 +162,7 @@ export async function createPersonnel(req: Request, res: Response): Promise<void
       }
     })
     const { password: _p, ...safe } = person
-    res.status(201).json(safe)
+    res.status(201).json({ ...safe, temporaryPassword })
   } catch (err: unknown) {
     if (err && typeof err === 'object' && 'code' in err) {
       const prismaErr = err as { code: string; meta?: { target?: string[] } }

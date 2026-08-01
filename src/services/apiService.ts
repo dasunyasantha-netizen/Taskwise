@@ -82,7 +82,13 @@ export const workspaceApi = {
   deleteDepartment:  (id: string)    => api.delete(`/workspace/departments/${id}`),
   getPersonnel:      (params?: string) => api.get(`/workspace/personnel${params ? '?' + params : ''}`),
   getPersonnelAboveMe: () => api.get<{ type: 'directors' | 'personnel'; items: Array<{ id: string; name: string; phone?: string; email?: string; department?: { name: string } }> }>('/workspace/personnel/above-me'),
-  createPersonnel:   (data: unknown) => api.post('/workspace/personnel', data),
+  createPersonnel:   (data: unknown) => api.post<{
+    id: string
+    name: string
+    loginId: string
+    phone: string
+    temporaryPassword: string
+  }>('/workspace/personnel', data),
   updatePersonnel:   (id: string, data: unknown) => api.put(`/workspace/personnel/${id}`, data),
   setSupervisor:     (id: string, supervisorId: string | null) => api.put(`/workspace/personnel/${id}`, { supervisorId }),
   movePersonnel:     (id: string, data: unknown) => api.put(`/workspace/personnel/${id}/move`, data),

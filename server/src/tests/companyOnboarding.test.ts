@@ -369,6 +369,19 @@ async function main() {
     assert.equal(res.statusCode, 201)
     assert.equal(res.body.loginId, 'FF0759999999')
     assert.equal(res.body.companyId, ffCompanyId)
+    assert.equal(res.body.temporaryPassword, 'Staff@123')
+  })
+
+  await test('A blank password generates a unique shareable temporary password that is never stored in plain text', async () => {
+    const res = mockRes()
+    await wsCtrl.createPersonnel(mockReq({ body: { name: 'Generated Password User', phone: '0758888888', departmentId: ffDept.id }, user: ffAdminUser }), res)
+    assert.equal(res.statusCode, 201)
+    assert.equal(res.body.loginId, 'FF0758888888')
+    assert.match(res.body.temporaryPassword, /^Tw!7[A-Za-z0-9_-]{8}$/)
+    const stored = await prisma.personnel.findUniqueOrThrow({ where: { id: res.body.id } })
+    assert.notEqual(stored.password, res.body.temporaryPassword)
+    assert.equal(await bcrypt.compare(res.body.temporaryPassword, stored.password), true)
+    assert.equal(stored.mustChangePassword, true)
   })
 
   await test('Duplicate normalized phone within Fair First is rejected', async () => {

@@ -13,6 +13,12 @@ export default function HierarchyPanel({ user }: { user: AuthUser }) {
   const [showPersonnelModal, setShowPersonnelModal] = useState(false)
   const [showMoveModal, setShowMoveModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
+  const [createdCredentials, setCreatedCredentials] = useState<{
+    name: string
+    loginId: string
+    temporaryPassword: string
+  } | null>(null)
+  const [copiedCredential, setCopiedCredential] = useState<'login' | 'password' | 'both' | null>(null)
   const [editingPersonnel, setEditingPersonnel] = useState<Personnel | null>(null)
   const [editForm, setEditForm] = useState({ name: '', phone: '', email: '', nic: '', departmentId: '', supervisorId: '' })
 
@@ -84,10 +90,30 @@ export default function HierarchyPanel({ user }: { user: AuthUser }) {
     if (!personnelForm.name || !personnelForm.phone || !personnelForm.departmentId) return
     setSaving(true)
     try {
-      await workspaceApi.createPersonnel(personnelForm)
-      setShowPersonnelModal(false); setPersonnelForm({ name: '', phone: '', email: '', nic: '', departmentId: '', password: '', isActive: true }); await load()
+      const created = await workspaceApi.createPersonnel(personnelForm)
+      setCreatedCredentials({
+        name: created.name,
+        loginId: created.loginId,
+        temporaryPassword: created.temporaryPassword,
+      })
+      setCopiedCredential(null)
+      setShowPersonnelModal(false)
+      setPersonnelForm({ name: '', phone: '', email: '', nic: '', departmentId: '', password: '', isActive: true })
+      await load()
     } catch (e: unknown) { setError(e instanceof Error ? e.message : 'Error') }
     setSaving(false)
+  }
+
+  const copyCredential = async (kind: 'login' | 'password' | 'both') => {
+    if (!createdCredentials) return
+    const text = kind === 'login'
+      ? createdCredentials.loginId
+      : kind === 'password'
+        ? createdCredentials.temporaryPassword
+        : `TaskWise login\nUsername: ${createdCredentials.loginId}\nTemporary password: ${createdCredentials.temporaryPassword}`
+    await navigator.clipboard.writeText(text)
+    setCopiedCredential(kind)
+    window.setTimeout(() => setCopiedCredential(null), 1800)
   }
 
   const deletePersonnel = async (id: string) => {
@@ -302,7 +328,10 @@ export default function HierarchyPanel({ user }: { user: AuthUser }) {
             </div>
             <div>
               <label className="block text-sm font-medium text-tw-text mb-1">Temporary Password</label>
-              <input className="input" type="password" placeholder="Leave blank for default" value={personnelForm.password} onChange={e => setPersonnelForm(f => ({ ...f, password: e.target.value }))} />
+              <input className="input" type="password" placeholder="Leave blank to generate securely" value={personnelForm.password} onChange={e => setPersonnelForm(f => ({ ...f, password: e.target.value }))} />
+              <p className="text-xs text-tw-text-secondary mt-1">
+                Leave blank to generate a unique temporary password. It will be shown once after creation.
+              </p>
             </div>
             <label className="flex items-center gap-2 text-sm text-tw-text">
               <input type="checkbox" checked={personnelForm.isActive} onChange={e => setPersonnelForm(f => ({ ...f, isActive: e.target.checked }))} />
@@ -325,6 +354,42 @@ export default function HierarchyPanel({ user }: { user: AuthUser }) {
             <div className="flex gap-2 justify-end">
               <button onClick={() => setShowPersonnelModal(false)} className="btn-secondary">Cancel</button>
               <button onClick={createPersonnel} disabled={saving} className="btn-primary">{saving ? 'Adding...' : 'Add Personnel'}</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* MODAL: Newly created credentials */}
+      {createdCredentials && (
+        <Modal title="Personnel Account Created" onClose={() => setCreatedCredentials(null)}>
+          <div className="space-y-4">
+            <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3">
+              <p className="text-sm font-semibold text-green-800">{createdCredentials.name} can now sign in.</p>
+              <p className="text-xs text-green-700 mt-1">Share these credentials securely. The password is shown only on this screen.</p>
+            </div>
+
+            <CredentialRow
+              label="Username / Login ID"
+              value={createdCredentials.loginId}
+              copied={copiedCredential === 'login'}
+              onCopy={() => copyCredential('login')}
+            />
+            <CredentialRow
+              label="Temporary Password"
+              value={createdCredentials.temporaryPassword}
+              copied={copiedCredential === 'password'}
+              onCopy={() => copyCredential('password')}
+            />
+
+            <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800">
+              The user will be asked to change a system-generated password after their first login.
+            </div>
+
+            <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
+              <button onClick={() => setCreatedCredentials(null)} className="btn-secondary">Done</button>
+              <button onClick={() => copyCredential('both')} className="btn-primary">
+                {copiedCredential === 'both' ? 'Copied!' : 'Copy Username & Password'}
+              </button>
             </div>
           </div>
         </Modal>
@@ -717,13 +782,29 @@ function PersonnelTab({ allPersonnel, layers, allDepts, personnelSearch, setPers
 
 function Modal({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-panel w-full max-w-md">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-tw-border">
+    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-3 sm:p-4 overflow-y-auto">
+      <div className="bg-white rounded-xl shadow-panel w-full max-w-md max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-2rem)] flex flex-col my-auto">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-tw-border flex-shrink-0">
           <h3 className="font-semibold text-tw-text">{title}</h3>
           <button onClick={onClose} className="text-tw-text-secondary hover:text-tw-text text-xl leading-none">×</button>
         </div>
-        <div className="px-5 py-4">{children}</div>
+        <div className="px-5 py-4 overflow-y-auto overscroll-contain">{children}</div>
+      </div>
+    </div>
+  )
+}
+
+function CredentialRow({ label, value, copied, onCopy }: { label: string; value: string; copied: boolean; onCopy: () => void }) {
+  return (
+    <div>
+      <label className="block text-xs font-semibold text-tw-text-secondary mb-1.5 uppercase tracking-wide">{label}</label>
+      <div className="flex items-stretch gap-2">
+        <div className="min-w-0 flex-1 bg-tw-hover border border-tw-border rounded-lg px-3 py-2.5 font-mono font-bold text-sm text-tw-text break-all select-all">
+          {value}
+        </div>
+        <button type="button" onClick={onCopy} className="btn-secondary px-3 text-xs flex-shrink-0">
+          {copied ? 'Copied!' : 'Copy'}
+        </button>
       </div>
     </div>
   )
