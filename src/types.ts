@@ -4,9 +4,11 @@ export type ActorType = 'director' | 'personnel'
 
 export interface ImpersonationInfo {
   sessionId: string
-  chairmanId: string
-  chairmanName: string
+  adminId: string
+  adminName: string
   startedAt: string
+  expiresAt: string
+  reason: string
 }
 
 export interface AuthUser {
@@ -303,14 +305,17 @@ export type ViewMode =
 
 export interface ImpersonationSession {
   id: string
-  chairmanId: string
+  adminId: string
   targetActorId: string
   targetActorType: string
   targetName: string
   workspaceId: string
   startedAt: string
+  expiresAt: string | null
   endedAt: string | null
   endReason: string | null
+  reason: string | null
+  adminName?: string
   ipAddress: string | null
   userAgent: string | null
 }

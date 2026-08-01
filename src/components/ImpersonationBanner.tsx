@@ -35,12 +35,12 @@ export default function ImpersonationBanner({ impersonation, targetName, onExit 
             </svg>
           </div>
           <div className="min-w-0">
-            <span className="text-white font-bold text-sm">Chairman Mode</span>
+            <span className="text-white font-bold text-sm">Support Access</span>
             <span className="text-white/80 text-sm mx-2">·</span>
             <span className="text-white text-sm">Viewing as </span>
             <span className="text-white font-bold text-sm">{targetName}</span>
             <span className="hidden sm:inline text-white/70 text-xs ml-3">
-              Session started {new Date(impersonation.startedAt).toLocaleTimeString()}
+              Expires {new Date(impersonation.expiresAt).toLocaleTimeString()}
             </span>
           </div>
         </div>

@@ -42,17 +42,17 @@ async function writeAudit(
   payload?: object,
   user?: AuthPayload,
 ) {
-  const isImp = !!(user?.chairmanId)
+  const isImp = !!(user?.adminId)
   const impPayload = isImp
-    ? { _impersonatedBy: user!.chairmanName ?? user!.chairmanId, _impersonationSessionId: user!.impersonationSessionId, _viewingAs: actorId }
+    ? { _impersonatedBy: user!.adminName ?? user!.adminId, _impersonationSessionId: user!.impersonationSessionId, _viewingAs: actorId }
     : {}
   await db.auditLog.create({
     data: {
       workspaceId,
       event,
-      // When impersonating, audit actor is the Chairman (director), not the target user
+      // During support access, audit actor is the System Admin, not the target user.
       actorType: isImp ? 'director' : actorType,
-      actorDirectorId:  isImp ? user!.chairmanId : (actorType === 'director' ? actorId : undefined),
+      actorDirectorId:  isImp ? user!.adminId : (actorType === 'director' ? actorId : undefined),
       actorPersonnelId: isImp ? undefined         : (actorType === 'personnel' ? actorId : undefined),
       taskId,
       payload: { ...payload, ...impPayload },

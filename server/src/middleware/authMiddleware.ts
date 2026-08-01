@@ -10,10 +10,11 @@ export interface AuthPayload {
   exp?: number
   layerNumber?: number  // Personnel only: which layer they belong to (1, 2, or 3)
   departmentId?: string // Personnel only: their department
-  // Impersonation fields — present only when Chairman is viewing as another user
+  // Support-access fields — present only in short-lived System Admin sessions
   impersonationSessionId?: string
-  chairmanId?: string
-  chairmanName?: string
+  adminId?: string
+  adminName?: string
+  authenticationMethod?: 'password' | 'webauthn'
 }
 
 declare global {
@@ -36,7 +37,7 @@ function startOfTodayInSriLankaUtcMs(now = new Date()): number {
   return sriLankaDayStart - SRI_LANKA_UTC_OFFSET_MS
 }
 
-export function authenticateToken(req: Request, res: Response, next: NextFunction): void {
+export async function authenticateToken(req: Request, res: Response, next: NextFunction): Promise<void> {
   const authHeader = req.headers['authorization']
   const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null
 
@@ -51,6 +52,55 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
       res.status(401).json({ error: 'Session expired. Please sign in again.' })
       return
     }
+    if (payload.impersonationSessionId) {
+      if (!payload.adminId) {
+        res.status(401).json({ error: 'Invalid support-access session' })
+        return
+      }
+      const session = await prisma.impersonationSession.findUnique({
+        where: { id: payload.impersonationSessionId },
+      })
+      const expiresAt = session?.expiresAt || (session ? new Date(session.startedAt.getTime() + 15 * 60 * 1000) : null)
+      if (
+        !session ||
+        session.endedAt ||
+        session.adminId !== payload.adminId ||
+        session.targetActorId !== payload.actorId ||
+        session.targetActorType !== payload.actorType ||
+        !expiresAt ||
+        expiresAt.getTime() <= Date.now()
+      ) {
+        if (session && !session.endedAt && expiresAt && expiresAt.getTime() <= Date.now()) {
+          prisma.impersonationSession.update({
+            where: { id: session.id },
+            data: { endedAt: new Date(), endReason: 'expired' },
+          }).catch(() => {})
+        }
+        res.status(401).json({ error: 'Support-access session expired or ended' })
+        return
+      }
+
+      if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
+        res.on('finish', () => {
+          prisma.auditLog.create({
+            data: {
+              workspaceId: session.workspaceId,
+              event: 'IMPERSONATION_ACTION',
+              actorDirectorId: payload.adminId,
+              actorType: 'director',
+              payload: {
+                action: `${req.method} ${req.originalUrl}`,
+                sessionId: session.id,
+                targetId: session.targetActorId,
+                targetName: session.targetName,
+                targetActorType: session.targetActorType,
+                statusCode: String(res.statusCode),
+              },
+            },
+          }).catch(() => {})
+        })
+      }
+    }
     req.user = payload
     next()
   } catch {
@@ -59,10 +109,9 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
 }
 
 export function requireDirector(req: Request, res: Response, next: NextFunction): void {
-  // Allow impersonation tokens where actorType is personnel but real actor is chairman
   const u = req.user
   if (!u) { res.status(403).json({ error: 'Director access required' }); return }
-  if (u.actorType !== 'director' && !u.impersonationSessionId) {
+  if (u.actorType !== 'director') {
     res.status(403).json({ error: 'Director access required' })
     return
   }

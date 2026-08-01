@@ -53,14 +53,19 @@ export const authApi = {
   me: () => api.get<unknown>('/auth/me'),
   changePassword: (currentPassword: string, newPassword: string) =>
     api.post('/auth/change-password', { currentPassword, newPassword }),
-  setImpersonationPassword: (currentLoginPassword: string, newImpersonationPassword: string) =>
-    api.post('/auth/impersonation-password', { currentLoginPassword, newImpersonationPassword }),
-  startImpersonation: (targetIdentifier: string, impersonationPassword: string) =>
-    api.post<{ token: string; user: unknown; session: { id: string; startedAt: string } }>('/auth/impersonate', { targetIdentifier, impersonationPassword }),
+  listImpersonationTargets: () =>
+    api.get<unknown[]>('/auth/impersonation/users'),
+  startImpersonation: (targetActorId: string, targetActorType: 'director' | 'personnel', reason: string, stepUpToken: string) =>
+    api.post<{ token: string; user: unknown; session: { id: string; startedAt: string; expiresAt: string } }>(
+      '/auth/impersonate',
+      { targetActorId, targetActorType, reason, stepUpToken },
+    ),
   endImpersonation: (reason?: string) =>
     api.post('/auth/impersonate/end', { reason: reason || 'exit' }),
   listImpersonationSessions: () =>
     api.get<unknown[]>('/auth/impersonation/sessions'),
+  revokeImpersonationSession: (id: string) =>
+    api.post(`/auth/impersonation/sessions/${id}/revoke`),
 }
 
 // ─── Workspace ───────────────────────────────────────────────────────────────

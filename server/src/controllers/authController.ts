@@ -4,11 +4,17 @@ import jwt from 'jsonwebtoken'
 import prisma from '../prisma'
 import { normalizeSriLankanPhone, resolveLoginLookup } from '../helpers/phone'
 
-function signToken(actorId: string, actorType: 'director' | 'personnel', workspaceId: string, extra?: object) {
+function signToken(
+  actorId: string,
+  actorType: 'director' | 'personnel',
+  workspaceId: string,
+  extra?: object,
+  expiresIn: jwt.SignOptions['expiresIn'] = '7d',
+) {
   return jwt.sign(
     { actorId, actorType, workspaceId, ...extra },
     process.env.JWT_SECRET!,
-    { expiresIn: '7d' }
+    { expiresIn }
   )
 }
 
@@ -296,168 +302,228 @@ export async function getMe(req: Request, res: Response): Promise<void> {
   }
 }
 
-// POST /api/auth/impersonation-password  — Chairman sets/changes their second impersonation password
-export async function setImpersonationPassword(req: Request, res: Response): Promise<void> {
+// GET /api/auth/impersonation/users — active accounts visible only to System Admins
+export async function listImpersonationTargets(req: Request, res: Response): Promise<void> {
   try {
-    const { actorId, actorType } = req.user!
-    if (actorType !== 'director') { res.status(403).json({ error: 'Director access required' }); return }
+    const adminId = req.user!.actorId
+    const [directors, personnel] = await Promise.all([
+      prisma.director.findMany({
+        where: {
+          isActive: true,
+          isSyswiseAdmin: false,
+          id: { not: adminId },
+          OR: [{ company: null }, { company: { status: 'ACTIVE' } }],
+        },
+        select: {
+          id: true, name: true, phone: true, email: true, loginId: true, workspaceId: true,
+          isCompanyAdmin: true,
+          company: { select: { displayName: true, legalName: true, prefix: true } },
+        },
+      }),
+      prisma.personnel.findMany({
+        where: {
+          isActive: true,
+          deletedAt: null,
+          OR: [{ company: null }, { company: { status: 'ACTIVE' } }],
+        },
+        select: {
+          id: true, name: true, phone: true, email: true, loginId: true, workspaceId: true,
+          department: { select: { name: true } },
+          company: { select: { displayName: true, legalName: true, prefix: true } },
+        },
+      }),
+    ])
 
-    const director = await prisma.director.findUnique({ where: { id: actorId } })
-    if (!director?.isChairman) { res.status(403).json({ error: 'Chairman access required' }); return }
+    const targets = [
+      ...directors.filter(d => d.workspaceId).map(d => ({
+        id: d.id,
+        actorType: 'director' as const,
+        name: d.name,
+        phone: d.phone,
+        email: d.email,
+        loginId: d.loginId || d.phone,
+        workspaceId: d.workspaceId!,
+        role: d.isCompanyAdmin ? 'Company administrator' : 'Director',
+        companyName: d.company?.displayName || d.company?.legalName || 'Legacy workspace',
+        companyPrefix: d.company?.prefix || null,
+      })),
+      ...personnel.map(p => ({
+        id: p.id,
+        actorType: 'personnel' as const,
+        name: p.name,
+        phone: p.phone,
+        email: p.email,
+        loginId: p.loginId || p.phone,
+        workspaceId: p.workspaceId,
+        role: p.department.name,
+        companyName: p.company?.displayName || p.company?.legalName || 'Legacy workspace',
+        companyPrefix: p.company?.prefix || null,
+      })),
+    ].sort((a, b) => a.companyName.localeCompare(b.companyName) || a.name.localeCompare(b.name))
 
-    const { currentLoginPassword, newImpersonationPassword } = req.body
-    if (!currentLoginPassword || !newImpersonationPassword) {
-      res.status(400).json({ error: 'currentLoginPassword and newImpersonationPassword are required' }); return
-    }
-    if (newImpersonationPassword.length < 10) {
-      res.status(400).json({ error: 'Impersonation password must be at least 10 characters' }); return
-    }
-
-    // Require verification of the Chairman's own login password first
-    if (!(await bcrypt.compare(currentLoginPassword, director.password))) {
-      res.status(401).json({ error: 'Login password is incorrect' }); return
-    }
-
-    const hash = await bcrypt.hash(newImpersonationPassword, 12)
-    await prisma.director.update({ where: { id: actorId }, data: { impersonationPasswordHash: hash } })
-
-    // Audit log
-    await prisma.auditLog.create({
-      data: {
-        workspaceId: director.workspaceId!,
-        event: 'IMPERSONATION_PASSWORD_SET',
-        actorDirectorId: actorId,
-        actorType: 'director',
-        payload: { action: 'Chairman set or changed impersonation password' },
-      }
-    })
-
-    res.json({ success: true })
+    res.json(targets)
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Internal server error' })
   }
 }
 
-// POST /api/auth/impersonate  — Chairman starts an impersonation session
+// POST /api/auth/impersonate — System Admin starts a 15-minute support session
 export async function startImpersonation(req: Request, res: Response): Promise<void> {
   try {
-    const { actorId, actorType } = req.user!
-    if (actorType !== 'director') { res.status(403).json({ error: 'Director access required' }); return }
-
-    const chairman = await prisma.director.findUnique({ where: { id: actorId } })
-    if (!chairman?.isChairman) { res.status(403).json({ error: 'Chairman access required' }); return }
-    if (!chairman.impersonationPasswordHash) {
-      res.status(400).json({ error: 'Impersonation password not set. Please set it in Settings first.' }); return
+    const { actorId: adminId } = req.user!
+    const admin = await prisma.director.findUnique({ where: { id: adminId } })
+    if (!admin?.isSyswiseAdmin || !admin.isActive) {
+      res.status(403).json({ error: 'System administrator access required' }); return
     }
 
-    const { targetIdentifier, impersonationPassword } = req.body
-    if (!targetIdentifier || !impersonationPassword) {
-      res.status(400).json({ error: 'targetIdentifier and impersonationPassword are required' }); return
+    const { targetActorId, targetActorType, reason, stepUpToken } = req.body as {
+      targetActorId?: string
+      targetActorType?: 'director' | 'personnel'
+      reason?: string
+      stepUpToken?: string
+    }
+    if (!targetActorId || !['director', 'personnel'].includes(targetActorType || '')) {
+      res.status(400).json({ error: 'A valid target account is required' }); return
+    }
+    const validatedTargetActorType = targetActorType as 'director' | 'personnel'
+    if (!reason?.trim() || reason.trim().length < 5 || reason.trim().length > 500) {
+      res.status(400).json({ error: 'Reason must be between 5 and 500 characters' }); return
+    }
+    if (!stepUpToken) {
+      res.status(401).json({ error: 'Passkey verification is required' }); return
     }
 
-    // Verify impersonation password
-    if (!(await bcrypt.compare(impersonationPassword, chairman.impersonationPasswordHash))) {
-      await prisma.auditLog.create({
-        data: {
-          workspaceId: chairman.workspaceId!,
-          event: 'IMPERSONATION_FAILED',
-          actorDirectorId: actorId,
-          actorType: 'director',
-          payload: { action: 'Failed impersonation attempt', targetIdentifier },
-        }
-      })
-      res.status(401).json({ error: 'Incorrect impersonation password' }); return
+    let stepUp: jwt.JwtPayload
+    try {
+      stepUp = jwt.verify(stepUpToken, process.env.JWT_SECRET!) as jwt.JwtPayload
+    } catch {
+      res.status(401).json({ error: 'Passkey verification expired. Verify again.' }); return
+    }
+    const stepUpAgeSeconds = Math.floor(Date.now() / 1000) - Number(stepUp.iat || 0)
+    if (
+      stepUp.actorId !== adminId ||
+      stepUp.actorType !== 'director' ||
+      stepUp.authenticationMethod !== 'webauthn' ||
+      stepUpAgeSeconds < 0 ||
+      stepUpAgeSeconds > 300
+    ) {
+      res.status(401).json({ error: 'A recent passkey verification for this administrator is required' }); return
     }
 
-    // Find target personnel by phone, email, name, or id — within same workspace
-    const target = await prisma.personnel.findFirst({
-      where: {
-        workspaceId: chairman.workspaceId!,
-        deletedAt: null,
-        OR: [
-          { id: targetIdentifier },
-          { phone: targetIdentifier },
-          { email: targetIdentifier },
-          { name: { equals: targetIdentifier, mode: 'insensitive' } },
-        ]
-      },
-      include: { department: { include: { layer: true } } }
-    })
+    const target = validatedTargetActorType === 'director'
+      ? await prisma.director.findFirst({
+          where: {
+            id: targetActorId,
+            isActive: true,
+            isSyswiseAdmin: false,
+            workspaceId: { not: null },
+            OR: [{ company: null }, { company: { status: 'ACTIVE' } }],
+          },
+          include: { company: true },
+        })
+      : await prisma.personnel.findFirst({
+          where: {
+            id: targetActorId,
+            isActive: true,
+            deletedAt: null,
+            OR: [{ company: null }, { company: { status: 'ACTIVE' } }],
+          },
+          include: { department: { include: { layer: true } }, company: true },
+        })
 
-    if (!target) {
-      res.status(404).json({ error: 'User not found in this workspace' }); return
+    if (!target || !target.workspaceId) {
+      res.status(404).json({ error: 'Active target account not found' }); return
     }
 
     const ipAddress = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || null
     const userAgent = (req.headers['user-agent'] as string) || null
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000)
 
-    // Create session record
+    // An administrator may have only one active support session at a time.
+    await prisma.impersonationSession.updateMany({
+      where: { adminId, endedAt: null },
+      data: { endedAt: new Date(), endReason: 'superseded' },
+    })
+
     const session = await prisma.impersonationSession.create({
       data: {
-        chairmanId: actorId,
+        adminId,
         targetActorId: target.id,
-        targetActorType: 'personnel',
+        targetActorType: validatedTargetActorType,
         targetName: target.name,
-        workspaceId: chairman.workspaceId!,
+        workspaceId: target.workspaceId,
+        reason: reason.trim(),
+        expiresAt,
         ipAddress,
         userAgent,
       }
     })
 
-    // Audit log — start
     await prisma.auditLog.create({
       data: {
-        workspaceId: chairman.workspaceId!,
+        workspaceId: target.workspaceId,
         event: 'IMPERSONATION_STARTED',
-        actorDirectorId: actorId,
+        actorDirectorId: adminId,
         actorType: 'director',
         payload: {
-          action: `Chairman started impersonation of ${target.name}`,
+          action: `System administrator started support access as ${target.name}`,
           sessionId: session.id,
           targetId: target.id,
           targetName: target.name,
+          targetActorType: validatedTargetActorType,
+          reason: reason.trim(),
+          expiresAt: expiresAt.toISOString(),
           ipAddress: ipAddress ?? undefined,
         },
       }
     })
 
-    const layerNumber = target.department.layer.number
-
-    // Issue impersonation JWT: actorId/actorType = target user, but with chairman fields embedded
-    const token = signToken(target.id, 'personnel', chairman.workspaceId!, {
-      layerNumber,
-      departmentId: target.departmentId,
+    const isPersonnel = validatedTargetActorType === 'personnel'
+    const personnelTarget = isPersonnel
+      ? target as typeof target & { departmentId: string; department: { layer: { number: number } } }
+      : null
+    const layerNumber = personnelTarget?.department.layer.number
+    const token = signToken(target.id, validatedTargetActorType, target.workspaceId, {
+      ...(isPersonnel ? { layerNumber, departmentId: personnelTarget!.departmentId } : {}),
       impersonationSessionId: session.id,
-      chairmanId: actorId,
-      chairmanName: chairman.name,
-    })
+      adminId,
+      adminName: admin.name,
+    }, '15m')
 
     const workspace = await prisma.workspace.findUnique({
-      where: { id: chairman.workspaceId! },
+      where: { id: target.workspaceId },
       select: { companyName: true, companyLogo: true }
     })
 
     res.json({
       token,
-      session: { id: session.id, startedAt: session.startedAt },
+      session: { id: session.id, startedAt: session.startedAt, expiresAt },
       user: {
         actorId: target.id,
-        actorType: 'personnel',
-        workspaceId: chairman.workspaceId,
+        actorType: validatedTargetActorType,
+        workspaceId: target.workspaceId,
         name: target.name,
         phone: target.phone,
         email: target.email,
         avatarUrl: target.avatarUrl,
-        layerNumber,
-        departmentId: target.departmentId,
+        loginId: target.loginId || target.phone,
+        ...(isPersonnel
+          ? { layerNumber, departmentId: personnelTarget!.departmentId, mustChangePassword: false }
+          : {
+              isChairman: (target as { isChairman?: boolean }).isChairman,
+              isCompanyAdmin: (target as { isCompanyAdmin?: boolean }).isCompanyAdmin,
+              isSyswiseAdmin: false,
+            }),
         companyName: workspace?.companyName,
         companyLogo: workspace?.companyLogo,
         impersonation: {
           sessionId: session.id,
-          chairmanId: actorId,
-          chairmanName: chairman.name,
+          adminId,
+          adminName: admin.name,
           startedAt: session.startedAt,
+          expiresAt,
+          reason: reason.trim(),
         }
       }
     })
@@ -467,11 +533,11 @@ export async function startImpersonation(req: Request, res: Response): Promise<v
   }
 }
 
-// POST /api/auth/impersonate/end  — Chairman ends the impersonation session
+// POST /api/auth/impersonate/end — System Admin ends the support session
 export async function endImpersonation(req: Request, res: Response): Promise<void> {
   try {
-    const { chairmanId, impersonationSessionId, workspaceId } = req.user!
-    if (!impersonationSessionId || !chairmanId) {
+    const { adminId, impersonationSessionId, workspaceId } = req.user!
+    if (!impersonationSessionId || !adminId) {
       res.status(400).json({ error: 'Not in an impersonation session' }); return
     }
 
@@ -491,10 +557,10 @@ export async function endImpersonation(req: Request, res: Response): Promise<voi
       data: {
         workspaceId: workspaceId || session.workspaceId,
         event: 'IMPERSONATION_ENDED',
-        actorDirectorId: chairmanId,
+        actorDirectorId: adminId,
         actorType: 'director',
         payload: {
-          action: `Chairman ended impersonation of ${session.targetName}`,
+          action: `System administrator ended support access as ${session.targetName}`,
           sessionId: session.id,
           targetId: session.targetActorId,
           targetName: session.targetName,
@@ -511,22 +577,68 @@ export async function endImpersonation(req: Request, res: Response): Promise<voi
   }
 }
 
-// GET /api/auth/impersonation/sessions  — Chairman views impersonation history
+// GET /api/auth/impersonation/sessions — System Admin views global support-access history
 export async function listImpersonationSessions(req: Request, res: Response): Promise<void> {
   try {
-    const { actorId, actorType } = req.user!
-    if (actorType !== 'director') { res.status(403).json({ error: 'Director access required' }); return }
-
-    const chairman = await prisma.director.findUnique({ where: { id: actorId } })
-    if (!chairman?.isChairman) { res.status(403).json({ error: 'Chairman access required' }); return }
-
-    const sessions = await prisma.impersonationSession.findMany({
-      where: { workspaceId: chairman.workspaceId! },
-      orderBy: { startedAt: 'desc' },
-      take: 100,
+    const now = new Date()
+    await prisma.impersonationSession.updateMany({
+      where: {
+        endedAt: null,
+        OR: [
+          { expiresAt: { lte: now } },
+          { expiresAt: null, startedAt: { lte: new Date(now.getTime() - 15 * 60 * 1000) } },
+        ],
+      },
+      data: { endedAt: now, endReason: 'expired' },
     })
 
-    res.json(sessions)
+    const sessions = await prisma.impersonationSession.findMany({
+      orderBy: { startedAt: 'desc' },
+      take: 100,
+      include: { admin: { select: { name: true } } },
+    })
+
+    res.json(sessions.map(s => ({ ...s, adminName: s.admin.name, admin: undefined })))
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+}
+
+// POST /api/auth/impersonation/sessions/:id/revoke — immediately ends an active session
+export async function revokeImpersonationSession(req: Request, res: Response): Promise<void> {
+  try {
+    const adminId = req.user!.actorId
+    const session = await prisma.impersonationSession.findUnique({ where: { id: req.params.id } })
+    if (!session) {
+      res.status(404).json({ error: 'Support-access session not found' }); return
+    }
+    if (session.endedAt) {
+      res.json({ success: true }); return
+    }
+
+    await prisma.$transaction([
+      prisma.impersonationSession.update({
+        where: { id: session.id },
+        data: { endedAt: new Date(), endReason: 'revoked' },
+      }),
+      prisma.auditLog.create({
+        data: {
+          workspaceId: session.workspaceId,
+          event: 'IMPERSONATION_REVOKED',
+          actorDirectorId: adminId,
+          actorType: 'director',
+          payload: {
+            action: `System administrator revoked support access as ${session.targetName}`,
+            sessionId: session.id,
+            targetId: session.targetActorId,
+            targetName: session.targetName,
+            targetActorType: session.targetActorType,
+          },
+        },
+      }),
+    ])
+    res.json({ success: true })
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Internal server error' })

@@ -12,6 +12,7 @@ import 'dotenv/config'
 import assert from 'assert'
 import { execSync } from 'child_process'
 import path from 'path'
+import jwt from 'jsonwebtoken'
 
 // ---- Point every app module at the test database BEFORE they are imported ----
 const DEV_URL = process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/taskwise_db?schema=public'
@@ -49,6 +50,8 @@ function mockReq(opts: any = {}): any {
     query: opts.query || {},
     user: opts.user,
     headers: opts.headers || {},
+    method: opts.method || 'GET',
+    originalUrl: opts.originalUrl || '/test',
     ip,
     socket: { remoteAddress: ip },
   }
@@ -67,7 +70,7 @@ async function main() {
   const companyCtrl = await import('../controllers/companyRequestController')
   const authCtrl = await import('../controllers/authController')
   const wsCtrl = await import('../controllers/workspaceController')
-  const { requireSyswiseAdmin } = await import('../middleware/authMiddleware')
+  const { authenticateToken, requireSyswiseAdmin } = await import('../middleware/authMiddleware')
 
   // Fresh slate.
   await prisma.$executeRawUnsafe(
@@ -400,6 +403,73 @@ async function main() {
     assert.equal(res.statusCode, 201)
     assert.equal(res.body.isSyswiseAdmin, undefined) // Personnel have no such field; flag is ignored.
     assert.equal(await prisma.director.count({ where: { isSyswiseAdmin: true } }), before)
+  })
+
+  // =========================================================================
+  section('System Admin support access')
+  await test('The global account directory excludes System Admin accounts', async () => {
+    const res = mockRes()
+    await authCtrl.listImpersonationTargets(mockReq({ user: ycAdminUser }), res)
+    assert.equal(res.statusCode, 200)
+    assert.equal(res.body.some((target: any) => target.id === adminDir.id), false)
+    assert.equal(res.body.some((target: any) => target.id === ffAdminId && target.actorType === 'director'), true)
+    assert.equal(res.body.some((target: any) => target.loginId === 'FF0759999999' && target.actorType === 'personnel'), true)
+  })
+
+  await test('Support access rejects a normal session token as step-up verification', async () => {
+    const ffStaff = await prisma.personnel.findFirstOrThrow({ where: { loginId: 'FF0759999999' } })
+    const passwordToken = jwt.sign(
+      { actorId: adminDir.id, actorType: 'director', workspaceId: ycWs.id, authenticationMethod: 'password' },
+      process.env.JWT_SECRET!,
+      { expiresIn: '5m' },
+    )
+    const res = mockRes()
+    await authCtrl.startImpersonation(mockReq({
+      user: ycAdminUser,
+      body: { targetActorId: ffStaff.id, targetActorType: 'personnel', reason: 'Approved support ticket', stepUpToken: passwordToken },
+    }), res)
+    assert.equal(res.statusCode, 401)
+  })
+
+  await test('Passkey-verified support access is cross-company, audited, and immediately revocable', async () => {
+    const ffStaff = await prisma.personnel.findFirstOrThrow({ where: { loginId: 'FF0759999999' } })
+    const stepUpToken = jwt.sign(
+      { actorId: adminDir.id, actorType: 'director', workspaceId: ycWs.id, authenticationMethod: 'webauthn' },
+      process.env.JWT_SECRET!,
+      { expiresIn: '5m' },
+    )
+    const startRes = mockRes()
+    await authCtrl.startImpersonation(mockReq({
+      user: ycAdminUser,
+      body: { targetActorId: ffStaff.id, targetActorType: 'personnel', reason: 'Approved support ticket TW-1042', stepUpToken },
+      ip: '10.8.0.1',
+    }), startRes)
+    assert.equal(startRes.statusCode, 200)
+    assert.equal(startRes.body.user.workspaceId, ffWorkspace!.id)
+    assert.equal(startRes.body.user.impersonation.reason, 'Approved support ticket TW-1042')
+
+    const claims = jwt.verify(startRes.body.token, process.env.JWT_SECRET!) as jwt.JwtPayload
+    assert.equal(claims.adminId, adminDir.id)
+    assert.equal(claims.actorId, ffStaff.id)
+    assert.equal(Number(claims.exp) - Number(claims.iat), 15 * 60)
+
+    const session = await prisma.impersonationSession.findUniqueOrThrow({ where: { id: claims.impersonationSessionId as string } })
+    assert.equal(session.reason, 'Approved support ticket TW-1042')
+    assert.ok(session.expiresAt)
+    assert.ok(await prisma.auditLog.findFirst({ where: { event: 'IMPERSONATION_STARTED', actorDirectorId: adminDir.id } }))
+
+    const revokeRes = mockRes()
+    await authCtrl.revokeImpersonationSession(mockReq({
+      user: ycAdminUser,
+      params: { id: claims.impersonationSessionId },
+    }), revokeRes)
+    assert.equal(revokeRes.statusCode, 200)
+    assert.ok(await prisma.auditLog.findFirst({ where: { event: 'IMPERSONATION_REVOKED', actorDirectorId: adminDir.id } }))
+
+    const authRes = mockRes(); let nexted = false
+    await authenticateToken(mockReq({ headers: { authorization: `Bearer ${startRes.body.token}` } }), authRes, () => { nexted = true })
+    assert.equal(nexted, false)
+    assert.equal(authRes.statusCode, 401)
   })
 
   // =========================================================================

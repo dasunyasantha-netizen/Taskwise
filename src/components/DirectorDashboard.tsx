@@ -899,7 +899,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
     { label: 'Team Hierarchy',  view: 'hierarchy_manager' as ViewMode, icon: '👥' },
     { label: 'Audit Log',       view: 'audit_log'       as ViewMode, icon: '📜' },
     { label: 'User Analytics',  view: 'user_analytics'  as ViewMode, icon: '📈' },
-    ...(user.isChairman ? [{ label: 'User Access', view: 'impersonation' as ViewMode, icon: '🔐' }] : []),
+    ...(user.isSyswiseAdmin ? [{ label: 'Support Access', view: 'impersonation' as ViewMode, icon: '🔐' }] : []),
     { label: 'Settings',       view: 'settings'           as ViewMode, icon: '⚙️' },
     ...(user.isSyswiseAdmin ? [{ label: 'Company Requests', view: 'company_requests' as ViewMode, icon: 'C' }] : []),
     { label: 'My Profile',     view: 'profile'            as ViewMode, icon: '👤' },
@@ -929,7 +929,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
     { label: 'Broadcasts',      view: 'broadcasts'        as ViewMode, icon: '📢' },
     { label: 'Overdue Tasks',   view: 'overdue'           as ViewMode, icon: '⏰', badge: stats.overdue },
     { label: 'Audit Log',       view: 'audit_log'         as ViewMode, icon: '📜' },
-    ...(user.isChairman ? [{ label: 'User Access', view: 'impersonation' as ViewMode, icon: '🔐' }] : []),
+    ...(user.isSyswiseAdmin ? [{ label: 'Support Access', view: 'impersonation' as ViewMode, icon: '🔐' }] : []),
     { label: 'Settings',        view: 'settings'          as ViewMode, icon: '⚙️' },
     ...(user.isSyswiseAdmin ? [{ label: 'Company Requests', view: 'company_requests' as ViewMode, icon: 'C' }] : []),
     { label: 'My Profile',      view: 'profile'           as ViewMode, icon: '👤' },
@@ -1038,7 +1038,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
                   : currentView === 'recent_updates' ? 'Recent Updates'
                   : currentView === 'group_tasks' ? 'Group Tasks'
                   : currentView === 'reports' ? 'Reports'
-                  : currentView === 'impersonation' ? 'User Access'
+                  : currentView === 'impersonation' ? 'Support Access'
                   : currentView === 'user_analytics' ? 'User Analytics'
                   : currentView === 'leaderboard' ? 'Leaderboard'
                   : currentView === 'company_requests' ? 'Company Requests'
@@ -1295,8 +1295,8 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
             <ReportsPage savedState={reportsState} onStateChange={setReportsState} scrollContainerRef={mainRef} />
           )}
 
-          {/* USER ACCESS / IMPERSONATION — Chairman only */}
-          {currentView === 'impersonation' && user.isChairman && onImpersonationStart && (
+          {/* SUPPORT ACCESS / IMPERSONATION — System Admin only */}
+          {currentView === 'impersonation' && user.isSyswiseAdmin && onImpersonationStart && (
             <ImpersonationPage user={user} onSessionStarted={onImpersonationStart} />
           )}
 

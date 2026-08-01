@@ -30,7 +30,6 @@ model Director {
   isSyswiseAdmin            Boolean  @default(false)
   isCompanyAdmin            Boolean  @default(false)
   isActive                  Boolean  @default(true)
-  impersonationPasswordHash String?  // bcrypt hash of chairman's second password
   webAuthnChallenge         String?  // temporary challenge for ongoing WebAuthn ceremony
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
@@ -52,19 +51,21 @@ model Director {
 
 model ImpersonationSession {
   id              String    @id @default(uuid())
-  chairmanId      String
-  chairman        Director  @relation(fields: [chairmanId], references: [id])
+  adminId         String
+  admin           Director  @relation(fields: [adminId], references: [id])
   targetActorId   String    // Personnel.id being impersonated
   targetActorType String    // always "personnel" for now
   targetName      String    // snapshot of name at session start
   workspaceId     String
   startedAt       DateTime  @default(now())
+  expiresAt       DateTime?
   endedAt         DateTime?
   endReason       String?   // "exit" | "logout" | "expired"
+  reason          String?
   ipAddress       String?
   userAgent       String?
 
-  @@index([chairmanId])
+  @@index([adminId])
   @@index([workspaceId, startedAt])
 }
 

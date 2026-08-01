@@ -51,7 +51,7 @@ function NoticeBanner({ loggedIn }: { loggedIn: boolean }) {
 const TOKEN_KEY      = 'taskwise_token'
 const USER_KEY       = 'taskwise_user'
 const VIEW_KEY       = 'taskwise_view'
-// Chairman stores his real session here during impersonation
+// System Admin stores the real session here during short-lived support access.
 const REAL_TOKEN_KEY = 'taskwise_real_token'
 const REAL_USER_KEY  = 'taskwise_real_user'
 
@@ -105,6 +105,20 @@ export default function App() {
 
   useEffect(() => {
     const handleSessionExpired = () => {
+      const realToken = localStorage.getItem(REAL_TOKEN_KEY)
+      const realUser = localStorage.getItem(REAL_USER_KEY)
+      if (realToken && realUser) {
+        try {
+          const parsed = JSON.parse(realUser) as AuthUser
+          localStorage.setItem(TOKEN_KEY, realToken)
+          localStorage.setItem(USER_KEY, realUser)
+          localStorage.removeItem(REAL_TOKEN_KEY)
+          localStorage.removeItem(REAL_USER_KEY)
+          setUser(parsed)
+          setView('director_dashboard')
+          return
+        } catch { /* fall through to sign-out */ }
+      }
       localStorage.removeItem(TOKEN_KEY)
       localStorage.removeItem(USER_KEY)
       localStorage.removeItem(VIEW_KEY)
@@ -161,9 +175,9 @@ export default function App() {
     })
   }
 
-  // Chairman starts impersonation — save real session, swap in impersonation session
+  // System Admin starts support access — save real session and swap tokens.
   const handleImpersonationStart = (token: string, impersonatedUser: AuthUser) => {
-    // Back up the real Chairman session
+    // Back up the real System Admin session.
     const realToken = localStorage.getItem(TOKEN_KEY)
     const realUser  = localStorage.getItem(USER_KEY)
     if (realToken) localStorage.setItem(REAL_TOKEN_KEY, realToken)
@@ -176,7 +190,7 @@ export default function App() {
     persistView('personnel_queue')
   }
 
-  // Chairman exits impersonation — restore real session
+  // System Admin exits support access — restore the real session.
   const handleImpersonationExit = () => {
     const realToken = localStorage.getItem(REAL_TOKEN_KEY)
     const realUser  = localStorage.getItem(REAL_USER_KEY)
@@ -222,6 +236,13 @@ export default function App() {
       <>
         {showSetup && !user.impersonation && (
           <SetupPrompt actorId={user.actorId} onDone={() => setShowSetup(false)} />
+        )}
+        {isImpersonating && (
+          <ImpersonationBanner
+            impersonation={user.impersonation!}
+            targetName={user.name}
+            onExit={handleImpersonationExit}
+          />
         )}
         <NoticeBanner loggedIn={true} />
         <div className={bannerPad}>

@@ -1,14 +1,14 @@
 import { Router } from 'express'
 import {
   unifiedLogin, directorRegister, changePassword, getMe,
-  setImpersonationPassword, startImpersonation, endImpersonation, listImpersonationSessions,
+  listImpersonationTargets, startImpersonation, endImpersonation, listImpersonationSessions, revokeImpersonationSession,
 } from '../controllers/authController'
 import {
   registrationOptions, registrationVerify,
   authenticationOptions, authenticationVerify,
   listCredentials, deleteCredential,
 } from '../controllers/webAuthnController'
-import { authenticateToken } from '../middleware/authMiddleware'
+import { authenticateToken, requireSyswiseAdmin } from '../middleware/authMiddleware'
 
 const router = Router()
 
@@ -17,11 +17,13 @@ router.post('/director/register',       directorRegister)
 router.get('/me',                       authenticateToken, getMe)
 router.post('/change-password',         authenticateToken, changePassword)
 
-// Chairman impersonation
-router.post('/impersonation-password',  authenticateToken, setImpersonationPassword)
-router.post('/impersonate',             authenticateToken, startImpersonation)
+// System Admin support access. The end route is called with the short-lived
+// impersonation token, while all discovery/start routes require the real admin token.
+router.get('/impersonation/users',      authenticateToken, requireSyswiseAdmin, listImpersonationTargets)
+router.post('/impersonate',             authenticateToken, requireSyswiseAdmin, startImpersonation)
 router.post('/impersonate/end',         authenticateToken, endImpersonation)
-router.get('/impersonation/sessions',   authenticateToken, listImpersonationSessions)
+router.get('/impersonation/sessions',   authenticateToken, requireSyswiseAdmin, listImpersonationSessions)
+router.post('/impersonation/sessions/:id/revoke', authenticateToken, requireSyswiseAdmin, revokeImpersonationSession)
 
 // WebAuthn / biometric login
 router.get('/webauthn/register/options',  authenticateToken, registrationOptions)

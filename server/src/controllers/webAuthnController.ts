@@ -188,7 +188,7 @@ export async function authenticationOptions(req: Request, res: Response): Promis
 
     const options = await generateAuthenticationOptions({
       rpID: RP_ID,
-      userVerification: 'preferred',
+      userVerification: 'required',
       allowCredentials: creds.map(c => ({
         id: c.credentialId,
         transports: c.transports ? JSON.parse(c.transports) : undefined,
@@ -242,6 +242,7 @@ export async function authenticationVerify(req: Request, res: Response): Promise
           counter:    Number(credRecord.counter),
           transports: credRecord.transports ? JSON.parse(credRecord.transports) : undefined,
         },
+        requireUserVerification: true,
       })
     } catch (err) {
       await clearChallenge(actorId, actorType)
@@ -265,17 +266,21 @@ export async function authenticationVerify(req: Request, res: Response): Promise
 
     // Issue a full session token — same shape as password login
     if (actorType === 'director') {
-      const dir = actor as { id: string; workspaceId?: string; name: string; phone: string; email?: string | null; avatarUrl?: string | null; isChairman: boolean }
+      const dir = actor as { id: string; workspaceId?: string; name: string; phone: string; email?: string | null; avatarUrl?: string | null; loginId?: string | null; companyId?: string | null; isChairman: boolean; isSyswiseAdmin: boolean; isCompanyAdmin: boolean }
       const workspace = dir.workspaceId
         ? await prisma.workspace.findUnique({ where: { id: dir.workspaceId }, select: { companyName: true, companyLogo: true } })
         : null
-      const token = signToken(dir.id, 'director', dir.workspaceId!)
+      const token = signToken(dir.id, 'director', dir.workspaceId!, { authenticationMethod: 'webauthn' })
       res.json({
         token,
         user: {
           actorId: dir.id, actorType: 'director', workspaceId: dir.workspaceId,
           name: dir.name, phone: dir.phone, email: dir.email, avatarUrl: dir.avatarUrl,
           isChairman: dir.isChairman,
+          isSyswiseAdmin: dir.isSyswiseAdmin,
+          isCompanyAdmin: dir.isCompanyAdmin,
+          loginId: dir.loginId || dir.phone,
+          companyId: dir.companyId,
           companyName: workspace?.companyName, companyLogo: workspace?.companyLogo,
         },
       })
@@ -283,7 +288,7 @@ export async function authenticationVerify(req: Request, res: Response): Promise
       const per = actor as { id: string; workspaceId: string; name: string; phone: string; email?: string | null; avatarUrl?: string | null; mustChangePassword: boolean; departmentId: string; department: { layer: { number: number } } }
       const layerNumber = per.department.layer.number
       const workspace = await prisma.workspace.findUnique({ where: { id: per.workspaceId }, select: { companyName: true, companyLogo: true } })
-      const token = signToken(per.id, 'personnel', per.workspaceId, { layerNumber, departmentId: per.departmentId })
+      const token = signToken(per.id, 'personnel', per.workspaceId, { layerNumber, departmentId: per.departmentId, authenticationMethod: 'webauthn' })
       res.json({
         token,
         mustChangePassword: per.mustChangePassword,
