@@ -570,10 +570,15 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
                             <button
                               type="button"
                               onClick={() => beginEditUpdate(log)}
-                              className="text-xs font-semibold text-tw-primary hover:underline px-1"
+                              className="inline-flex h-8 w-8 sm:w-auto items-center justify-center gap-1.5 rounded-lg border border-tw-border bg-white px-0 sm:px-3 text-xs font-semibold text-tw-primary shadow-sm transition-colors hover:border-tw-primary hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-tw-primary/30"
                               aria-label={`Edit update by ${log.authorName || log.authorType}`}
+                              title="Edit update"
                             >
-                              Edit
+                              <svg className="h-4 w-4 sm:hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                <path d="M12 20h9" />
+                                <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                              </svg>
+                              <span className="hidden sm:inline">Edit</span>
                             </button>
                           )}
                         </div>
