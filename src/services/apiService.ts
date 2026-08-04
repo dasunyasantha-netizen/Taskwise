@@ -286,6 +286,6 @@ export const auditApi = {
   userAnalyticsOverview: () => api.get('/reports/user-analytics/overview'),
   userLoginHistory:    (actorId: string, actorType = 'personnel') =>
     api.get(`/reports/user-analytics/logins/${actorId}?actorType=${actorType}`),
-  leaderboard:         () => api.get('/reports/leaderboard'),
+  leaderboard:         (period: 'all' | 'week' | 'month' = 'all') => api.get(`/reports/leaderboard?period=${period}`),
   myScore:             () => api.get('/reports/my-score'),
 }

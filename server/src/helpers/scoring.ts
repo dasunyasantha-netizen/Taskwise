@@ -24,6 +24,62 @@ export const POINTS = {
   REJECTION:         -5,   // per task rejected by a director / chairman
 } as const
 
+export type ScorePeriod = 'all' | 'week' | 'month'
+
+/** TaskWise currently operates on Sri Lanka calendar time (UTC+05:30). */
+export const SCORING_UTC_OFFSET_MINUTES = 330
+
+export interface ScoreRange {
+  period: ScorePeriod
+  start: Date
+  endExclusive: Date
+  startDate: string
+  endDate: string
+}
+
+const offsetMs = SCORING_UTC_OFFSET_MINUTES * 60 * 1000
+
+const localCalendarDay = (date: Date): Date => {
+  const shifted = new Date(date.getTime() + offsetMs)
+  return new Date(Date.UTC(shifted.getUTCFullYear(), shifted.getUTCMonth(), shifted.getUTCDate()))
+}
+
+const localMidnightToUtc = (localDate: Date): Date => new Date(localDate.getTime() - offsetMs)
+
+const dateKey = (date: Date): string => date.toISOString().slice(0, 10)
+
+/** Resolve the current calendar period. Weeks run Monday-Sunday; months start on day 1. */
+export function resolveScoreRange(period: ScorePeriod, now = new Date()): ScoreRange {
+  const today = localCalendarDay(now)
+  const epochDay = new Date(`${SCORING_EPOCH}T00:00:00Z`)
+  let startDay = new Date(epochDay)
+  let endDayExclusive = new Date(today)
+  endDayExclusive.setUTCDate(endDayExclusive.getUTCDate() + 1)
+
+  if (period === 'week') {
+    startDay = new Date(today)
+    const daysSinceMonday = (startDay.getUTCDay() + 6) % 7
+    startDay.setUTCDate(startDay.getUTCDate() - daysSinceMonday)
+    endDayExclusive = new Date(startDay)
+    endDayExclusive.setUTCDate(endDayExclusive.getUTCDate() + 7)
+  } else if (period === 'month') {
+    startDay = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1))
+    endDayExclusive = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 1))
+  }
+
+  if (startDay < epochDay) startDay = epochDay
+  const inclusiveEnd = new Date(endDayExclusive)
+  inclusiveEnd.setUTCDate(inclusiveEnd.getUTCDate() - 1)
+
+  return {
+    period,
+    start: localMidnightToUtc(startDay),
+    endExclusive: localMidnightToUtc(endDayExclusive),
+    startDate: dateKey(startDay),
+    endDate: dateKey(inclusiveEnd),
+  }
+}
+
 export interface UserScore {
   id: string
   name: string
@@ -60,39 +116,45 @@ const n = (v: bigint | number | null): number => (v == null ? 0 : Number(v))
  * Compute per-personnel scores for a whole workspace in a single query.
  * Returns rows sorted by totalPoints descending (highest first).
  */
-export async function computeWorkspaceScores(workspaceId: string): Promise<UserScore[]> {
-  const epoch = new Date(`${SCORING_EPOCH}T00:00:00Z`)
+export async function computeWorkspaceScores(
+  workspaceId: string,
+  range: ScoreRange = resolveScoreRange('all'),
+): Promise<UserScore[]> {
+  const { start, endExclusive } = range
 
   const rows = await prisma.$queryRaw<RawRow[]>(Prisma.sql`
     WITH login_pts AS (
-      SELECT "actorId" AS pid, COUNT(DISTINCT DATE("loggedInAt")) AS login_days
+      SELECT "actorId" AS pid, COUNT(DISTINCT DATE("loggedInAt" + INTERVAL '5 hours 30 minutes')) AS login_days
       FROM "LoginLog"
       WHERE "workspaceId" = ${workspaceId}
         AND "actorType" = 'personnel'
-        AND "loggedInAt" >= ${epoch}
+        AND "loggedInAt" >= ${start}
+        AND "loggedInAt" < ${endExclusive}
       GROUP BY "actorId"
     ),
     update_pts AS (
       SELECT pid, COUNT(*) AS task_updates FROM (
-        SELECT DISTINCT "authorPersonnelId" AS pid, "taskId", DATE("logDate") AS d
+        SELECT DISTINCT "authorPersonnelId" AS pid, "taskId", DATE("logDate" + INTERVAL '5 hours 30 minutes') AS d
         FROM "TaskProgressLog"
         WHERE "workspaceId" = ${workspaceId}
           AND "authorType" = 'personnel'
           AND "authorPersonnelId" IS NOT NULL
-          AND "logDate" >= ${epoch}
+          AND "logDate" >= ${start}
+          AND "logDate" < ${endExclusive}
       ) daily_updates
       GROUP BY pid
     ),
     submit_pts AS (
       SELECT a."actorPersonnelId" AS pid,
-        COUNT(*) FILTER (WHERE DATE(a."createdAt") <= DATE(t."deadline")) AS ontime_count,
-        COALESCE(SUM(GREATEST(0, DATE(a."createdAt") - DATE(t."deadline"))), 0) AS overdue_days
+        COUNT(*) FILTER (WHERE DATE(a."createdAt" + INTERVAL '5 hours 30 minutes') <= DATE(t."deadline")) AS ontime_count,
+        COALESCE(SUM(GREATEST(0, DATE(a."createdAt" + INTERVAL '5 hours 30 minutes') - DATE(t."deadline"))), 0) AS overdue_days
       FROM "AuditLog" a
       JOIN "Task" t ON t.id = a."taskId"
       WHERE a."workspaceId" = ${workspaceId}
         AND a.event = 'TASK_SUBMITTED'
         AND a."actorPersonnelId" IS NOT NULL
-        AND a."createdAt" >= ${epoch}
+        AND a."createdAt" >= ${start}
+        AND a."createdAt" < ${endExclusive}
         AND t."deadline" IS NOT NULL
       GROUP BY a."actorPersonnelId"
     ),
@@ -102,7 +164,8 @@ export async function computeWorkspaceScores(workspaceId: string): Promise<UserS
       JOIN "Task" t ON t.id = a."taskId"
       WHERE a."workspaceId" = ${workspaceId}
         AND a.event = 'TASK_REJECTED'
-        AND a."createdAt" >= ${epoch}
+        AND a."createdAt" >= ${start}
+        AND a."createdAt" < ${endExclusive}
         AND t."actedByType" = 'personnel'
         AND t."actedById" IS NOT NULL
       GROUP BY t."actedById"

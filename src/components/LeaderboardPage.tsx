@@ -30,8 +30,16 @@ interface Summary {
 interface LeaderboardData {
   leaderboard: ScoreRow[]
   summary: Summary
-  config: { epoch: string; points: Record<string, number> }
+  config: {
+    epoch: string
+    points: Record<string, number>
+    period: ScorePeriod
+    rangeStart: string
+    rangeEnd: string
+  }
 }
+
+type ScorePeriod = 'all' | 'week' | 'month'
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -45,6 +53,14 @@ function activityLevel(r: ScoreRow) {
   if (engagement >= 40) return { label: 'Very Active',  cls: 'bg-emerald-100 text-emerald-700' }
   if (engagement >= 15) return { label: 'Active',       cls: 'bg-blue-100 text-blue-700' }
   return { label: 'Low Activity', cls: 'bg-amber-100 text-amber-700' }
+}
+
+function formatPeriodDate(value: string, includeYear = false) {
+  return new Date(`${value}T00:00:00`).toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    ...(includeYear ? { year: 'numeric' as const } : {}),
+  })
 }
 
 // Rank badge — medals for the podium, plain number otherwise
@@ -143,14 +159,20 @@ export default function LeaderboardPage() {
   const [error, setError]     = useState('')
   const [search, setSearch]   = useState('')
   const [dept, setDept]       = useState('')
+  const [period, setPeriod]   = useState<ScorePeriod>('all')
   const [selected, setSelected] = useState<ScoreRow | null>(null)
 
   useEffect(() => {
-    auditApi.leaderboard()
-      .then(d => setData(d as LeaderboardData))
-      .catch(() => setError('Failed to load leaderboard'))
-      .finally(() => setLoading(false))
-  }, [])
+    let active = true
+    setLoading(true)
+    setError('')
+    setSelected(null)
+    auditApi.leaderboard(period)
+      .then(d => { if (active) setData(d as LeaderboardData) })
+      .catch(() => { if (active) setError('Failed to load leaderboard') })
+      .finally(() => { if (active) setLoading(false) })
+    return () => { active = false }
+  }, [period])
 
   const departments = useMemo(() => {
     if (!data) return []
@@ -173,6 +195,9 @@ export default function LeaderboardPage() {
   if (!data) return null
 
   const { summary, config } = data
+  const periodDescription = config.period === 'all'
+    ? `Points earned across the workspace since ${new Date(config.epoch).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`
+    : `Points earned ${config.period === 'week' ? 'this week' : 'this month'} · ${formatPeriodDate(config.rangeStart)} – ${formatPeriodDate(config.rangeEnd, true)}`
   const cards = [
     {
       label: 'Top Performer', icon: '🏆', cls: 'text-yellow-600',
@@ -198,11 +223,32 @@ export default function LeaderboardPage() {
 
   return (
     <div className="p-4 md:p-6 space-y-5">
-      <div>
-        <h1 className="text-xl md:text-2xl font-bold text-tw-text">🏆 Leaderboard</h1>
-        <p className="text-sm text-tw-text-secondary mt-0.5">
-          Points earned across the workspace since {new Date(config.epoch).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
-        </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-xl md:text-2xl font-bold text-tw-text">🏆 Leaderboard</h1>
+          <p className="text-sm text-tw-text-secondary mt-0.5">{periodDescription}</p>
+        </div>
+        <div className="inline-flex w-full sm:w-auto rounded-xl border border-tw-border bg-white p-1 shadow-sm" role="group" aria-label="Leaderboard period">
+          {([
+            ['all', 'All Time'],
+            ['week', 'This Week'],
+            ['month', 'This Month'],
+          ] as Array<[ScorePeriod, string]>).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setPeriod(value)}
+              aria-pressed={period === value}
+              className={`flex-1 sm:flex-none rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${
+                period === value
+                  ? 'bg-tw-primary text-white shadow-sm'
+                  : 'text-tw-text-secondary hover:bg-tw-hover hover:text-tw-text'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Summary cards */}

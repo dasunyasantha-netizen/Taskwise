@@ -1,6 +1,6 @@
 import { Request, Response } from 'express'
 import prisma from '../prisma'
-import { computeWorkspaceScores, POINTS, SCORING_EPOCH } from '../helpers/scoring'
+import { computeWorkspaceScores, POINTS, resolveScoreRange, SCORING_EPOCH, ScorePeriod } from '../helpers/scoring'
 
 // GET /api/audit
 export async function listAuditLogs(req: Request, res: Response): Promise<void> {
@@ -206,8 +206,14 @@ export async function getLeaderboard(req: Request, res: Response): Promise<void>
   try {
     if (req.user!.actorType !== 'director') { res.status(403).json({ error: 'Director only' }); return }
     const { workspaceId } = req.user!
+    const requestedPeriod = typeof req.query.period === 'string' ? req.query.period : 'all'
+    if (!['all', 'week', 'month'].includes(requestedPeriod)) {
+      res.status(400).json({ error: 'Period must be all, week, or month' })
+      return
+    }
+    const range = resolveScoreRange(requestedPeriod as ScorePeriod)
 
-    const scores = await computeWorkspaceScores(workspaceId)   // already sorted desc
+    const scores = await computeWorkspaceScores(workspaceId, range)   // already sorted desc
 
     // Summary cards
     const totalPointsEarned = scores.reduce((s, u) => s + u.totalPoints, 0)
@@ -232,7 +238,13 @@ export async function getLeaderboard(req: Request, res: Response): Promise<void>
         scoredUserCount: scored.length,
         mostActiveDept,
       },
-      config: { epoch: SCORING_EPOCH, points: POINTS },
+      config: {
+        epoch: SCORING_EPOCH,
+        points: POINTS,
+        period: range.period,
+        rangeStart: range.startDate,
+        rangeEnd: range.endDate,
+      },
     })
   } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
 }

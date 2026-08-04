@@ -1,6 +1,7 @@
 import assert from 'assert'
 import { normalizeSriLankanPhone, makeLoginId, parseLoginId } from '../helpers/phone'
 import { generatePrefixCandidates, suggestAvailablePrefix, validateCompanyPrefix } from '../helpers/prefix'
+import { resolveScoreRange } from '../helpers/scoring'
 
 async function main() {
   const phones = ['0712345678', '712345678', '94712345678', '+94712345678', '+94 71 234 5678', '071 234 5678']
@@ -31,6 +32,23 @@ async function main() {
 
   const abcFallback = await suggestAvailablePrefix('ABC Logistics', async p => p === 'AL')
   assert.equal(abcFallback, 'ABL')
+
+  const week = resolveScoreRange('week', new Date('2026-08-04T12:00:00Z'))
+  assert.equal(week.startDate, '2026-08-03')
+  assert.equal(week.endDate, '2026-08-09')
+  assert.equal(week.start.toISOString(), '2026-08-02T18:30:00.000Z')
+
+  const sunday = resolveScoreRange('week', new Date('2026-08-09T18:00:00Z'))
+  assert.equal(sunday.startDate, '2026-08-03')
+  assert.equal(sunday.endDate, '2026-08-09')
+
+  const mondayAfterMidnight = resolveScoreRange('week', new Date('2026-08-09T20:00:00Z'))
+  assert.equal(mondayAfterMidnight.startDate, '2026-08-10')
+  assert.equal(mondayAfterMidnight.endDate, '2026-08-16')
+
+  const month = resolveScoreRange('month', new Date('2026-08-31T18:00:00Z'))
+  assert.equal(month.startDate, '2026-08-01')
+  assert.equal(month.endDate, '2026-08-31')
 
   console.log('company helper tests passed')
 }
