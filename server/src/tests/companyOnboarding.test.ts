@@ -70,6 +70,7 @@ async function main() {
   const companyCtrl = await import('../controllers/companyRequestController')
   const authCtrl = await import('../controllers/authController')
   const wsCtrl = await import('../controllers/workspaceController')
+  const taskCtrl = await import('../controllers/taskController')
   const { authenticateToken, requireSyswiseAdmin } = await import('../middleware/authMiddleware')
 
   // Fresh slate.
@@ -416,6 +417,64 @@ async function main() {
     assert.equal(res.statusCode, 201)
     assert.equal(res.body.isSyswiseAdmin, undefined) // Personnel have no such field; flag is ignored.
     assert.equal(await prisma.director.count({ where: { isSyswiseAdmin: true } }), before)
+  })
+
+  // =========================================================================
+  section('Director progress-update editing')
+  const ffStaffForUpdate = await prisma.personnel.findFirstOrThrow({ where: { loginId: 'FF0759999999' } })
+  const editProject = await prisma.project.create({
+    data: { workspaceId: ffWorkspace!.id, directorId: ffAdminId, name: 'Progress Edit Test' },
+  })
+  const editTask = await prisma.task.create({
+    data: { workspaceId: ffWorkspace!.id, projectId: editProject.id, title: 'Editable Progress', createdByDirectorId: ffAdminId },
+  })
+  const personnelUpdate = await prisma.taskProgressLog.create({
+    data: {
+      workspaceId: ffWorkspace!.id,
+      taskId: editTask.id,
+      authorType: 'personnel',
+      authorPersonnelId: ffStaffForUpdate.id,
+      note: 'Original personnel update',
+    },
+  })
+
+  await test('A director can edit an update posted by personnel in the same workspace', async () => {
+    const res = mockRes()
+    await taskCtrl.updateProgressLog(mockReq({
+      params: { id: editTask.id, logId: personnelUpdate.id },
+      body: { note: 'Director corrected update' },
+      user: ffAdminUser,
+    }), res)
+    assert.equal(res.statusCode, 200)
+    assert.equal(res.body.note, 'Director corrected update')
+    assert.ok(res.body.editedAt)
+    assert.equal(res.body.authorPersonnelId, ffStaffForUpdate.id)
+    const audit = await prisma.auditLog.findFirst({ where: { event: 'PROGRESS_LOG_EDITED', taskId: editTask.id } })
+    assert.equal(audit?.actorDirectorId, ffAdminId)
+    assert.equal((audit?.payload as any)?.previousNote, 'Original personnel update')
+    assert.equal((audit?.payload as any)?.updatedNote, 'Director corrected update')
+  })
+
+  await test('Personnel cannot use the director progress-update edit endpoint', async () => {
+    const res = mockRes()
+    await taskCtrl.updateProgressLog(mockReq({
+      params: { id: editTask.id, logId: personnelUpdate.id },
+      body: { note: 'Unauthorized change' },
+      user: { actorId: ffStaffForUpdate.id, actorType: 'personnel', workspaceId: ffWorkspace!.id },
+    }), res)
+    assert.equal(res.statusCode, 403)
+    const stored = await prisma.taskProgressLog.findUniqueOrThrow({ where: { id: personnelUpdate.id } })
+    assert.equal(stored.note, 'Director corrected update')
+  })
+
+  await test('A director cannot edit an update from another workspace', async () => {
+    const res = mockRes()
+    await taskCtrl.updateProgressLog(mockReq({
+      params: { id: editTask.id, logId: personnelUpdate.id },
+      body: { note: 'Cross-workspace change' },
+      user: ycAdminUser,
+    }), res)
+    assert.equal(res.statusCode, 404)
   })
 
   // =========================================================================

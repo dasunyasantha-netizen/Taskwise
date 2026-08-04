@@ -237,6 +237,7 @@ export interface TaskProgressLog {
   note: string
   logDate: string
   createdAt: string
+  editedAt?: string
 }
 
 // ─── Notifications ───────────────────────────────────────────────────────────

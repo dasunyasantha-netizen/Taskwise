@@ -1438,3 +1438,66 @@ export async function addProgressLog(req: Request, res: Response): Promise<void>
     res.status(201).json(log)
   } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
 }
+
+// PUT /api/tasks/:id/progress-logs/:logId
+// Directors may correct any progress update in their own workspace. The
+// original author is retained and the change is preserved in the audit log.
+export async function updateProgressLog(req: Request, res: Response): Promise<void> {
+  try {
+    const { actorId, actorType, workspaceId } = req.user!
+    if (actorType !== 'director') {
+      res.status(403).json({ error: 'Director access required to edit progress updates' }); return
+    }
+
+    const { note } = req.body as { note?: string }
+    const trimmedNote = note?.trim()
+    if (!trimmedNote) {
+      res.status(400).json({ error: 'Update text is required' }); return
+    }
+    if (trimmedNote.length > 5000) {
+      res.status(400).json({ error: 'Update text must be 5000 characters or fewer' }); return
+    }
+
+    const existing = await prisma.taskProgressLog.findFirst({
+      where: {
+        id: req.params.logId,
+        taskId: req.params.id,
+        workspaceId,
+        task: { deletedAt: null },
+      },
+    })
+    if (!existing) {
+      res.status(404).json({ error: 'Progress update not found' }); return
+    }
+
+    const editedAt = new Date()
+    const updated = await prisma.$transaction(async tx => {
+      const log = await tx.taskProgressLog.update({
+        where: { id: existing.id },
+        data: { note: trimmedNote, editedAt },
+      })
+      await writeAudit(
+        tx,
+        workspaceId,
+        'PROGRESS_LOG_EDITED',
+        actorType,
+        actorId,
+        existing.taskId,
+        {
+          progressLogId: existing.id,
+          originalAuthorType: existing.authorType,
+          originalAuthorId: existing.authorPersonnelId || existing.authorDirectorId,
+          previousNote: existing.note,
+          updatedNote: trimmedNote,
+        },
+        req.user!,
+      )
+      return log
+    })
+
+    res.json(updated)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+}

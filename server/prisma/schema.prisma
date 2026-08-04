@@ -525,6 +525,7 @@ model TaskProgressLog {
   note        String
   logDate     DateTime   @default(now())
   createdAt   DateTime   @default(now())
+  editedAt    DateTime?
 
   @@index([taskId, logDate])
   @@index([workspaceId])

@@ -40,6 +40,7 @@ const eventLabels: Record<string, string> = {
   COMMENT_ADDED:   'Comment added',
   DEADLINE_CHANGED:  'Deadline changed',
   DEADLINE_EXTENDED: 'Deadline extended',
+  PROGRESS_LOG_EDITED: 'Progress update edited',
   ASSIGNEES_CHANGED: 'Assignees changed',
   TASK_CHAIN_HANDOVER:        'Chained to next task',
   TASK_AUTO_APPROVED_HANDOVER:'Auto-approved (chain handover)',
@@ -71,6 +72,10 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
   const [newComment, setNewComment] = useState('')
   const [newUpdate, setNewUpdate] = useState('')
   const [addingUpdate, setAddingUpdate] = useState(false)
+  const [editingUpdateId, setEditingUpdateId] = useState<string | null>(null)
+  const [editingUpdateNote, setEditingUpdateNote] = useState('')
+  const [editingUpdateSaving, setEditingUpdateSaving] = useState(false)
+  const [editingUpdateError, setEditingUpdateError] = useState('')
   const [reason, setReason] = useState('')
   const [showReasonModal, setShowReasonModal] = useState<'return' | 'reject' | 'cancel' | null>(null)
   const [showAssignModal, setShowAssignModal] = useState(false)
@@ -173,6 +178,34 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
       await loadProgressLogs()
     } catch (e: unknown) { setActionError(e instanceof Error ? e.message : 'Failed to add update') }
     setAddingUpdate(false)
+  }
+
+  const beginEditUpdate = (log: TaskProgressLog) => {
+    setEditingUpdateId(log.id)
+    setEditingUpdateNote(log.note)
+    setEditingUpdateError('')
+  }
+
+  const cancelEditUpdate = () => {
+    setEditingUpdateId(null)
+    setEditingUpdateNote('')
+    setEditingUpdateError('')
+  }
+
+  const saveProgressUpdate = async (logId: string) => {
+    const note = editingUpdateNote.trim()
+    if (!note || editingUpdateSaving) return
+    setEditingUpdateSaving(true)
+    setEditingUpdateError('')
+    try {
+      await taskApi.updateProgressLog(task.id, logId, note)
+      await loadProgressLogs()
+      cancelEditUpdate()
+    } catch (e: unknown) {
+      setEditingUpdateError(e instanceof Error ? e.message : 'Failed to edit update')
+    } finally {
+      setEditingUpdateSaving(false)
+    }
   }
 
   const createSubtask = async () => {
@@ -528,11 +561,47 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
                           </div>
                           <span className="text-sm font-semibold text-tw-text">{log.authorName || log.authorType}</span>
                         </div>
-                        <span className="text-xs text-tw-text-secondary whitespace-nowrap">
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <span className="text-xs text-tw-text-secondary whitespace-nowrap">
                           {d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · {d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
-                        </span>
+                            {log.editedAt ? ' · Edited' : ''}
+                          </span>
+                          {isDirector && editingUpdateId !== log.id && (
+                            <button
+                              type="button"
+                              onClick={() => beginEditUpdate(log)}
+                              className="text-xs font-semibold text-tw-primary hover:underline px-1"
+                              aria-label={`Edit update by ${log.authorName || log.authorType}`}
+                            >
+                              Edit
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      <p className="text-sm text-tw-text leading-relaxed break-words pl-8">{log.note}</p>
+                      {editingUpdateId === log.id ? (
+                        <div className="pl-8 space-y-2">
+                          <textarea
+                            value={editingUpdateNote}
+                            onChange={e => { setEditingUpdateNote(e.target.value); setEditingUpdateError('') }}
+                            maxLength={5000}
+                            rows={3}
+                            autoFocus
+                            className="input w-full resize-y text-sm min-h-20"
+                          />
+                          {editingUpdateError && <p className="text-xs text-tw-danger">{editingUpdateError}</p>}
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs text-tw-text-secondary">{editingUpdateNote.length}/5000</span>
+                            <div className="flex gap-2">
+                              <button type="button" onClick={cancelEditUpdate} disabled={editingUpdateSaving} className="btn-secondary text-xs py-1.5 px-3">Cancel</button>
+                              <button type="button" onClick={() => saveProgressUpdate(log.id)} disabled={!editingUpdateNote.trim() || editingUpdateSaving} className="btn-primary text-xs py-1.5 px-3">
+                                {editingUpdateSaving ? 'Saving…' : 'Save Update'}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-tw-text leading-relaxed break-words pl-8">{log.note}</p>
+                      )}
                     </div>
                   )
                 })}

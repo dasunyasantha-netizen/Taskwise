@@ -7,7 +7,7 @@ import {
   changeAssignees,
   assignNextTasks, getTaskChain, getPreviousHistory,
   getSubtasks, getComments, addComment, getTaskHistory,
-  getProgressLogs, addProgressLog,
+  getProgressLogs, addProgressLog, updateProgressLog,
   extendDeadline, getDeadlineExtensions,
 } from '../controllers/taskController'
 
@@ -38,6 +38,7 @@ router.post('/:id/comments',       addComment)
 router.get('/:id/history',         getTaskHistory)
 router.get('/:id/progress-logs',        getProgressLogs)
 router.post('/:id/progress-logs',       addProgressLog)
+router.put('/:id/progress-logs/:logId', updateProgressLog)
 router.post('/:id/extend-deadline',     extendDeadline)
 router.get('/:id/deadline-extensions',  getDeadlineExtensions)
 router.post('/:id/assign-next',         assignNextTasks)

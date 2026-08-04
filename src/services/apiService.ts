@@ -131,6 +131,7 @@ export const taskApi = {
   history:        (id: string)      => api.get(`/tasks/${id}/history`),
   progressLogs:      (id: string)      => api.get(`/tasks/${id}/progress-logs`),
   addProgressLog:    (id: string, note: string) => api.post(`/tasks/${id}/progress-logs`, { note }),
+  updateProgressLog: (id: string, logId: string, note: string) => api.put(`/tasks/${id}/progress-logs/${logId}`, { note }),
   extendDeadline:    (id: string, data: { newDeadline: string; reason: string; note?: string }) =>
     api.post(`/tasks/${id}/extend-deadline`, data),
   deadlineExtensions:(id: string)      => api.get(`/tasks/${id}/deadline-extensions`),
