@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { insuranceApi } from '../services/apiService'
 import type { InsurancePolicy, InsuranceQuotation, InsuranceSummary, InsuranceType } from '../types'
+import Select from './Select'
+import DatePicker from './DatePicker'
 
 type RecordTab = 'quotations' | 'policies'
 type FormData = Record<string, string | boolean>
@@ -11,6 +13,45 @@ const INSURANCE_TYPES: Array<{ value: InsuranceType; label: string }> = [
   { value: 'CASUALTY', label: 'Casualty' },
   { value: 'MARINE', label: 'Marine' },
   { value: 'TRAVEL', label: 'Travel' },
+]
+
+const FUEL_TYPES = [
+  { value: 'Petrol', label: 'Petrol' },
+  { value: 'Diesel', label: 'Diesel' },
+  { value: 'Hybrid', label: 'Hybrid' },
+  { value: 'Electric', label: 'Electric' },
+  { value: 'Other', label: 'Other' },
+]
+
+const VEHICLE_USAGES = [
+  { value: 'Private', label: 'Private' },
+  { value: 'Commercial', label: 'Commercial' },
+  { value: 'Hiring', label: 'Hiring' },
+  { value: 'Goods carrying', label: 'Goods carrying' },
+  { value: 'Other', label: 'Other' },
+]
+
+const PROPERTY_TYPES = [
+  { value: 'Building', label: 'Building' },
+  { value: 'Contents', label: 'Contents' },
+  { value: 'Building and contents', label: 'Building and contents' },
+  { value: 'Stock', label: 'Stock' },
+  { value: 'Machinery', label: 'Machinery' },
+  { value: 'Other', label: 'Other' },
+]
+
+const QUOTATION_STATUSES = [
+  { value: '', label: 'All statuses' },
+  { value: 'ACTIVE', label: 'Active' },
+  { value: 'CONVERTED', label: 'Converted' },
+  { value: 'EXPIRED', label: 'Expired' },
+  { value: 'RENEWED', label: 'Renewed' },
+]
+
+const PAYMENT_STATUSES = [
+  { value: '', label: 'All payments' },
+  { value: 'PAID', label: 'Paid' },
+  { value: 'OUTSTANDING', label: 'Outstanding' },
 ]
 
 const emptyForm = (): FormData => ({
@@ -63,14 +104,10 @@ function SubjectFields({ form, set }: { form: FormData; set: (key: string, value
       <Field label="Vehicle number" required><TextInput value={String(form.vehicleNumber)} onChange={v => set('vehicleNumber', v)} placeholder="e.g. WP CAB-1234" /></Field>
       <Field label="Vehicle make and model" required><TextInput value={String(form.vehicleMakeModel)} onChange={v => set('vehicleMakeModel', v)} placeholder="e.g. Toyota Aqua" /></Field>
       <Field label="Fuel type" required>
-        <select className="input text-sm" value={String(form.fuelType)} onChange={e => set('fuelType', e.target.value)}>
-          <option value="">Select fuel type</option><option>Petrol</option><option>Diesel</option><option>Hybrid</option><option>Electric</option><option>Other</option>
-        </select>
+        <Select value={String(form.fuelType)} onChange={v => set('fuelType', v)} options={FUEL_TYPES} placeholder="Select fuel type" />
       </Field>
       <Field label="Vehicle usage" required>
-        <select className="input text-sm" value={String(form.vehicleUsage)} onChange={e => set('vehicleUsage', e.target.value)}>
-          <option value="">Select usage</option><option>Private</option><option>Commercial</option><option>Hiring</option><option>Goods carrying</option><option>Other</option>
-        </select>
+        <Select value={String(form.vehicleUsage)} onChange={v => set('vehicleUsage', v)} options={VEHICLE_USAGES} placeholder="Select usage" />
       </Field>
     </>
   )
@@ -78,9 +115,7 @@ function SubjectFields({ form, set }: { form: FormData; set: (key: string, value
     <>
       <div className="md:col-span-2"><Field label="Property address" required><TextInput value={String(form.propertyAddress)} onChange={v => set('propertyAddress', v)} /></Field></div>
       <Field label="Property type" required>
-        <select className="input text-sm" value={String(form.propertyType)} onChange={e => set('propertyType', e.target.value)}>
-          <option value="">Select property type</option><option>Building</option><option>Contents</option><option>Building and contents</option><option>Stock</option><option>Machinery</option><option>Other</option>
-        </select>
+        <Select value={String(form.propertyType)} onChange={v => set('propertyType', v)} options={PROPERTY_TYPES} placeholder="Select property type" />
       </Field>
       <Field label="Property usage" required><TextInput value={String(form.propertyUsage)} onChange={v => set('propertyUsage', v)} placeholder="Residential, commercial, industrial…" /></Field>
     </>
@@ -103,8 +138,8 @@ function SubjectFields({ form, set }: { form: FormData; set: (key: string, value
     <>
       <Field label="Passport number" required><TextInput value={String(form.passportNumber)} onChange={v => set('passportNumber', v)} /></Field>
       <Field label="Destination" required><TextInput value={String(form.destination)} onChange={v => set('destination', v)} /></Field>
-      <Field label="Travel start date" required><TextInput value={String(form.travelStartDate)} onChange={v => set('travelStartDate', v)} type="date" /></Field>
-      <Field label="Travel end date" required><TextInput value={String(form.travelEndDate)} onChange={v => set('travelEndDate', v)} type="date" /></Field>
+      <Field label="Travel start date" required><DatePicker value={String(form.travelStartDate)} onChange={v => set('travelStartDate', v)} placeholder="Select travel start date" /></Field>
+      <Field label="Travel end date" required><DatePicker value={String(form.travelEndDate)} onChange={v => set('travelEndDate', v)} minDate={String(form.travelStartDate) || undefined} placeholder="Select travel end date" /></Field>
     </>
   )
 }
@@ -150,9 +185,12 @@ function RecordFormModal({ kind, initial, onClose, onSaved }: {
               <TextInput value={String(form[kind === 'quotation' ? 'quotationNumber' : 'policyNumber'])} onChange={v => set(kind === 'quotation' ? 'quotationNumber' : 'policyNumber', v)} placeholder="Enter the number manually" />
             </Field>
             <Field label="Insurance type" required>
-              <select className="input text-sm" value={String(form.insuranceType)} onChange={e => set('insuranceType', e.target.value)} disabled={!!initial && kind === 'policy' && 'sourceQuotation' in initial && !!initial.sourceQuotation}>
-                {INSURANCE_TYPES.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}
-              </select>
+              <Select
+                value={String(form.insuranceType)}
+                onChange={v => set('insuranceType', v)}
+                options={INSURANCE_TYPES}
+                disabled={!!initial && kind === 'policy' && 'sourceQuotation' in initial && !!initial.sourceQuotation}
+              />
             </Field>
             <Field label="Customer name" required><TextInput value={String(form.customerName)} onChange={v => set('customerName', v)} /></Field>
             <Field label="Contact number" required><TextInput value={String(form.contactNumber)} onChange={v => set('contactNumber', v)} type="tel" /></Field>
@@ -161,8 +199,8 @@ function RecordFormModal({ kind, initial, onClose, onSaved }: {
             <Field label="Premium (LKR)" required><TextInput value={String(form.premium)} onChange={v => set('premium', v)} type="number" min="0.01" step="0.01" /></Field>
             {kind === 'policy' && (
               <>
-                <Field label="Issue date" required><TextInput value={String(form.issueDate)} onChange={v => set('issueDate', v)} type="date" /></Field>
-                <Field label="Expiry date" required><TextInput value={String(form.expiryDate)} onChange={v => set('expiryDate', v)} type="date" /></Field>
+                <Field label="Issue date" required><DatePicker value={String(form.issueDate)} onChange={v => set('issueDate', v)} placeholder="Select issue date" /></Field>
+                <Field label="Expiry date" required><DatePicker value={String(form.expiryDate)} onChange={v => set('expiryDate', v)} minDate={String(form.issueDate) || undefined} placeholder="Select expiry date" /></Field>
                 <div className="md:col-span-2 rounded-xl border border-tw-border bg-gray-50 p-4">
                   <label className="flex items-center gap-2 text-sm font-semibold text-tw-text mb-3"><input type="checkbox" checked={Boolean(form.paid)} onChange={e => set('paid', e.target.checked)} className="w-4 h-4" /> Paid in full</label>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -205,8 +243,8 @@ function ConvertModal({ quotation, onClose, onSaved }: { quotation: InsuranceQuo
           <div className="sm:col-span-2"><Field label="Policy number" required><TextInput value={String(form.policyNumber)} onChange={v => setForm(f => ({ ...f, policyNumber: v }))} /></Field></div>
           <Field label="Premium (LKR)" required><TextInput value={String(form.premium)} onChange={v => setForm(f => ({ ...f, premium: v }))} type="number" min="0.01" step="0.01" /></Field>
           <Field label="Payment amount (LKR)"><TextInput value={form.paid ? String(premium) : String(form.paymentAmount)} onChange={v => setForm(f => ({ ...f, paymentAmount: v }))} type="number" min="0" step="0.01" /></Field>
-          <Field label="Issue date" required><TextInput value={String(form.issueDate)} onChange={v => setForm(f => ({ ...f, issueDate: v }))} type="date" /></Field>
-          <Field label="Expiry date" required><TextInput value={String(form.expiryDate)} onChange={v => setForm(f => ({ ...f, expiryDate: v }))} type="date" /></Field>
+          <Field label="Issue date" required><DatePicker value={String(form.issueDate)} onChange={v => setForm(f => ({ ...f, issueDate: v }))} placeholder="Select issue date" /></Field>
+          <Field label="Expiry date" required><DatePicker value={String(form.expiryDate)} onChange={v => setForm(f => ({ ...f, expiryDate: v }))} minDate={String(form.issueDate) || undefined} placeholder="Select expiry date" /></Field>
           <label className="sm:col-span-2 flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-2 text-sm font-semibold"><input type="checkbox" checked={Boolean(form.paid)} onChange={e => setForm(f => ({ ...f, paid: e.target.checked }))} /> Paid in full <span className="ml-auto text-xs text-tw-text-secondary">Balance: {money(Math.max(0, premium - payment))}</span></label>
         </div>
         <div className="flex justify-end gap-2 mt-5"><button type="button" className="btn-secondary" onClick={onClose}>Cancel</button><button className="btn-primary" disabled={saving}>{saving ? 'Converting…' : 'Convert to Policy'}</button></div>
@@ -331,8 +369,18 @@ export default function InsuranceManagementPage() {
           </div>
           <div className="flex flex-col md:flex-row gap-2">
             <input className="input text-sm flex-1" value={search} onChange={e => setSearch(e.target.value)} placeholder={`Search ${tab} by number, customer, contact or insured details…`} />
-            <select className="input text-sm md:max-w-[180px]" value={type} onChange={e => setType(e.target.value)}><option value="">All insurance types</option>{INSURANCE_TYPES.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}</select>
-            <select className="input text-sm md:max-w-[180px]" value={status} onChange={e => setStatus(e.target.value)}>{tab === 'quotations' ? <><option value="">All statuses</option><option value="ACTIVE">Active</option><option value="CONVERTED">Converted</option><option value="EXPIRED">Expired</option><option value="RENEWED">Renewed</option></> : <><option value="">All payments</option><option value="PAID">Paid</option><option value="OUTSTANDING">Outstanding</option></>}</select>
+            <Select
+              className="md:w-[190px]"
+              value={type}
+              onChange={setType}
+              options={[{ value: '', label: 'All insurance types' }, ...INSURANCE_TYPES]}
+            />
+            <Select
+              className="md:w-[190px]"
+              value={status}
+              onChange={setStatus}
+              options={tab === 'quotations' ? QUOTATION_STATUSES : PAYMENT_STATUSES}
+            />
           </div>
         </div>
         {loading ? <div className="py-12 text-center text-sm text-tw-text-secondary">Loading insurance records…</div> : records.length === 0 ? <div className="py-12 text-center"><div className="text-3xl mb-2">🔎</div><div className="font-semibold text-tw-text">No records found</div><div className="text-sm text-tw-text-secondary mt-1">Try changing the search or filters.</div></div> : (
