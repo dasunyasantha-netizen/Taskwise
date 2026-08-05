@@ -73,14 +73,14 @@ export default function ForcePasswordChange({ user, onPasswordChanged, onLogout 
 
         <div className="bg-blue-50 rounded-2xl px-4 py-3 mb-5">
           <p className="text-xs text-blue-700">
-            Your temporary password is the <strong>last 6 digits of your phone number</strong> ({user.phone?.slice(-6)}).
+            Enter the <strong>temporary password provided by your administrator</strong>, then choose a new private password.
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1.5">Temporary Password</label>
-            <input type="password" className="input rounded-xl" placeholder="Last 6 digits of your phone"
+            <input type="password" className="input rounded-xl" placeholder="Enter temporary password"
               value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} required autoFocus />
           </div>
           <div>
