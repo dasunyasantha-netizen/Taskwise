@@ -148,6 +148,21 @@ export const taskApi = {
 }
 
 // ─── Notifications ───────────────────────────────────────────────────────────
+// Fairfirst-only insurance management
+export const insuranceApi = {
+  summary:           () => api.get('/insurance/summary'),
+  quotations:        (params?: string) => api.get(`/insurance/quotations${params ? '?' + params : ''}`),
+  quotation:         (id: string) => api.get(`/insurance/quotations/${id}`),
+  createQuotation:   (data: unknown) => api.post('/insurance/quotations', data),
+  updateQuotation:   (id: string, data: unknown) => api.put(`/insurance/quotations/${id}`, data),
+  convertQuotation:  (id: string, data: unknown) => api.post(`/insurance/quotations/${id}/convert`, data),
+  renewQuotation:    (id: string, data: unknown) => api.post(`/insurance/quotations/${id}/renew`, data),
+  policies:          (params?: string) => api.get(`/insurance/policies${params ? '?' + params : ''}`),
+  policy:            (id: string) => api.get(`/insurance/policies/${id}`),
+  createPolicy:      (data: unknown) => api.post('/insurance/policies', data),
+  updatePolicy:      (id: string, data: unknown) => api.put(`/insurance/policies/${id}`, data),
+}
+
 export const notificationApi = {
   list:                 () => api.get('/notifications'),
   read:                 (id: string) => api.post(`/notifications/${id}/read`),

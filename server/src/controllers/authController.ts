@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import prisma from '../prisma'
 import { companyLoginPrefix, normalizeSriLankanPhone, resolveLoginLookup } from '../helpers/phone'
+import { getEnabledFeatures } from '../helpers/features'
 
 function signToken(
   actorId: string,
@@ -84,6 +85,7 @@ export async function unifiedLogin(req: Request, res: Response): Promise<void> {
             select: { companyName: true, companyLogo: true }
           })
         : null
+      const features = await getEnabledFeatures(director.workspaceId!)
 
       // Log login event (fire-and-forget — don't block the response)
       prisma.loginLog.create({ data: {
@@ -111,6 +113,7 @@ export async function unifiedLogin(req: Request, res: Response): Promise<void> {
           companyPrefix: director.company?.prefix,
           companyName: workspace?.companyName,
           companyLogo: workspace?.companyLogo,
+          features,
         }
       })
       return
@@ -143,6 +146,7 @@ export async function unifiedLogin(req: Request, res: Response): Promise<void> {
         where: { id: personnel.workspaceId },
         select: { companyName: true, companyLogo: true }
       })
+      const features = await getEnabledFeatures(personnel.workspaceId)
 
       // Log login event (fire-and-forget)
       prisma.loginLog.create({ data: {
@@ -171,6 +175,7 @@ export async function unifiedLogin(req: Request, res: Response): Promise<void> {
           companyName: workspace?.companyName,
           companyLogo: workspace?.companyLogo,
           mustChangePassword: personnel.mustChangePassword,
+          features,
         }
       })
       return
@@ -271,6 +276,7 @@ export async function changePassword(req: Request, res: Response): Promise<void>
 export async function getMe(req: Request, res: Response): Promise<void> {
   try {
     const { actorId, actorType, workspaceId } = req.user!
+    const features = await getEnabledFeatures(workspaceId)
     if (actorType === 'director') {
       const director = await prisma.director.findUnique({
         where: { id: actorId },
@@ -282,7 +288,7 @@ export async function getMe(req: Request, res: Response): Promise<void> {
             select: { companyName: true, companyLogo: true }
           })
         : null
-      res.json({ actorId, actorType, workspaceId, ...director, companyPrefix: director?.company?.prefix, companyName: workspace?.companyName, companyLogo: workspace?.companyLogo })
+      res.json({ actorId, actorType, workspaceId, ...director, companyPrefix: director?.company?.prefix, companyName: workspace?.companyName, companyLogo: workspace?.companyLogo, features })
     } else {
       const personnel = await prisma.personnel.findUnique({
         where: { id: actorId },
@@ -294,7 +300,7 @@ export async function getMe(req: Request, res: Response): Promise<void> {
             select: { companyName: true, companyLogo: true }
           })
         : null
-      res.json({ actorId, actorType, workspaceId, ...personnel, companyPrefix: personnel?.company?.prefix, companyName: workspace?.companyName, companyLogo: workspace?.companyLogo })
+      res.json({ actorId, actorType, workspaceId, ...personnel, companyPrefix: personnel?.company?.prefix, companyName: workspace?.companyName, companyLogo: workspace?.companyLogo, features })
     }
   } catch (err) {
     console.error(err)
@@ -495,6 +501,7 @@ export async function startImpersonation(req: Request, res: Response): Promise<v
       where: { id: target.workspaceId },
       select: { companyName: true, companyLogo: true }
     })
+    const features = await getEnabledFeatures(target.workspaceId)
 
     res.json({
       token,
@@ -519,6 +526,7 @@ export async function startImpersonation(req: Request, res: Response): Promise<v
         companyLogo: workspace?.companyLogo,
         companyId: target.companyId,
         companyPrefix: companyLoginPrefix(target.company),
+        features,
         impersonation: {
           sessionId: session.id,
           adminId,

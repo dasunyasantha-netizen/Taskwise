@@ -13,36 +13,36 @@ datasource db {
 // ─────────────────────────────────────────────────────────────────────────────
 
 model Director {
-  id          String     @id @default(uuid())
-  email       String?    @unique
-  phone       String
-  normalizedPhone String?
-  loginId     String?    @unique
-  nic         String?    @unique  // National Identity Card — globally unique
-  password    String
-  name        String
-  avatarUrl   String?
-  workspaceId String?    @unique
-  workspace   Workspace? @relation(fields: [workspaceId], references: [id])
-  companyId   String?
-  company     Company?   @relation("CompanyDirectors", fields: [companyId], references: [id])
-  isChairman                Boolean  @default(false)
-  isSyswiseAdmin            Boolean  @default(false)
-  isCompanyAdmin            Boolean  @default(false)
-  isActive                  Boolean  @default(true)
-  webAuthnChallenge         String?  // temporary challenge for ongoing WebAuthn ceremony
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  id                String     @id @default(uuid())
+  email             String?    @unique
+  phone             String
+  normalizedPhone   String?
+  loginId           String?    @unique
+  nic               String?    @unique // National Identity Card — globally unique
+  password          String
+  name              String
+  avatarUrl         String?
+  workspaceId       String?    @unique
+  workspace         Workspace? @relation(fields: [workspaceId], references: [id])
+  companyId         String?
+  company           Company?   @relation("CompanyDirectors", fields: [companyId], references: [id])
+  isChairman        Boolean    @default(false)
+  isSyswiseAdmin    Boolean    @default(false)
+  isCompanyAdmin    Boolean    @default(false)
+  isActive          Boolean    @default(true)
+  webAuthnChallenge String? // temporary challenge for ongoing WebAuthn ceremony
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
 
-  projectsCreated       Project[]
-  categoriesCreated     ProjectCategory[]
-  tasksCreated          Task[]              @relation("TaskCreatedByDirector")
-  auditLogs             AuditLog[]          @relation("AuditActorDirector")
-  notifications         Notification[]      @relation("NotifRecipientDirector")
-  comments              TaskComment[]       @relation("CommentAuthorDirector")
-  progressLogs          TaskProgressLog[]   @relation("ProgressLogDirector")
-  impersonationSessions ImpersonationSession[]
-  approvedCompanyRequests CompanyRequest[] @relation("CompanyRequestApprovedBy")
+  projectsCreated         Project[]
+  categoriesCreated       ProjectCategory[]
+  tasksCreated            Task[]                 @relation("TaskCreatedByDirector")
+  auditLogs               AuditLog[]             @relation("AuditActorDirector")
+  notifications           Notification[]         @relation("NotifRecipientDirector")
+  comments                TaskComment[]          @relation("CommentAuthorDirector")
+  progressLogs            TaskProgressLog[]      @relation("ProgressLogDirector")
+  impersonationSessions   ImpersonationSession[]
+  approvedCompanyRequests CompanyRequest[]       @relation("CompanyRequestApprovedBy")
   reviewedCompanyActions  CompanyRequestAction[] @relation("CompanyRequestActionDirector")
 
   @@index([companyId])
@@ -53,14 +53,14 @@ model ImpersonationSession {
   id              String    @id @default(uuid())
   adminId         String
   admin           Director  @relation(fields: [adminId], references: [id])
-  targetActorId   String    // Personnel.id being impersonated
-  targetActorType String    // always "personnel" for now
-  targetName      String    // snapshot of name at session start
+  targetActorId   String // Personnel.id being impersonated
+  targetActorType String // always "personnel" for now
+  targetName      String // snapshot of name at session start
   workspaceId     String
   startedAt       DateTime  @default(now())
   expiresAt       DateTime?
   endedAt         DateTime?
-  endReason       String?   // "exit" | "logout" | "expired"
+  endReason       String? // "exit" | "logout" | "expired"
   reason          String?
   ipAddress       String?
   userAgent       String?
@@ -72,76 +72,92 @@ model ImpersonationSession {
 model Workspace {
   id          String   @id @default(uuid())
   name        String
-  companyName String?  // branding: displayed in sidebar/login
-  companyLogo String?  // branding: base64 or URL of company logo
+  companyName String? // branding: displayed in sidebar/login
+  companyLogo String? // branding: base64 or URL of company logo
   companyId   String?  @unique
   company     Company? @relation(fields: [companyId], references: [id])
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  director Director?
-  layers   Layer[]
-  projects Project[]
+  director            Director?
+  layers              Layer[]
+  projects            Project[]
+  insuranceQuotations InsuranceQuotation[]
+  insurancePolicies   InsurancePolicy[]
 }
 
 model Company {
-  id                 String   @id @default(uuid())
-  legalName          String
-  displayName        String?
-  registrationNumber String   @unique
-  prefix             String   @unique
-  status             String   @default("ACTIVE") // ACTIVE | SUSPENDED | INACTIVE
-  allowUnprefixedLogin Boolean @default(false)
-  workspaceId        String?  @unique
-  workspace          Workspace?
-  createdFromRequestId String? @unique
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  id                   String     @id @default(uuid())
+  legalName            String
+  displayName          String?
+  registrationNumber   String     @unique
+  prefix               String     @unique
+  status               String     @default("ACTIVE") // ACTIVE | SUSPENDED | INACTIVE
+  allowUnprefixedLogin Boolean    @default(false)
+  workspaceId          String?    @unique
+  workspace            Workspace?
+  createdFromRequestId String?    @unique
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
 
-  directors Director[] @relation("CompanyDirectors")
+  directors Director[]       @relation("CompanyDirectors")
   personnel Personnel[]
   requests  CompanyRequest[]
+  features  CompanyFeature[]
 
   @@index([status])
 }
 
+model CompanyFeature {
+  id         String   @id @default(uuid())
+  companyId  String
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  featureKey String
+  enabled    Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([companyId, featureKey])
+  @@index([featureKey, enabled])
+}
+
 model CompanyRequest {
-  id                    String   @id @default(uuid())
-  reference             String   @unique
-  status                String   @default("PENDING") // PENDING | MORE_INFORMATION_REQUIRED | APPROVED | REJECTED | CANCELLED
-  legalName             String
-  displayName           String?
-  registrationNumber    String
-  address               String
-  industry              String
-  website               String?
-  expectedUsers         Int?
-  reason                String
-  supportingDocumentName String?
-  supportingDocumentMime String?
-  supportingDocumentData String?
-  applicantFirstName    String
-  applicantMiddleName   String?
-  applicantLastName     String
-  applicantName         String
-  applicantPhone        String
+  id                       String    @id @default(uuid())
+  reference                String    @unique
+  status                   String    @default("PENDING") // PENDING | MORE_INFORMATION_REQUIRED | APPROVED | REJECTED | CANCELLED
+  legalName                String
+  displayName              String?
+  registrationNumber       String
+  address                  String
+  industry                 String
+  website                  String?
+  expectedUsers            Int?
+  reason                   String
+  supportingDocumentName   String?
+  supportingDocumentMime   String?
+  supportingDocumentData   String?
+  applicantFirstName       String
+  applicantMiddleName      String?
+  applicantLastName        String
+  applicantName            String
+  applicantPhone           String
   applicantNormalizedPhone String
-  applicantEmail        String
-  applicantPasswordHash String
-  suggestedPrefix       String
-  finalPrefix           String?
-  publicStatusTokenHash String
-  moreInfoInstructions  String?
-  rejectionReason       String?
-  internalNote          String?
-  approvedByDirectorId  String?
-  approvedByDirector    Director? @relation("CompanyRequestApprovedBy", fields: [approvedByDirectorId], references: [id])
-  approvedAt            DateTime?
-  companyId             String?
-  company               Company?  @relation(fields: [companyId], references: [id])
-  administratorDirectorId String?
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  applicantEmail           String
+  applicantPasswordHash    String
+  suggestedPrefix          String
+  finalPrefix              String?
+  publicStatusTokenHash    String
+  moreInfoInstructions     String?
+  rejectionReason          String?
+  internalNote             String?
+  approvedByDirectorId     String?
+  approvedByDirector       Director? @relation("CompanyRequestApprovedBy", fields: [approvedByDirectorId], references: [id])
+  approvedAt               DateTime?
+  companyId                String?
+  company                  Company?  @relation(fields: [companyId], references: [id])
+  administratorDirectorId  String?
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
 
   actions CompanyRequestAction[]
 
@@ -151,15 +167,15 @@ model CompanyRequest {
 }
 
 model CompanyRequestAction {
-  id          String   @id @default(uuid())
-  requestId   String
-  request     CompanyRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  id              String         @id @default(uuid())
+  requestId       String
+  request         CompanyRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
   actorDirectorId String?
-  actorDirector   Director? @relation("CompanyRequestActionDirector", fields: [actorDirectorId], references: [id])
-  action      String
-  note        String?
-  metadata    Json?
-  createdAt   DateTime @default(now())
+  actorDirector   Director?      @relation("CompanyRequestActionDirector", fields: [actorDirectorId], references: [id])
+  action          String
+  note            String?
+  metadata        Json?
+  createdAt       DateTime       @default(now())
 
   @@index([requestId, createdAt])
   @@index([actorDirectorId])
@@ -170,13 +186,13 @@ model CompanyRequestAction {
 // ─────────────────────────────────────────────────────────────────────────────
 
 model Layer {
-  id          String     @id @default(uuid())
+  id          String    @id @default(uuid())
   workspaceId String
-  workspace   Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  number      Int        // 1, 2, or 3
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  number      Int // 1, 2, or 3
   name        String
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   departments Department[]
 
@@ -185,13 +201,13 @@ model Layer {
 }
 
 model Department {
-  id          String      @id @default(uuid())
+  id          String    @id @default(uuid())
   layerId     String
-  layer       Layer       @relation(fields: [layerId], references: [id], onDelete: Cascade)
+  layer       Layer     @relation(fields: [layerId], references: [id], onDelete: Cascade)
   workspaceId String
   name        String
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
 
   personnel       Personnel[]
@@ -202,43 +218,44 @@ model Department {
 }
 
 model Personnel {
-  id           String     @id @default(uuid())
-  workspaceId  String
-  companyId    String?
-  company      Company?   @relation(fields: [companyId], references: [id])
-  departmentId String
-  department   Department @relation(fields: [departmentId], references: [id])
-  email        String?    // optional — phone is the login credential
-  phone        String
-  normalizedPhone String?
-  loginId      String?    @unique
-  nic          String?    @unique  // globally unique — one real person across all workspaces
-  password     String
-  name         String
+  id                 String      @id @default(uuid())
+  workspaceId        String
+  companyId          String?
+  company            Company?    @relation(fields: [companyId], references: [id])
+  departmentId       String
+  department         Department  @relation(fields: [departmentId], references: [id])
+  email              String? // optional — phone is the login credential
+  phone              String
+  normalizedPhone    String?
+  loginId            String?     @unique
+  nic                String?     @unique // globally unique — one real person across all workspaces
+  password           String
+  name               String
   avatarUrl          String?
-  mustChangePassword Boolean  @default(false)
-  isActive            Boolean  @default(true)
-  webAuthnChallenge  String?  // temporary challenge for ongoing WebAuthn ceremony
-  supervisorId String?    // direct supervisor (another Personnel one layer up)
-  supervisor   Personnel? @relation("PersonnelSupervisor", fields: [supervisorId], references: [id])
-  subordinates Personnel[] @relation("PersonnelSupervisor")
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
-  deletedAt    DateTime?
+  mustChangePassword Boolean     @default(false)
+  isActive           Boolean     @default(true)
+  webAuthnChallenge  String? // temporary challenge for ongoing WebAuthn ceremony
+  supervisorId       String? // direct supervisor (another Personnel one layer up)
+  supervisor         Personnel?  @relation("PersonnelSupervisor", fields: [supervisorId], references: [id])
+  subordinates       Personnel[] @relation("PersonnelSupervisor")
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+  deletedAt          DateTime?
 
   taskGroupMemberships TaskGroupMember[]
   taskAssignments      TaskAssignment[]
-  tasksCreated     Task[]           @relation("TaskCreatedByPersonnel")
-  auditLogs        AuditLog[]       @relation("AuditActorPersonnel")
-  notifications    Notification[]   @relation("NotifRecipientPersonnel")
-  comments         TaskComment[]    @relation("CommentAuthorPersonnel")
-  progressLogs     TaskProgressLog[] @relation("ProgressLogAuthor")
+  tasksCreated         Task[]            @relation("TaskCreatedByPersonnel")
+  auditLogs            AuditLog[]        @relation("AuditActorPersonnel")
+  notifications        Notification[]    @relation("NotifRecipientPersonnel")
+  comments             TaskComment[]     @relation("CommentAuthorPersonnel")
+  progressLogs         TaskProgressLog[] @relation("ProgressLogAuthor")
+
+  @@unique([companyId, normalizedPhone])
   @@index([workspaceId])
   @@index([companyId])
   @@index([normalizedPhone])
   @@index([departmentId])
   @@index([supervisorId])
-  @@unique([companyId, normalizedPhone])
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -254,7 +271,7 @@ model TaskGroup {
   updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
 
-  members      TaskGroupMember[]
+  members       TaskGroupMember[]
   groupProjects TaskGroupProject[]
 
   @@index([workspaceId])
@@ -274,12 +291,12 @@ model TaskGroupMember {
 
 // Links a Project to a TaskGroup (group-wise project)
 model TaskGroupProject {
-  id          String    @id @default(uuid())
-  groupId     String
-  group       TaskGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  projectId   String    @unique
-  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  createdAt   DateTime  @default(now())
+  id        String    @id @default(uuid())
+  groupId   String
+  group     TaskGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  projectId String    @unique
+  project   Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
 
   @@index([groupId])
 }
@@ -297,7 +314,7 @@ model ProjectCategory {
   description String?
   color       String    @default("#0073ea")
   status      String    @default("active") // active | archived
-  isSystem    Boolean   @default(false)    // true for "Uncategorized" — not selectable in UI
+  isSystem    Boolean   @default(false) // true for "Uncategorized" — not selectable in UI
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -312,19 +329,19 @@ model ProjectCategory {
 // ─────────────────────────────────────────────────────────────────────────────
 
 model Project {
-  id          String    @id @default(uuid())
+  id          String           @id @default(uuid())
   workspaceId String
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspace   Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   directorId  String
-  director    Director  @relation(fields: [directorId], references: [id])
+  director    Director         @relation(fields: [directorId], references: [id])
   categoryId  String?
   category    ProjectCategory? @relation(fields: [categoryId], references: [id])
   name        String
   description String?
-  color       String    @default("#0073ea")
-  status      String    @default("active") // active | archived
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  color       String           @default("#0073ea")
+  status      String           @default("active") // active | archived
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
   deletedAt   DateTime?
 
   tasks        Task[]
@@ -346,11 +363,120 @@ model Project {
 //                        REJECTED  (authority rejects; assignee can reopen → IN_PROGRESS)
 // Any → CANCELLED (Director only, soft-delete)
 
+// FAIRFIRST INSURANCE MANAGEMENT (feature-gated per company)
+
+model InsuranceQuotation {
+  id              String    @id @default(uuid())
+  workspaceId     String
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  quotationNumber String
+  insuranceType   String
+  customerName    String
+  contactNumber   String
+  sumInsured      Decimal   @db.Decimal(18, 2)
+  premium         Decimal   @db.Decimal(18, 2)
+  issueDate       DateTime  @default(now())
+  expiresAt       DateTime
+  status          String    @default("ACTIVE") // ACTIVE | CONVERTED | EXPIRED | RENEWED
+  notes           String?
+
+  vehicleNumber    String?
+  vehicleMakeModel String?
+  fuelType         String?
+  vehicleUsage     String?
+  propertyAddress  String?
+  propertyType     String?
+  propertyUsage    String?
+  riskDescription  String?
+  businessActivity String?
+  cargoDescription String?
+  transitFrom      String?
+  transitTo        String?
+  conveyance       String?
+  passportNumber   String?
+  destination      String?
+  travelStartDate  DateTime?
+  travelEndDate    DateTime?
+
+  createdById   String
+  createdByType String
+  createdByName String
+  updatedById   String?
+  updatedByType String?
+  updatedByName String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  renewedFromId   String?
+  renewedFrom     InsuranceQuotation?  @relation("QuotationRenewals", fields: [renewedFromId], references: [id])
+  renewedTo       InsuranceQuotation[] @relation("QuotationRenewals")
+  convertedPolicy InsurancePolicy?     @relation("QuotationPolicy")
+
+  @@unique([workspaceId, quotationNumber])
+  @@index([workspaceId, status])
+  @@index([workspaceId, insuranceType])
+  @@index([workspaceId, expiresAt])
+  @@index([renewedFromId])
+}
+
+model InsurancePolicy {
+  id               String    @id @default(uuid())
+  workspaceId      String
+  workspace        Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  policyNumber     String
+  insuranceType    String
+  customerName     String
+  contactNumber    String
+  sumInsured       Decimal   @db.Decimal(18, 2)
+  premium          Decimal   @db.Decimal(18, 2)
+  issueDate        DateTime
+  expiryDate       DateTime
+  status           String    @default("COMPLETED")
+  paid             Boolean   @default(false)
+  paymentAmount    Decimal   @default(0) @db.Decimal(18, 2)
+  paymentUpdatedAt DateTime?
+  notes            String?
+
+  vehicleNumber    String?
+  vehicleMakeModel String?
+  fuelType         String?
+  vehicleUsage     String?
+  propertyAddress  String?
+  propertyType     String?
+  propertyUsage    String?
+  riskDescription  String?
+  businessActivity String?
+  cargoDescription String?
+  transitFrom      String?
+  transitTo        String?
+  conveyance       String?
+  passportNumber   String?
+  destination      String?
+  travelStartDate  DateTime?
+  travelEndDate    DateTime?
+
+  sourceQuotationId String?             @unique
+  sourceQuotation   InsuranceQuotation? @relation("QuotationPolicy", fields: [sourceQuotationId], references: [id])
+  createdById       String
+  createdByType     String
+  createdByName     String
+  updatedById       String?
+  updatedByType     String?
+  updatedByName     String?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@unique([workspaceId, policyNumber])
+  @@index([workspaceId, insuranceType])
+  @@index([workspaceId, expiryDate])
+  @@index([workspaceId, paid])
+}
+
 model Task {
-  id          String   @id @default(uuid())
+  id          String  @id @default(uuid())
   workspaceId String
   projectId   String
-  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project     Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   // Self-reference for subtask tree. parentTaskId=null means top-level (Director only).
   parentTaskId String?
@@ -358,8 +484,8 @@ model Task {
   subtasks     Task[]  @relation("TaskSubtasks")
 
   // Group-wise task: groupTaskId links per-member instances to the parent group task
-  groupTaskId       String?
-  groupTask         Task?   @relation("GroupTaskInstances", fields: [groupTaskId], references: [id])
+  groupTaskId        String?
+  groupTask          Task?   @relation("GroupTaskInstances", fields: [groupTaskId], references: [id])
   groupTaskInstances Task[]  @relation("GroupTaskInstances")
 
   title       String
@@ -369,10 +495,10 @@ model Task {
   // PENDING | ASSIGNED | IN_PROGRESS | BLOCKED | SUBMITTED | APPROVED | RETURNED | REJECTED | CANCELLED
   // BLOCKED: assignee is waiting on information or another team; unblocks back to IN_PROGRESS
 
-  deadline         DateTime?
-  originalDeadline DateTime? // snapshot of deadline at task creation — never changed after first set
-  deadlineSetById  String?   // Director.id or Personnel.id
-  deadlineSetByType String?  // "director" | "personnel"
+  deadline          DateTime?
+  originalDeadline  DateTime? // snapshot of deadline at task creation — never changed after first set
+  deadlineSetById   String? // Director.id or Personnel.id
+  deadlineSetByType String? // "director" | "personnel"
 
   // Creator (top-level = Director; subtask = Personnel or Director)
   createdByDirectorId  String?
@@ -389,7 +515,7 @@ model Task {
   actedById   String?
   actedByType String? // "director" | "personnel"
 
-  startedAt    DateTime? // when status first moved to IN_PROGRESS
+  startedAt DateTime? // when status first moved to IN_PROGRESS
 
   returnReason String?
   returnedAt   DateTime?
@@ -424,18 +550,18 @@ model Task {
 // ─────────────────────────────────────────────────────────────────────────────
 
 model TaskChain {
-  id                      String   @id @default(uuid())
-  chainId                 String   // UUID shared across all steps in one chain
-  workspaceId             String
-  parentTaskId            String   // the approved task
-  parentTask              Task     @relation("ChainParentTask", fields: [parentTaskId], references: [id])
-  childTaskId             String   // the newly created next task
-  childTask               Task     @relation("ChainChildTask", fields: [childTaskId], references: [id])
-  chainStepNumber         Int      // 1-based step within this chain
-  createdByChairmanId     String   // Director.id who set up the handover
-  handoverNote            String?  // optional note from chairman to next assignee
-  allowPreviousAssigneeView Boolean @default(false) // can previous assignee see next task?
-  createdAt               DateTime @default(now())
+  id                        String   @id @default(uuid())
+  chainId                   String // UUID shared across all steps in one chain
+  workspaceId               String
+  parentTaskId              String // the approved task
+  parentTask                Task     @relation("ChainParentTask", fields: [parentTaskId], references: [id])
+  childTaskId               String // the newly created next task
+  childTask                 Task     @relation("ChainChildTask", fields: [childTaskId], references: [id])
+  chainStepNumber           Int // 1-based step within this chain
+  createdByChairmanId       String // Director.id who set up the handover
+  handoverNote              String? // optional note from chairman to next assignee
+  allowPreviousAssigneeView Boolean  @default(false) // can previous assignee see next task?
+  createdAt                 DateTime @default(now())
 
   @@index([chainId])
   @@index([parentTaskId])
@@ -471,7 +597,7 @@ model TaskComment {
   authorPersonnel   Personnel? @relation("CommentAuthorPersonnel", fields: [authorPersonnelId], references: [id])
   authorDirectorId  String?
   authorDirector    Director?  @relation("CommentAuthorDirector", fields: [authorDirectorId], references: [id])
-  authorType        String     // "director" | "personnel"
+  authorType        String // "director" | "personnel"
   content           String
   createdAt         DateTime   @default(now())
   updatedAt         DateTime   @updatedAt
@@ -499,7 +625,7 @@ model AuditLog {
   actorDirector    Director?  @relation("AuditActorDirector", fields: [actorDirectorId], references: [id])
   actorPersonnelId String?
   actorPersonnel   Personnel? @relation("AuditActorPersonnel", fields: [actorPersonnelId], references: [id])
-  actorType        String     // "director" | "personnel"
+  actorType        String // "director" | "personnel"
   payload          Json?
   createdAt        DateTime   @default(now())
 
@@ -513,19 +639,19 @@ model AuditLog {
 // ─────────────────────────────────────────────────────────────────────────────
 
 model TaskProgressLog {
-  id          String     @id @default(uuid())
-  taskId      String
-  task        Task       @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  workspaceId String
+  id                String     @id @default(uuid())
+  taskId            String
+  task              Task       @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  workspaceId       String
   authorPersonnelId String?
   authorPersonnel   Personnel? @relation("ProgressLogAuthor", fields: [authorPersonnelId], references: [id])
   authorDirectorId  String?
   authorDirector    Director?  @relation("ProgressLogDirector", fields: [authorDirectorId], references: [id])
-  authorType  String     // "director" | "personnel"
-  note        String
-  logDate     DateTime   @default(now())
-  createdAt   DateTime   @default(now())
-  editedAt    DateTime?
+  authorType        String // "director" | "personnel"
+  note              String
+  logDate           DateTime   @default(now())
+  createdAt         DateTime   @default(now())
+  editedAt          DateTime?
 
   @@index([taskId, logDate])
   @@index([workspaceId])
@@ -542,19 +668,19 @@ model Notification {
   recipientDirector    Director?  @relation("NotifRecipientDirector", fields: [recipientDirectorId], references: [id], onDelete: Cascade)
   recipientPersonnelId String?
   recipientPersonnel   Personnel? @relation("NotifRecipientPersonnel", fields: [recipientPersonnelId], references: [id], onDelete: Cascade)
-  recipientType        String     // "director" | "personnel"
+  recipientType        String // "director" | "personnel"
   type                 String
   // task_assigned | task_returned | task_submitted_for_approval |
   // task_approved | task_rejected | task_deadline_warning |
   // subtask_created | comment_added | personnel_moved
-  title     String
-  message   String
-  taskId    String?
-  task      Task?    @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  payload   Json?
-  isRead    Boolean  @default(false)
-  readAt    DateTime?
-  createdAt DateTime @default(now())
+  title                String
+  message              String
+  taskId               String?
+  task                 Task?      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  payload              Json?
+  isRead               Boolean    @default(false)
+  readAt               DateTime?
+  createdAt            DateTime   @default(now())
 
   @@index([recipientPersonnelId, isRead, createdAt])
   @@index([recipientDirectorId, isRead, createdAt])
@@ -567,12 +693,12 @@ model Notification {
 // ─────────────────────────────────────────────────────────────────────────────
 
 model Notice {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   workspaceId String
   message     String
-  audience    String   @default("ALL") // ALL | LAYER
-  layerNumber Int?     // set when audience = LAYER
-  createdAt   DateTime @default(now())
+  audience    String    @default("ALL") // ALL | LAYER
+  layerNumber Int? // set when audience = LAYER
+  createdAt   DateTime  @default(now())
   expiresAt   DateTime?
 
   dismissals NoticeDismissal[]
@@ -585,7 +711,7 @@ model NoticeDismissal {
   noticeId  String
   notice    Notice   @relation(fields: [noticeId], references: [id], onDelete: Cascade)
   actorId   String
-  actorType String   // "director" | "personnel"
+  actorType String // "director" | "personnel"
   createdAt DateTime @default(now())
 
   @@unique([noticeId, actorId, actorType])
@@ -596,18 +722,18 @@ model NoticeDismissal {
 // ─────────────────────────────────────────────────────────────────────────────
 
 model DeadlineExtension {
-  id              String    @id @default(uuid())
-  taskId          String
-  task            Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  workspaceId     String
-  oldDeadline     DateTime
-  newDeadline     DateTime
-  reason          String
-  note            String?
-  extendedById    String    // Director.id or Personnel.id
-  extendedByType  String    // "director" | "personnel"
-  extendedByName  String    // snapshot of name at time of extension
-  createdAt       DateTime  @default(now())
+  id             String   @id @default(uuid())
+  taskId         String
+  task           Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  workspaceId    String
+  oldDeadline    DateTime
+  newDeadline    DateTime
+  reason         String
+  note           String?
+  extendedById   String // Director.id or Personnel.id
+  extendedByType String // "director" | "personnel"
+  extendedByName String // snapshot of name at time of extension
+  createdAt      DateTime @default(now())
 
   @@index([taskId])
   @@index([workspaceId])
@@ -620,9 +746,9 @@ model DeadlineExtension {
 model LoginLog {
   id          String   @id @default(uuid())
   workspaceId String
-  actorId     String   // Director.id or Personnel.id
-  actorType   String   // "director" | "personnel"
-  actorName   String   // snapshot of name at login time
+  actorId     String // Director.id or Personnel.id
+  actorType   String // "director" | "personnel"
+  actorName   String // snapshot of name at login time
   loggedInAt  DateTime @default(now())
   ipAddress   String?
   userAgent   String?
@@ -632,14 +758,14 @@ model LoginLog {
 }
 
 model PushSubscription {
-  id           String   @id @default(uuid())
-  actorId      String
-  actorType    String   // "director" | "personnel"
-  workspaceId  String
-  endpoint     String   @unique
-  p256dh       String
-  auth         String
-  createdAt    DateTime @default(now())
+  id          String   @id @default(uuid())
+  actorId     String
+  actorType   String // "director" | "personnel"
+  workspaceId String
+  endpoint    String   @unique
+  p256dh      String
+  auth        String
+  createdAt   DateTime @default(now())
 
   @@index([actorId, actorType])
 }
@@ -649,18 +775,18 @@ model PushSubscription {
 // ─────────────────────────────────────────────────────────────────────────────
 
 model WebAuthnCredential {
-  id                 String   @id @default(uuid())
-  actorId            String
-  actorType          String   // "director" | "personnel"
-  credentialId       String   @unique  // base64url-encoded credential ID from authenticator
-  publicKey          String   // base64url-encoded COSE public key
-  counter            BigInt   @default(0)
-  deviceType         String   // "singleDevice" | "multiDevice"
-  backedUp           Boolean  @default(false)
-  transports         String?  // JSON array of AuthenticatorTransport strings
-  deviceName         String?  // friendly label set by user ("iPhone 14", "Work Laptop")
-  createdAt          DateTime @default(now())
-  lastUsedAt         DateTime?
+  id           String    @id @default(uuid())
+  actorId      String
+  actorType    String // "director" | "personnel"
+  credentialId String    @unique // base64url-encoded credential ID from authenticator
+  publicKey    String // base64url-encoded COSE public key
+  counter      BigInt    @default(0)
+  deviceType   String // "singleDevice" | "multiDevice"
+  backedUp     Boolean   @default(false)
+  transports   String? // JSON array of AuthenticatorTransport strings
+  deviceName   String? // friendly label set by user ("iPhone 14", "Work Laptop")
+  createdAt    DateTime  @default(now())
+  lastUsedAt   DateTime?
 
   @@index([actorId, actorType])
 }

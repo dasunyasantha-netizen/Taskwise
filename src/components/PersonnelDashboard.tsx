@@ -8,6 +8,7 @@ import ProfilePage from './ProfilePage'
 import ElapsedDays from './ElapsedDays'
 import { usePWA } from '../hooks/usePWA'
 import ProgressUpdateSheet from './ProgressUpdateSheet'
+import InsuranceManagementPage from './InsuranceManagementPage'
 
 interface Props {
   user: AuthUser
@@ -783,6 +784,7 @@ function MobileUserMenu({ user, onProfile, onLogout }: { user: AuthUser; onProfi
 
 // ── Main dashboard ────────────────────────────────────────────────────────────
 export default function PersonnelDashboard({ user, currentView, setView, onLogout, onUserUpdate }: Props) {
+  const insuranceEnabled = user.features?.includes('insurance_management') === true
   const { canInstall, isIOS, installApp, pushEnabled, enablePush } = usePWA()
   const [showIOSGuide, setShowIOSGuide] = useState(false)
   const [queue, setQueue]               = useState<Task[]>([])
@@ -866,6 +868,7 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
   const [approvalTasks, setApprovalTasks] = useState<Task[]>([])
 
   const navItems = [
+    ...(insuranceEnabled ? [{ label: 'Insurance', view: 'insurance_management' as ViewMode, icon: '🛡️' }] : []),
     { label: 'My Queue',       view: 'personnel_queue'          as ViewMode, icon: '📋' },
     { label: 'Approval Queue', view: 'personnel_approval_queue' as ViewMode, icon: '✅', badge: approvalTasks.length },
     { label: 'Board View',     view: 'project_board'            as ViewMode, icon: '⊞' },
@@ -981,6 +984,7 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
                 {currentView === 'personnel_queue' ? 'My Queue'
                   : currentView === 'personnel_approval_queue' ? 'Approvals'
                   : currentView === 'project_board' ? (selectedProject ? selectedProject.name : 'Projects')
+                  : currentView === 'insurance_management' ? 'Insurance Management'
                   : 'My Profile'}
               </span>
               <div className="text-xs text-white/50 md:hidden">{user.name}</div>
@@ -1279,6 +1283,10 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
           )}
 
           {/* ── BOARD VIEW ────────────────────────────────────────────── */}
+          {currentView === 'insurance_management' && insuranceEnabled && (
+            <InsuranceManagementPage />
+          )}
+
           {currentView === 'project_board' && !selectedProject && (
             <div className="p-4 md:p-6">
               <h1 className="hidden md:block text-xl font-bold text-tw-text mb-4 md:mb-6">Projects</h1>

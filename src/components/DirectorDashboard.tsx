@@ -23,6 +23,7 @@ import ImpersonationPage from './ImpersonationPage'
 import UserAnalyticsPage from './UserAnalyticsPage'
 import LeaderboardPage from './LeaderboardPage'
 import CompanyRequestsPage from './CompanyRequestsPage'
+import InsuranceManagementPage from './InsuranceManagementPage'
 
 interface Props {
   user: AuthUser
@@ -783,6 +784,7 @@ function MobileUserMenu({ user, onProfile, onSettings, onLogout }: { user: AuthU
 
 // ─── Director Dashboard ───────────────────────────────────────────────────────
 export default function DirectorDashboard({ user, currentView, setView, onLogout, onUserUpdate, onImpersonationStart }: Props) {
+  const insuranceEnabled = user.features?.includes('insurance_management') === true
   // ── Navigation history (view + scroll position) ───────────────────────────
   const [viewHistory, setViewHistory] = useState<Array<{ view: ViewMode; scrollTop: number }>>([])
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
@@ -888,6 +890,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
   }
 
   const navItems = [
+    ...(insuranceEnabled ? [{ label: 'Insurance', view: 'insurance_management' as ViewMode, icon: '🛡️' }] : []),
     { label: 'Dashboard',      view: 'director_dashboard' as ViewMode, icon: '⊞' },
     { label: 'Projects',       view: 'project_board'      as ViewMode, icon: '📋' },
     { label: 'Approval Queue', view: 'approval_queue'     as ViewMode, icon: '✅', badge: stats.pending_approval },
@@ -923,6 +926,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
   ]
   const [showMobileMore, setShowMobileMore] = useState(false)
   const mobileMoreItems = [
+    ...(insuranceEnabled ? [{ label: 'Insurance', view: 'insurance_management' as ViewMode, icon: '🛡️' }] : []),
     { label: 'Team Hierarchy',  view: 'hierarchy_manager' as ViewMode, icon: '👥' },
     { label: 'Reports',         view: 'reports'           as ViewMode, icon: '📊' },
     { label: 'Recent Updates',  view: 'recent_updates'    as ViewMode, icon: '🕐' },
@@ -1041,6 +1045,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
                   : currentView === 'impersonation' ? 'Support Access'
                   : currentView === 'user_analytics' ? 'User Analytics'
                   : currentView === 'leaderboard' ? 'Leaderboard'
+                  : currentView === 'insurance_management' ? 'Insurance Management'
                   : currentView === 'company_requests' ? 'Company Requests'
                   : 'My Profile'}
               </div>
@@ -1189,6 +1194,10 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
                 </>
               )}
             </div>
+          )}
+
+          {currentView === 'insurance_management' && insuranceEnabled && (
+            <InsuranceManagementPage />
           )}
 
           {/* PROJECTS */}

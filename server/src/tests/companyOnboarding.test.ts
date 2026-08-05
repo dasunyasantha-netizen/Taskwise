@@ -71,6 +71,8 @@ async function main() {
   const authCtrl = await import('../controllers/authController')
   const wsCtrl = await import('../controllers/workspaceController')
   const taskCtrl = await import('../controllers/taskController')
+  const insuranceCtrl = await import('../controllers/insuranceController')
+  const { FEATURES, requireFeature } = await import('../helpers/features')
   const { authenticateToken, requireSyswiseAdmin } = await import('../middleware/authMiddleware')
 
   // Fresh slate.
@@ -250,6 +252,10 @@ async function main() {
     assert.equal(dir?.isSyswiseAdmin, false)
   })
 
+  await prisma.companyFeature.create({
+    data: { companyId: ffCompanyId, featureKey: FEATURES.INSURANCE_MANAGEMENT, enabled: true },
+  })
+
   await test('The approving administrator and time are recorded', async () => {
     const r = await prisma.companyRequest.findUnique({ where: { id: ffRequest!.id } })
     assert.equal(r?.status, 'APPROVED')
@@ -316,6 +322,7 @@ async function main() {
     assert.equal(res.statusCode, 200)
     assert.equal(res.body.user.actorId, ffAdminId)
     assert.equal(res.body.user.companyPrefix, 'FF')
+    assert.deepEqual(res.body.user.features, [FEATURES.INSURANCE_MANAGEMENT])
   })
 
   await test('Lowercase prefixes are handled consistently', async () => {
@@ -417,6 +424,135 @@ async function main() {
     assert.equal(res.statusCode, 201)
     assert.equal(res.body.isSyswiseAdmin, undefined) // Personnel have no such field; flag is ignored.
     assert.equal(await prisma.director.count({ where: { isSyswiseAdmin: true } }), before)
+  })
+
+  // =========================================================================
+  section('Fairfirst insurance management')
+  const ffInsuranceStaff = await prisma.personnel.findFirstOrThrow({ where: { loginId: 'FF0759999999' } })
+  const ffInsuranceUser = { actorId: ffInsuranceStaff.id, actorType: 'personnel', workspaceId: ffWorkspace!.id }
+
+  await test('Insurance feature access is enabled only for Fairfirst', async () => {
+    const guard = requireFeature(FEATURES.INSURANCE_MANAGEMENT)
+    const ffRes = mockRes(); let ffNext = false
+    await guard(mockReq({ user: ffInsuranceUser }), ffRes, () => { ffNext = true })
+    assert.equal(ffNext, true)
+
+    const ycRes = mockRes(); let ycNext = false
+    await guard(mockReq({ user: ycAdminUser }), ycRes, () => { ycNext = true })
+    assert.equal(ycNext, false)
+    assert.equal(ycRes.statusCode, 403)
+  })
+
+  let motorQuotationId = ''
+  await test('Any Fairfirst user can create a one-month motor quotation', async () => {
+    const res = mockRes()
+    await insuranceCtrl.createQuotation(mockReq({
+      user: ffInsuranceUser,
+      body: {
+        quotationNumber: 'FF-Q-001', insuranceType: 'MOTOR', customerName: 'Test Customer', contactNumber: '0771234567',
+        vehicleNumber: 'WP CAB-1234', vehicleMakeModel: 'Toyota Aqua', fuelType: 'Hybrid', vehicleUsage: 'Private',
+        sumInsured: 8500000, premium: 125000,
+      },
+    }), res)
+    assert.equal(res.statusCode, 201)
+    assert.equal(res.body.createdByName, ffInsuranceStaff.name)
+    assert.equal(res.body.status, 'ACTIVE')
+    assert.equal(res.body.vehicleNumber, 'WP CAB-1234')
+    motorQuotationId = res.body.id
+    const issue = new Date(res.body.issueDate)
+    const expiry = new Date(res.body.expiresAt)
+    assert.ok(expiry > issue)
+    assert.ok(expiry.getTime() - issue.getTime() >= 28 * 24 * 60 * 60 * 1000)
+  })
+
+  await test('A different Fairfirst user can edit the quotation', async () => {
+    const res = mockRes()
+    await insuranceCtrl.updateQuotation(mockReq({
+      user: ffAdminUser,
+      params: { id: motorQuotationId },
+      body: {
+        quotationNumber: 'FF-Q-001', insuranceType: 'MOTOR', customerName: 'Test Customer', contactNumber: '0771234567',
+        vehicleNumber: 'WP CAB-1234', vehicleMakeModel: 'Toyota Aqua', fuelType: 'Hybrid', vehicleUsage: 'Private',
+        sumInsured: 8500000, premium: 130000,
+      },
+    }), res)
+    assert.equal(res.statusCode, 200)
+    assert.equal(res.body.premium, 130000)
+  })
+
+  await test('Non-motor quotations store only suitable type-specific details', async () => {
+    const res = mockRes()
+    await insuranceCtrl.createQuotation(mockReq({
+      user: ffInsuranceUser,
+      body: {
+        quotationNumber: 'FF-FIRE-001', insuranceType: 'FIRE', customerName: 'Property Owner', contactNumber: '0770001111',
+        propertyAddress: '10 Main Street', propertyType: 'Building and contents', propertyUsage: 'Commercial',
+        vehicleNumber: 'SHOULD-NOT-BE-STORED', sumInsured: 25000000, premium: 220000,
+      },
+    }), res)
+    assert.equal(res.statusCode, 201)
+    assert.equal(res.body.propertyAddress, '10 Main Street')
+    assert.equal(res.body.vehicleNumber, null)
+  })
+
+  await test('An active quotation converts to a policy with a partial-payment balance', async () => {
+    const res = mockRes()
+    await insuranceCtrl.convertQuotation(mockReq({
+      user: ffInsuranceUser,
+      params: { id: motorQuotationId },
+      body: { policyNumber: 'FF-P-001', premium: 130000, issueDate: '2026-08-05', expiryDate: '2027-08-04', paid: false, paymentAmount: 30000 },
+    }), res)
+    assert.equal(res.statusCode, 201)
+    assert.equal(res.body.paymentAmount, 30000)
+    assert.equal(res.body.remainingAmount, 100000)
+    assert.equal(res.body.paid, false)
+    const quote = await prisma.insuranceQuotation.findUniqueOrThrow({ where: { id: motorQuotationId } })
+    assert.equal(quote.status, 'CONVERTED')
+  })
+
+  await test('A policy can be created directly and marked paid in full', async () => {
+    const res = mockRes()
+    await insuranceCtrl.createPolicy(mockReq({
+      user: ffInsuranceUser,
+      body: {
+        policyNumber: 'FF-DIRECT-001', insuranceType: 'TRAVEL', customerName: 'Traveller', contactNumber: '+94770002222',
+        passportNumber: 'N1234567', destination: 'Singapore', travelStartDate: '2026-09-01', travelEndDate: '2026-09-10',
+        sumInsured: 5000000, premium: 15000, issueDate: '2026-08-05', expiryDate: '2026-09-10', paid: true, paymentAmount: 0,
+      },
+    }), res)
+    assert.equal(res.statusCode, 201)
+    assert.equal(res.body.paid, true)
+    assert.equal(res.body.paymentAmount, 15000)
+    assert.equal(res.body.remainingAmount, 0)
+  })
+
+  await test('An expired quotation can be renewed under a new manual number', async () => {
+    const createRes = mockRes()
+    await insuranceCtrl.createQuotation(mockReq({
+      user: ffInsuranceUser,
+      body: {
+        quotationNumber: 'FF-OLD-001', insuranceType: 'CASUALTY', customerName: 'Renewal Customer', contactNumber: '0761234567',
+        businessActivity: 'Retail', riskDescription: 'Public liability', sumInsured: 10000000, premium: 45000,
+      },
+    }), createRes)
+    await prisma.insuranceQuotation.update({ where: { id: createRes.body.id }, data: { expiresAt: new Date('2026-01-01') } })
+    const renewRes = mockRes()
+    await insuranceCtrl.renewQuotation(mockReq({ user: ffAdminUser, params: { id: createRes.body.id }, body: { quotationNumber: 'FF-RENEW-001', premium: 47500 } }), renewRes)
+    assert.equal(renewRes.statusCode, 201)
+    assert.equal(renewRes.body.quotationNumber, 'FF-RENEW-001')
+    assert.equal(renewRes.body.premium, 47500)
+    const original = await prisma.insuranceQuotation.findUniqueOrThrow({ where: { id: createRes.body.id } })
+    assert.equal(original.status, 'RENEWED')
+    assert.equal(renewRes.body.renewedFromId, original.id)
+  })
+
+  await test('Insurance records remain isolated from other company workspaces', async () => {
+    const quoteRes = mockRes(); await insuranceCtrl.listQuotations(mockReq({ user: ycAdminUser, query: {} }), quoteRes)
+    const policyRes = mockRes(); await insuranceCtrl.listPolicies(mockReq({ user: ycAdminUser, query: {} }), policyRes)
+    assert.deepEqual(quoteRes.body, [])
+    assert.deepEqual(policyRes.body, [])
+    assert.equal(await prisma.insuranceQuotation.count({ where: { workspaceId: ycWs.id } }), 0)
+    assert.equal(await prisma.insurancePolicy.count({ where: { workspaceId: ycWs.id } }), 0)
   })
 
   // =========================================================================

@@ -31,7 +31,89 @@ export interface AuthUser {
   loginId?: string
   companyId?: string
   companyPrefix?: string
+  features?: string[]
   impersonation?: ImpersonationInfo
+}
+
+// â”€â”€â”€ Fairfirst Insurance Management â”€â”€â”€
+
+export type InsuranceType = 'MOTOR' | 'FIRE' | 'CASUALTY' | 'MARINE' | 'TRAVEL'
+export type QuotationStatus = 'ACTIVE' | 'CONVERTED' | 'EXPIRED' | 'RENEWED'
+
+export interface InsuranceSubjectDetails {
+  vehicleNumber?: string | null
+  vehicleMakeModel?: string | null
+  fuelType?: string | null
+  vehicleUsage?: string | null
+  propertyAddress?: string | null
+  propertyType?: string | null
+  propertyUsage?: string | null
+  riskDescription?: string | null
+  businessActivity?: string | null
+  cargoDescription?: string | null
+  transitFrom?: string | null
+  transitTo?: string | null
+  conveyance?: string | null
+  passportNumber?: string | null
+  destination?: string | null
+  travelStartDate?: string | null
+  travelEndDate?: string | null
+}
+
+export interface InsuranceQuotation extends InsuranceSubjectDetails {
+  id: string
+  workspaceId: string
+  quotationNumber: string
+  insuranceType: InsuranceType
+  customerName: string
+  contactNumber: string
+  sumInsured: number
+  premium: number
+  issueDate: string
+  expiresAt: string
+  status: QuotationStatus
+  notes?: string | null
+  createdByName: string
+  createdAt: string
+  updatedAt: string
+  convertedPolicy?: { id: string; policyNumber: string } | null
+  renewedFrom?: { id: string; quotationNumber: string } | null
+  renewedTo?: Array<{ id: string; quotationNumber: string }>
+}
+
+export interface InsurancePolicy extends InsuranceSubjectDetails {
+  id: string
+  workspaceId: string
+  policyNumber: string
+  insuranceType: InsuranceType
+  customerName: string
+  contactNumber: string
+  sumInsured: number
+  premium: number
+  issueDate: string
+  expiryDate: string
+  status: 'COMPLETED'
+  paid: boolean
+  paymentAmount: number
+  remainingAmount: number
+  paymentUpdatedAt?: string | null
+  notes?: string | null
+  createdByName: string
+  createdAt: string
+  updatedAt: string
+  sourceQuotation?: { id: string; quotationNumber: string } | null
+}
+
+export interface InsuranceSummary {
+  activeQuotations: number
+  expiredQuotations: number
+  convertedQuotations: number
+  completedPolicies: number
+  unpaidPolicies: number
+  expiringPolicies: number
+  totalPolicyPremium: number
+  totalPayments: number
+  outstandingAmount: number
 }
 
 // ─── Workspace & Hierarchy ───────────────────────────────────────────────────
@@ -301,6 +383,7 @@ export type ViewMode =
   | 'user_analytics'
   | 'leaderboard'
   | 'company_requests'
+  | 'insurance_management'
   | 'settings'
   | 'profile'
 
