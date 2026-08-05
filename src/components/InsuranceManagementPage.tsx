@@ -138,8 +138,8 @@ function SubjectFields({ form, set }: { form: FormData; set: (key: string, value
     <>
       <Field label="Passport number" required><TextInput value={String(form.passportNumber)} onChange={v => set('passportNumber', v)} /></Field>
       <Field label="Destination" required><TextInput value={String(form.destination)} onChange={v => set('destination', v)} /></Field>
-      <Field label="Travel start date" required><DatePicker value={String(form.travelStartDate)} onChange={v => set('travelStartDate', v)} placeholder="Select travel start date" /></Field>
-      <Field label="Travel end date" required><DatePicker value={String(form.travelEndDate)} onChange={v => set('travelEndDate', v)} minDate={String(form.travelStartDate) || undefined} placeholder="Select travel end date" /></Field>
+      <Field label="Travel start date" required><DatePicker compact value={String(form.travelStartDate)} onChange={v => set('travelStartDate', v)} placeholder="Select travel start date" /></Field>
+      <Field label="Travel end date" required><DatePicker compact value={String(form.travelEndDate)} onChange={v => set('travelEndDate', v)} minDate={String(form.travelStartDate) || undefined} placeholder="Select travel end date" /></Field>
     </>
   )
 }
@@ -199,8 +199,8 @@ function RecordFormModal({ kind, initial, onClose, onSaved }: {
             <Field label="Premium (LKR)" required><TextInput value={String(form.premium)} onChange={v => set('premium', v)} type="number" min="0.01" step="0.01" /></Field>
             {kind === 'policy' && (
               <>
-                <Field label="Issue date" required><DatePicker value={String(form.issueDate)} onChange={v => set('issueDate', v)} placeholder="Select issue date" /></Field>
-                <Field label="Expiry date" required><DatePicker value={String(form.expiryDate)} onChange={v => set('expiryDate', v)} minDate={String(form.issueDate) || undefined} placeholder="Select expiry date" /></Field>
+                <Field label="Issue date" required><DatePicker compact value={String(form.issueDate)} onChange={v => set('issueDate', v)} placeholder="Select issue date" /></Field>
+                <Field label="Expiry date" required><DatePicker compact value={String(form.expiryDate)} onChange={v => set('expiryDate', v)} minDate={String(form.issueDate) || undefined} placeholder="Select expiry date" /></Field>
                 <div className="md:col-span-2 rounded-xl border border-tw-border bg-gray-50 p-4">
                   <label className="flex items-center gap-2 text-sm font-semibold text-tw-text mb-3"><input type="checkbox" checked={Boolean(form.paid)} onChange={e => set('paid', e.target.checked)} className="w-4 h-4" /> Paid in full</label>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -243,8 +243,8 @@ function ConvertModal({ quotation, onClose, onSaved }: { quotation: InsuranceQuo
           <div className="sm:col-span-2"><Field label="Policy number" required><TextInput value={String(form.policyNumber)} onChange={v => setForm(f => ({ ...f, policyNumber: v }))} /></Field></div>
           <Field label="Premium (LKR)" required><TextInput value={String(form.premium)} onChange={v => setForm(f => ({ ...f, premium: v }))} type="number" min="0.01" step="0.01" /></Field>
           <Field label="Payment amount (LKR)"><TextInput value={form.paid ? String(premium) : String(form.paymentAmount)} onChange={v => setForm(f => ({ ...f, paymentAmount: v }))} type="number" min="0" step="0.01" /></Field>
-          <Field label="Issue date" required><DatePicker value={String(form.issueDate)} onChange={v => setForm(f => ({ ...f, issueDate: v }))} placeholder="Select issue date" /></Field>
-          <Field label="Expiry date" required><DatePicker value={String(form.expiryDate)} onChange={v => setForm(f => ({ ...f, expiryDate: v }))} minDate={String(form.issueDate) || undefined} placeholder="Select expiry date" /></Field>
+          <Field label="Issue date" required><DatePicker compact value={String(form.issueDate)} onChange={v => setForm(f => ({ ...f, issueDate: v }))} placeholder="Select issue date" /></Field>
+          <Field label="Expiry date" required><DatePicker compact value={String(form.expiryDate)} onChange={v => setForm(f => ({ ...f, expiryDate: v }))} minDate={String(form.issueDate) || undefined} placeholder="Select expiry date" /></Field>
           <label className="sm:col-span-2 flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-2 text-sm font-semibold"><input type="checkbox" checked={Boolean(form.paid)} onChange={e => setForm(f => ({ ...f, paid: e.target.checked }))} /> Paid in full <span className="ml-auto text-xs text-tw-text-secondary">Balance: {money(Math.max(0, premium - payment))}</span></label>
         </div>
         <div className="flex justify-end gap-2 mt-5"><button type="button" className="btn-secondary" onClick={onClose}>Cancel</button><button className="btn-primary" disabled={saving}>{saving ? 'Converting…' : 'Convert to Policy'}</button></div>

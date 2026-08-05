@@ -9,12 +9,13 @@ interface Props {
   maxDate?: string
   className?: string
   triggerClassName?: string
+  compact?: boolean
 }
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 const DAYS   = ['Su','Mo','Tu','We','Th','Fr','Sa']
 
-export default function DatePicker({ value, onChange, placeholder = 'Select date', minDate, maxDate, className = '', triggerClassName }: Props) {
+export default function DatePicker({ value, onChange, placeholder = 'Select date', minDate, maxDate, className = '', triggerClassName, compact = false }: Props) {
   const today = new Date()
   const parsed = value ? new Date(value + 'T00:00:00') : null
 
@@ -43,8 +44,15 @@ export default function DatePicker({ value, onChange, placeholder = 'Select date
     if (!open && ref.current) {
       const rect = ref.current.getBoundingClientRect()
       const spaceBelow = window.innerHeight - rect.bottom
-      const openUpward = spaceBelow < 360 && rect.top > 360
-      setDropPos({ top: rect.bottom + 4, left: rect.left, width: Math.max(rect.width, 288), openUpward })
+      const estimatedHeight = compact ? 312 : 360
+      const openUpward = spaceBelow < estimatedHeight && rect.top > spaceBelow
+      const width = Math.min(compact ? 272 : Math.max(rect.width, 288), window.innerWidth - 16)
+      setDropPos({
+        top: openUpward ? rect.top - 4 : rect.bottom + 4,
+        left: rect.left,
+        width,
+        openUpward,
+      })
     }
     setOpen(o => !o)
   }
@@ -100,15 +108,15 @@ export default function DatePicker({ value, onChange, placeholder = 'Select date
       style={{
         position: 'fixed',
         top: dropPos.openUpward ? undefined : dropPos.top,
-        bottom: dropPos.openUpward ? window.innerHeight - (dropPos.top - 4) : undefined,
-        left: Math.min(dropPos.left, window.innerWidth - dropPos.width - 8),
+        bottom: dropPos.openUpward ? window.innerHeight - dropPos.top : undefined,
+        left: Math.max(8, Math.min(dropPos.left, window.innerWidth - dropPos.width - 8)),
         width: dropPos.width,
         zIndex: 9999,
       }}
       className="bg-white border border-tw-border rounded-xl shadow-panel overflow-hidden"
     >
       {/* Month / Year nav */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-tw-border">
+      <div className={`flex items-center justify-between border-b border-tw-border ${compact ? 'px-3 py-2' : 'px-4 py-3'}`}>
         <button onMouseDown={e => { e.preventDefault(); prevMonth() }} className="p-1.5 rounded-lg hover:bg-tw-hover transition-colors text-tw-text-secondary hover:text-tw-text">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/></svg>
         </button>
@@ -125,7 +133,7 @@ export default function DatePicker({ value, onChange, placeholder = 'Select date
       </div>
 
       {showYearPicker && (
-        <div className="grid grid-cols-4 gap-1 p-3 border-b border-tw-border bg-white">
+        <div className={`grid grid-cols-4 gap-1 border-b border-tw-border bg-white ${compact ? 'p-2' : 'p-3'}`}>
           {yearRange.map(y => (
             <button key={y} onMouseDown={e => { e.preventDefault(); setViewYear(y); setShowYearPicker(false) }}
               className={`py-1.5 rounded-lg text-sm font-medium transition-colors ${y === viewYear ? 'bg-tw-primary text-white' : 'hover:bg-tw-hover text-tw-text'}`}>
@@ -137,12 +145,12 @@ export default function DatePicker({ value, onChange, placeholder = 'Select date
 
       {!showYearPicker && (
         <>
-          <div className="grid grid-cols-7 px-3 pt-3 pb-1">
+          <div className={`grid grid-cols-7 ${compact ? 'px-2 pt-2 pb-0.5' : 'px-3 pt-3 pb-1'}`}>
             {DAYS.map(d => (
               <div key={d} className="text-center text-xs font-semibold text-tw-text-secondary py-1">{d}</div>
             ))}
           </div>
-          <div className="grid grid-cols-7 px-3 pb-3 gap-y-0.5">
+          <div className={`grid grid-cols-7 gap-y-0.5 ${compact ? 'px-2 pb-2' : 'px-3 pb-3'}`}>
             {Array.from({ length: firstDay }).map((_, i) => <div key={`e-${i}`} />)}
             {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(day => {
               const sel = isSelected(day)
@@ -154,7 +162,7 @@ export default function DatePicker({ value, onChange, placeholder = 'Select date
                   disabled={dis}
                   onMouseDown={e => { e.preventDefault(); if (!dis) selectDay(day) }}
                   className={`
-                    w-full aspect-square flex items-center justify-center text-sm rounded-lg font-medium transition-colors
+                    w-full ${compact ? 'h-8' : 'aspect-square'} flex items-center justify-center text-sm rounded-lg font-medium transition-colors
                     ${sel  ? 'bg-tw-primary text-white shadow-sm'              : ''}
                     ${!sel && tod  ? 'border border-tw-primary text-tw-primary' : ''}
                     ${!sel && !dis ? 'hover:bg-tw-hover text-tw-text'           : ''}
@@ -166,7 +174,7 @@ export default function DatePicker({ value, onChange, placeholder = 'Select date
               )
             })}
           </div>
-          <div className="flex items-center justify-between px-4 py-2.5 border-t border-tw-border bg-tw-hover">
+          <div className={`flex items-center justify-between border-t border-tw-border bg-tw-hover ${compact ? 'px-3 py-2' : 'px-4 py-2.5'}`}>
             <button onMouseDown={e => { e.preventDefault(); onChange(''); close() }} className="text-xs text-tw-text-secondary hover:text-tw-danger transition-colors font-medium">Clear</button>
             <button onMouseDown={e => { e.preventDefault(); selectDay(today.getDate()); setViewYear(today.getFullYear()); setViewMonth(today.getMonth()) }}
               className="text-xs text-tw-primary hover:underline font-medium">Today</button>
