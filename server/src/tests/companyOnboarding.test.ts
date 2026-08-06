@@ -556,6 +556,102 @@ async function main() {
   })
 
   // =========================================================================
+  section('Assigned task activity auto-start')
+  const activityProject = await prisma.project.create({
+    data: { workspaceId: ffWorkspace!.id, directorId: ffAdminId, name: 'Activity Auto-start Test' },
+  })
+  const ffActivityUser = {
+    actorId: ffInsuranceStaff.id,
+    actorType: 'personnel',
+    workspaceId: ffWorkspace!.id,
+    departmentId: ffInsuranceStaff.departmentId,
+  }
+  const createAssignedActivityTask = (title: string, departmentOnly = false, creatorIsAssignee = false) => prisma.task.create({
+    data: {
+      workspaceId: ffWorkspace!.id,
+      projectId: activityProject.id,
+      title,
+      status: 'ASSIGNED',
+      deadline: creatorIsAssignee ? new Date('2027-01-01') : undefined,
+      originalDeadline: creatorIsAssignee ? new Date('2027-01-01') : undefined,
+      createdByPersonnelId: creatorIsAssignee ? ffInsuranceStaff.id : undefined,
+      assignments: { create: departmentOnly ? { departmentId: ffInsuranceStaff.departmentId } : { personnelId: ffInsuranceStaff.id } },
+    },
+  })
+
+  await test('An assignee progress update automatically starts an assigned task', async () => {
+    const task = await createAssignedActivityTask('Progress starts work')
+    const res = mockRes()
+    await taskCtrl.addProgressLog(mockReq({
+      params: { id: task.id }, body: { note: 'Work has begun' }, user: ffActivityUser,
+    }), res)
+    assert.equal(res.statusCode, 201)
+    const stored = await prisma.task.findUniqueOrThrow({ where: { id: task.id } })
+    assert.equal(stored.status, 'IN_PROGRESS')
+    assert.equal(stored.actedById, ffInsuranceStaff.id)
+    assert.ok(stored.startedAt)
+    const audit = await prisma.auditLog.findFirst({ where: { taskId: task.id, event: 'TASK_STARTED' } })
+    assert.equal((audit?.payload as any)?.trigger, 'progress_update')
+  })
+
+  await test('A department member comment claims and starts a department task', async () => {
+    const task = await createAssignedActivityTask('Comment starts department work', true)
+    const res = mockRes()
+    await taskCtrl.addComment(mockReq({
+      params: { id: task.id }, body: { content: 'I am working on this' }, user: ffActivityUser,
+    }), res)
+    assert.equal(res.statusCode, 201)
+    const stored = await prisma.task.findUniqueOrThrow({ where: { id: task.id } })
+    assert.equal(stored.status, 'IN_PROGRESS')
+    const assignments = await prisma.taskAssignment.findMany({ where: { taskId: task.id } })
+    assert.equal(assignments.some(item => item.personnelId === ffInsuranceStaff.id), true)
+    assert.equal(assignments.some(item => item.departmentId === ffInsuranceStaff.departmentId), false)
+  })
+
+  await test('Creating a subtask automatically starts the assigned parent task', async () => {
+    const parent = await createAssignedActivityTask('Subtask starts work')
+    const res = mockRes()
+    await taskCtrl.createTask(mockReq({
+      body: { title: 'First work item', projectId: activityProject.id, parentTaskId: parent.id },
+      user: ffActivityUser,
+    }), res)
+    assert.equal(res.statusCode, 201)
+    assert.equal((await prisma.task.findUniqueOrThrow({ where: { id: parent.id } })).status, 'IN_PROGRESS')
+  })
+
+  await test('Editing an assigned task automatically starts it for its assignee', async () => {
+    const task = await createAssignedActivityTask('Edit starts work')
+    const res = mockRes()
+    await taskCtrl.updateTask(mockReq({
+      params: { id: task.id }, body: { description: 'Added working details' }, user: ffActivityUser,
+    }), res)
+    assert.equal(res.statusCode, 200)
+    assert.equal((await prisma.task.findUniqueOrThrow({ where: { id: task.id } })).status, 'IN_PROGRESS')
+  })
+
+  await test('Extending a deadline starts the task only when the creator is also its assignee', async () => {
+    const task = await createAssignedActivityTask('Deadline starts work', false, true)
+    const res = mockRes()
+    await taskCtrl.extendDeadline(mockReq({
+      params: { id: task.id },
+      body: { newDeadline: '2027-02-01', reason: 'More implementation time' },
+      user: ffActivityUser,
+    }), res)
+    assert.equal(res.statusCode, 200)
+    assert.equal((await prisma.task.findUniqueOrThrow({ where: { id: task.id } })).status, 'IN_PROGRESS')
+  })
+
+  await test('A director comment does not start somebody else\'s assigned task', async () => {
+    const task = await createAssignedActivityTask('Director comment is administrative')
+    const res = mockRes()
+    await taskCtrl.addComment(mockReq({
+      params: { id: task.id }, body: { content: 'Please clarify this task' }, user: ffAdminUser,
+    }), res)
+    assert.equal(res.statusCode, 201)
+    assert.equal((await prisma.task.findUniqueOrThrow({ where: { id: task.id } })).status, 'ASSIGNED')
+  })
+
+  // =========================================================================
   section('Director progress-update editing')
   const ffStaffForUpdate = await prisma.personnel.findFirstOrThrow({ where: { loginId: 'FF0759999999' } })
   const editProject = await prisma.project.create({

@@ -77,6 +77,74 @@ async function notifyActor(db: TxClient | typeof prisma, workspaceId: string, re
   sendPushToActor(recipientId, recipientType, title, message)
 }
 
+// A real work action by an assignee means the task has started, regardless of
+// which desktop/mobile surface the action came from. Administrative actions
+// such as reassignment and return intentionally do not call this helper.
+async function startAssignedTaskForActivity(
+  db: TxClient,
+  taskId: string,
+  workspaceId: string,
+  user: AuthPayload,
+  trigger: 'progress_update' | 'comment' | 'subtask' | 'task_edit' | 'deadline_extension',
+): Promise<boolean> {
+  if (user.actorType !== 'personnel') return false
+
+  const task = await db.task.findFirst({
+    where: { id: taskId, workspaceId, status: 'ASSIGNED', deletedAt: null },
+    select: { id: true, title: true, approvalById: true, approvalByType: true },
+  })
+  if (!task) return false
+
+  const assignments = await db.taskAssignment.findMany({
+    where: {
+      taskId,
+      OR: [
+        { personnelId: user.actorId },
+        ...(user.departmentId ? [{ departmentId: user.departmentId }] : []),
+      ],
+    },
+    select: { id: true, personnelId: true, departmentId: true },
+  })
+  const assignment = assignments.find(item => item.personnelId === user.actorId)
+    ?? assignments.find(item => item.departmentId === user.departmentId)
+  if (!assignment) return false
+
+  const started = await db.task.updateMany({
+    where: { id: taskId, workspaceId, status: 'ASSIGNED' },
+    data: {
+      status: 'IN_PROGRESS',
+      actedById: user.actorId,
+      actedByType: 'personnel',
+      startedAt: new Date(),
+    },
+  })
+  if (started.count === 0) return false
+
+  // Claim a department-level task for the member who performed the work.
+  if (!assignment.personnelId && assignment.departmentId) {
+    await db.taskAssignment.delete({ where: { id: assignment.id } })
+    const existingPersonal = await db.taskAssignment.findFirst({ where: { taskId, personnelId: user.actorId }, select: { id: true } })
+    if (!existingPersonal) {
+      await db.taskAssignment.create({ data: { taskId, personnelId: user.actorId } })
+    }
+  }
+
+  await writeAudit(db, workspaceId, 'TASK_STARTED', 'personnel', user.actorId, taskId, { actedBy: user.actorId, trigger }, user)
+  if (task.approvalById && task.approvalByType) {
+    await notifyActor(
+      db,
+      workspaceId,
+      task.approvalByType as 'director' | 'personnel',
+      task.approvalById,
+      'task_assigned',
+      'Task started',
+      `Work has started on "${task.title}".`,
+      taskId,
+    )
+  }
+  return true
+}
+
 // GET /api/tasks
 export async function listTasks(req: Request, res: Response): Promise<void> {
   try {
@@ -231,15 +299,22 @@ export async function createTask(req: Request, res: Response): Promise<void> {
     }
 
     // If subtask, verify parent exists and deadline constraint
+    let parentTask: { id: string; deadline: Date | null } | null = null
     if (parentTaskId) {
-      const parent = await prisma.task.findFirst({ where: { id: parentTaskId, workspaceId, deletedAt: null } })
-      if (!parent) { res.status(404).json({ error: 'Parent task not found' }); return }
-      if (deadline && parent.deadline && new Date(deadline) > parent.deadline) {
-        res.status(400).json({ error: `Subtask deadline cannot be after the parent task deadline (${parent.deadline.toISOString().slice(0, 10)})` }); return
+      parentTask = await prisma.task.findFirst({
+        where: { id: parentTaskId, workspaceId, deletedAt: null },
+        select: { id: true, deadline: true },
+      })
+      if (!parentTask) { res.status(404).json({ error: 'Parent task not found' }); return }
+      if (deadline && parentTask.deadline && new Date(deadline) > parentTask.deadline) {
+        res.status(400).json({ error: `Subtask deadline cannot be after the parent task deadline (${parentTask.deadline.toISOString().slice(0, 10)})` }); return
       }
     }
 
     const task = await prisma.$transaction(async tx => {
+      if (parentTask) {
+        await startAssignedTaskForActivity(tx, parentTask.id, workspaceId, req.user!, 'subtask')
+      }
       const t = await tx.task.create({
         data: {
           workspaceId,
@@ -293,6 +368,9 @@ export async function updateTask(req: Request, res: Response): Promise<void> {
     }
 
     const updated = await prisma.$transaction(async tx => {
+      if (!reassignPersonnelId) {
+        await startAssignedTaskForActivity(tx, task.id, workspaceId, req.user!, 'task_edit')
+      }
       const t = await tx.task.update({
         where: { id: req.params.id },
         data: {
@@ -949,6 +1027,7 @@ export async function addComment(req: Request, res: Response): Promise<void> {
     const task = await prisma.task.findFirst({ where: { id: req.params.id, workspaceId, deletedAt: null } })
     if (!task) { res.status(404).json({ error: 'Task not found' }); return }
     const comment = await prisma.$transaction(async tx => {
+      await startAssignedTaskForActivity(tx, task.id, workspaceId, req.user!, 'comment')
       const c = await tx.taskComment.create({
         data: {
           taskId: task.id,
@@ -1048,6 +1127,7 @@ export async function extendDeadline(req: Request, res: Response): Promise<void>
     const oldDeadline = task.deadline ?? new Date()
 
     await prisma.$transaction(async tx => {
+      await startAssignedTaskForActivity(tx, task.id, workspaceId, req.user!, 'deadline_extension')
       await tx.task.update({
         where: { id: task.id },
         data: {
@@ -1425,15 +1505,18 @@ export async function addProgressLog(req: Request, res: Response): Promise<void>
     const { actorId, actorType, workspaceId } = req.user!
     const task = await prisma.task.findFirst({ where: { id: req.params.id, workspaceId, deletedAt: null } })
     if (!task) { res.status(404).json({ error: 'Task not found' }); return }
-    const log = await prisma.taskProgressLog.create({
-      data: {
-        taskId: task.id,
-        workspaceId,
-        note: note.trim(),
-        authorType: actorType,
-        authorPersonnelId: actorType === 'personnel' ? actorId : undefined,
-        authorDirectorId:  actorType === 'director'  ? actorId : undefined,
-      }
+    const log = await prisma.$transaction(async tx => {
+      await startAssignedTaskForActivity(tx, task.id, workspaceId, req.user!, 'progress_update')
+      return tx.taskProgressLog.create({
+        data: {
+          taskId: task.id,
+          workspaceId,
+          note: note.trim(),
+          authorType: actorType,
+          authorPersonnelId: actorType === 'personnel' ? actorId : undefined,
+          authorDirectorId:  actorType === 'director'  ? actorId : undefined,
+        }
+      })
     })
     res.status(201).json(log)
   } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
