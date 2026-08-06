@@ -53,6 +53,8 @@ export const authApi = {
   me: () => api.get<unknown>('/auth/me'),
   changePassword: (currentPassword: string, newPassword: string) =>
     api.post('/auth/change-password', { currentPassword, newPassword }),
+  completeForcedPasswordChange: (newPassword: string) =>
+    api.post('/auth/complete-forced-password-change', { newPassword }),
   listImpersonationTargets: () =>
     api.get<unknown[]>('/auth/impersonation/users'),
   startImpersonation: (targetActorId: string, targetActorType: 'director' | 'personnel', reason: string, stepUpToken: string) =>

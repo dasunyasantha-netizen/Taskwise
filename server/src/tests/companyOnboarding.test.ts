@@ -479,13 +479,29 @@ async function main() {
     assert.equal(loginRes.statusCode, 200)
     assert.equal(loginRes.body.user.mustChangePassword, true)
 
-    const changeRes = mockRes()
-    await authCtrl.changePassword(mockReq({
+    const reuseRes = mockRes()
+    await authCtrl.completeForcedPasswordChange(mockReq({
       user: { actorId: ycUser.id, actorType: 'personnel', workspaceId: ycWs.id },
-      body: { currentPassword: 'Youth@123', newPassword: 'YouthPrivate@456' },
+      body: { newPassword: 'Youth@123' },
+    }), reuseRes)
+    assert.equal(reuseRes.statusCode, 400)
+
+    const changeRes = mockRes()
+    await authCtrl.completeForcedPasswordChange(mockReq({
+      user: { actorId: ycUser.id, actorType: 'personnel', workspaceId: ycWs.id },
+      body: { newPassword: 'YouthPrivate@456' },
     }), changeRes)
     assert.equal(changeRes.statusCode, 200)
-    assert.equal((await prisma.personnel.findUniqueOrThrow({ where: { id: ycUser.id } })).mustChangePassword, false)
+    const changed = await prisma.personnel.findUniqueOrThrow({ where: { id: ycUser.id } })
+    assert.equal(changed.mustChangePassword, false)
+    assert.equal(await bcrypt.compare('YouthPrivate@456', changed.password), true)
+
+    const repeatRes = mockRes()
+    await authCtrl.completeForcedPasswordChange(mockReq({
+      user: { actorId: ycUser.id, actorType: 'personnel', workspaceId: ycWs.id },
+      body: { newPassword: 'AnotherPrivate@789' },
+    }), repeatRes)
+    assert.equal(repeatRes.statusCode, 409)
 
     const audit = await prisma.auditLog.findFirstOrThrow({ where: { event: 'PERSONNEL_PASSWORD_RESET', actorDirectorId: adminDir.id } })
     assert.equal(JSON.stringify(audit).includes('Youth@123'), false)

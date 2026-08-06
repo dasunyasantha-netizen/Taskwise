@@ -9,7 +9,6 @@ interface Props {
 }
 
 export default function ForcePasswordChange({ user, onPasswordChanged, onLogout }: Props) {
-  const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword]         = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading]   = useState(false)
@@ -23,10 +22,6 @@ export default function ForcePasswordChange({ user, onPasswordChanged, onLogout 
       setError('New password must be at least 8 characters')
       return
     }
-    if (newPassword === currentPassword) {
-      setError('New password must be different from your temporary password')
-      return
-    }
     if (newPassword !== confirmPassword) {
       setError('Passwords do not match')
       return
@@ -34,7 +29,7 @@ export default function ForcePasswordChange({ user, onPasswordChanged, onLogout 
 
     setLoading(true)
     try {
-      await authApi.changePassword(currentPassword, newPassword)
+      await authApi.completeForcedPasswordChange(newPassword)
       onPasswordChanged()
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to change password')
@@ -73,20 +68,15 @@ export default function ForcePasswordChange({ user, onPasswordChanged, onLogout 
 
         <div className="bg-blue-50 rounded-2xl px-4 py-3 mb-5">
           <p className="text-xs text-blue-700">
-            Enter the <strong>temporary password provided by your administrator</strong>, then choose a new private password.
+            Choose a new private password for your account. You will use it for future TaskWise sign-ins.
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1.5">Temporary Password</label>
-            <input type="password" className="input rounded-xl" placeholder="Enter temporary password"
-              value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} required autoFocus />
-          </div>
-          <div>
             <label className="block text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1.5">New Password</label>
             <input type="password" className="input rounded-xl" placeholder="Min 8 characters"
-              value={newPassword} onChange={e => setNewPassword(e.target.value)} required />
+              value={newPassword} onChange={e => setNewPassword(e.target.value)} required autoFocus />
           </div>
           <div>
             <label className="block text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1.5">Confirm Password</label>

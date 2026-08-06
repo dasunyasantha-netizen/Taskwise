@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import {
-  unifiedLogin, directorRegister, changePassword, getMe,
+  unifiedLogin, directorRegister, changePassword, completeForcedPasswordChange, getMe,
   listImpersonationTargets, startImpersonation, endImpersonation, listImpersonationSessions, revokeImpersonationSession,
 } from '../controllers/authController'
 import {
@@ -16,6 +16,7 @@ router.post('/login',                   unifiedLogin)
 router.post('/director/register',       directorRegister)
 router.get('/me',                       authenticateToken, getMe)
 router.post('/change-password',         authenticateToken, changePassword)
+router.post('/complete-forced-password-change', authenticateToken, completeForcedPasswordChange)
 
 // System Admin support access. The end route is called with the short-lived
 // impersonation token, while all discovery/start routes require the real admin token.

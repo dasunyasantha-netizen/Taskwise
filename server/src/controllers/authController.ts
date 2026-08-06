@@ -272,6 +272,50 @@ export async function changePassword(req: Request, res: Response): Promise<void>
   }
 }
 
+// POST /api/auth/complete-forced-password-change
+// The user already proved possession of the temporary password by signing in.
+// This endpoint is available only while the personnel account is marked for a
+// mandatory password change, so the temporary password is not requested twice.
+export async function completeForcedPasswordChange(req: Request, res: Response): Promise<void> {
+  try {
+    const { actorId, actorType, workspaceId } = req.user!
+    const { newPassword } = req.body
+    if (actorType !== 'personnel') { res.status(403).json({ error: 'Personnel account required' }); return }
+    if (!newPassword || typeof newPassword !== 'string') { res.status(400).json({ error: 'newPassword is required' }); return }
+    if (newPassword.length < 8) { res.status(400).json({ error: 'New password must be at least 8 characters' }); return }
+
+    const personnel = await prisma.personnel.findFirst({
+      where: { id: actorId, workspaceId, deletedAt: null, isActive: true },
+      select: { id: true, password: true, mustChangePassword: true },
+    })
+    if (!personnel) { res.status(404).json({ error: 'Account not found' }); return }
+    if (!personnel.mustChangePassword) { res.status(409).json({ error: 'No mandatory password change is pending' }); return }
+    if (await bcrypt.compare(newPassword, personnel.password)) {
+      res.status(400).json({ error: 'New password must be different from the temporary password' }); return
+    }
+
+    await prisma.$transaction(async tx => {
+      await tx.personnel.update({
+        where: { id: personnel.id },
+        data: { password: await bcrypt.hash(newPassword, 12), mustChangePassword: false },
+      })
+      await tx.auditLog.create({
+        data: {
+          workspaceId,
+          event: 'FORCED_PASSWORD_CHANGE_COMPLETED',
+          actorType: 'personnel',
+          actorPersonnelId: personnel.id,
+          payload: { mandatoryChangeCompleted: true },
+        },
+      })
+    })
+    res.json({ success: true })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+}
+
 // GET /api/auth/me
 export async function getMe(req: Request, res: Response): Promise<void> {
   try {
