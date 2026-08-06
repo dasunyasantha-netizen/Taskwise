@@ -71,6 +71,8 @@ async function main() {
   const authCtrl = await import('../controllers/authController')
   const wsCtrl = await import('../controllers/workspaceController')
   const taskCtrl = await import('../controllers/taskController')
+  const auditCtrl = await import('../controllers/auditController')
+  const { computeWorkspaceScores } = await import('../helpers/scoring')
   const insuranceCtrl = await import('../controllers/insuranceController')
   const { FEATURES, requireFeature } = await import('../helpers/features')
   const { authenticateToken, requireSyswiseAdmin } = await import('../middleware/authMiddleware')
@@ -707,6 +709,91 @@ async function main() {
       user: ycAdminUser,
     }), res)
     assert.equal(res.statusCode, 404)
+  })
+
+  // =========================================================================
+  section('Versioned scoring and cancelled-task review')
+  await test('Edited point values apply only to future events', async () => {
+    const firstTask = await prisma.task.create({
+      data: { workspaceId: ffWorkspace!.id, projectId: activityProject.id, title: 'Scoring before change' },
+    })
+    const secondTask = await prisma.task.create({
+      data: { workspaceId: ffWorkspace!.id, projectId: activityProject.id, title: 'Scoring after change' },
+    })
+    const before = (await computeWorkspaceScores(ffWorkspace!.id)).find(row => row.id === ffInsuranceStaff.id)!.taskUpdatePoints
+    const oldEventAt = new Date(Date.now() - 60_000)
+    await prisma.taskProgressLog.create({
+      data: { workspaceId: ffWorkspace!.id, taskId: firstTask.id, authorType: 'personnel', authorPersonnelId: ffInsuranceStaff.id, note: 'Before rule', logDate: oldEventAt },
+    })
+
+    const settingsRes = mockRes()
+    await auditCtrl.updateScoringSettings(mockReq({
+      user: ffAdminUser,
+      body: { points: { TASK_UPDATE: 9 } },
+    }), settingsRes)
+    assert.equal(settingsRes.statusCode, 200)
+    assert.equal(settingsRes.body.points.TASK_UPDATE, 9)
+
+    await prisma.taskProgressLog.create({
+      data: { workspaceId: ffWorkspace!.id, taskId: secondTask.id, authorType: 'personnel', authorPersonnelId: ffInsuranceStaff.id, note: 'After rule', logDate: new Date(Date.now() + 1_000) },
+    })
+    const after = (await computeWorkspaceScores(ffWorkspace!.id)).find(row => row.id === ffInsuranceStaff.id)!.taskUpdatePoints
+    assert.equal(after - before, 11) // original +2, future +9
+  })
+
+  await test('A cancelled task stays neutral until the director decides to deduct', async () => {
+    const task = await prisma.task.create({
+      data: {
+        workspaceId: ffWorkspace!.id,
+        projectId: activityProject.id,
+        title: 'Cancellation penalty review',
+        status: 'IN_PROGRESS',
+        actedById: ffInsuranceStaff.id,
+        actedByType: 'personnel',
+        assignments: { create: { personnelId: ffInsuranceStaff.id } },
+      },
+    })
+    const baseline = (await computeWorkspaceScores(ffWorkspace!.id)).find(row => row.id === ffInsuranceStaff.id)!.cancellationPoints
+    const cancelRes = mockRes()
+    await taskCtrl.cancelTask(mockReq({ user: ffAdminUser, params: { id: task.id }, body: { reason: 'Work no longer required' } }), cancelRes)
+    assert.equal(cancelRes.statusCode, 200)
+
+    const pending = await prisma.taskCancellationReview.findUniqueOrThrow({ where: { taskId: task.id }, include: { recipients: true } })
+    assert.equal(pending.status, 'PENDING')
+    assert.deepEqual(pending.recipients.map(item => item.personnelId), [ffInsuranceStaff.id])
+    const neutral = (await computeWorkspaceScores(ffWorkspace!.id)).find(row => row.id === ffInsuranceStaff.id)!.cancellationPoints
+    assert.equal(neutral, baseline)
+
+    const listRes = mockRes()
+    await auditCtrl.listCancelledTaskReviews(mockReq({ user: ffAdminUser, query: { status: 'pending' } }), listRes)
+    assert.equal(listRes.statusCode, 200)
+    assert.equal(listRes.body.reviews.some((item: any) => item.task.id === task.id), true)
+
+    const decisionRes = mockRes()
+    await auditCtrl.decideCancelledTaskReview(mockReq({ user: ffAdminUser, params: { taskId: task.id }, body: { decision: 'DEDUCT' } }), decisionRes)
+    assert.equal(decisionRes.statusCode, 200)
+    assert.equal(decisionRes.body.penaltyPoints, -5)
+    const deducted = (await computeWorkspaceScores(ffWorkspace!.id)).find(row => row.id === ffInsuranceStaff.id)!
+    assert.equal(deducted.cancellationPoints - baseline, -5)
+    assert.equal(deducted.cancellationCount, 1)
+  })
+
+  await test('The director can waive a cancelled-task penalty', async () => {
+    const task = await prisma.task.create({
+      data: {
+        workspaceId: ffWorkspace!.id,
+        projectId: activityProject.id,
+        title: 'Waived cancellation',
+        status: 'ASSIGNED',
+        assignments: { create: { personnelId: ffInsuranceStaff.id } },
+      },
+    })
+    await taskCtrl.cancelTask(mockReq({ user: ffAdminUser, params: { id: task.id }, body: { reason: 'Cancelled by customer' } }), mockRes())
+    const decisionRes = mockRes()
+    await auditCtrl.decideCancelledTaskReview(mockReq({ user: ffAdminUser, params: { taskId: task.id }, body: { decision: 'DONT_DEDUCT' } }), decisionRes)
+    assert.equal(decisionRes.statusCode, 200)
+    assert.equal(decisionRes.body.status, 'NOT_DEDUCTED')
+    assert.equal(decisionRes.body.penaltyPoints, null)
   })
 
   // =========================================================================

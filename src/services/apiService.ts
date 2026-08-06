@@ -303,4 +303,9 @@ export const auditApi = {
     api.get(`/reports/user-analytics/logins/${actorId}?actorType=${actorType}`),
   leaderboard:         (period: 'all' | 'week' | 'month' = 'all') => api.get(`/reports/leaderboard?period=${period}`),
   myScore:             () => api.get('/reports/my-score'),
+  updateScoringSettings: (points: Record<string, number>) => api.put('/reports/scoring-settings', { points }),
+  cancelledTaskReviews: (status: 'pending' | 'deducted' | 'not_deducted' | 'all' = 'pending') =>
+    api.get(`/reports/cancelled-task-reviews?status=${status}`),
+  decideCancelledTask: (taskId: string, decision: 'DEDUCT' | 'DONT_DEDUCT') =>
+    api.post(`/reports/cancelled-task-reviews/${taskId}/decision`, { decision }),
 }

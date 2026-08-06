@@ -1,6 +1,14 @@
 import { Request, Response } from 'express'
 import prisma from '../prisma'
-import { computeWorkspaceScores, POINTS, resolveScoreRange, SCORING_EPOCH, ScorePeriod } from '../helpers/scoring'
+import {
+  computeWorkspaceScores,
+  getCurrentScoringPoints,
+  resolveScoreRange,
+  SCORING_EPOCH,
+  SCORING_EVENT_TYPES,
+  ScorePeriod,
+  ScoringEventType,
+} from '../helpers/scoring'
 
 // GET /api/audit
 export async function listAuditLogs(req: Request, res: Response): Promise<void> {
@@ -213,7 +221,10 @@ export async function getLeaderboard(req: Request, res: Response): Promise<void>
     }
     const range = resolveScoreRange(requestedPeriod as ScorePeriod)
 
-    const scores = await computeWorkspaceScores(workspaceId, range)   // already sorted desc
+    const [scores, currentPoints] = await Promise.all([
+      computeWorkspaceScores(workspaceId, range),
+      getCurrentScoringPoints(workspaceId),
+    ])
 
     // Summary cards
     const totalPointsEarned = scores.reduce((s, u) => s + u.totalPoints, 0)
@@ -240,7 +251,7 @@ export async function getLeaderboard(req: Request, res: Response): Promise<void>
       },
       config: {
         epoch: SCORING_EPOCH,
-        points: POINTS,
+        points: currentPoints,
         period: range.period,
         rangeStart: range.startDate,
         rangeEnd: range.endDate,
@@ -254,7 +265,10 @@ export async function getLeaderboard(req: Request, res: Response): Promise<void>
 export async function getMyScore(req: Request, res: Response): Promise<void> {
   try {
     const { workspaceId, actorId, actorType } = req.user!
-    const scores = await computeWorkspaceScores(workspaceId)
+    const [scores, currentPoints] = await Promise.all([
+      computeWorkspaceScores(workspaceId),
+      getCurrentScoringPoints(workspaceId),
+    ])
     const sorted = scores  // already sorted desc
     const idx = sorted.findIndex(s => s.id === actorId)
     const mine = idx >= 0 ? { ...sorted[idx], rank: idx + 1 } : null
@@ -262,7 +276,138 @@ export async function getMyScore(req: Request, res: Response): Promise<void> {
       score: mine,
       totalUsers: sorted.length,
       actorType,
-      config: { epoch: SCORING_EPOCH, points: POINTS },
+      config: { epoch: SCORING_EPOCH, points: currentPoints },
     })
   } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
+}
+
+// PUT /api/reports/scoring-settings
+// Adds effective-dated rule versions. Existing event scores remain unchanged.
+export async function updateScoringSettings(req: Request, res: Response): Promise<void> {
+  try {
+    if (req.user!.actorType !== 'director') { res.status(403).json({ error: 'Director only' }); return }
+    const { workspaceId, actorId } = req.user!
+    const submitted = req.body?.points as Record<string, unknown> | undefined
+    if (!submitted || typeof submitted !== 'object') { res.status(400).json({ error: 'points is required' }); return }
+
+    const next: Partial<Record<ScoringEventType, number>> = {}
+    for (const eventType of SCORING_EVENT_TYPES) {
+      if (!(eventType in submitted)) continue
+      const value = Number(submitted[eventType])
+      if (!Number.isInteger(value) || Math.abs(value) > 1000) {
+        res.status(400).json({ error: `${eventType} must be a whole number between -1000 and 1000` }); return
+      }
+      const isReward = ['DAILY_LOGIN', 'TASK_UPDATE', 'ON_TIME_SUBMISSION'].includes(eventType)
+      if ((isReward && value < 0) || (!isReward && value > 0)) {
+        res.status(400).json({ error: `${eventType} has an invalid reward/penalty sign` }); return
+      }
+      next[eventType] = value
+    }
+    if (Object.keys(next).length === 0) { res.status(400).json({ error: 'No scoring values supplied' }); return }
+
+    const current = await getCurrentScoringPoints(workspaceId)
+    const changes = SCORING_EVENT_TYPES.filter(key => next[key] !== undefined && next[key] !== current[key])
+    if (changes.length === 0) { res.json({ points: current, effectiveAt: null, changed: false }); return }
+
+    const effectiveAt = new Date()
+    await prisma.$transaction(async tx => {
+      await tx.scoringRuleVersion.createMany({
+        data: changes.map(eventType => ({
+          workspaceId,
+          eventType,
+          points: next[eventType]!,
+          effectiveAt,
+          changedByDirectorId: actorId,
+        })),
+      })
+      await tx.auditLog.create({
+        data: {
+          workspaceId,
+          event: 'SCORING_RULES_UPDATED',
+          actorType: 'director',
+          actorDirectorId: actorId,
+          payload: { effectiveAt: effectiveAt.toISOString(), changes: Object.fromEntries(changes.map(key => [key, { from: current[key], to: next[key] }])) },
+        },
+      })
+    })
+    res.json({ points: { ...current, ...next }, effectiveAt, changed: true })
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
+}
+
+// GET /api/reports/cancelled-task-reviews
+export async function listCancelledTaskReviews(req: Request, res: Response): Promise<void> {
+  try {
+    if (req.user!.actorType !== 'director') { res.status(403).json({ error: 'Director only' }); return }
+    const { workspaceId } = req.user!
+    const status = typeof req.query.status === 'string' ? req.query.status.toUpperCase() : 'PENDING'
+    if (!['PENDING', 'DEDUCTED', 'NOT_DEDUCTED', 'ALL'].includes(status)) {
+      res.status(400).json({ error: 'Invalid review status' }); return
+    }
+    const reviews = await prisma.taskCancellationReview.findMany({
+      where: { workspaceId, ...(status === 'ALL' ? {} : { status }) },
+      include: {
+        task: {
+          select: {
+            id: true, title: true, cancelReason: true, cancelledAt: true,
+            project: { select: { name: true, category: { select: { name: true } } } },
+          },
+        },
+        recipients: { include: { personnel: { select: { id: true, name: true } } } },
+        decidedByDirector: { select: { id: true, name: true } },
+      },
+      orderBy: [{ status: 'desc' }, { createdAt: 'desc' }],
+    })
+    const points = await getCurrentScoringPoints(workspaceId)
+    res.json({ reviews, cancellationPenalty: points.CANCELLATION })
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
+}
+
+// POST /api/reports/cancelled-task-reviews/:taskId/decision
+export async function decideCancelledTaskReview(req: Request, res: Response): Promise<void> {
+  try {
+    if (req.user!.actorType !== 'director') { res.status(403).json({ error: 'Director only' }); return }
+    const { workspaceId, actorId } = req.user!
+    const decision = String(req.body?.decision ?? '').toUpperCase()
+    if (!['DEDUCT', 'DONT_DEDUCT'].includes(decision)) {
+      res.status(400).json({ error: 'decision must be DEDUCT or DONT_DEDUCT' }); return
+    }
+    const review = await prisma.taskCancellationReview.findFirst({
+      where: { taskId: req.params.taskId, workspaceId },
+      include: { recipients: true, task: { select: { title: true } } },
+    })
+    if (!review) { res.status(404).json({ error: 'Cancelled task review not found' }); return }
+    if (review.status !== 'PENDING') { res.status(409).json({ error: 'This cancelled task has already been reviewed' }); return }
+    if (decision === 'DEDUCT' && review.recipients.length === 0) {
+      res.status(400).json({ error: 'No responsible personnel is recorded for this task; choose Don’t deduct' }); return
+    }
+
+    const currentPoints = await getCurrentScoringPoints(workspaceId)
+    const decidedAt = new Date()
+    const status = decision === 'DEDUCT' ? 'DEDUCTED' : 'NOT_DEDUCTED'
+    const penaltyPoints = decision === 'DEDUCT' ? currentPoints.CANCELLATION : null
+    await prisma.$transaction(async tx => {
+      const changed = await tx.taskCancellationReview.updateMany({
+        where: { id: review.id, status: 'PENDING' },
+        data: { status, penaltyPoints, decidedAt, decidedByDirectorId: actorId },
+      })
+      if (changed.count !== 1) throw new Error('Cancellation review was already decided')
+      await tx.auditLog.create({
+        data: {
+          workspaceId,
+          taskId: req.params.taskId,
+          event: decision === 'DEDUCT' ? 'CANCELLATION_PENALTY_APPLIED' : 'CANCELLATION_PENALTY_WAIVED',
+          actorType: 'director',
+          actorDirectorId: actorId,
+          payload: { taskTitle: review.task.title, penaltyPoints, recipientPersonnelIds: review.recipients.map(r => r.personnelId) },
+        },
+      })
+    })
+    res.json({ success: true, status, penaltyPoints, decidedAt })
+  } catch (err) {
+    console.error(err)
+    if (err instanceof Error && err.message === 'Cancellation review was already decided') {
+      res.status(409).json({ error: err.message }); return
+    }
+    res.status(500).json({ error: 'Internal server error' })
+  }
 }

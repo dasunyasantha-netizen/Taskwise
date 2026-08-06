@@ -36,14 +36,16 @@ model Director {
 
   projectsCreated         Project[]
   categoriesCreated       ProjectCategory[]
-  tasksCreated            Task[]                 @relation("TaskCreatedByDirector")
-  auditLogs               AuditLog[]             @relation("AuditActorDirector")
-  notifications           Notification[]         @relation("NotifRecipientDirector")
-  comments                TaskComment[]          @relation("CommentAuthorDirector")
-  progressLogs            TaskProgressLog[]      @relation("ProgressLogDirector")
+  tasksCreated            Task[]                   @relation("TaskCreatedByDirector")
+  auditLogs               AuditLog[]               @relation("AuditActorDirector")
+  notifications           Notification[]           @relation("NotifRecipientDirector")
+  comments                TaskComment[]            @relation("CommentAuthorDirector")
+  progressLogs            TaskProgressLog[]        @relation("ProgressLogDirector")
   impersonationSessions   ImpersonationSession[]
-  approvedCompanyRequests CompanyRequest[]       @relation("CompanyRequestApprovedBy")
-  reviewedCompanyActions  CompanyRequestAction[] @relation("CompanyRequestActionDirector")
+  approvedCompanyRequests CompanyRequest[]         @relation("CompanyRequestApprovedBy")
+  reviewedCompanyActions  CompanyRequestAction[]   @relation("CompanyRequestActionDirector")
+  scoringRuleVersions     ScoringRuleVersion[]     @relation("ScoringRuleChangedBy")
+  cancellationDecisions   TaskCancellationReview[] @relation("CancellationDecisionBy")
 
   @@index([companyId])
   @@index([normalizedPhone])
@@ -84,6 +86,8 @@ model Workspace {
   projects            Project[]
   insuranceQuotations InsuranceQuotation[]
   insurancePolicies   InsurancePolicy[]
+  scoringRuleVersions ScoringRuleVersion[]
+  cancellationReviews TaskCancellationReview[]
 }
 
 model Company {
@@ -242,13 +246,14 @@ model Personnel {
   updatedAt          DateTime    @updatedAt
   deletedAt          DateTime?
 
-  taskGroupMemberships TaskGroupMember[]
-  taskAssignments      TaskAssignment[]
-  tasksCreated         Task[]            @relation("TaskCreatedByPersonnel")
-  auditLogs            AuditLog[]        @relation("AuditActorPersonnel")
-  notifications        Notification[]    @relation("NotifRecipientPersonnel")
-  comments             TaskComment[]     @relation("CommentAuthorPersonnel")
-  progressLogs         TaskProgressLog[] @relation("ProgressLogAuthor")
+  taskGroupMemberships  TaskGroupMember[]
+  taskAssignments       TaskAssignment[]
+  tasksCreated          Task[]                             @relation("TaskCreatedByPersonnel")
+  auditLogs             AuditLog[]                         @relation("AuditActorPersonnel")
+  notifications         Notification[]                     @relation("NotifRecipientPersonnel")
+  comments              TaskComment[]                      @relation("CommentAuthorPersonnel")
+  progressLogs          TaskProgressLog[]                  @relation("ProgressLogAuthor")
+  cancellationPenalties TaskCancellationPenaltyRecipient[]
 
   @@unique([companyId, normalizedPhone])
   @@index([workspaceId])
@@ -532,6 +537,7 @@ model Task {
   notifications      Notification[]
   progressLogs       TaskProgressLog[]
   deadlineExtensions DeadlineExtension[]
+  cancellationReview TaskCancellationReview?
 
   // Chain relations
   chainAsParent TaskChain[] @relation("ChainParentTask")
@@ -543,6 +549,55 @@ model Task {
   @@index([groupTaskId])
   @@index([status])
   @@index([deadline])
+}
+
+// Effective-dated workspace scoring values. New versions affect only events
+// recorded at or after effectiveAt, preserving historical leaderboard totals.
+model ScoringRuleVersion {
+  id                  String    @id @default(uuid())
+  workspaceId         String
+  workspace           Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  eventType           String
+  points              Int
+  effectiveAt         DateTime
+  changedByDirectorId String?
+  changedByDirector   Director? @relation("ScoringRuleChangedBy", fields: [changedByDirectorId], references: [id])
+  createdAt           DateTime  @default(now())
+
+  @@unique([workspaceId, eventType, effectiveAt])
+  @@index([workspaceId, eventType, effectiveAt])
+}
+
+// Every cancelled task waits for an explicit director decision. A deducted
+// penalty is snapshotted so later scoring-rule changes do not rewrite history.
+model TaskCancellationReview {
+  id                  String                             @id @default(uuid())
+  workspaceId         String
+  workspace           Workspace                          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  taskId              String                             @unique
+  task                Task                               @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  status              String                             @default("PENDING") // PENDING | DEDUCTED | NOT_DEDUCTED
+  penaltyPoints       Int?
+  decidedAt           DateTime?
+  decidedByDirectorId String?
+  decidedByDirector   Director?                          @relation("CancellationDecisionBy", fields: [decidedByDirectorId], references: [id])
+  createdAt           DateTime                           @default(now())
+  updatedAt           DateTime                           @updatedAt
+  recipients          TaskCancellationPenaltyRecipient[]
+
+  @@index([workspaceId, status, createdAt])
+}
+
+model TaskCancellationPenaltyRecipient {
+  id          String                 @id @default(uuid())
+  reviewId    String
+  review      TaskCancellationReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  personnelId String
+  personnel   Personnel              @relation(fields: [personnelId], references: [id], onDelete: Cascade)
+  createdAt   DateTime               @default(now())
+
+  @@unique([reviewId, personnelId])
+  @@index([personnelId])
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

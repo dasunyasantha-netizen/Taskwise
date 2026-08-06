@@ -32,6 +32,29 @@ async function resolveActedByName(task: Record<string, unknown>): Promise<Record
 
 type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 
+type CancellationTask = {
+  id: string
+  actedById?: string | null
+  actedByType?: string | null
+  assignments: Array<{ personnelId: string | null }>
+}
+
+async function enqueueCancellationReview(db: TxClient, workspaceId: string, task: CancellationTask) {
+  const recipientIds = task.actedByType === 'personnel' && task.actedById
+    ? [task.actedById]
+    : Array.from(new Set(task.assignments.map(a => a.personnelId).filter((id): id is string => !!id)))
+
+  await db.taskCancellationReview.upsert({
+    where: { taskId: task.id },
+    update: {},
+    create: {
+      workspaceId,
+      taskId: task.id,
+      recipients: { create: recipientIds.map(personnelId => ({ personnelId })) },
+    },
+  })
+}
+
 async function writeAudit(
   db: TxClient | typeof prisma,
   workspaceId: string,
@@ -875,10 +898,14 @@ export async function cancelTask(req: Request, res: Response): Promise<void> {
     if (req.user!.actorType !== 'director') { res.status(403).json({ error: 'Director only' }); return }
     const { actorId, actorType, workspaceId } = req.user!
     const { reason } = req.body
-    const task = await prisma.task.findFirst({ where: { id: req.params.id, workspaceId, deletedAt: null } })
+    const task = await prisma.task.findFirst({
+      where: { id: req.params.id, workspaceId, deletedAt: null },
+      include: { assignments: { select: { personnelId: true } } },
+    })
     if (!task) { res.status(404).json({ error: 'Task not found' }); return }
     await prisma.$transaction(async tx => {
       await tx.task.update({ where: { id: task.id }, data: { status: 'CANCELLED', cancelledAt: new Date(), cancelReason: reason } })
+      await enqueueCancellationReview(tx, workspaceId, task)
       await writeAudit(tx, workspaceId, 'TASK_CANCELLED', actorType, actorId, task.id, { reason }, req.user!)
     })
     res.json({ success: true })
@@ -953,6 +980,7 @@ export async function changeAssignees(req: Request, res: Response): Promise<void
               payload: { reason: `Assignee removed from parent task. ${reason}`, autoCancel: true },
             }
           })
+          await enqueueCancellationReview(tx, workspaceId, sub)
         }
         await tx.taskAssignment.delete({ where: { id: assignment.id } })
       }

@@ -13,6 +13,13 @@ interface ScoreRow {
   onTimeCount: number
   overdueDays: number
   rejectionCount: number
+  cancellationCount: number
+  loginPoints: number
+  taskUpdatePoints: number
+  onTimePoints: number
+  overduePoints: number
+  rejectionPoints: number
+  cancellationPoints: number
   earned: number
   deductions: number
   totalPoints: number
@@ -40,6 +47,28 @@ interface LeaderboardData {
 }
 
 type ScorePeriod = 'all' | 'week' | 'month'
+
+type ScoringKey = 'DAILY_LOGIN' | 'TASK_UPDATE' | 'ON_TIME_SUBMISSION' | 'OVERDUE_PER_DAY' | 'REJECTION' | 'CANCELLATION'
+
+interface CancellationReview {
+  id: string
+  status: 'PENDING' | 'DEDUCTED' | 'NOT_DEDUCTED'
+  penaltyPoints: number | null
+  createdAt: string
+  task: {
+    id: string
+    title: string
+    cancelReason: string | null
+    cancelledAt: string | null
+    project: { name: string; category: { name: string } | null }
+  }
+  recipients: Array<{ personnel: { id: string; name: string } }>
+}
+
+interface CancellationReviewData {
+  reviews: CancellationReview[]
+  cancellationPenalty: number
+}
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -84,14 +113,15 @@ function BreakdownModal({ row, points, onClose }: {
   points: Record<string, number>
   onClose: () => void
 }) {
-  // Each category: count × per-unit points = subtotal
+  // Actual subtotals preserve the rule value that was active for each event.
   const lines = [
-    { label: 'Daily logins',        icon: '📅', count: row.loginDays,      unit: points.DAILY_LOGIN,        sub: `${row.loginDays} day${row.loginDays !== 1 ? 's' : ''}` },
-    { label: 'Task updates',        icon: '✏️', count: row.taskUpdates,    unit: points.TASK_UPDATE,        sub: `${row.taskUpdates} update${row.taskUpdates !== 1 ? 's' : ''} (max 1/task/day)` },
-    { label: 'On-time submissions', icon: '✅', count: row.onTimeCount,    unit: points.ON_TIME_SUBMISSION, sub: `${row.onTimeCount} task${row.onTimeCount !== 1 ? 's' : ''}` },
-    { label: 'Overdue days',        icon: '⏰', count: row.overdueDays,    unit: points.OVERDUE_PER_DAY,    sub: `${row.overdueDays} day${row.overdueDays !== 1 ? 's' : ''} late` },
-    { label: 'Rejections',          icon: '↩️', count: row.rejectionCount, unit: points.REJECTION,          sub: `${row.rejectionCount} rejected` },
-  ].map(l => ({ ...l, subtotal: l.count * l.unit }))
+    { label: 'Daily logins',        icon: '📅', unit: points.DAILY_LOGIN,        subtotal: row.loginPoints,        sub: `${row.loginDays} day${row.loginDays !== 1 ? 's' : ''}` },
+    { label: 'Task updates',        icon: '✏️', unit: points.TASK_UPDATE,        subtotal: row.taskUpdatePoints,   sub: `${row.taskUpdates} update${row.taskUpdates !== 1 ? 's' : ''} (max 1/task/day)` },
+    { label: 'On-time submissions', icon: '✅', unit: points.ON_TIME_SUBMISSION, subtotal: row.onTimePoints,       sub: `${row.onTimeCount} task${row.onTimeCount !== 1 ? 's' : ''}` },
+    { label: 'Overdue days',        icon: '⏰', unit: points.OVERDUE_PER_DAY,    subtotal: row.overduePoints,      sub: `${row.overdueDays} day${row.overdueDays !== 1 ? 's' : ''} late` },
+    { label: 'Rejections',          icon: '↩️', unit: points.REJECTION,          subtotal: row.rejectionPoints,    sub: `${row.rejectionCount} rejected` },
+    { label: 'Cancelled tasks',     icon: '🚫', unit: points.CANCELLATION,       subtotal: row.cancellationPoints, sub: `${row.cancellationCount} director-approved deduction${row.cancellationCount !== 1 ? 's' : ''}` },
+  ]
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
@@ -127,7 +157,7 @@ function BreakdownModal({ row, points, onClose }: {
                   <div className="min-w-0">
                     <div className="text-sm font-medium text-tw-text">{l.label}</div>
                     <div className="text-xs text-tw-text-secondary">
-                      {l.sub} <span className="opacity-70">· {l.unit > 0 ? '+' : ''}{l.unit} each</span>
+                      {l.sub} <span className="opacity-70">· current value {l.unit > 0 ? '+' : ''}{l.unit}</span>
                     </div>
                   </div>
                 </div>
@@ -151,6 +181,176 @@ function BreakdownModal({ row, points, onClose }: {
   )
 }
 
+const scoringFields: Array<{ key: ScoringKey; label: string; hint: string }> = [
+  { key: 'DAILY_LOGIN', label: 'Daily login', hint: 'Reward per day' },
+  { key: 'TASK_UPDATE', label: 'Task update', hint: 'Max once per task/day' },
+  { key: 'ON_TIME_SUBMISSION', label: 'On-time submission', hint: 'Reward per task' },
+  { key: 'OVERDUE_PER_DAY', label: 'Overdue day', hint: 'Enter a negative value' },
+  { key: 'REJECTION', label: 'Rejection', hint: 'Enter a negative value' },
+  { key: 'CANCELLATION', label: 'Cancelled task', hint: 'Applied only after review' },
+]
+
+function ScoringManagementPanel({ points, onChanged }: {
+  points: Record<string, number>
+  onChanged: () => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState<Record<ScoringKey, number>>(() => ({
+    DAILY_LOGIN: points.DAILY_LOGIN,
+    TASK_UPDATE: points.TASK_UPDATE,
+    ON_TIME_SUBMISSION: points.ON_TIME_SUBMISSION,
+    OVERDUE_PER_DAY: points.OVERDUE_PER_DAY,
+    REJECTION: points.REJECTION,
+    CANCELLATION: points.CANCELLATION,
+  }))
+  const [reviews, setReviews] = useState<CancellationReview[]>([])
+  const [reviewsLoading, setReviewsLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [workingTaskId, setWorkingTaskId] = useState('')
+  const [message, setMessage] = useState('')
+  const [panelError, setPanelError] = useState('')
+
+  useEffect(() => {
+    setDraft({
+      DAILY_LOGIN: points.DAILY_LOGIN,
+      TASK_UPDATE: points.TASK_UPDATE,
+      ON_TIME_SUBMISSION: points.ON_TIME_SUBMISSION,
+      OVERDUE_PER_DAY: points.OVERDUE_PER_DAY,
+      REJECTION: points.REJECTION,
+      CANCELLATION: points.CANCELLATION,
+    })
+  }, [points])
+
+  const loadReviews = () => {
+    setReviewsLoading(true)
+    auditApi.cancelledTaskReviews('pending')
+      .then(result => setReviews((result as CancellationReviewData).reviews))
+      .catch(err => setPanelError(err instanceof Error ? err.message : 'Failed to load cancelled tasks'))
+      .finally(() => setReviewsLoading(false))
+  }
+
+  useEffect(loadReviews, [])
+
+  const savePoints = async () => {
+    setSaving(true); setPanelError(''); setMessage('')
+    try {
+      await auditApi.updateScoringSettings(draft)
+      setEditing(false)
+      setMessage('New point values saved. They apply only to future events.')
+      onChanged()
+    } catch (err) {
+      setPanelError(err instanceof Error ? err.message : 'Failed to save points')
+    } finally { setSaving(false) }
+  }
+
+  const decide = async (review: CancellationReview, decision: 'DEDUCT' | 'DONT_DEDUCT') => {
+    setWorkingTaskId(review.task.id); setPanelError(''); setMessage('')
+    try {
+      await auditApi.decideCancelledTask(review.task.id, decision)
+      setReviews(current => current.filter(item => item.id !== review.id))
+      setMessage(decision === 'DEDUCT'
+        ? `Cancellation penalty applied for “${review.task.title}”.`
+        : `No cancellation penalty applied for “${review.task.title}”.`)
+      onChanged()
+    } catch (err) {
+      setPanelError(err instanceof Error ? err.message : 'Failed to record decision')
+    } finally { setWorkingTaskId('') }
+  }
+
+  return (
+    <div className="card overflow-hidden">
+      <div className="px-4 py-3 border-b border-tw-border flex items-center justify-between gap-3">
+        <div>
+          <div className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide">Scoring management</div>
+          <div className="text-xs text-tw-text-secondary mt-1">Changes apply to future events only.</div>
+        </div>
+        {!editing && <button type="button" className="btn-secondary text-xs" onClick={() => setEditing(true)}>Edit points</button>}
+      </div>
+
+      <div className="p-4 border-b border-tw-border">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          {scoringFields.map(field => (
+            <label key={field.key} className="block min-w-0">
+              <span className="text-xs font-semibold text-tw-text block truncate">{field.label}</span>
+              {editing ? (
+                <input
+                  type="number"
+                  step="1"
+                  min={field.key === 'DAILY_LOGIN' || field.key === 'TASK_UPDATE' || field.key === 'ON_TIME_SUBMISSION' ? 0 : -1000}
+                  max={field.key === 'DAILY_LOGIN' || field.key === 'TASK_UPDATE' || field.key === 'ON_TIME_SUBMISSION' ? 1000 : 0}
+                  className="input text-sm mt-1"
+                  value={draft[field.key]}
+                  onChange={e => setDraft(current => ({ ...current, [field.key]: Number(e.target.value) }))}
+                />
+              ) : (
+                <div className={`text-lg font-bold mt-1 ${points[field.key] < 0 ? 'text-tw-danger' : 'text-emerald-600'}`}>
+                  {points[field.key] > 0 ? '+' : ''}{points[field.key]}
+                </div>
+              )}
+              <span className="text-[11px] text-tw-text-secondary block mt-0.5">{field.hint}</span>
+            </label>
+          ))}
+        </div>
+        {editing && (
+          <div className="flex justify-end gap-2 mt-4">
+            <button type="button" className="btn-secondary text-sm" disabled={saving} onClick={() => { setEditing(false); setDraft({
+              DAILY_LOGIN: points.DAILY_LOGIN, TASK_UPDATE: points.TASK_UPDATE, ON_TIME_SUBMISSION: points.ON_TIME_SUBMISSION,
+              OVERDUE_PER_DAY: points.OVERDUE_PER_DAY, REJECTION: points.REJECTION, CANCELLATION: points.CANCELLATION,
+            }) }}>Cancel</button>
+            <button type="button" className="btn-primary text-sm" disabled={saving} onClick={savePoints}>{saving ? 'Saving…' : 'Save future values'}</button>
+          </div>
+        )}
+      </div>
+
+      <div>
+        <div className="px-4 py-3 bg-tw-hover flex items-center justify-between border-b border-tw-border">
+          <div className="text-sm font-semibold text-tw-text">Cancelled tasks awaiting decision</div>
+          <span className="text-xs font-bold px-2 py-1 rounded-full bg-amber-100 text-amber-700">{reviews.length} pending</span>
+        </div>
+        {panelError && <div className="mx-4 mt-3 rounded-lg bg-red-50 text-tw-danger text-xs px-3 py-2">{panelError}</div>}
+        {message && <div className="mx-4 mt-3 rounded-lg bg-emerald-50 text-emerald-700 text-xs px-3 py-2">{message}</div>}
+        {reviewsLoading ? (
+          <div className="px-4 py-8 text-center text-sm text-tw-text-secondary">Loading cancelled tasks…</div>
+        ) : reviews.length === 0 ? (
+          <div className="px-4 py-8 text-center text-sm text-tw-text-secondary">No cancelled tasks need a points decision.</div>
+        ) : (
+          <div className="divide-y divide-tw-border max-h-80 overflow-y-auto">
+            {reviews.map(review => {
+              const names = review.recipients.map(r => r.personnel.name)
+              const busy = workingTaskId === review.task.id
+              return (
+                <div key={review.id} className="px-4 py-3 flex flex-col md:flex-row md:items-center gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-sm text-tw-text truncate">{review.task.title}</div>
+                    <div className="text-xs text-tw-text-secondary mt-0.5">
+                      {review.task.project.category?.name ?? 'Uncategorized'} · {review.task.project.name}
+                      {review.task.cancelledAt ? ` · Cancelled ${new Date(review.task.cancelledAt).toLocaleDateString('en-GB')}` : ''}
+                    </div>
+                    <div className="text-xs mt-1 text-tw-text-secondary">
+                      Responsible: {names.length ? names.join(', ') : 'No individual recorded'}
+                      {review.task.cancelReason ? ` · ${review.task.cancelReason}` : ''}
+                    </div>
+                  </div>
+                  <div className="flex gap-2 flex-shrink-0">
+                    <button
+                      type="button"
+                      className="rounded-lg border border-tw-danger/30 bg-red-50 text-tw-danger px-3 py-2 text-xs font-semibold disabled:opacity-50"
+                      disabled={busy || names.length === 0}
+                      title={names.length === 0 ? 'No responsible personnel is recorded' : `Apply ${draft.CANCELLATION} points to each responsible user`}
+                      onClick={() => decide(review, 'DEDUCT')}
+                    >Deduct {points.CANCELLATION}</button>
+                    <button type="button" className="btn-secondary text-xs" disabled={busy} onClick={() => decide(review, 'DONT_DEDUCT')}>Don’t deduct</button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function LeaderboardPage() {
@@ -161,6 +361,7 @@ export default function LeaderboardPage() {
   const [dept, setDept]       = useState('')
   const [period, setPeriod]   = useState<ScorePeriod>('all')
   const [selected, setSelected] = useState<ScoreRow | null>(null)
+  const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     let active = true
@@ -172,7 +373,7 @@ export default function LeaderboardPage() {
       .catch(() => { if (active) setError('Failed to load leaderboard') })
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
-  }, [period])
+  }, [period, reloadKey])
 
   const departments = useMemo(() => {
     if (!data) return []
@@ -265,17 +466,7 @@ export default function LeaderboardPage() {
         ))}
       </div>
 
-      {/* Scoring legend */}
-      <div className="card px-4 py-3">
-        <div className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-2">How points are earned</div>
-        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-tw-text-secondary">
-          <span><b className="text-emerald-600">+{config.points.DAILY_LOGIN}</b> daily login</span>
-          <span><b className="text-emerald-600">+{config.points.TASK_UPDATE}</b> task update (max 1/task/day)</span>
-          <span><b className="text-emerald-600">+{config.points.ON_TIME_SUBMISSION}</b> on-time submission</span>
-          <span><b className="text-tw-danger">{config.points.OVERDUE_PER_DAY}</b> per day overdue</span>
-          <span><b className="text-tw-danger">{config.points.REJECTION}</b> per rejection</span>
-        </div>
-      </div>
+      <ScoringManagementPanel points={config.points} onChanged={() => setReloadKey(key => key + 1)} />
 
       {/* Leaderboard table */}
       <div className="card overflow-hidden">
