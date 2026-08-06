@@ -94,6 +94,13 @@ export const workspaceApi = {
   movePersonnel:     (id: string, data: unknown) => api.put(`/workspace/personnel/${id}/move`, data),
   deletePersonnel:   (id: string)    => api.delete(`/workspace/personnel/${id}`),
   getPersonnelQueue: (id: string)    => api.get(`/workspace/personnel/${id}/queue`),
+  getManagedUsers:   ()              => api.get('/workspace/managed-users'),
+  resetManagedUserPassword: (id: string) => api.post<{
+    success: boolean
+    user: { id: string; name: string; loginId: string }
+    temporaryPassword: string
+    mustChangePassword: boolean
+  }>(`/workspace/managed-users/${id}/reset-password`),
 }
 
 // ─── Projects ────────────────────────────────────────────────────────────────

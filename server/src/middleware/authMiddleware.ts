@@ -118,13 +118,29 @@ export function requireDirector(req: Request, res: Response, next: NextFunction)
   next()
 }
 
-export function requireChairman(req: Request, res: Response, next: NextFunction): void {
-  if (req.user?.actorType !== 'director') {
-    res.status(403).json({ error: 'Chairman access required' })
-    return
+export async function requireChairman(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    if (req.user?.actorType !== 'director') {
+      res.status(403).json({ error: 'Chairman access required' })
+      return
+    }
+    const chairman = await prisma.director.findFirst({
+      where: {
+        id: req.user.actorId,
+        workspaceId: req.user.workspaceId,
+        isChairman: true,
+        isActive: true,
+      },
+      select: { id: true },
+    })
+    if (!chairman) {
+      res.status(403).json({ error: 'Chairman access required' })
+      return
+    }
+    next()
+  } catch {
+    res.status(500).json({ error: 'Internal server error' })
   }
-  // Actual chairman check done in the controller after DB lookup
-  next()
 }
 
 export async function requireSyswiseAdmin(req: Request, res: Response, next: NextFunction): Promise<void> {

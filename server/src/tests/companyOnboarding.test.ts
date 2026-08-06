@@ -75,7 +75,7 @@ async function main() {
   const { computeWorkspaceScores } = await import('../helpers/scoring')
   const insuranceCtrl = await import('../controllers/insuranceController')
   const { FEATURES, requireFeature } = await import('../helpers/features')
-  const { authenticateToken, requireSyswiseAdmin } = await import('../middleware/authMiddleware')
+  const { authenticateToken, requireChairman, requireSyswiseAdmin } = await import('../middleware/authMiddleware')
 
   // Fresh slate.
   await prisma.$executeRawUnsafe(
@@ -426,6 +426,69 @@ async function main() {
     assert.equal(res.statusCode, 201)
     assert.equal(res.body.isSyswiseAdmin, undefined) // Personnel have no such field; flag is ignored.
     assert.equal(await prisma.director.count({ where: { isSyswiseAdmin: true } }), before)
+  })
+
+  // =========================================================================
+  section('Chairman user management')
+  const runChairmanGuard = async (user: any) => {
+    const res = mockRes(); let nexted = false
+    await requireChairman(mockReq({ user }), res, () => { nexted = true })
+    return { res, nexted }
+  }
+
+  await test('A normal company director cannot access chairman user management', async () => {
+    const { res, nexted } = await runChairmanGuard(ffAdminUser)
+    assert.equal(nexted, false)
+    assert.equal(res.statusCode, 403)
+  })
+
+  await prisma.director.update({ where: { id: adminDir.id }, data: { isChairman: true } })
+
+  await test('The chairman can list only personnel in their own workspace', async () => {
+    const { res: guardRes, nexted } = await runChairmanGuard(ycAdminUser)
+    assert.equal(guardRes.statusCode, 200)
+    assert.equal(nexted, true)
+
+    const res = mockRes()
+    await wsCtrl.getManagedUsers(mockReq({ user: ycAdminUser }), res)
+    assert.equal(res.statusCode, 200)
+    assert.equal(res.body.some((person: any) => person.id === ycUser.id), true)
+    assert.equal(res.body.some((person: any) => person.loginId === 'FF0759999999'), false)
+    assert.equal(JSON.stringify(res.body).includes('password'), false)
+  })
+
+  await test('The chairman cannot reset a user from another company', async () => {
+    const ffStaff = await prisma.personnel.findFirstOrThrow({ where: { loginId: 'FF0759999999' } })
+    const res = mockRes()
+    await wsCtrl.resetManagedUserPassword(mockReq({ user: ycAdminUser, params: { id: ffStaff.id } }), res)
+    assert.equal(res.statusCode, 404)
+  })
+
+  await test('Chairman reset uses Youth@123 and forces a one-time password change', async () => {
+    const resetRes = mockRes()
+    await wsCtrl.resetManagedUserPassword(mockReq({ user: ycAdminUser, params: { id: ycUser.id } }), resetRes)
+    assert.equal(resetRes.statusCode, 200)
+    assert.equal(resetRes.body.temporaryPassword, 'Youth@123')
+    assert.equal(resetRes.body.user.loginId, '0712345678')
+
+    const stored = await prisma.personnel.findUniqueOrThrow({ where: { id: ycUser.id } })
+    assert.equal(stored.mustChangePassword, true)
+    assert.equal(await bcrypt.compare('Youth@123', stored.password), true)
+
+    const loginRes = await login('0712345678', 'Youth@123')
+    assert.equal(loginRes.statusCode, 200)
+    assert.equal(loginRes.body.user.mustChangePassword, true)
+
+    const changeRes = mockRes()
+    await authCtrl.changePassword(mockReq({
+      user: { actorId: ycUser.id, actorType: 'personnel', workspaceId: ycWs.id },
+      body: { currentPassword: 'Youth@123', newPassword: 'YouthPrivate@456' },
+    }), changeRes)
+    assert.equal(changeRes.statusCode, 200)
+    assert.equal((await prisma.personnel.findUniqueOrThrow({ where: { id: ycUser.id } })).mustChangePassword, false)
+
+    const audit = await prisma.auditLog.findFirstOrThrow({ where: { event: 'PERSONNEL_PASSWORD_RESET', actorDirectorId: adminDir.id } })
+    assert.equal(JSON.stringify(audit).includes('Youth@123'), false)
   })
 
   // =========================================================================

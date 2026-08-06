@@ -21,6 +21,7 @@ import type { ReportsState } from './ReportsPage'
 import { DEFAULT_REPORTS_STATE } from './ReportsPage'
 import ImpersonationPage from './ImpersonationPage'
 import UserAnalyticsPage from './UserAnalyticsPage'
+import ChairmanUserManagementPage from './ChairmanUserManagementPage'
 import LeaderboardPage from './LeaderboardPage'
 import CompanyRequestsPage from './CompanyRequestsPage'
 import InsuranceManagementPage from './InsuranceManagementPage'
@@ -1044,6 +1045,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
                   : currentView === 'reports' ? 'Reports'
                   : currentView === 'impersonation' ? 'Support Access'
                   : currentView === 'user_analytics' ? 'User Analytics'
+                  : currentView === 'user_management' ? 'User Management'
                   : currentView === 'leaderboard' ? 'Leaderboard'
                   : currentView === 'insurance_management' ? 'Insurance Management'
                   : currentView === 'company_requests' ? 'Company Requests'
@@ -1311,7 +1313,15 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
 
           {/* USER ANALYTICS */}
           {currentView === 'user_analytics' && (
-            <UserAnalyticsPage onOpenLeaderboard={() => navigate('leaderboard')} />
+            <UserAnalyticsPage
+              onOpenLeaderboard={() => navigate('leaderboard')}
+              onOpenUserManagement={user.isChairman ? () => navigate('user_management') : undefined}
+            />
+          )}
+
+          {/* USER MANAGEMENT — Chairman only */}
+          {currentView === 'user_management' && user.isChairman && (
+            <ChairmanUserManagementPage />
           )}
 
           {/* LEADERBOARD */}

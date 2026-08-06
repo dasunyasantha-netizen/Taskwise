@@ -381,6 +381,7 @@ export type ViewMode =
   | 'reports'
   | 'impersonation'
   | 'user_analytics'
+  | 'user_management'
   | 'leaderboard'
   | 'company_requests'
   | 'insurance_management'

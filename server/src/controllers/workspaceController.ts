@@ -110,6 +110,72 @@ export async function getPersonnel(req: Request, res: Response): Promise<void> {
   } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
 }
 
+// GET /api/workspace/managed-users — Chairman only
+export async function getManagedUsers(req: Request, res: Response): Promise<void> {
+  try {
+    const users = await prisma.personnel.findMany({
+      where: { workspaceId: req.user!.workspaceId, deletedAt: null },
+      select: {
+        id: true,
+        name: true,
+        loginId: true,
+        phone: true,
+        email: true,
+        nic: true,
+        isActive: true,
+        mustChangePassword: true,
+        createdAt: true,
+        updatedAt: true,
+        department: { select: { id: true, name: true, layer: { select: { number: true, name: true } } } },
+      },
+      orderBy: { name: 'asc' },
+    })
+    res.json(users)
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
+}
+
+// POST /api/workspace/managed-users/:id/reset-password — Chairman only
+export async function resetManagedUserPassword(req: Request, res: Response): Promise<void> {
+  try {
+    const { workspaceId, actorId } = req.user!
+    const person = await prisma.personnel.findFirst({
+      where: { id: req.params.id, workspaceId, deletedAt: null },
+      select: { id: true, name: true, loginId: true, phone: true },
+    })
+    if (!person) { res.status(404).json({ error: 'User not found in your company' }); return }
+
+    const temporaryPassword = 'Youth@123'
+    const password = await bcrypt.hash(temporaryPassword, 12)
+    await prisma.$transaction(async tx => {
+      await tx.personnel.update({
+        where: { id: person.id },
+        data: { password, mustChangePassword: true },
+      })
+      await tx.auditLog.create({
+        data: {
+          workspaceId,
+          event: 'PERSONNEL_PASSWORD_RESET',
+          actorType: 'director',
+          actorDirectorId: actorId,
+          payload: {
+            personnelId: person.id,
+            personnelName: person.name,
+            loginId: person.loginId || person.phone,
+            forcePasswordChange: true,
+          },
+        },
+      })
+    })
+
+    res.json({
+      success: true,
+      user: { id: person.id, name: person.name, loginId: person.loginId || person.phone },
+      temporaryPassword,
+      mustChangePassword: true,
+    })
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
+}
+
 // POST /api/workspace/personnel
 export async function createPersonnel(req: Request, res: Response): Promise<void> {
   try {
