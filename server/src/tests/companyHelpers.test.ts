@@ -50,6 +50,19 @@ async function main() {
   assert.equal(month.startDate, '2026-08-01')
   assert.equal(month.endDate, '2026-08-31')
 
+  const lastWeek = resolveScoreRange('last_week', new Date('2026-08-11T12:00:00Z'))
+  assert.equal(lastWeek.startDate, '2026-08-03')
+  assert.equal(lastWeek.endDate, '2026-08-09')
+  assert.equal(lastWeek.start.toISOString(), '2026-08-02T18:30:00.000Z')
+
+  const lastMonth = resolveScoreRange('last_month', new Date('2026-09-15T12:00:00Z'))
+  assert.equal(lastMonth.startDate, '2026-08-01')
+  assert.equal(lastMonth.endDate, '2026-08-31')
+
+  const previousDecember = resolveScoreRange('last_month', new Date('2027-01-15T12:00:00Z'))
+  assert.equal(previousDecember.startDate, '2026-12-01')
+  assert.equal(previousDecember.endDate, '2026-12-31')
+
   console.log('company helper tests passed')
 }
 

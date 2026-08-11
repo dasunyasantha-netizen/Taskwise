@@ -46,7 +46,7 @@ export async function getCurrentScoringPoints(workspaceId: string): Promise<Scor
   return current
 }
 
-export type ScorePeriod = 'all' | 'week' | 'month'
+export type ScorePeriod = 'all' | 'week' | 'last_week' | 'month' | 'last_month'
 
 /** TaskWise currently operates on Sri Lanka calendar time (UTC+05:30). */
 export const SCORING_UTC_OFFSET_MINUTES = 330
@@ -70,7 +70,7 @@ const localMidnightToUtc = (localDate: Date): Date => new Date(localDate.getTime
 
 const dateKey = (date: Date): string => date.toISOString().slice(0, 10)
 
-/** Resolve the current calendar period. Weeks run Monday-Sunday; months start on day 1. */
+/** Resolve calendar periods. Weeks run Monday-Sunday; months use calendar boundaries. */
 export function resolveScoreRange(period: ScorePeriod, now = new Date()): ScoreRange {
   const today = localCalendarDay(now)
   const epochDay = new Date(`${SCORING_EPOCH}T00:00:00Z`)
@@ -78,15 +78,17 @@ export function resolveScoreRange(period: ScorePeriod, now = new Date()): ScoreR
   let endDayExclusive = new Date(today)
   endDayExclusive.setUTCDate(endDayExclusive.getUTCDate() + 1)
 
-  if (period === 'week') {
+  if (period === 'week' || period === 'last_week') {
     startDay = new Date(today)
     const daysSinceMonday = (startDay.getUTCDay() + 6) % 7
     startDay.setUTCDate(startDay.getUTCDate() - daysSinceMonday)
+    if (period === 'last_week') startDay.setUTCDate(startDay.getUTCDate() - 7)
     endDayExclusive = new Date(startDay)
     endDayExclusive.setUTCDate(endDayExclusive.getUTCDate() + 7)
-  } else if (period === 'month') {
-    startDay = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1))
-    endDayExclusive = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 1))
+  } else if (period === 'month' || period === 'last_month') {
+    const monthOffset = period === 'last_month' ? -1 : 0
+    startDay = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + monthOffset, 1))
+    endDayExclusive = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + monthOffset + 1, 1))
   }
 
   if (startDay < epochDay) startDay = epochDay

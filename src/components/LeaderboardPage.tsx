@@ -46,7 +46,7 @@ interface LeaderboardData {
   }
 }
 
-type ScorePeriod = 'all' | 'week' | 'month'
+type ScorePeriod = 'all' | 'week' | 'last_week' | 'month' | 'last_month'
 
 type ScoringKey = 'DAILY_LOGIN' | 'TASK_UPDATE' | 'ON_TIME_SUBMISSION' | 'OVERDUE_PER_DAY' | 'REJECTION' | 'CANCELLATION'
 
@@ -396,9 +396,15 @@ export default function LeaderboardPage() {
   if (!data) return null
 
   const { summary, config } = data
+  const periodLabel: Record<Exclude<ScorePeriod, 'all'>, string> = {
+    week: 'this week',
+    last_week: 'last week',
+    month: 'this month',
+    last_month: 'last month',
+  }
   const periodDescription = config.period === 'all'
     ? `Points earned across the workspace since ${new Date(config.epoch).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`
-    : `Points earned ${config.period === 'week' ? 'this week' : 'this month'} · ${formatPeriodDate(config.rangeStart)} – ${formatPeriodDate(config.rangeEnd, true)}`
+    : `Points earned ${periodLabel[config.period]} · ${formatPeriodDate(config.rangeStart)} – ${formatPeriodDate(config.rangeEnd, true)}`
   const cards = [
     {
       label: 'Top Performer', icon: '🏆', cls: 'text-yellow-600',
@@ -429,18 +435,20 @@ export default function LeaderboardPage() {
           <h1 className="text-xl md:text-2xl font-bold text-tw-text">🏆 Leaderboard</h1>
           <p className="text-sm text-tw-text-secondary mt-0.5">{periodDescription}</p>
         </div>
-        <div className="inline-flex w-full sm:w-auto rounded-xl border border-tw-border bg-white p-1 shadow-sm" role="group" aria-label="Leaderboard period">
+        <div className="inline-flex w-full sm:w-auto overflow-x-auto rounded-xl border border-tw-border bg-white p-1 shadow-sm" role="group" aria-label="Leaderboard period">
           {([
             ['all', 'All Time'],
             ['week', 'This Week'],
+            ['last_week', 'Last Week'],
             ['month', 'This Month'],
+            ['last_month', 'Last Month'],
           ] as Array<[ScorePeriod, string]>).map(([value, label]) => (
             <button
               key={value}
               type="button"
               onClick={() => setPeriod(value)}
               aria-pressed={period === value}
-              className={`flex-1 sm:flex-none rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${
+              className={`flex-none rounded-lg px-3 py-2 text-xs font-semibold whitespace-nowrap transition-colors ${
                 period === value
                   ? 'bg-tw-primary text-white shadow-sm'
                   : 'text-tw-text-secondary hover:bg-tw-hover hover:text-tw-text'

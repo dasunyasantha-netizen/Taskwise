@@ -215,8 +215,8 @@ export async function getLeaderboard(req: Request, res: Response): Promise<void>
     if (req.user!.actorType !== 'director') { res.status(403).json({ error: 'Director only' }); return }
     const { workspaceId } = req.user!
     const requestedPeriod = typeof req.query.period === 'string' ? req.query.period : 'all'
-    if (!['all', 'week', 'month'].includes(requestedPeriod)) {
-      res.status(400).json({ error: 'Period must be all, week, or month' })
+    if (!['all', 'week', 'last_week', 'month', 'last_month'].includes(requestedPeriod)) {
+      res.status(400).json({ error: 'Invalid leaderboard period' })
       return
     }
     const range = resolveScoreRange(requestedPeriod as ScorePeriod)

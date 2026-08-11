@@ -310,7 +310,7 @@ export const auditApi = {
   userAnalyticsOverview: () => api.get('/reports/user-analytics/overview'),
   userLoginHistory:    (actorId: string, actorType = 'personnel') =>
     api.get(`/reports/user-analytics/logins/${actorId}?actorType=${actorType}`),
-  leaderboard:         (period: 'all' | 'week' | 'month' = 'all') => api.get(`/reports/leaderboard?period=${period}`),
+  leaderboard:         (period: 'all' | 'week' | 'last_week' | 'month' | 'last_month' = 'all') => api.get(`/reports/leaderboard?period=${period}`),
   myScore:             () => api.get('/reports/my-score'),
   updateScoringSettings: (points: Record<string, number>) => api.put('/reports/scoring-settings', { points }),
   cancelledTaskReviews: (status: 'pending' | 'deducted' | 'not_deducted' | 'all' = 'pending') =>
