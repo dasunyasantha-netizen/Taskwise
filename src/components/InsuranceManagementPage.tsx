@@ -56,6 +56,7 @@ const PAYMENT_STATUSES = [
 
 const emptyForm = (): FormData => ({
   quotationNumber: '', policyNumber: '', insuranceType: 'MOTOR', customerName: '', contactNumber: '',
+  introducer: '', partner: '',
   sumInsured: '', premium: '', notes: '', issueDate: '', expiryDate: '', paid: false, paymentAmount: '',
   vehicleNumber: '', vehicleMakeModel: '', fuelType: '', vehicleUsage: '',
   propertyAddress: '', propertyType: '', propertyUsage: '', riskDescription: '', businessActivity: '',
@@ -95,6 +96,38 @@ function TextInput({ value, onChange, type = 'text', placeholder, required, min,
   value: string; onChange: (value: string) => void; type?: string; placeholder?: string; required?: boolean; min?: string; step?: string
 }) {
   return <input className="input text-sm" value={value} onChange={e => onChange(e.target.value)} type={type} placeholder={placeholder} required={required} min={min} step={step} />
+}
+
+function normalizedMoneyInput(value: string): string {
+  const cleaned = value.replace(/,/g, '').replace(/[^\d.]/g, '')
+  const decimalIndex = cleaned.indexOf('.')
+  if (decimalIndex === -1) return cleaned.replace(/^0+(?=\d)/, '')
+  const whole = cleaned.slice(0, decimalIndex).replace(/^0+(?=\d)/, '') || '0'
+  const decimals = cleaned.slice(decimalIndex + 1).replace(/\./g, '').slice(0, 2)
+  return `${whole}.${decimals}`
+}
+
+function formattedMoneyInput(value: string): string {
+  if (!value) return ''
+  const [whole, decimals] = value.split('.')
+  const grouped = (whole || '0').replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+  return value.includes('.') ? `${grouped}.${decimals ?? ''}` : grouped
+}
+
+function MoneyInput({ value, onChange, required }: {
+  value: string; onChange: (value: string) => void; required?: boolean
+}) {
+  return (
+    <input
+      className="input text-sm"
+      value={formattedMoneyInput(value)}
+      onChange={event => onChange(normalizedMoneyInput(event.target.value))}
+      type="text"
+      inputMode="decimal"
+      placeholder="0.00"
+      required={required}
+    />
+  )
 }
 
 function SubjectFields({ form, set }: { form: FormData; set: (key: string, value: string | boolean) => void }) {
@@ -172,13 +205,13 @@ function RecordFormModal({ kind, initial, onClose, onSaved }: {
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 p-3 md:p-6 flex items-center justify-center" onClick={onClose}>
-      <form onSubmit={submit} className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[94vh] flex flex-col" onClick={e => e.stopPropagation()}>
-        <div className="px-5 py-4 border-b border-tw-border flex items-center justify-between">
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center sm:p-4 md:p-6" onClick={onClose}>
+      <form onSubmit={submit} className="bg-white shadow-2xl w-full max-w-3xl h-[100dvh] sm:h-auto sm:max-h-[94dvh] flex flex-col sm:rounded-2xl" onClick={e => e.stopPropagation()}>
+        <div className="shrink-0 px-5 py-4 border-b border-tw-border flex items-center justify-between">
           <div><h2 className="font-bold text-tw-text">{initial ? 'Edit' : 'Create'} {kind === 'quotation' ? 'Quotation' : 'Policy'}</h2><p className="text-xs text-tw-text-secondary mt-0.5">Fields change according to the insurance type.</p></div>
           <button type="button" onClick={onClose} className="w-8 h-8 rounded-lg hover:bg-tw-hover text-tw-text-secondary text-xl">×</button>
         </div>
-        <div className="flex-1 overflow-y-auto px-5 py-4">
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
           {error && <div className="mb-4 bg-red-50 border border-red-200 text-tw-danger text-sm px-3 py-2 rounded-lg">{error}</div>}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Field label={kind === 'quotation' ? 'Quotation number' : 'Policy number'} required>
@@ -194,9 +227,11 @@ function RecordFormModal({ kind, initial, onClose, onSaved }: {
             </Field>
             <Field label="Customer name" required><TextInput value={String(form.customerName)} onChange={v => set('customerName', v)} /></Field>
             <Field label="Contact number" required><TextInput value={String(form.contactNumber)} onChange={v => set('contactNumber', v)} type="tel" /></Field>
+            <Field label="Introducer"><TextInput value={String(form.introducer)} onChange={v => set('introducer', v)} placeholder="Person who introduced the business" /></Field>
+            {kind === 'quotation' && <Field label="Partner"><TextInput value={String(form.partner)} onChange={v => set('partner', v)} placeholder="Partner name" /></Field>}
             <SubjectFields form={form} set={set} />
-            <Field label="Sum insured (LKR)" required><TextInput value={String(form.sumInsured)} onChange={v => set('sumInsured', v)} type="number" min="0.01" step="0.01" /></Field>
-            <Field label="Premium (LKR)" required><TextInput value={String(form.premium)} onChange={v => set('premium', v)} type="number" min="0.01" step="0.01" /></Field>
+            <Field label="Sum insured (LKR)" required><MoneyInput value={String(form.sumInsured)} onChange={v => set('sumInsured', v)} required /></Field>
+            <Field label="Premium (LKR)" required><MoneyInput value={String(form.premium)} onChange={v => set('premium', v)} required /></Field>
             {kind === 'policy' && (
               <>
                 <Field label="Issue date" required><DatePicker compact value={String(form.issueDate)} onChange={v => set('issueDate', v)} placeholder="Select issue date" /></Field>
@@ -204,7 +239,7 @@ function RecordFormModal({ kind, initial, onClose, onSaved }: {
                 <div className="md:col-span-2 rounded-xl border border-tw-border bg-gray-50 p-4">
                   <label className="flex items-center gap-2 text-sm font-semibold text-tw-text mb-3"><input type="checkbox" checked={Boolean(form.paid)} onChange={e => set('paid', e.target.checked)} className="w-4 h-4" /> Paid in full</label>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <Field label="Payment amount (LKR)"><TextInput value={form.paid ? String(premium || '') : String(form.paymentAmount)} onChange={v => set('paymentAmount', v)} type="number" min="0" step="0.01" /></Field>
+                    <Field label="Payment amount (LKR)"><MoneyInput value={form.paid ? String(premium || '') : String(form.paymentAmount)} onChange={v => set('paymentAmount', v)} /></Field>
                     <div><span className="block text-xs font-semibold text-tw-text-secondary mb-1.5">Remaining amount</span><div className={`input text-sm font-bold flex items-center ${remaining > 0 ? 'text-tw-danger' : 'text-emerald-600'}`}>{money(remaining)}</div></div>
                   </div>
                 </div>
@@ -213,9 +248,9 @@ function RecordFormModal({ kind, initial, onClose, onSaved }: {
             <div className="md:col-span-2"><Field label="Notes"><textarea className="input text-sm min-h-20 resize-y" value={String(form.notes)} onChange={e => set('notes', e.target.value)} placeholder="Optional notes" /></Field></div>
           </div>
         </div>
-        <div className="px-5 py-4 border-t border-tw-border flex justify-end gap-2">
-          <button type="button" className="btn-secondary" onClick={onClose} disabled={saving}>Cancel</button>
-          <button className="btn-primary" disabled={saving}>{saving ? 'Saving…' : initial ? 'Save Changes' : kind === 'quotation' ? 'Create Quotation' : 'Add Policy'}</button>
+        <div className="shrink-0 px-5 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] border-t border-tw-border bg-white grid grid-cols-2 sm:flex sm:justify-end gap-2">
+          <button type="button" className="btn-secondary w-full sm:w-auto" onClick={onClose} disabled={saving}>Cancel</button>
+          <button className="btn-primary w-full sm:w-auto" disabled={saving}>{saving ? 'Saving…' : initial ? 'Save Changes' : kind === 'quotation' ? 'Create Quotation' : 'Add Policy'}</button>
         </div>
       </form>
     </div>
@@ -241,8 +276,8 @@ function ConvertModal({ quotation, onClose, onSaved }: { quotation: InsuranceQuo
         {error && <div className="mb-3 bg-red-50 border border-red-200 text-tw-danger text-sm px-3 py-2 rounded-lg">{error}</div>}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="sm:col-span-2"><Field label="Policy number" required><TextInput value={String(form.policyNumber)} onChange={v => setForm(f => ({ ...f, policyNumber: v }))} /></Field></div>
-          <Field label="Premium (LKR)" required><TextInput value={String(form.premium)} onChange={v => setForm(f => ({ ...f, premium: v }))} type="number" min="0.01" step="0.01" /></Field>
-          <Field label="Payment amount (LKR)"><TextInput value={form.paid ? String(premium) : String(form.paymentAmount)} onChange={v => setForm(f => ({ ...f, paymentAmount: v }))} type="number" min="0" step="0.01" /></Field>
+          <Field label="Premium (LKR)" required><MoneyInput value={String(form.premium)} onChange={v => setForm(f => ({ ...f, premium: v }))} required /></Field>
+          <Field label="Payment amount (LKR)"><MoneyInput value={form.paid ? String(premium) : String(form.paymentAmount)} onChange={v => setForm(f => ({ ...f, paymentAmount: v }))} /></Field>
           <Field label="Issue date" required><DatePicker compact value={String(form.issueDate)} onChange={v => setForm(f => ({ ...f, issueDate: v }))} placeholder="Select issue date" /></Field>
           <Field label="Expiry date" required><DatePicker compact value={String(form.expiryDate)} onChange={v => setForm(f => ({ ...f, expiryDate: v }))} minDate={String(form.issueDate) || undefined} placeholder="Select expiry date" /></Field>
           <label className="sm:col-span-2 flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-2 text-sm font-semibold"><input type="checkbox" checked={Boolean(form.paid)} onChange={e => setForm(f => ({ ...f, paid: e.target.checked }))} /> Paid in full <span className="ml-auto text-xs text-tw-text-secondary">Balance: {money(Math.max(0, premium - payment))}</span></label>
@@ -261,7 +296,7 @@ function RenewModal({ quotation, onClose, onSaved }: { quotation: InsuranceQuota
       <form onSubmit={submit} className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-5" onClick={e => e.stopPropagation()}>
         <h2 className="font-bold text-tw-text text-lg">Renew Quotation</h2><p className="text-sm text-tw-text-secondary mb-4">A new quotation will be valid for one calendar month.</p>
         {error && <div className="mb-3 bg-red-50 border border-red-200 text-tw-danger text-sm px-3 py-2 rounded-lg">{error}</div>}
-        <div className="space-y-4"><Field label="New quotation number" required><TextInput value={number} onChange={setNumber} /></Field><Field label="Premium (LKR)" required><TextInput value={premium} onChange={setPremium} type="number" min="0.01" step="0.01" /></Field></div>
+        <div className="space-y-4"><Field label="New quotation number" required><TextInput value={number} onChange={setNumber} /></Field><Field label="Premium (LKR)" required><MoneyInput value={premium} onChange={setPremium} required /></Field></div>
         <div className="flex justify-end gap-2 mt-5"><button type="button" className="btn-secondary" onClick={onClose}>Cancel</button><button className="btn-primary" disabled={saving}>{saving ? 'Renewing…' : 'Create Renewal'}</button></div>
       </form>
     </div>
@@ -286,6 +321,7 @@ function DetailModal({ record, kind, onClose, onEdit, onConvert, onRenew }: {
   const pairs: Array<[string, React.ReactNode]> = [
     [kind === 'quotation' ? 'Quotation number' : 'Policy number', kind === 'quotation' ? quote!.quotationNumber : policy!.policyNumber],
     ['Insurance type', typeLabel(record.insuranceType)], ['Customer', record.customerName], ['Contact number', record.contactNumber],
+    ['Introducer', record.introducer || '—'], ...(quote ? [['Partner', quote.partner || '—']] as Array<[string, string]> : []),
     ...subjectPairs(record), ['Sum insured', money(record.sumInsured)], ['Premium', money(record.premium)],
     ...(quote ? [['Issue date', displayDate(quote.issueDate)], ['Valid until', displayDate(quote.expiresAt)]] as Array<[string, string]> : []),
     ...(policy ? [['Issue date', displayDate(policy.issueDate)], ['Expiry date', displayDate(policy.expiryDate)], ['Payment received', money(policy.paymentAmount)], ['Remaining amount', money(policy.remainingAmount)]] as Array<[string, string]> : []),
@@ -349,6 +385,7 @@ export default function InsuranceManagementPage() {
   const cards = summary ? [
     { label: 'Active quotations', value: summary.activeQuotations, sub: `${summary.expiredQuotations} expired`, color: 'text-blue-600', icon: '📝' },
     { label: 'Completed policies', value: summary.completedPolicies, sub: `${summary.expiringPolicies} expire within 30 days`, color: 'text-emerald-600', icon: '🛡️' },
+    { label: 'Total quotation value', value: money(summary.totalActiveQuotationPremium), sub: 'Premium value of active quotations', color: 'text-violet-600', icon: '🧾' },
     { label: 'Policy premium', value: money(summary.totalPolicyPremium), sub: `${money(summary.totalPayments)} collected`, color: 'text-indigo-600', icon: '💼' },
     { label: 'Outstanding', value: money(summary.outstandingAmount), sub: `${summary.unpaidPolicies} policies not fully paid`, color: 'text-tw-danger', icon: '💳' },
   ] : []
@@ -360,7 +397,7 @@ export default function InsuranceManagementPage() {
         <div className="flex gap-2"><button className="btn-secondary flex-1 sm:flex-none" onClick={() => { setEditing(null); setFormKind('policy') }}>+ Add Policy</button><button className="btn-primary flex-1 sm:flex-none" onClick={() => { setEditing(null); setFormKind('quotation') }}>+ Create Quotation</button></div>
       </div>
       {error && <div className="bg-red-50 border border-red-200 text-tw-danger text-sm px-4 py-3 rounded-xl">{error}</div>}
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">{cards.map(card => <div key={card.label} className="card p-4"><div className="flex items-center gap-2 text-xs text-tw-text-secondary mb-1"><span>{card.icon}</span>{card.label}</div><div className={`text-lg md:text-xl font-bold truncate ${card.color}`}>{card.value}</div><div className="text-xs text-tw-text-secondary mt-1 truncate">{card.sub}</div></div>)}</div>
+      <div className="grid grid-cols-2 xl:grid-cols-5 gap-3">{cards.map(card => <div key={card.label} className="card p-4"><div className="flex items-center gap-2 text-xs text-tw-text-secondary mb-1"><span>{card.icon}</span>{card.label}</div><div className={`text-lg md:text-xl font-bold truncate ${card.color}`}>{card.value}</div><div className="text-xs text-tw-text-secondary mt-1 truncate">{card.sub}</div></div>)}</div>
       <div className="card overflow-hidden">
         <div className="p-3 md:p-4 border-b border-tw-border space-y-3">
           <div className="inline-flex rounded-xl border border-tw-border bg-gray-50 p-1 w-full sm:w-auto">
@@ -368,7 +405,7 @@ export default function InsuranceManagementPage() {
             <button onClick={() => setTab('policies')} className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-sm font-semibold ${tab === 'policies' ? 'bg-white text-tw-primary shadow-sm' : 'text-tw-text-secondary'}`}>Policies ({policies.length})</button>
           </div>
           <div className="flex flex-col md:flex-row gap-2">
-            <input className="input text-sm flex-1" value={search} onChange={e => setSearch(e.target.value)} placeholder={`Search ${tab} by number, customer, contact or insured details…`} />
+            <input className="input text-sm flex-1" value={search} onChange={e => setSearch(e.target.value)} placeholder={`Search ${tab} by number, customer, introducer${tab === 'quotations' ? ', partner' : ''} or insured details…`} />
             <Select
               className="md:w-[190px]"
               value={type}

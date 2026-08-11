@@ -97,6 +97,7 @@ function commonData(body: Record<string, unknown>) {
     insuranceType: type,
     customerName: textValue(body.customerName, 'Customer name', true, 200)!,
     contactNumber: textValue(body.contactNumber, 'Contact number', true, 50)!,
+    introducer: textValue(body.introducer, 'Introducer', false, 200),
     sumInsured: moneyValue(body.sumInsured, 'Sum insured'),
     premium: moneyValue(body.premium, 'Premium'),
     notes: textValue(body.notes, 'Notes', false, 3000),
@@ -171,7 +172,7 @@ function policyJson<T extends { sumInsured: Prisma.Decimal; premium: Prisma.Deci
 
 function quotationSearch(q: string): Prisma.InsuranceQuotationWhereInput[] {
   return [
-    'quotationNumber', 'customerName', 'contactNumber', 'vehicleNumber', 'vehicleMakeModel',
+    'quotationNumber', 'customerName', 'contactNumber', 'introducer', 'partner', 'vehicleNumber', 'vehicleMakeModel',
     'propertyAddress', 'riskDescription', 'businessActivity', 'cargoDescription',
     'transitFrom', 'transitTo', 'passportNumber', 'destination',
   ].map(field => ({ [field]: { contains: q, mode: 'insensitive' } })) as Prisma.InsuranceQuotationWhereInput[]
@@ -179,7 +180,7 @@ function quotationSearch(q: string): Prisma.InsuranceQuotationWhereInput[] {
 
 function policySearch(q: string): Prisma.InsurancePolicyWhereInput[] {
   return [
-    'policyNumber', 'customerName', 'contactNumber', 'vehicleNumber', 'vehicleMakeModel',
+    'policyNumber', 'customerName', 'contactNumber', 'introducer', 'vehicleNumber', 'vehicleMakeModel',
     'propertyAddress', 'riskDescription', 'businessActivity', 'cargoDescription',
     'transitFrom', 'transitTo', 'passportNumber', 'destination',
   ].map(field => ({ [field]: { contains: q, mode: 'insensitive' } })) as Prisma.InsurancePolicyWhereInput[]
@@ -205,6 +206,9 @@ export async function getInsuranceSummary(req: Request, res: Response): Promise<
     const now = new Date()
     const in30Days = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
     const totalPolicyPremium = policies.reduce((sum, policy) => sum + Number(policy.premium), 0)
+    const totalActiveQuotationPremium = quotations
+      .filter(quotation => quotation.status === 'ACTIVE')
+      .reduce((sum, quotation) => sum + Number(quotation.premium), 0)
     const totalPayments = policies.reduce((sum, policy) => sum + Number(policy.paymentAmount), 0)
     res.json({
       activeQuotations: quotations.filter(q => q.status === 'ACTIVE').length,
@@ -213,6 +217,7 @@ export async function getInsuranceSummary(req: Request, res: Response): Promise<
       completedPolicies: policies.length,
       unpaidPolicies: policies.filter(p => !p.paid).length,
       expiringPolicies: policies.filter(p => p.expiryDate >= now && p.expiryDate <= in30Days).length,
+      totalActiveQuotationPremium: Math.round(totalActiveQuotationPremium * 100) / 100,
       totalPolicyPremium: Math.round(totalPolicyPremium * 100) / 100,
       totalPayments: Math.round(totalPayments * 100) / 100,
       outstandingAmount: Math.max(0, Math.round((totalPolicyPremium - totalPayments) * 100) / 100),
@@ -260,7 +265,7 @@ export async function createQuotation(req: Request, res: Response): Promise<void
   try {
     const body = req.body as Record<string, unknown>
     const quotationNumber = textValue(body.quotationNumber, 'Quotation number', true, 100)!
-    const data = commonData(body)
+    const data = { ...commonData(body), partner: textValue(body.partner, 'Partner', false, 200) }
     const issueDate = new Date()
     const name = await actorName(req)
     const row = await prisma.insuranceQuotation.create({
@@ -295,6 +300,7 @@ export async function updateQuotation(req: Request, res: Response): Promise<void
       data: {
         quotationNumber,
         ...commonData(body),
+        partner: textValue(body.partner, 'Partner', false, 200),
         updatedById: req.user!.actorId,
         updatedByType: req.user!.actorType,
         updatedByName: name,
@@ -332,6 +338,7 @@ export async function convertQuotation(req: Request, res: Response): Promise<voi
           insuranceType: quotation.insuranceType,
           customerName: quotation.customerName,
           contactNumber: quotation.contactNumber,
+          introducer: quotation.introducer,
           sumInsured: quotation.sumInsured,
           premium,
           issueDate,
@@ -373,6 +380,8 @@ export async function renewQuotation(req: Request, res: Response): Promise<void>
           insuranceType: quotation.insuranceType,
           customerName: quotation.customerName,
           contactNumber: quotation.contactNumber,
+          introducer: quotation.introducer,
+          partner: quotation.partner,
           sumInsured: quotation.sumInsured,
           premium,
           issueDate,

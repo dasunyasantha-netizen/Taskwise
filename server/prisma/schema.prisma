@@ -378,6 +378,8 @@ model InsuranceQuotation {
   insuranceType   String
   customerName    String
   contactNumber   String
+  introducer      String?
+  partner         String?
   sumInsured      Decimal   @db.Decimal(18, 2)
   premium         Decimal   @db.Decimal(18, 2)
   issueDate       DateTime  @default(now())
@@ -432,6 +434,7 @@ model InsurancePolicy {
   insuranceType    String
   customerName     String
   contactNumber    String
+  introducer       String?
   sumInsured       Decimal   @db.Decimal(18, 2)
   premium          Decimal   @db.Decimal(18, 2)
   issueDate        DateTime

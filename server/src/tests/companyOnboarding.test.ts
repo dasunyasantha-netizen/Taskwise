@@ -531,6 +531,7 @@ async function main() {
       user: ffInsuranceUser,
       body: {
         quotationNumber: 'FF-Q-001', insuranceType: 'MOTOR', customerName: 'Test Customer', contactNumber: '0771234567',
+        introducer: 'Nimal Perera', partner: 'Fairfirst Colombo Partner',
         vehicleNumber: 'WP CAB-1234', vehicleMakeModel: 'Toyota Aqua', fuelType: 'Hybrid', vehicleUsage: 'Private',
         sumInsured: 8500000, premium: 125000,
       },
@@ -539,6 +540,8 @@ async function main() {
     assert.equal(res.body.createdByName, ffInsuranceStaff.name)
     assert.equal(res.body.status, 'ACTIVE')
     assert.equal(res.body.vehicleNumber, 'WP CAB-1234')
+    assert.equal(res.body.introducer, 'Nimal Perera')
+    assert.equal(res.body.partner, 'Fairfirst Colombo Partner')
     motorQuotationId = res.body.id
     const issue = new Date(res.body.issueDate)
     const expiry = new Date(res.body.expiresAt)
@@ -553,6 +556,7 @@ async function main() {
       params: { id: motorQuotationId },
       body: {
         quotationNumber: 'FF-Q-001', insuranceType: 'MOTOR', customerName: 'Test Customer', contactNumber: '0771234567',
+        introducer: 'Nimal Perera', partner: 'Fairfirst Colombo Partner',
         vehicleNumber: 'WP CAB-1234', vehicleMakeModel: 'Toyota Aqua', fuelType: 'Hybrid', vehicleUsage: 'Private',
         sumInsured: 8500000, premium: 130000,
       },
@@ -587,6 +591,7 @@ async function main() {
     assert.equal(res.body.paymentAmount, 30000)
     assert.equal(res.body.remainingAmount, 100000)
     assert.equal(res.body.paid, false)
+    assert.equal(res.body.introducer, 'Nimal Perera')
     const quote = await prisma.insuranceQuotation.findUniqueOrThrow({ where: { id: motorQuotationId } })
     assert.equal(quote.status, 'CONVERTED')
   })
@@ -597,6 +602,7 @@ async function main() {
       user: ffInsuranceUser,
       body: {
         policyNumber: 'FF-DIRECT-001', insuranceType: 'TRAVEL', customerName: 'Traveller', contactNumber: '+94770002222',
+        introducer: 'Travel Desk',
         passportNumber: 'N1234567', destination: 'Singapore', travelStartDate: '2026-09-01', travelEndDate: '2026-09-10',
         sumInsured: 5000000, premium: 15000, issueDate: '2026-08-05', expiryDate: '2026-09-10', paid: true, paymentAmount: 0,
       },
@@ -605,6 +611,7 @@ async function main() {
     assert.equal(res.body.paid, true)
     assert.equal(res.body.paymentAmount, 15000)
     assert.equal(res.body.remainingAmount, 0)
+    assert.equal(res.body.introducer, 'Travel Desk')
   })
 
   await test('An expired quotation can be renewed under a new manual number', async () => {
@@ -613,6 +620,7 @@ async function main() {
       user: ffInsuranceUser,
       body: {
         quotationNumber: 'FF-OLD-001', insuranceType: 'CASUALTY', customerName: 'Renewal Customer', contactNumber: '0761234567',
+        introducer: 'Branch Manager', partner: 'Regional Partner',
         businessActivity: 'Retail', riskDescription: 'Public liability', sumInsured: 10000000, premium: 45000,
       },
     }), createRes)
@@ -622,9 +630,19 @@ async function main() {
     assert.equal(renewRes.statusCode, 201)
     assert.equal(renewRes.body.quotationNumber, 'FF-RENEW-001')
     assert.equal(renewRes.body.premium, 47500)
+    assert.equal(renewRes.body.introducer, 'Branch Manager')
+    assert.equal(renewRes.body.partner, 'Regional Partner')
     const original = await prisma.insuranceQuotation.findUniqueOrThrow({ where: { id: createRes.body.id } })
     assert.equal(original.status, 'RENEWED')
     assert.equal(renewRes.body.renewedFromId, original.id)
+  })
+
+  await test('Insurance summary totals active quotation premiums without double-counting converted records', async () => {
+    const res = mockRes()
+    await insuranceCtrl.getInsuranceSummary(mockReq({ user: ffInsuranceUser }), res)
+    assert.equal(res.statusCode, 200)
+    assert.equal(res.body.totalActiveQuotationPremium, 267500)
+    assert.equal(res.body.totalPolicyPremium, 145000)
   })
 
   await test('Insurance records remain isolated from other company workspaces', async () => {

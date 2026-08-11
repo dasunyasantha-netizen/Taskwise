@@ -67,6 +67,8 @@ export interface InsuranceQuotation extends InsuranceSubjectDetails {
   insuranceType: InsuranceType
   customerName: string
   contactNumber: string
+  introducer?: string | null
+  partner?: string | null
   sumInsured: number
   premium: number
   issueDate: string
@@ -88,6 +90,7 @@ export interface InsurancePolicy extends InsuranceSubjectDetails {
   insuranceType: InsuranceType
   customerName: string
   contactNumber: string
+  introducer?: string | null
   sumInsured: number
   premium: number
   issueDate: string
@@ -111,6 +114,7 @@ export interface InsuranceSummary {
   completedPolicies: number
   unpaidPolicies: number
   expiringPolicies: number
+  totalActiveQuotationPremium: number
   totalPolicyPremium: number
   totalPayments: number
   outstandingAmount: number
