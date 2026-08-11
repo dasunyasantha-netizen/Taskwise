@@ -7,6 +7,7 @@ import DirectorDashboard from './components/DirectorDashboard'
 import PersonnelDashboard from './components/PersonnelDashboard'
 import ImpersonationBanner from './components/ImpersonationBanner'
 import SetupPrompt from './components/SetupPrompt'
+import InsurancePolicyCompletionPrompt from './components/InsurancePolicyCompletionPrompt'
 import { authApi, noticeApi, type Notice } from './services/apiService'
 
 function NoticeBanner({ loggedIn }: { loggedIn: boolean }) {
@@ -232,8 +233,10 @@ export default function App() {
   const bannerPad = isImpersonating ? 'pt-11' : ''
 
   if (user.actorType === 'director') {
+    const requiresInsurancePolicyCompletion = user.features?.includes('insurance_management') === true && !user.impersonation
     return (
       <>
+        {requiresInsurancePolicyCompletion && <InsurancePolicyCompletionPrompt />}
         {showSetup && !user.impersonation && (
           <SetupPrompt actorId={user.actorId} onDone={() => setShowSetup(false)} />
         )}

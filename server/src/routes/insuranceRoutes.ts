@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { authenticateToken } from '../middleware/authMiddleware'
+import { authenticateToken, requireDirector } from '../middleware/authMiddleware'
 import { FEATURES, requireFeature } from '../helpers/features'
 import {
   getInsuranceSummary,
@@ -13,6 +13,9 @@ import {
   getPolicy,
   createPolicy,
   updatePolicy,
+  listIncompletePolicies,
+  completePolicyBusinessDetails,
+  reactivatePolicy,
 } from '../controllers/insuranceController'
 
 const router = Router()
@@ -28,7 +31,10 @@ router.post('/quotations/:id/convert', convertQuotation)
 router.post('/quotations/:id/renew', renewQuotation)
 router.get('/policies', listPolicies)
 router.post('/policies', createPolicy)
+router.get('/policies/incomplete', requireDirector, listIncompletePolicies)
 router.get('/policies/:id', getPolicy)
 router.put('/policies/:id', updatePolicy)
+router.put('/policies/:id/complete-business-details', requireDirector, completePolicyBusinessDetails)
+router.post('/policies/:id/reactivate', reactivatePolicy)
 
 export default router

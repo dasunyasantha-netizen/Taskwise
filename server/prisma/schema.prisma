@@ -372,6 +372,7 @@ model Project {
 
 model InsuranceQuotation {
   id              String    @id @default(uuid())
+  sequenceNumber  Int       @unique @default(autoincrement())
   workspaceId     String
   workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   quotationNumber String
@@ -428,6 +429,7 @@ model InsuranceQuotation {
 
 model InsurancePolicy {
   id               String    @id @default(uuid())
+  sequenceNumber   Int       @unique @default(autoincrement())
   workspaceId      String
   workspace        Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   policyNumber     String
@@ -439,7 +441,10 @@ model InsurancePolicy {
   premium          Decimal   @db.Decimal(18, 2)
   issueDate        DateTime
   expiryDate       DateTime
-  status           String    @default("COMPLETED")
+  status           String    @default("ACTIVE")
+  salesCode        String?
+  businessType     String?
+  gwp              Decimal   @default(0) @db.Decimal(18, 2)
   paid             Boolean   @default(false)
   paymentAmount    Decimal   @default(0) @db.Decimal(18, 2)
   paymentUpdatedAt DateTime?

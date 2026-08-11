@@ -43,20 +43,26 @@ const PROPERTY_TYPES = [
 const QUOTATION_STATUSES = [
   { value: '', label: 'All statuses' },
   { value: 'ACTIVE', label: 'Active' },
-  { value: 'CONVERTED', label: 'Converted' },
   { value: 'EXPIRED', label: 'Expired' },
   { value: 'RENEWED', label: 'Renewed' },
 ]
 
-const PAYMENT_STATUSES = [
-  { value: '', label: 'All payments' },
-  { value: 'PAID', label: 'Paid' },
-  { value: 'OUTSTANDING', label: 'Outstanding' },
+const POLICY_STATUSES = [
+  { value: '', label: 'All statuses' },
+  { value: 'ACTIVE', label: 'Active' },
+  { value: 'CANCELLED', label: 'Cancelled' },
+  { value: 'EXPIRED', label: 'Expired' },
+]
+
+const BUSINESS_TYPES = [
+  { value: 'NEW', label: 'New' },
+  { value: 'RENEWAL', label: 'Renewal' },
 ]
 
 const emptyForm = (): FormData => ({
   quotationNumber: '', policyNumber: '', insuranceType: 'MOTOR', customerName: '', contactNumber: '',
   introducer: '', partner: '',
+  salesCode: '', businessType: 'NEW', gwp: '',
   sumInsured: '', premium: '', notes: '', issueDate: '', expiryDate: '', paid: false, paymentAmount: '',
   vehicleNumber: '', vehicleMakeModel: '', fuelType: '', vehicleUsage: '',
   propertyAddress: '', propertyType: '', propertyUsage: '', riskDescription: '', businessActivity: '',
@@ -214,8 +220,10 @@ function RecordFormModal({ kind, initial, onClose, onSaved }: {
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
           {error && <div className="mb-4 bg-red-50 border border-red-200 text-tw-danger text-sm px-3 py-2 rounded-lg">{error}</div>}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Field label={kind === 'quotation' ? 'Quotation number' : 'Policy number'} required>
-              <TextInput value={String(form[kind === 'quotation' ? 'quotationNumber' : 'policyNumber'])} onChange={v => set(kind === 'quotation' ? 'quotationNumber' : 'policyNumber', v)} placeholder="Enter the number manually" />
+            <Field label={kind === 'quotation' ? 'Quotation number' : 'Policy number'}>
+              <div className="input text-sm flex items-center bg-gray-50 text-tw-text-secondary">
+                {initial ? String(form[kind === 'quotation' ? 'quotationNumber' : 'policyNumber']) : 'Assigned automatically when saved'}
+              </div>
             </Field>
             <Field label="Insurance type" required>
               <Select
@@ -229,6 +237,13 @@ function RecordFormModal({ kind, initial, onClose, onSaved }: {
             <Field label="Contact number" required><TextInput value={String(form.contactNumber)} onChange={v => set('contactNumber', v)} type="tel" /></Field>
             <Field label="Introducer"><TextInput value={String(form.introducer)} onChange={v => set('introducer', v)} placeholder="Person who introduced the business" /></Field>
             {kind === 'quotation' && <Field label="Partner"><TextInput value={String(form.partner)} onChange={v => set('partner', v)} placeholder="Partner name" /></Field>}
+            {kind === 'policy' && (
+              <>
+                <Field label="Sales code" required><TextInput value={String(form.salesCode)} onChange={v => set('salesCode', v)} required /></Field>
+                <Field label="Business type" required><Select value={String(form.businessType)} onChange={v => set('businessType', v)} options={BUSINESS_TYPES} /></Field>
+                <Field label="GWP — Gross Written Premium (LKR)" required><MoneyInput value={String(form.gwp)} onChange={v => set('gwp', v)} required /></Field>
+              </>
+            )}
             <SubjectFields form={form} set={set} />
             <Field label="Sum insured (LKR)" required><MoneyInput value={String(form.sumInsured)} onChange={v => set('sumInsured', v)} required /></Field>
             <Field label="Premium (LKR)" required><MoneyInput value={String(form.premium)} onChange={v => set('premium', v)} required /></Field>
@@ -260,7 +275,7 @@ function RecordFormModal({ kind, initial, onClose, onSaved }: {
 function ConvertModal({ quotation, onClose, onSaved }: { quotation: InsuranceQuotation; onClose: () => void; onSaved: () => Promise<void> }) {
   const today = new Date().toISOString().slice(0, 10)
   const nextYear = new Date(); nextYear.setFullYear(nextYear.getFullYear() + 1)
-  const [form, setForm] = useState<FormData>({ policyNumber: '', premium: String(quotation.premium), issueDate: today, expiryDate: nextYear.toISOString().slice(0, 10), paid: false, paymentAmount: '' })
+  const [form, setForm] = useState<FormData>({ premium: String(quotation.premium), gwp: '', salesCode: '', businessType: 'NEW', issueDate: today, expiryDate: nextYear.toISOString().slice(0, 10), paid: false, paymentAmount: '' })
   const [saving, setSaving] = useState(false); const [error, setError] = useState('')
   const premium = Number(form.premium) || 0; const payment = form.paid ? premium : Number(form.paymentAmount) || 0
   const submit = async (e: React.FormEvent) => {
@@ -271,12 +286,15 @@ function ConvertModal({ quotation, onClose, onSaved }: { quotation: InsuranceQuo
   }
   return (
     <div className="fixed inset-0 z-[60] bg-black/40 p-4 flex items-center justify-center" onClick={onClose}>
-      <form onSubmit={submit} className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-5" onClick={e => e.stopPropagation()}>
+      <form onSubmit={submit} className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[94dvh] overflow-y-auto p-5" onClick={e => e.stopPropagation()}>
         <h2 className="font-bold text-tw-text text-lg">Convert to Policy</h2><p className="text-sm text-tw-text-secondary mb-4">Quotation {quotation.quotationNumber} · {quotation.customerName}</p>
         {error && <div className="mb-3 bg-red-50 border border-red-200 text-tw-danger text-sm px-3 py-2 rounded-lg">{error}</div>}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="sm:col-span-2"><Field label="Policy number" required><TextInput value={String(form.policyNumber)} onChange={v => setForm(f => ({ ...f, policyNumber: v }))} /></Field></div>
+          <div className="sm:col-span-2"><Field label="Policy number"><div className="input text-sm flex items-center bg-gray-50 text-tw-text-secondary">Assigned automatically when converted</div></Field></div>
+          <Field label="Sales code" required><TextInput value={String(form.salesCode)} onChange={v => setForm(f => ({ ...f, salesCode: v }))} required /></Field>
+          <Field label="Business type" required><Select value={String(form.businessType)} onChange={v => setForm(f => ({ ...f, businessType: v }))} options={BUSINESS_TYPES} /></Field>
           <Field label="Premium (LKR)" required><MoneyInput value={String(form.premium)} onChange={v => setForm(f => ({ ...f, premium: v }))} required /></Field>
+          <Field label="GWP — Gross Written Premium (LKR)" required><MoneyInput value={String(form.gwp)} onChange={v => setForm(f => ({ ...f, gwp: v }))} required /></Field>
           <Field label="Payment amount (LKR)"><MoneyInput value={form.paid ? String(premium) : String(form.paymentAmount)} onChange={v => setForm(f => ({ ...f, paymentAmount: v }))} /></Field>
           <Field label="Issue date" required><DatePicker compact value={String(form.issueDate)} onChange={v => setForm(f => ({ ...f, issueDate: v }))} placeholder="Select issue date" /></Field>
           <Field label="Expiry date" required><DatePicker compact value={String(form.expiryDate)} onChange={v => setForm(f => ({ ...f, expiryDate: v }))} minDate={String(form.issueDate) || undefined} placeholder="Select expiry date" /></Field>
@@ -289,21 +307,59 @@ function ConvertModal({ quotation, onClose, onSaved }: { quotation: InsuranceQuo
 }
 
 function RenewModal({ quotation, onClose, onSaved }: { quotation: InsuranceQuotation; onClose: () => void; onSaved: () => Promise<void> }) {
-  const [number, setNumber] = useState(''); const [premium, setPremium] = useState(String(quotation.premium)); const [saving, setSaving] = useState(false); const [error, setError] = useState('')
-  const submit = async (e: React.FormEvent) => { e.preventDefault(); setSaving(true); setError(''); try { await insuranceApi.renewQuotation(quotation.id, { quotationNumber: number, premium }); await onSaved(); onClose() } catch (err) { setError(err instanceof Error ? err.message : 'Unable to renew quotation') } setSaving(false) }
+  const [premium, setPremium] = useState(String(quotation.premium)); const [saving, setSaving] = useState(false); const [error, setError] = useState('')
+  const submit = async (e: React.FormEvent) => { e.preventDefault(); setSaving(true); setError(''); try { await insuranceApi.renewQuotation(quotation.id, { premium }); await onSaved(); onClose() } catch (err) { setError(err instanceof Error ? err.message : 'Unable to renew quotation') } setSaving(false) }
   return (
     <div className="fixed inset-0 z-[60] bg-black/40 p-4 flex items-center justify-center" onClick={onClose}>
       <form onSubmit={submit} className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-5" onClick={e => e.stopPropagation()}>
         <h2 className="font-bold text-tw-text text-lg">Renew Quotation</h2><p className="text-sm text-tw-text-secondary mb-4">A new quotation will be valid for one calendar month.</p>
         {error && <div className="mb-3 bg-red-50 border border-red-200 text-tw-danger text-sm px-3 py-2 rounded-lg">{error}</div>}
-        <div className="space-y-4"><Field label="New quotation number" required><TextInput value={number} onChange={setNumber} /></Field><Field label="Premium (LKR)" required><MoneyInput value={premium} onChange={setPremium} required /></Field></div>
+        <div className="space-y-4"><Field label="New quotation number"><div className="input text-sm flex items-center bg-gray-50 text-tw-text-secondary">Assigned automatically when renewed</div></Field><Field label="Premium (LKR)" required><MoneyInput value={premium} onChange={setPremium} required /></Field></div>
         <div className="flex justify-end gap-2 mt-5"><button type="button" className="btn-secondary" onClick={onClose}>Cancel</button><button className="btn-primary" disabled={saving}>{saving ? 'Renewing…' : 'Create Renewal'}</button></div>
       </form>
     </div>
   )
 }
 
-const badgeClass: Record<string, string> = { ACTIVE: 'badge-success', CONVERTED: 'badge-primary', EXPIRED: 'badge-danger', RENEWED: 'badge-warning', COMPLETED: 'badge-success' }
+function ReactivatePolicyModal({ policy, onClose, onSaved }: { policy: InsurancePolicy; onClose: () => void; onSaved: () => Promise<void> }) {
+  const today = new Date().toISOString().slice(0, 10)
+  const nextYear = new Date(); nextYear.setFullYear(nextYear.getFullYear() + 1)
+  const [form, setForm] = useState<FormData>({
+    premium: String(policy.premium), gwp: policy.gwp > 0 ? String(policy.gwp) : '',
+    salesCode: policy.salesCode || '', businessType: policy.businessType || 'RENEWAL',
+    issueDate: today, expiryDate: nextYear.toISOString().slice(0, 10), paymentAmount: '',
+  })
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault(); setSaving(true); setError('')
+    try { await insuranceApi.reactivatePolicy(policy.id, form); await onSaved(); onClose() }
+    catch (err) { setError(err instanceof Error ? err.message : 'Unable to reactivate policy') }
+    setSaving(false)
+  }
+  const set = (key: string, value: string) => setForm(current => ({ ...current, [key]: value }))
+  return (
+    <div className="fixed inset-0 z-[60] bg-black/40 p-3 sm:p-4 flex items-center justify-center" onClick={onClose}>
+      <form onSubmit={submit} className="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[94dvh] overflow-y-auto p-5" onClick={event => event.stopPropagation()}>
+        <h2 className="font-bold text-tw-text text-lg">Reactivate Policy</h2>
+        <p className="text-sm text-tw-text-secondary mb-4">{policy.policyNumber} · {policy.customerName}</p>
+        {error && <div className="mb-3 bg-red-50 border border-red-200 text-tw-danger text-sm px-3 py-2 rounded-lg">{error}</div>}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label="Sales code" required><TextInput value={String(form.salesCode)} onChange={value => set('salesCode', value)} required /></Field>
+          <Field label="Business type" required><Select value={String(form.businessType)} onChange={value => set('businessType', value)} options={BUSINESS_TYPES} /></Field>
+          <Field label="New premium (LKR)" required><MoneyInput value={String(form.premium)} onChange={value => set('premium', value)} required /></Field>
+          <Field label="New GWP (LKR)" required><MoneyInput value={String(form.gwp)} onChange={value => set('gwp', value)} required /></Field>
+          <Field label="New issue date" required><DatePicker compact value={String(form.issueDate)} onChange={value => set('issueDate', value)} placeholder="Select issue date" /></Field>
+          <Field label="New expiry date" required><DatePicker compact value={String(form.expiryDate)} onChange={value => set('expiryDate', value)} minDate={String(form.issueDate)} placeholder="Select expiry date" /></Field>
+          <div className="sm:col-span-2"><Field label="Payment received to reactivate (LKR)" required><MoneyInput value={String(form.paymentAmount)} onChange={value => set('paymentAmount', value)} required /></Field></div>
+        </div>
+        <div className="grid grid-cols-2 sm:flex sm:justify-end gap-2 mt-5"><button type="button" className="btn-secondary" onClick={onClose}>Cancel</button><button className="btn-primary" disabled={saving}>{saving ? 'Reactivating…' : 'Reactivate Policy'}</button></div>
+      </form>
+    </div>
+  )
+}
+
+const badgeClass: Record<string, string> = { ACTIVE: 'badge-success', CONVERTED: 'badge-primary', EXPIRED: 'badge-danger', CANCELLED: 'badge-danger', RENEWED: 'badge-warning' }
 
 function subjectPairs(record: InsuranceQuotation | InsurancePolicy): Array<[string, string]> {
   if (record.insuranceType === 'MOTOR') return [['Vehicle number', record.vehicleNumber || '—'], ['Make and model', record.vehicleMakeModel || '—'], ['Fuel type', record.fuelType || '—'], ['Usage', record.vehicleUsage || '—']]
@@ -313,8 +369,8 @@ function subjectPairs(record: InsuranceQuotation | InsurancePolicy): Array<[stri
   return [['Passport number', record.passportNumber || '—'], ['Destination', record.destination || '—'], ['Travel start', displayDate(record.travelStartDate)], ['Travel end', displayDate(record.travelEndDate)]]
 }
 
-function DetailModal({ record, kind, onClose, onEdit, onConvert, onRenew }: {
-  record: InsuranceQuotation | InsurancePolicy; kind: 'quotation' | 'policy'; onClose: () => void; onEdit: () => void; onConvert?: () => void; onRenew?: () => void
+function DetailModal({ record, kind, onClose, onEdit, onConvert, onRenew, onReactivate }: {
+  record: InsuranceQuotation | InsurancePolicy; kind: 'quotation' | 'policy'; onClose: () => void; onEdit: () => void; onConvert?: () => void; onRenew?: () => void; onReactivate?: () => void
 }) {
   const quote = kind === 'quotation' ? record as InsuranceQuotation : null
   const policy = kind === 'policy' ? record as InsurancePolicy : null
@@ -324,7 +380,7 @@ function DetailModal({ record, kind, onClose, onEdit, onConvert, onRenew }: {
     ['Introducer', record.introducer || '—'], ...(quote ? [['Partner', quote.partner || '—']] as Array<[string, string]> : []),
     ...subjectPairs(record), ['Sum insured', money(record.sumInsured)], ['Premium', money(record.premium)],
     ...(quote ? [['Issue date', displayDate(quote.issueDate)], ['Valid until', displayDate(quote.expiresAt)]] as Array<[string, string]> : []),
-    ...(policy ? [['Issue date', displayDate(policy.issueDate)], ['Expiry date', displayDate(policy.expiryDate)], ['Payment received', money(policy.paymentAmount)], ['Remaining amount', money(policy.remainingAmount)]] as Array<[string, string]> : []),
+    ...(policy ? [['Sales code', policy.salesCode || '—'], ['Business type', policy.businessType || '—'], ['GWP', money(policy.gwp)], ['Issue date', displayDate(policy.issueDate)], ['Expiry date', displayDate(policy.expiryDate)], ['Payment received', money(policy.paymentAmount)], ['Remaining amount', money(policy.remainingAmount)]] as Array<[string, string]> : []),
     ['Created by', record.createdByName], ['Notes', record.notes || '—'],
   ]
   return (
@@ -334,7 +390,8 @@ function DetailModal({ record, kind, onClose, onEdit, onConvert, onRenew }: {
         <div className="flex-1 overflow-y-auto p-5"><div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">{pairs.map(([label, value]) => <div key={label} className={label === 'Notes' || label.includes('Risk') || label.includes('Cargo') || label.includes('Property address') ? 'sm:col-span-2' : ''}><div className="text-xs font-semibold text-tw-text-secondary mb-1">{label}</div><div className={`text-sm font-medium break-words ${label === 'Remaining amount' && policy && policy.remainingAmount > 0 ? 'text-tw-danger' : 'text-tw-text'}`}>{value}</div></div>)}</div></div>
         <div className="px-5 py-4 border-t border-tw-border flex flex-wrap justify-end gap-2">
           {quote?.status === 'ACTIVE' && <button className="btn-secondary" onClick={onEdit}>Edit</button>}
-          {policy && <button className="btn-secondary" onClick={onEdit}>Edit Policy / Payment</button>}
+          {policy?.status === 'ACTIVE' && <button className="btn-secondary" onClick={onEdit}>Edit Policy / Payment</button>}
+          {policy && ['CANCELLED', 'EXPIRED'].includes(policy.status) && onReactivate && <button className="btn-primary" onClick={onReactivate}>Reactivate Policy</button>}
           {quote?.status === 'EXPIRED' && onRenew && <button className="btn-primary" onClick={onRenew}>Renew Quotation</button>}
           {quote?.status === 'ACTIVE' && onConvert && <button className="btn-primary" onClick={onConvert}>Convert to Policy</button>}
         </div>
@@ -354,6 +411,7 @@ export default function InsuranceManagementPage() {
   const [selected, setSelected] = useState<InsuranceQuotation | InsurancePolicy | null>(null)
   const [editing, setEditing] = useState<InsuranceQuotation | InsurancePolicy | null>(null)
   const [convert, setConvert] = useState<InsuranceQuotation | null>(null); const [renew, setRenew] = useState<InsuranceQuotation | null>(null)
+  const [reactivate, setReactivate] = useState<InsurancePolicy | null>(null)
 
   const load = async () => {
     setLoading(true); setError('')
@@ -368,6 +426,11 @@ export default function InsuranceManagementPage() {
     setLoading(false)
   }
   useEffect(() => { load() }, [])
+  useEffect(() => {
+    const refresh = () => { load() }
+    window.addEventListener('taskwise:insurance-updated', refresh)
+    return () => window.removeEventListener('taskwise:insurance-updated', refresh)
+  }, [])
   useEffect(() => { setStatus(''); setSelected(null) }, [tab])
 
   const records = useMemo(() => {
@@ -375,20 +438,21 @@ export default function InsuranceManagementPage() {
     const q = search.trim().toLowerCase()
     return source.filter(record => {
       const haystack = Object.values(record).filter(value => typeof value === 'string' || typeof value === 'number').join(' ').toLowerCase()
-      const statusMatch = !status || (tab === 'quotations'
-        ? record.status === status
-        : status === 'PAID' ? (record as InsurancePolicy).paid : status === 'OUTSTANDING' ? !(record as InsurancePolicy).paid : true)
+      const statusMatch = !status || record.status === status
       return (!q || haystack.includes(q)) && (!type || record.insuranceType === type) && statusMatch
     })
   }, [tab, quotations, policies, search, type, status])
 
-  const cards = summary ? [
-    { label: 'Active quotations', value: summary.activeQuotations, sub: `${summary.expiredQuotations} expired`, color: 'text-blue-600', icon: '📝' },
-    { label: 'Completed policies', value: summary.completedPolicies, sub: `${summary.expiringPolicies} expire within 30 days`, color: 'text-emerald-600', icon: '🛡️' },
-    { label: 'Total quotation value', value: money(summary.totalActiveQuotationPremium), sub: 'Premium value of active quotations', color: 'text-violet-600', icon: '🧾' },
-    { label: 'Policy premium', value: money(summary.totalPolicyPremium), sub: `${money(summary.totalPayments)} collected`, color: 'text-indigo-600', icon: '💼' },
-    { label: 'Outstanding', value: money(summary.outstandingAmount), sub: `${summary.unpaidPolicies} policies not fully paid`, color: 'text-tw-danger', icon: '💳' },
-  ] : []
+  const cards = summary ? (tab === 'quotations' ? [
+    { status: 'ACTIVE', label: 'Active', value: money(summary.quotationTotals.ACTIVE.value), sub: `${summary.quotationTotals.ACTIVE.count} quotations`, color: 'text-emerald-600', icon: '📝' },
+    { status: 'EXPIRED', label: 'Expired', value: money(summary.quotationTotals.EXPIRED.value), sub: `${summary.quotationTotals.EXPIRED.count} quotations`, color: 'text-tw-danger', icon: '⌛' },
+    { status: 'RENEWED', label: 'Renewed', value: money(summary.quotationTotals.RENEWED.value), sub: `${summary.quotationTotals.RENEWED.count} quotations`, color: 'text-amber-600', icon: '🔄' },
+  ] : [
+    { status: 'ACTIVE', label: 'Active', value: money(summary.policyTotals.ACTIVE.value), sub: `${summary.policyTotals.ACTIVE.count} policies · GWP`, color: 'text-emerald-600', icon: '🛡️' },
+    { status: 'CANCELLED', label: 'Cancelled', value: money(summary.policyTotals.CANCELLED.value), sub: `${summary.policyTotals.CANCELLED.count} policies · GWP`, color: 'text-tw-danger', icon: '⛔' },
+    { status: 'EXPIRED', label: 'Expired', value: money(summary.policyTotals.EXPIRED.value), sub: `${summary.policyTotals.EXPIRED.count} policies · GWP`, color: 'text-amber-600', icon: '⌛' },
+    { status: '', label: 'Final', value: money(summary.finalPolicyGwp), sub: 'Active GWP − cancelled and expired GWP', color: summary.finalPolicyGwp < 0 ? 'text-tw-danger' : 'text-indigo-600', icon: '📊' },
+  ]) : []
 
   return (
     <div className="p-4 md:p-6 space-y-5">
@@ -397,7 +461,7 @@ export default function InsuranceManagementPage() {
         <div className="flex gap-2"><button className="btn-secondary flex-1 sm:flex-none" onClick={() => { setEditing(null); setFormKind('policy') }}>+ Add Policy</button><button className="btn-primary flex-1 sm:flex-none" onClick={() => { setEditing(null); setFormKind('quotation') }}>+ Create Quotation</button></div>
       </div>
       {error && <div className="bg-red-50 border border-red-200 text-tw-danger text-sm px-4 py-3 rounded-xl">{error}</div>}
-      <div className="grid grid-cols-2 xl:grid-cols-5 gap-3">{cards.map(card => <div key={card.label} className="card p-4"><div className="flex items-center gap-2 text-xs text-tw-text-secondary mb-1"><span>{card.icon}</span>{card.label}</div><div className={`text-lg md:text-xl font-bold truncate ${card.color}`}>{card.value}</div><div className="text-xs text-tw-text-secondary mt-1 truncate">{card.sub}</div></div>)}</div>
+      <div className={`grid grid-cols-2 ${tab === 'quotations' ? 'xl:grid-cols-3' : 'xl:grid-cols-4'} gap-3`}>{cards.map(card => <button type="button" key={card.label} onClick={() => setStatus(card.status)} className={`card p-4 text-left transition-all hover:border-tw-primary ${status === card.status ? 'ring-2 ring-tw-primary border-tw-primary' : ''}`}><div className="flex items-center gap-2 text-xs text-tw-text-secondary mb-1"><span>{card.icon}</span>{card.label}</div><div className={`text-lg md:text-xl font-bold truncate ${card.color}`}>{card.value}</div><div className="text-xs text-tw-text-secondary mt-1 truncate">{card.sub}</div></button>)}</div>
       <div className="card overflow-hidden">
         <div className="p-3 md:p-4 border-b border-tw-border space-y-3">
           <div className="inline-flex rounded-xl border border-tw-border bg-gray-50 p-1 w-full sm:w-auto">
@@ -405,7 +469,7 @@ export default function InsuranceManagementPage() {
             <button onClick={() => setTab('policies')} className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-sm font-semibold ${tab === 'policies' ? 'bg-white text-tw-primary shadow-sm' : 'text-tw-text-secondary'}`}>Policies ({policies.length})</button>
           </div>
           <div className="flex flex-col md:flex-row gap-2">
-            <input className="input text-sm flex-1" value={search} onChange={e => setSearch(e.target.value)} placeholder={`Search ${tab} by number, customer, introducer${tab === 'quotations' ? ', partner' : ''} or insured details…`} />
+            <input className="input text-sm flex-1" value={search} onChange={e => setSearch(e.target.value)} placeholder={`Search ${tab} by number, customer, introducer${tab === 'quotations' ? ', partner' : ', sales code'} or insured details…`} />
             <Select
               className="md:w-[190px]"
               value={type}
@@ -416,21 +480,22 @@ export default function InsuranceManagementPage() {
               className="md:w-[190px]"
               value={status}
               onChange={setStatus}
-              options={tab === 'quotations' ? QUOTATION_STATUSES : PAYMENT_STATUSES}
+              options={tab === 'quotations' ? QUOTATION_STATUSES : POLICY_STATUSES}
             />
           </div>
         </div>
         {loading ? <div className="py-12 text-center text-sm text-tw-text-secondary">Loading insurance records…</div> : records.length === 0 ? <div className="py-12 text-center"><div className="text-3xl mb-2">🔎</div><div className="font-semibold text-tw-text">No records found</div><div className="text-sm text-tw-text-secondary mt-1">Try changing the search or filters.</div></div> : (
           <>
-            <div className="md:hidden divide-y divide-tw-border">{records.map(record => { const isQuote = 'quotationNumber' in record; const policy = !isQuote ? record as InsurancePolicy : null; return <button key={record.id} onClick={() => setSelected(record)} className="w-full text-left p-4 active:bg-tw-hover"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="font-semibold text-tw-text truncate">{isQuote ? record.quotationNumber : policy!.policyNumber}</div><div className="text-sm text-tw-text-secondary truncate">{record.customerName} · {record.contactNumber}</div></div><span className={`badge ${isQuote ? badgeClass[record.status] : policy!.paid ? 'badge-success' : 'badge-warning'}`}>{isQuote ? record.status : policy!.paid ? 'PAID' : 'OUTSTANDING'}</span></div><div className="flex items-center justify-between mt-3 text-xs text-tw-text-secondary"><span>{typeLabel(record.insuranceType)}</span><span className="font-semibold text-tw-text">{money(record.premium)}</span></div>{policy && !policy.paid && <div className="text-xs text-tw-danger mt-1 text-right">Balance {money(policy.remainingAmount)}</div>}</button> })}</div>
-            <div className="hidden md:block overflow-x-auto"><table className="w-full text-sm"><thead><tr className="bg-[#f0f4ff] border-b border-tw-border"><th className="px-4 py-3 text-left text-xs font-bold text-tw-primary uppercase">{tab === 'quotations' ? 'Quotation' : 'Policy'}</th><th className="px-4 py-3 text-left text-xs font-bold text-tw-primary uppercase">Customer</th><th className="px-4 py-3 text-left text-xs font-bold text-tw-primary uppercase">Type</th><th className="px-4 py-3 text-right text-xs font-bold text-tw-primary uppercase">Premium</th><th className="px-4 py-3 text-left text-xs font-bold text-tw-primary uppercase">{tab === 'quotations' ? 'Valid until' : 'Expiry'}</th><th className="px-4 py-3 text-center text-xs font-bold text-tw-primary uppercase">Status</th></tr></thead><tbody className="divide-y divide-tw-border">{records.map(record => { const isQuote = 'quotationNumber' in record; const policy = !isQuote ? record as InsurancePolicy : null; return <tr key={record.id} onClick={() => setSelected(record)} className="hover:bg-tw-hover cursor-pointer"><td className="px-4 py-3 font-semibold text-tw-text">{isQuote ? record.quotationNumber : policy!.policyNumber}</td><td className="px-4 py-3"><div className="font-medium text-tw-text">{record.customerName}</div><div className="text-xs text-tw-text-secondary">{record.contactNumber}</div></td><td className="px-4 py-3 text-tw-text-secondary">{typeLabel(record.insuranceType)}</td><td className="px-4 py-3 text-right font-semibold">{money(record.premium)}{policy && !policy.paid && <div className="text-xs text-tw-danger">{money(policy.remainingAmount)} due</div>}</td><td className="px-4 py-3 text-tw-text-secondary">{displayDate(isQuote ? record.expiresAt : policy!.expiryDate)}</td><td className="px-4 py-3 text-center"><span className={`badge ${isQuote ? badgeClass[record.status] : policy!.paid ? 'badge-success' : 'badge-warning'}`}>{isQuote ? record.status : policy!.paid ? 'PAID' : 'OUTSTANDING'}</span></td></tr> })}</tbody></table></div>
+            <div className="md:hidden divide-y divide-tw-border">{records.map(record => { const isQuote = 'quotationNumber' in record; const policy = !isQuote ? record as InsurancePolicy : null; return <button key={record.id} onClick={() => setSelected(record)} className="w-full text-left p-4 active:bg-tw-hover"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="font-semibold text-tw-text truncate">{isQuote ? record.quotationNumber : policy!.policyNumber}</div><div className="text-sm text-tw-text-secondary truncate">{record.customerName} · {record.contactNumber}</div></div><span className={`badge ${badgeClass[record.status] || 'badge-gray'}`}>{record.status}</span></div><div className="flex items-center justify-between mt-3 text-xs text-tw-text-secondary"><span>{typeLabel(record.insuranceType)}</span><span className="font-semibold text-tw-text">{isQuote ? money(record.premium) : `GWP ${money(policy!.gwp)}`}</span></div>{policy && <div className={`text-xs mt-1 text-right ${policy.remainingAmount > 0 ? 'text-tw-danger' : 'text-emerald-600'}`}>Premium {money(policy.premium)} · Balance {money(policy.remainingAmount)}</div>}</button> })}</div>
+            <div className="hidden md:block overflow-x-auto"><table className="w-full text-sm"><thead><tr className="bg-[#f0f4ff] border-b border-tw-border"><th className="px-4 py-3 text-left text-xs font-bold text-tw-primary uppercase">{tab === 'quotations' ? 'Quotation' : 'Policy'}</th><th className="px-4 py-3 text-left text-xs font-bold text-tw-primary uppercase">Customer</th><th className="px-4 py-3 text-left text-xs font-bold text-tw-primary uppercase">Type</th><th className="px-4 py-3 text-right text-xs font-bold text-tw-primary uppercase">{tab === 'quotations' ? 'Premium' : 'GWP / Premium'}</th><th className="px-4 py-3 text-left text-xs font-bold text-tw-primary uppercase">{tab === 'quotations' ? 'Valid until' : 'Expiry'}</th><th className="px-4 py-3 text-center text-xs font-bold text-tw-primary uppercase">Status</th></tr></thead><tbody className="divide-y divide-tw-border">{records.map(record => { const isQuote = 'quotationNumber' in record; const policy = !isQuote ? record as InsurancePolicy : null; return <tr key={record.id} onClick={() => setSelected(record)} className="hover:bg-tw-hover cursor-pointer"><td className="px-4 py-3 font-semibold text-tw-text">{isQuote ? record.quotationNumber : policy!.policyNumber}</td><td className="px-4 py-3"><div className="font-medium text-tw-text">{record.customerName}</div><div className="text-xs text-tw-text-secondary">{record.contactNumber}</div></td><td className="px-4 py-3 text-tw-text-secondary">{typeLabel(record.insuranceType)}</td><td className="px-4 py-3 text-right font-semibold">{isQuote ? money(record.premium) : <><div>{money(policy!.gwp)}</div><div className="text-xs text-tw-text-secondary">Premium {money(policy!.premium)}</div>{policy!.remainingAmount > 0 && <div className="text-xs text-tw-danger">{money(policy!.remainingAmount)} due</div>}</>}</td><td className="px-4 py-3 text-tw-text-secondary">{displayDate(isQuote ? record.expiresAt : policy!.expiryDate)}</td><td className="px-4 py-3 text-center"><span className={`badge ${badgeClass[record.status] || 'badge-gray'}`}>{record.status}</span></td></tr> })}</tbody></table></div>
           </>
         )}
       </div>
       {formKind && <RecordFormModal kind={formKind} initial={editing} onClose={() => { setFormKind(null); setEditing(null) }} onSaved={load} />}
-      {selected && <DetailModal record={selected} kind={'quotationNumber' in selected ? 'quotation' : 'policy'} onClose={() => setSelected(null)} onEdit={() => { setEditing(selected); setFormKind('quotationNumber' in selected ? 'quotation' : 'policy'); setSelected(null) }} onConvert={'quotationNumber' in selected ? () => { setConvert(selected); setSelected(null) } : undefined} onRenew={'quotationNumber' in selected ? () => { setRenew(selected); setSelected(null) } : undefined} />}
+      {selected && <DetailModal record={selected} kind={'quotationNumber' in selected ? 'quotation' : 'policy'} onClose={() => setSelected(null)} onEdit={() => { setEditing(selected); setFormKind('quotationNumber' in selected ? 'quotation' : 'policy'); setSelected(null) }} onConvert={'quotationNumber' in selected ? () => { setConvert(selected); setSelected(null) } : undefined} onRenew={'quotationNumber' in selected ? () => { setRenew(selected); setSelected(null) } : undefined} onReactivate={'policyNumber' in selected ? () => { setReactivate(selected); setSelected(null) } : undefined} />}
       {convert && <ConvertModal quotation={convert} onClose={() => setConvert(null)} onSaved={load} />}
       {renew && <RenewModal quotation={renew} onClose={() => setRenew(null)} onSaved={load} />}
+      {reactivate && <ReactivatePolicyModal policy={reactivate} onClose={() => setReactivate(null)} onSaved={load} />}
     </div>
   )
 }

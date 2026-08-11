@@ -542,6 +542,7 @@ async function main() {
     assert.equal(res.body.vehicleNumber, 'WP CAB-1234')
     assert.equal(res.body.introducer, 'Nimal Perera')
     assert.equal(res.body.partner, 'Fairfirst Colombo Partner')
+    assert.match(res.body.quotationNumber, /^Q-\d{6,}$/)
     motorQuotationId = res.body.id
     const issue = new Date(res.body.issueDate)
     const expiry = new Date(res.body.expiresAt)
@@ -585,24 +586,28 @@ async function main() {
     await insuranceCtrl.convertQuotation(mockReq({
       user: ffInsuranceUser,
       params: { id: motorQuotationId },
-      body: { policyNumber: 'FF-P-001', premium: 130000, issueDate: '2026-08-05', expiryDate: '2027-08-04', paid: false, paymentAmount: 30000 },
+      body: { premium: 130000, gwp: 125000, salesCode: 'SC-100', businessType: 'NEW', issueDate: '2026-08-05', expiryDate: '2027-08-04', paid: false, paymentAmount: 30000 },
     }), res)
     assert.equal(res.statusCode, 201)
     assert.equal(res.body.paymentAmount, 30000)
     assert.equal(res.body.remainingAmount, 100000)
     assert.equal(res.body.paid, false)
+    assert.equal(res.body.gwp, 125000)
+    assert.match(res.body.policyNumber, /^P-\d{6,}$/)
     assert.equal(res.body.introducer, 'Nimal Perera')
     const quote = await prisma.insuranceQuotation.findUniqueOrThrow({ where: { id: motorQuotationId } })
     assert.equal(quote.status, 'CONVERTED')
   })
 
-  await test('A policy can be created directly and marked paid in full', async () => {
+  let directPolicyId = ''
+  await test('A policy can be created directly with mandatory business data and marked paid in full', async () => {
     const res = mockRes()
     await insuranceCtrl.createPolicy(mockReq({
       user: ffInsuranceUser,
       body: {
         policyNumber: 'FF-DIRECT-001', insuranceType: 'TRAVEL', customerName: 'Traveller', contactNumber: '+94770002222',
         introducer: 'Travel Desk',
+        salesCode: 'SC-200', businessType: 'RENEWAL', gwp: 14000,
         passportNumber: 'N1234567', destination: 'Singapore', travelStartDate: '2026-09-01', travelEndDate: '2026-09-10',
         sumInsured: 5000000, premium: 15000, issueDate: '2026-08-05', expiryDate: '2026-09-10', paid: true, paymentAmount: 0,
       },
@@ -612,9 +617,13 @@ async function main() {
     assert.equal(res.body.paymentAmount, 15000)
     assert.equal(res.body.remainingAmount, 0)
     assert.equal(res.body.introducer, 'Travel Desk')
+    assert.equal(res.body.businessType, 'RENEWAL')
+    assert.equal(res.body.gwp, 14000)
+    assert.match(res.body.policyNumber, /^P-\d{6,}$/)
+    directPolicyId = res.body.id
   })
 
-  await test('An expired quotation can be renewed under a new manual number', async () => {
+  await test('An expired quotation can be renewed under a new automatic number', async () => {
     const createRes = mockRes()
     await insuranceCtrl.createQuotation(mockReq({
       user: ffInsuranceUser,
@@ -626,9 +635,10 @@ async function main() {
     }), createRes)
     await prisma.insuranceQuotation.update({ where: { id: createRes.body.id }, data: { expiresAt: new Date('2026-01-01') } })
     const renewRes = mockRes()
-    await insuranceCtrl.renewQuotation(mockReq({ user: ffAdminUser, params: { id: createRes.body.id }, body: { quotationNumber: 'FF-RENEW-001', premium: 47500 } }), renewRes)
+    await insuranceCtrl.renewQuotation(mockReq({ user: ffAdminUser, params: { id: createRes.body.id }, body: { premium: 47500 } }), renewRes)
     assert.equal(renewRes.statusCode, 201)
-    assert.equal(renewRes.body.quotationNumber, 'FF-RENEW-001')
+    assert.match(renewRes.body.quotationNumber, /^Q-\d{6,}$/)
+    assert.notEqual(renewRes.body.quotationNumber, createRes.body.quotationNumber)
     assert.equal(renewRes.body.premium, 47500)
     assert.equal(renewRes.body.introducer, 'Branch Manager')
     assert.equal(renewRes.body.partner, 'Regional Partner')
@@ -637,12 +647,62 @@ async function main() {
     assert.equal(renewRes.body.renewedFromId, original.id)
   })
 
-  await test('Insurance summary totals active quotation premiums without double-counting converted records', async () => {
+  await test('Insurance summary returns status totals using quotation premiums and policy GWP', async () => {
     const res = mockRes()
     await insuranceCtrl.getInsuranceSummary(mockReq({ user: ffInsuranceUser }), res)
     assert.equal(res.statusCode, 200)
-    assert.equal(res.body.totalActiveQuotationPremium, 267500)
-    assert.equal(res.body.totalPolicyPremium, 145000)
+    assert.equal(res.body.quotationTotals.ACTIVE.value, 267500)
+    assert.equal(res.body.policyTotals.ACTIVE.value, 139000)
+    assert.equal(res.body.finalPolicyGwp, 139000)
+  })
+
+  await test('Converted quotations are hidden from quotation listings', async () => {
+    const res = mockRes()
+    await insuranceCtrl.listQuotations(mockReq({ user: ffInsuranceUser, query: {} }), res)
+    assert.equal(res.statusCode, 200)
+    assert.equal(res.body.some((quotation: any) => quotation.id === motorQuotationId), false)
+    assert.equal(res.body.some((quotation: any) => quotation.status === 'CONVERTED'), false)
+  })
+
+  await test('Policies with no payment after 30 days are cancelled and can be reactivated with payment', async () => {
+    const policy = await prisma.insurancePolicy.update({
+      where: { id: directPolicyId },
+      data: { issueDate: new Date('2026-01-01'), expiryDate: new Date('2027-09-10'), paid: false, paymentAmount: 0, status: 'ACTIVE' },
+    })
+    const listRes = mockRes()
+    await insuranceCtrl.listPolicies(mockReq({ user: ffInsuranceUser, query: {} }), listRes)
+    assert.equal(listRes.body.find((row: any) => row.id === policy.id).status, 'CANCELLED')
+
+    const reactivateRes = mockRes()
+    await insuranceCtrl.reactivatePolicy(mockReq({
+      user: ffInsuranceUser,
+      params: { id: policy.id },
+      body: { salesCode: 'SC-201', businessType: 'RENEWAL', premium: 18000, gwp: 17000, issueDate: '2026-08-11', expiryDate: '2027-08-10', paymentAmount: 5000 },
+    }), reactivateRes)
+    assert.equal(reactivateRes.statusCode, 200)
+    assert.equal(reactivateRes.body.status, 'ACTIVE')
+    assert.equal(reactivateRes.body.paymentAmount, 5000)
+    assert.equal(reactivateRes.body.gwp, 17000)
+  })
+
+  await test('Past-expiry policies become expired and can also be reactivated', async () => {
+    await prisma.insurancePolicy.update({ where: { id: directPolicyId }, data: { expiryDate: new Date('2026-07-01'), status: 'ACTIVE' } })
+    const listRes = mockRes(); await insuranceCtrl.listPolicies(mockReq({ user: ffInsuranceUser, query: {} }), listRes)
+    assert.equal(listRes.body.find((row: any) => row.id === directPolicyId).status, 'EXPIRED')
+    const res = mockRes()
+    await insuranceCtrl.reactivatePolicy(mockReq({ user: ffInsuranceUser, params: { id: directPolicyId }, body: { salesCode: 'SC-202', businessType: 'RENEWAL', premium: 19000, gwp: 18500, issueDate: '2026-08-11', expiryDate: '2027-08-10', paymentAmount: 6000 } }), res)
+    assert.equal(res.statusCode, 200)
+    assert.equal(res.body.status, 'ACTIVE')
+  })
+
+  await test('Director can complete mandatory business data on an existing policy', async () => {
+    await prisma.insurancePolicy.update({ where: { id: directPolicyId }, data: { salesCode: null, businessType: null, gwp: 0 } })
+    const listRes = mockRes(); await insuranceCtrl.listIncompletePolicies(mockReq({ user: ffAdminUser }), listRes)
+    assert.equal(listRes.body.some((policy: any) => policy.id === directPolicyId), true)
+    const updateRes = mockRes()
+    await insuranceCtrl.completePolicyBusinessDetails(mockReq({ user: ffAdminUser, params: { id: directPolicyId }, body: { salesCode: 'SC-203', businessType: 'NEW', gwp: 18000 } }), updateRes)
+    assert.equal(updateRes.statusCode, 200)
+    assert.equal(updateRes.body.gwp, 18000)
   })
 
   await test('Insurance records remain isolated from other company workspaces', async () => {

@@ -39,6 +39,8 @@ export interface AuthUser {
 
 export type InsuranceType = 'MOTOR' | 'FIRE' | 'CASUALTY' | 'MARINE' | 'TRAVEL'
 export type QuotationStatus = 'ACTIVE' | 'CONVERTED' | 'EXPIRED' | 'RENEWED'
+export type PolicyStatus = 'ACTIVE' | 'CANCELLED' | 'EXPIRED'
+export type InsuranceBusinessType = 'NEW' | 'RENEWAL'
 
 export interface InsuranceSubjectDetails {
   vehicleNumber?: string | null
@@ -95,7 +97,10 @@ export interface InsurancePolicy extends InsuranceSubjectDetails {
   premium: number
   issueDate: string
   expiryDate: string
-  status: 'COMPLETED'
+  status: PolicyStatus
+  salesCode?: string | null
+  businessType?: InsuranceBusinessType | null
+  gwp: number
   paid: boolean
   paymentAmount: number
   remainingAmount: number
@@ -108,16 +113,19 @@ export interface InsurancePolicy extends InsuranceSubjectDetails {
 }
 
 export interface InsuranceSummary {
-  activeQuotations: number
-  expiredQuotations: number
-  convertedQuotations: number
-  completedPolicies: number
-  unpaidPolicies: number
-  expiringPolicies: number
-  totalActiveQuotationPremium: number
-  totalPolicyPremium: number
-  totalPayments: number
-  outstandingAmount: number
+  quotationTotals: Record<'ACTIVE' | 'EXPIRED' | 'RENEWED', { count: number; value: number }>
+  policyTotals: Record<PolicyStatus, { count: number; value: number }>
+  finalPolicyGwp: number
+}
+
+export interface IncompleteInsurancePolicy {
+  id: string
+  policyNumber: string
+  customerName: string
+  status: PolicyStatus
+  salesCode?: string | null
+  businessType?: InsuranceBusinessType | null
+  gwp: number
 }
 
 // ─── Workspace & Hierarchy ───────────────────────────────────────────────────
