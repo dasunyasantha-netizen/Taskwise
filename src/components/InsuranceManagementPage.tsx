@@ -62,7 +62,7 @@ const BUSINESS_TYPES = [
 const emptyForm = (): FormData => ({
   quotationNumber: '', policyNumber: '', insuranceType: 'MOTOR', customerName: '', contactNumber: '',
   introducer: '', partner: '',
-  salesCode: '', businessType: 'NEW', gwp: '',
+  companyPolicyNumber: '', salesCode: '', businessType: 'NEW', gwp: '',
   sumInsured: '', premium: '', notes: '', issueDate: '', expiryDate: '', paid: false, paymentAmount: '',
   vehicleNumber: '', vehicleMakeModel: '', fuelType: '', vehicleUsage: '',
   propertyAddress: '', propertyType: '', propertyUsage: '', riskDescription: '', businessActivity: '',
@@ -239,6 +239,7 @@ function RecordFormModal({ kind, initial, onClose, onSaved }: {
             {kind === 'quotation' && <Field label="Partner"><TextInput value={String(form.partner)} onChange={v => set('partner', v)} placeholder="Partner name" /></Field>}
             {kind === 'policy' && (
               <>
+                <Field label="Company policy number" required><TextInput value={String(form.companyPolicyNumber)} onChange={v => set('companyPolicyNumber', v)} placeholder="Policy number issued by Fairfirst" required /></Field>
                 <Field label="Sales code" required><TextInput value={String(form.salesCode)} onChange={v => set('salesCode', v)} required /></Field>
                 <Field label="Business type" required><Select value={String(form.businessType)} onChange={v => set('businessType', v)} options={BUSINESS_TYPES} /></Field>
                 <Field label="GWP — Gross Written Premium (LKR)" required><MoneyInput value={String(form.gwp)} onChange={v => set('gwp', v)} required /></Field>
@@ -275,7 +276,7 @@ function RecordFormModal({ kind, initial, onClose, onSaved }: {
 function ConvertModal({ quotation, onClose, onSaved }: { quotation: InsuranceQuotation; onClose: () => void; onSaved: () => Promise<void> }) {
   const today = new Date().toISOString().slice(0, 10)
   const nextYear = new Date(); nextYear.setFullYear(nextYear.getFullYear() + 1)
-  const [form, setForm] = useState<FormData>({ premium: String(quotation.premium), gwp: '', salesCode: '', businessType: 'NEW', issueDate: today, expiryDate: nextYear.toISOString().slice(0, 10), paid: false, paymentAmount: '' })
+  const [form, setForm] = useState<FormData>({ premium: String(quotation.premium), gwp: '', companyPolicyNumber: '', salesCode: '', businessType: 'NEW', issueDate: today, expiryDate: nextYear.toISOString().slice(0, 10), paid: false, paymentAmount: '' })
   const [saving, setSaving] = useState(false); const [error, setError] = useState('')
   const premium = Number(form.premium) || 0; const payment = form.paid ? premium : Number(form.paymentAmount) || 0
   const submit = async (e: React.FormEvent) => {
@@ -291,6 +292,7 @@ function ConvertModal({ quotation, onClose, onSaved }: { quotation: InsuranceQuo
         {error && <div className="mb-3 bg-red-50 border border-red-200 text-tw-danger text-sm px-3 py-2 rounded-lg">{error}</div>}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="sm:col-span-2"><Field label="Policy number"><div className="input text-sm flex items-center bg-gray-50 text-tw-text-secondary">Assigned automatically when converted</div></Field></div>
+          <div className="sm:col-span-2"><Field label="Company policy number" required><TextInput value={String(form.companyPolicyNumber)} onChange={v => setForm(f => ({ ...f, companyPolicyNumber: v }))} placeholder="Policy number issued by Fairfirst" required /></Field></div>
           <Field label="Sales code" required><TextInput value={String(form.salesCode)} onChange={v => setForm(f => ({ ...f, salesCode: v }))} required /></Field>
           <Field label="Business type" required><Select value={String(form.businessType)} onChange={v => setForm(f => ({ ...f, businessType: v }))} options={BUSINESS_TYPES} /></Field>
           <Field label="Premium (LKR)" required><MoneyInput value={String(form.premium)} onChange={v => setForm(f => ({ ...f, premium: v }))} required /></Field>
@@ -326,6 +328,7 @@ function ReactivatePolicyModal({ policy, onClose, onSaved }: { policy: Insurance
   const nextYear = new Date(); nextYear.setFullYear(nextYear.getFullYear() + 1)
   const [form, setForm] = useState<FormData>({
     premium: String(policy.premium), gwp: policy.gwp > 0 ? String(policy.gwp) : '',
+    companyPolicyNumber: policy.companyPolicyNumber || '',
     salesCode: policy.salesCode || '', businessType: policy.businessType || 'RENEWAL',
     issueDate: today, expiryDate: nextYear.toISOString().slice(0, 10), paymentAmount: '',
   })
@@ -345,6 +348,7 @@ function ReactivatePolicyModal({ policy, onClose, onSaved }: { policy: Insurance
         <p className="text-sm text-tw-text-secondary mb-4">{policy.policyNumber} · {policy.customerName}</p>
         {error && <div className="mb-3 bg-red-50 border border-red-200 text-tw-danger text-sm px-3 py-2 rounded-lg">{error}</div>}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="sm:col-span-2"><Field label="Company policy number" required><TextInput value={String(form.companyPolicyNumber)} onChange={value => set('companyPolicyNumber', value)} placeholder="Policy number issued by Fairfirst" required /></Field></div>
           <Field label="Sales code" required><TextInput value={String(form.salesCode)} onChange={value => set('salesCode', value)} required /></Field>
           <Field label="Business type" required><Select value={String(form.businessType)} onChange={value => set('businessType', value)} options={BUSINESS_TYPES} /></Field>
           <Field label="New premium (LKR)" required><MoneyInput value={String(form.premium)} onChange={value => set('premium', value)} required /></Field>
@@ -380,7 +384,7 @@ function DetailModal({ record, kind, onClose, onEdit, onConvert, onRenew, onReac
     ['Introducer', record.introducer || '—'], ...(quote ? [['Partner', quote.partner || '—']] as Array<[string, string]> : []),
     ...subjectPairs(record), ['Sum insured', money(record.sumInsured)], ['Premium', money(record.premium)],
     ...(quote ? [['Issue date', displayDate(quote.issueDate)], ['Valid until', displayDate(quote.expiresAt)]] as Array<[string, string]> : []),
-    ...(policy ? [['Sales code', policy.salesCode || '—'], ['Business type', policy.businessType || '—'], ['GWP', money(policy.gwp)], ['Issue date', displayDate(policy.issueDate)], ['Expiry date', displayDate(policy.expiryDate)], ['Payment received', money(policy.paymentAmount)], ['Remaining amount', money(policy.remainingAmount)]] as Array<[string, string]> : []),
+    ...(policy ? [['Company policy number', policy.companyPolicyNumber || '—'], ['Sales code', policy.salesCode || '—'], ['Business type', policy.businessType || '—'], ['GWP', money(policy.gwp)], ['Issue date', displayDate(policy.issueDate)], ['Expiry date', displayDate(policy.expiryDate)], ['Payment received', money(policy.paymentAmount)], ['Remaining amount', money(policy.remainingAmount)]] as Array<[string, string]> : []),
     ['Created by', record.createdByName], ['Notes', record.notes || '—'],
   ]
   return (
@@ -469,7 +473,7 @@ export default function InsuranceManagementPage() {
             <button onClick={() => setTab('policies')} className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-sm font-semibold ${tab === 'policies' ? 'bg-white text-tw-primary shadow-sm' : 'text-tw-text-secondary'}`}>Policies ({policies.length})</button>
           </div>
           <div className="flex flex-col md:flex-row gap-2">
-            <input className="input text-sm flex-1" value={search} onChange={e => setSearch(e.target.value)} placeholder={`Search ${tab} by number, customer, introducer${tab === 'quotations' ? ', partner' : ', sales code'} or insured details…`} />
+            <input className="input text-sm flex-1" value={search} onChange={e => setSearch(e.target.value)} placeholder={`Search ${tab} by number, customer, introducer${tab === 'quotations' ? ', partner' : ', company policy number, sales code'} or insured details…`} />
             <Select
               className="md:w-[190px]"
               value={type}
@@ -486,8 +490,8 @@ export default function InsuranceManagementPage() {
         </div>
         {loading ? <div className="py-12 text-center text-sm text-tw-text-secondary">Loading insurance records…</div> : records.length === 0 ? <div className="py-12 text-center"><div className="text-3xl mb-2">🔎</div><div className="font-semibold text-tw-text">No records found</div><div className="text-sm text-tw-text-secondary mt-1">Try changing the search or filters.</div></div> : (
           <>
-            <div className="md:hidden divide-y divide-tw-border">{records.map(record => { const isQuote = 'quotationNumber' in record; const policy = !isQuote ? record as InsurancePolicy : null; return <button key={record.id} onClick={() => setSelected(record)} className="w-full text-left p-4 active:bg-tw-hover"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="font-semibold text-tw-text truncate">{isQuote ? record.quotationNumber : policy!.policyNumber}</div><div className="text-sm text-tw-text-secondary truncate">{record.customerName} · {record.contactNumber}</div></div><span className={`badge ${badgeClass[record.status] || 'badge-gray'}`}>{record.status}</span></div><div className="flex items-center justify-between mt-3 text-xs text-tw-text-secondary"><span>{typeLabel(record.insuranceType)}</span><span className="font-semibold text-tw-text">{isQuote ? money(record.premium) : `GWP ${money(policy!.gwp)}`}</span></div>{policy && <div className={`text-xs mt-1 text-right ${policy.remainingAmount > 0 ? 'text-tw-danger' : 'text-emerald-600'}`}>Premium {money(policy.premium)} · Balance {money(policy.remainingAmount)}</div>}</button> })}</div>
-            <div className="hidden md:block overflow-x-auto"><table className="w-full text-sm"><thead><tr className="bg-[#f0f4ff] border-b border-tw-border"><th className="px-4 py-3 text-left text-xs font-bold text-tw-primary uppercase">{tab === 'quotations' ? 'Quotation' : 'Policy'}</th><th className="px-4 py-3 text-left text-xs font-bold text-tw-primary uppercase">Customer</th><th className="px-4 py-3 text-left text-xs font-bold text-tw-primary uppercase">Type</th><th className="px-4 py-3 text-right text-xs font-bold text-tw-primary uppercase">{tab === 'quotations' ? 'Premium' : 'GWP / Premium'}</th><th className="px-4 py-3 text-left text-xs font-bold text-tw-primary uppercase">{tab === 'quotations' ? 'Valid until' : 'Expiry'}</th><th className="px-4 py-3 text-center text-xs font-bold text-tw-primary uppercase">Status</th></tr></thead><tbody className="divide-y divide-tw-border">{records.map(record => { const isQuote = 'quotationNumber' in record; const policy = !isQuote ? record as InsurancePolicy : null; return <tr key={record.id} onClick={() => setSelected(record)} className="hover:bg-tw-hover cursor-pointer"><td className="px-4 py-3 font-semibold text-tw-text">{isQuote ? record.quotationNumber : policy!.policyNumber}</td><td className="px-4 py-3"><div className="font-medium text-tw-text">{record.customerName}</div><div className="text-xs text-tw-text-secondary">{record.contactNumber}</div></td><td className="px-4 py-3 text-tw-text-secondary">{typeLabel(record.insuranceType)}</td><td className="px-4 py-3 text-right font-semibold">{isQuote ? money(record.premium) : <><div>{money(policy!.gwp)}</div><div className="text-xs text-tw-text-secondary">Premium {money(policy!.premium)}</div>{policy!.remainingAmount > 0 && <div className="text-xs text-tw-danger">{money(policy!.remainingAmount)} due</div>}</>}</td><td className="px-4 py-3 text-tw-text-secondary">{displayDate(isQuote ? record.expiresAt : policy!.expiryDate)}</td><td className="px-4 py-3 text-center"><span className={`badge ${badgeClass[record.status] || 'badge-gray'}`}>{record.status}</span></td></tr> })}</tbody></table></div>
+            <div className="md:hidden divide-y divide-tw-border">{records.map(record => { const isQuote = 'quotationNumber' in record; const policy = !isQuote ? record as InsurancePolicy : null; return <button key={record.id} onClick={() => setSelected(record)} className="w-full text-left p-4 active:bg-tw-hover"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="font-semibold text-tw-text truncate">{isQuote ? record.quotationNumber : policy!.policyNumber}</div>{policy?.companyPolicyNumber && <div className="text-xs text-tw-text-secondary truncate">Company No. {policy.companyPolicyNumber}</div>}<div className="text-sm text-tw-text-secondary truncate">{record.customerName} · {record.contactNumber}</div></div><span className={`badge ${badgeClass[record.status] || 'badge-gray'}`}>{record.status}</span></div><div className="flex items-center justify-between mt-3 text-xs text-tw-text-secondary"><span>{typeLabel(record.insuranceType)}</span><span className="font-semibold text-tw-text">{isQuote ? money(record.premium) : `GWP ${money(policy!.gwp)}`}</span></div>{policy && <div className={`text-xs mt-1 text-right ${policy.remainingAmount > 0 ? 'text-tw-danger' : 'text-emerald-600'}`}>Premium {money(policy.premium)} · Balance {money(policy.remainingAmount)}</div>}</button> })}</div>
+            <div className="hidden md:block overflow-x-auto"><table className="w-full text-sm"><thead><tr className="bg-[#f0f4ff] border-b border-tw-border"><th className="px-4 py-3 text-left text-xs font-bold text-tw-primary uppercase">{tab === 'quotations' ? 'Quotation' : 'Policy'}</th><th className="px-4 py-3 text-left text-xs font-bold text-tw-primary uppercase">Customer</th><th className="px-4 py-3 text-left text-xs font-bold text-tw-primary uppercase">Type</th><th className="px-4 py-3 text-right text-xs font-bold text-tw-primary uppercase">{tab === 'quotations' ? 'Premium' : 'GWP / Premium'}</th><th className="px-4 py-3 text-left text-xs font-bold text-tw-primary uppercase">{tab === 'quotations' ? 'Valid until' : 'Expiry'}</th><th className="px-4 py-3 text-center text-xs font-bold text-tw-primary uppercase">Status</th></tr></thead><tbody className="divide-y divide-tw-border">{records.map(record => { const isQuote = 'quotationNumber' in record; const policy = !isQuote ? record as InsurancePolicy : null; return <tr key={record.id} onClick={() => setSelected(record)} className="hover:bg-tw-hover cursor-pointer"><td className="px-4 py-3 font-semibold text-tw-text">{isQuote ? record.quotationNumber : policy!.policyNumber}{policy?.companyPolicyNumber && <div className="text-xs font-normal text-tw-text-secondary">Company No. {policy.companyPolicyNumber}</div>}</td><td className="px-4 py-3"><div className="font-medium text-tw-text">{record.customerName}</div><div className="text-xs text-tw-text-secondary">{record.contactNumber}</div></td><td className="px-4 py-3 text-tw-text-secondary">{typeLabel(record.insuranceType)}</td><td className="px-4 py-3 text-right font-semibold">{isQuote ? money(record.premium) : <><div>{money(policy!.gwp)}</div><div className="text-xs text-tw-text-secondary">Premium {money(policy!.premium)}</div>{policy!.remainingAmount > 0 && <div className="text-xs text-tw-danger">{money(policy!.remainingAmount)} due</div>}</>}</td><td className="px-4 py-3 text-tw-text-secondary">{displayDate(isQuote ? record.expiresAt : policy!.expiryDate)}</td><td className="px-4 py-3 text-center"><span className={`badge ${badgeClass[record.status] || 'badge-gray'}`}>{record.status}</span></td></tr> })}</tbody></table></div>
           </>
         )}
       </div>

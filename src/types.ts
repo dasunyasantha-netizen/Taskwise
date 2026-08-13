@@ -98,6 +98,7 @@ export interface InsurancePolicy extends InsuranceSubjectDetails {
   issueDate: string
   expiryDate: string
   status: PolicyStatus
+  companyPolicyNumber?: string | null
   salesCode?: string | null
   businessType?: InsuranceBusinessType | null
   gwp: number
@@ -123,6 +124,7 @@ export interface IncompleteInsurancePolicy {
   policyNumber: string
   customerName: string
   status: PolicyStatus
+  companyPolicyNumber?: string | null
   salesCode?: string | null
   businessType?: InsuranceBusinessType | null
   gwp: number

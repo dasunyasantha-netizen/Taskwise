@@ -54,6 +54,7 @@ function businessTypeValue(value: unknown): BusinessType {
 
 function policyBusinessData(body: Record<string, unknown>) {
   return {
+    companyPolicyNumber: textValue(body.companyPolicyNumber, 'Company policy number', true, 100)!,
     salesCode: textValue(body.salesCode, 'Sales code', true, 100)!,
     businessType: businessTypeValue(body.businessType),
     gwp: moneyValue(body.gwp, 'GWP'),
@@ -245,7 +246,7 @@ function quotationSearch(q: string): Prisma.InsuranceQuotationWhereInput[] {
 
 function policySearch(q: string): Prisma.InsurancePolicyWhereInput[] {
   return [
-    'policyNumber', 'customerName', 'contactNumber', 'introducer', 'salesCode', 'businessType', 'vehicleNumber', 'vehicleMakeModel',
+    'policyNumber', 'companyPolicyNumber', 'customerName', 'contactNumber', 'introducer', 'salesCode', 'businessType', 'vehicleNumber', 'vehicleMakeModel',
     'propertyAddress', 'riskDescription', 'businessActivity', 'cargoDescription',
     'transitFrom', 'transitTo', 'passportNumber', 'destination',
   ].map(field => ({ [field]: { contains: q, mode: 'insensitive' } })) as Prisma.InsurancePolicyWhereInput[]
@@ -582,6 +583,7 @@ export async function listIncompletePolicies(req: Request, res: Response): Promi
       where: {
         workspaceId,
         OR: [
+          { companyPolicyNumber: null }, { companyPolicyNumber: '' },
           { salesCode: null }, { salesCode: '' },
           { businessType: null }, { businessType: { notIn: [...BUSINESS_TYPES] } },
           { gwp: { lte: 0 } },
@@ -589,7 +591,7 @@ export async function listIncompletePolicies(req: Request, res: Response): Promi
       },
       select: {
         id: true, policyNumber: true, customerName: true, status: true,
-        salesCode: true, businessType: true, gwp: true,
+        companyPolicyNumber: true, salesCode: true, businessType: true, gwp: true,
       },
       orderBy: { sequenceNumber: 'asc' },
     })
@@ -607,6 +609,7 @@ export async function completePolicyBusinessDetails(req: Request, res: Response)
     await audit(req, 'INSURANCE_POLICY_BUSINESS_DETAILS_COMPLETED', {
       policyId: row.id,
       policyNumber: row.policyNumber,
+      companyPolicyNumber: row.companyPolicyNumber,
       salesCode: row.salesCode,
       businessType: row.businessType,
       gwp: Number(row.gwp),

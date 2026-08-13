@@ -442,6 +442,7 @@ model InsurancePolicy {
   issueDate        DateTime
   expiryDate       DateTime
   status           String    @default("ACTIVE")
+  companyPolicyNumber String?
   salesCode        String?
   businessType     String?
   gwp              Decimal   @default(0) @db.Decimal(18, 2)

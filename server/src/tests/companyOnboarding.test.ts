@@ -586,7 +586,7 @@ async function main() {
     await insuranceCtrl.convertQuotation(mockReq({
       user: ffInsuranceUser,
       params: { id: motorQuotationId },
-      body: { premium: 130000, gwp: 125000, salesCode: 'SC-100', businessType: 'NEW', issueDate: '2026-08-05', expiryDate: '2027-08-04', paid: false, paymentAmount: 30000 },
+      body: { premium: 130000, gwp: 125000, companyPolicyNumber: 'FF/MOT/100', salesCode: 'SC-100', businessType: 'NEW', issueDate: '2026-08-05', expiryDate: '2027-08-04', paid: false, paymentAmount: 30000 },
     }), res)
     assert.equal(res.statusCode, 201)
     assert.equal(res.body.paymentAmount, 30000)
@@ -607,7 +607,7 @@ async function main() {
       body: {
         policyNumber: 'FF-DIRECT-001', insuranceType: 'TRAVEL', customerName: 'Traveller', contactNumber: '+94770002222',
         introducer: 'Travel Desk',
-        salesCode: 'SC-200', businessType: 'RENEWAL', gwp: 14000,
+        companyPolicyNumber: 'FF/TRV/200', salesCode: 'SC-200', businessType: 'RENEWAL', gwp: 14000,
         passportNumber: 'N1234567', destination: 'Singapore', travelStartDate: '2026-09-01', travelEndDate: '2026-09-10',
         sumInsured: 5000000, premium: 15000, issueDate: '2026-08-05', expiryDate: '2026-09-10', paid: true, paymentAmount: 0,
       },
@@ -619,8 +619,24 @@ async function main() {
     assert.equal(res.body.introducer, 'Travel Desk')
     assert.equal(res.body.businessType, 'RENEWAL')
     assert.equal(res.body.gwp, 14000)
+    assert.equal(res.body.companyPolicyNumber, 'FF/TRV/200')
     assert.match(res.body.policyNumber, /^P-\d{6,}$/)
     directPolicyId = res.body.id
+  })
+
+  await test('A policy cannot be created without the company policy number', async () => {
+    const res = mockRes()
+    await insuranceCtrl.createPolicy(mockReq({
+      user: ffInsuranceUser,
+      body: {
+        insuranceType: 'TRAVEL', customerName: 'No Number', contactNumber: '+94770003333',
+        salesCode: 'SC-300', businessType: 'NEW', gwp: 9000,
+        passportNumber: 'N7654321', destination: 'Dubai', travelStartDate: '2026-09-01', travelEndDate: '2026-09-10',
+        sumInsured: 1000000, premium: 10000, issueDate: '2026-08-05', expiryDate: '2026-09-10',
+      },
+    }), res)
+    assert.equal(res.statusCode, 400)
+    assert.equal(res.body.error, 'Company policy number is required')
   })
 
   await test('An expired quotation can be renewed under a new automatic number', async () => {
@@ -677,7 +693,7 @@ async function main() {
     await insuranceCtrl.reactivatePolicy(mockReq({
       user: ffInsuranceUser,
       params: { id: policy.id },
-      body: { salesCode: 'SC-201', businessType: 'RENEWAL', premium: 18000, gwp: 17000, issueDate: '2026-08-11', expiryDate: '2027-08-10', paymentAmount: 5000 },
+      body: { companyPolicyNumber: 'FF/TRV/201', salesCode: 'SC-201', businessType: 'RENEWAL', premium: 18000, gwp: 17000, issueDate: '2026-08-11', expiryDate: '2027-08-10', paymentAmount: 5000 },
     }), reactivateRes)
     assert.equal(reactivateRes.statusCode, 200)
     assert.equal(reactivateRes.body.status, 'ACTIVE')
@@ -690,19 +706,33 @@ async function main() {
     const listRes = mockRes(); await insuranceCtrl.listPolicies(mockReq({ user: ffInsuranceUser, query: {} }), listRes)
     assert.equal(listRes.body.find((row: any) => row.id === directPolicyId).status, 'EXPIRED')
     const res = mockRes()
-    await insuranceCtrl.reactivatePolicy(mockReq({ user: ffInsuranceUser, params: { id: directPolicyId }, body: { salesCode: 'SC-202', businessType: 'RENEWAL', premium: 19000, gwp: 18500, issueDate: '2026-08-11', expiryDate: '2027-08-10', paymentAmount: 6000 } }), res)
+    await insuranceCtrl.reactivatePolicy(mockReq({ user: ffInsuranceUser, params: { id: directPolicyId }, body: { companyPolicyNumber: 'FF/TRV/202', salesCode: 'SC-202', businessType: 'RENEWAL', premium: 19000, gwp: 18500, issueDate: '2026-08-11', expiryDate: '2027-08-10', paymentAmount: 6000 } }), res)
     assert.equal(res.statusCode, 200)
     assert.equal(res.body.status, 'ACTIVE')
   })
 
   await test('Director can complete mandatory business data on an existing policy', async () => {
-    await prisma.insurancePolicy.update({ where: { id: directPolicyId }, data: { salesCode: null, businessType: null, gwp: 0 } })
+    await prisma.insurancePolicy.update({ where: { id: directPolicyId }, data: { companyPolicyNumber: null, salesCode: null, businessType: null, gwp: 0 } })
     const listRes = mockRes(); await insuranceCtrl.listIncompletePolicies(mockReq({ user: ffAdminUser }), listRes)
     assert.equal(listRes.body.some((policy: any) => policy.id === directPolicyId), true)
     const updateRes = mockRes()
-    await insuranceCtrl.completePolicyBusinessDetails(mockReq({ user: ffAdminUser, params: { id: directPolicyId }, body: { salesCode: 'SC-203', businessType: 'NEW', gwp: 18000 } }), updateRes)
+    await insuranceCtrl.completePolicyBusinessDetails(mockReq({ user: ffAdminUser, params: { id: directPolicyId }, body: { companyPolicyNumber: 'FF/TRV/203', salesCode: 'SC-203', businessType: 'NEW', gwp: 18000 } }), updateRes)
     assert.equal(updateRes.statusCode, 200)
     assert.equal(updateRes.body.gwp, 18000)
+    assert.equal(updateRes.body.companyPolicyNumber, 'FF/TRV/203')
+  })
+
+  await test('A policy missing only the company policy number is still flagged at login', async () => {
+    await prisma.insurancePolicy.update({ where: { id: directPolicyId }, data: { companyPolicyNumber: null } })
+    const listRes = mockRes(); await insuranceCtrl.listIncompletePolicies(mockReq({ user: ffAdminUser }), listRes)
+    assert.equal(listRes.body.some((policy: any) => policy.id === directPolicyId), true)
+
+    const updateRes = mockRes()
+    await insuranceCtrl.completePolicyBusinessDetails(mockReq({ user: ffAdminUser, params: { id: directPolicyId }, body: { companyPolicyNumber: 'FF/TRV/204', salesCode: 'SC-203', businessType: 'NEW', gwp: 18000 } }), updateRes)
+    assert.equal(updateRes.statusCode, 200)
+
+    const clearedRes = mockRes(); await insuranceCtrl.listIncompletePolicies(mockReq({ user: ffAdminUser }), clearedRes)
+    assert.equal(clearedRes.body.some((policy: any) => policy.id === directPolicyId), false)
   })
 
   await test('Insurance records remain isolated from other company workspaces', async () => {

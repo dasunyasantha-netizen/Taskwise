@@ -26,6 +26,7 @@ function formatAmount(value: string): string {
 export default function InsurancePolicyCompletionPrompt() {
   const [policies, setPolicies] = useState<IncompleteInsurancePolicy[]>([])
   const [checked, setChecked] = useState(false)
+  const [companyPolicyNumber, setCompanyPolicyNumber] = useState('')
   const [salesCode, setSalesCode] = useState('')
   const [businessType, setBusinessType] = useState('NEW')
   const [gwp, setGwp] = useState('')
@@ -41,6 +42,7 @@ export default function InsurancePolicyCompletionPrompt() {
 
   const current = policies[0]
   useEffect(() => {
+    setCompanyPolicyNumber(current?.companyPolicyNumber || '')
     setSalesCode(current?.salesCode || '')
     setBusinessType(current?.businessType || 'NEW')
     setGwp(current?.gwp && current.gwp > 0 ? String(current.gwp) : '')
@@ -52,7 +54,7 @@ export default function InsurancePolicyCompletionPrompt() {
   const submit = async (event: React.FormEvent) => {
     event.preventDefault(); setSaving(true); setError('')
     try {
-      await insuranceApi.completePolicyBusinessDetails(current.id, { salesCode, businessType, gwp })
+      await insuranceApi.completePolicyBusinessDetails(current.id, { companyPolicyNumber, salesCode, businessType, gwp })
       setPolicies(existing => existing.slice(1))
       window.dispatchEvent(new CustomEvent('taskwise:insurance-updated'))
     } catch (err) {
@@ -67,7 +69,7 @@ export default function InsurancePolicyCompletionPrompt() {
         <div className="px-5 sm:px-6 py-5 border-b border-tw-border">
           <div className="w-11 h-11 rounded-xl bg-blue-100 text-xl flex items-center justify-center mb-3">🛡️</div>
           <h2 className="text-xl font-bold text-tw-text">Complete Policy Information</h2>
-          <p className="text-sm text-tw-text-secondary mt-1">Fairfirst now requires Sales Code, Business Type, and GWP for every policy.</p>
+          <p className="text-sm text-tw-text-secondary mt-1">Fairfirst now requires Company Policy Number, Sales Code, Business Type, and GWP for every policy.</p>
         </div>
         <div className="px-5 sm:px-6 py-5 space-y-4">
           <div className="rounded-xl bg-blue-50 border border-blue-100 px-4 py-3">
@@ -76,7 +78,8 @@ export default function InsurancePolicyCompletionPrompt() {
             <div className="text-xs text-blue-700 mt-2">{policies.length} incomplete {policies.length === 1 ? 'policy' : 'policies'} remaining</div>
           </div>
           {error && <div className="rounded-lg bg-red-50 border border-red-200 text-tw-danger text-sm px-3 py-2">{error}</div>}
-          <label className="block"><span className="block text-xs font-semibold text-tw-text-secondary mb-1.5">Sales code <span className="text-tw-danger">*</span></span><input className="input text-sm" value={salesCode} onChange={event => setSalesCode(event.target.value)} required autoFocus /></label>
+          <label className="block"><span className="block text-xs font-semibold text-tw-text-secondary mb-1.5">Company policy number <span className="text-tw-danger">*</span></span><input className="input text-sm" value={companyPolicyNumber} onChange={event => setCompanyPolicyNumber(event.target.value)} placeholder="Policy number issued by Fairfirst" required autoFocus /></label>
+          <label className="block"><span className="block text-xs font-semibold text-tw-text-secondary mb-1.5">Sales code <span className="text-tw-danger">*</span></span><input className="input text-sm" value={salesCode} onChange={event => setSalesCode(event.target.value)} required /></label>
           <label className="block"><span className="block text-xs font-semibold text-tw-text-secondary mb-1.5">Business type <span className="text-tw-danger">*</span></span><Select value={businessType} onChange={setBusinessType} options={BUSINESS_TYPES} /></label>
           <label className="block"><span className="block text-xs font-semibold text-tw-text-secondary mb-1.5">GWP — Gross Written Premium (LKR) <span className="text-tw-danger">*</span></span><input className="input text-sm" type="text" inputMode="decimal" value={formatAmount(gwp)} onChange={event => setGwp(normalizeAmount(event.target.value))} placeholder="0.00" required /></label>
         </div>
