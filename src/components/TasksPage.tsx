@@ -166,6 +166,14 @@ function TaskCard({ task, instances, onSelect }: { task: Task; instances: Task[]
             {childCount > 0 && (
               <span className="text-[11px] font-semibold text-tw-text-secondary flex-shrink-0">{childCount}</span>
             )}
+            {onSelect && (
+              <button
+                onClick={e => { e.stopPropagation(); onSelect(task) }}
+                className="flex-shrink-0 text-xs font-medium px-2.5 py-1 rounded-md bg-tw-primary/10 text-tw-primary hover:bg-tw-primary hover:text-white transition-colors whitespace-nowrap"
+              >
+                Open task
+              </button>
+            )}
             <svg className={`w-4 h-4 flex-shrink-0 text-tw-text-secondary transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
               fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -199,14 +207,6 @@ function TaskCard({ task, instances, onSelect }: { task: Task; instances: Task[]
                     </span>
                   )}
                 </div>
-                {onSelect && (
-                  <button
-                    onClick={e => { e.stopPropagation(); onSelect(task) }}
-                    className="text-xs font-semibold text-tw-primary hover:underline"
-                  >
-                    Open task →
-                  </button>
-                )}
               </div>
 
               {instances.length > 0 && (
