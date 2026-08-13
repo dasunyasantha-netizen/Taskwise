@@ -98,6 +98,7 @@ export interface InsurancePolicy extends InsuranceSubjectDetails {
   issueDate: string
   expiryDate: string
   status: PolicyStatus
+  cancelledAt?: string | null
   companyPolicyNumber?: string | null
   salesCode?: string | null
   businessType?: InsuranceBusinessType | null

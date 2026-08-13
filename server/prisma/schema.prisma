@@ -442,6 +442,7 @@ model InsurancePolicy {
   issueDate        DateTime
   expiryDate       DateTime
   status           String    @default("ACTIVE")
+  cancelledAt      DateTime?
   companyPolicyNumber String?
   salesCode        String?
   businessType     String?

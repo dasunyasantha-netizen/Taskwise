@@ -67,7 +67,8 @@ function automaticNumber(prefix: 'Q' | 'P', sequenceNumber: number): string {
 
 // A quotation is valid for 30 days from its issue date.
 const QUOTATION_VALIDITY_DAYS = 30
-// A policy lapses for non-payment 30 days after issue — motor only, see policyStatus.
+// A motor policy is cancelled if the full premium is not received within 30 days
+// of issue. This is separate from the user-entered expiry date, and wins over it.
 const PAYMENT_GRACE_DAYS = 30
 // Every other insurance type stays active until its expiry date, paid or not.
 const PAYMENT_LAPSE_TYPE: InsuranceType = 'MOTOR'
@@ -176,46 +177,56 @@ async function expireQuotations(workspaceId: string) {
   })
 }
 
+// A motor policy lapses when the FULL premium is still outstanding at the end of
+// the grace period. Expressed in SQL because it compares two columns, which
+// Prisma's updateMany cannot do.
+function lapsedForNonPayment(now: Date) {
+  return Prisma.sql`(
+    "insuranceType" = ${PAYMENT_LAPSE_TYPE}
+    AND "paymentAmount" < "premium"
+    AND "issueDate" + make_interval(days => ${PAYMENT_GRACE_DAYS}::int) < ${now}
+  )`
+}
+
 async function refreshPolicyStatuses(workspaceId: string) {
   const now = new Date()
   const todayStart = startOfTodaySriLanka(now)
-  const paymentDeadline = addDays(now, -PAYMENT_GRACE_DAYS)
+  const lapsed = lapsedForNonPayment(now)
+  // Cancellation is checked first: a policy that lapsed for non-payment keeps
+  // that reason even once its expiry date has also passed.
   await prisma.$transaction([
-    prisma.insurancePolicy.updateMany({
-      where: { workspaceId, expiryDate: { lt: todayStart }, status: { not: 'EXPIRED' } },
-      data: { status: 'EXPIRED' },
-    }),
-    prisma.insurancePolicy.updateMany({
-      where: {
-        workspaceId,
-        insuranceType: PAYMENT_LAPSE_TYPE,
-        expiryDate: { gte: todayStart },
-        paymentAmount: { equals: 0 },
-        issueDate: { lt: paymentDeadline },
-        status: { not: 'CANCELLED' },
-      },
-      data: { status: 'CANCELLED' },
-    }),
-    prisma.insurancePolicy.updateMany({
-      where: {
-        workspaceId,
-        expiryDate: { gte: todayStart },
-        OR: [
-          { insuranceType: { not: PAYMENT_LAPSE_TYPE } },
-          { paymentAmount: { gt: 0 } },
-          { issueDate: { gte: paymentDeadline } },
-        ],
-        status: { not: 'ACTIVE' },
-      },
-      data: { status: 'ACTIVE' },
-    }),
+    prisma.$executeRaw`
+      UPDATE "InsurancePolicy"
+      SET "status" = 'CANCELLED',
+          "cancelledAt" = "issueDate" + make_interval(days => ${PAYMENT_GRACE_DAYS}::int)
+      WHERE "workspaceId" = ${workspaceId} AND ${lapsed}
+        AND ("status" <> 'CANCELLED' OR "cancelledAt" IS NULL)
+    `,
+    prisma.$executeRaw`
+      UPDATE "InsurancePolicy"
+      SET "status" = 'EXPIRED', "cancelledAt" = NULL
+      WHERE "workspaceId" = ${workspaceId} AND NOT ${lapsed}
+        AND "expiryDate" < ${todayStart}
+        AND ("status" <> 'EXPIRED' OR "cancelledAt" IS NOT NULL)
+    `,
+    prisma.$executeRaw`
+      UPDATE "InsurancePolicy"
+      SET "status" = 'ACTIVE', "cancelledAt" = NULL
+      WHERE "workspaceId" = ${workspaceId} AND NOT ${lapsed}
+        AND "expiryDate" >= ${todayStart}
+        AND ("status" <> 'ACTIVE' OR "cancelledAt" IS NOT NULL)
+    `,
   ])
 }
 
-function policyStatus(insuranceType: string, issueDate: Date, expiryDate: Date, paymentAmount: number, now = new Date()): 'ACTIVE' | 'CANCELLED' | 'EXPIRED' {
-  if (expiryDate < startOfTodaySriLanka(now)) return 'EXPIRED'
-  if (insuranceType === PAYMENT_LAPSE_TYPE && paymentAmount <= 0 && issueDate < addDays(now, -PAYMENT_GRACE_DAYS)) return 'CANCELLED'
-  return 'ACTIVE'
+// Mirrors refreshPolicyStatuses for a single record at write time.
+function policyState(insuranceType: string, issueDate: Date, expiryDate: Date, paymentAmount: number, premium: number, now = new Date()): { status: 'ACTIVE' | 'CANCELLED' | 'EXPIRED'; cancelledAt: Date | null } {
+  const lapseDate = addDays(issueDate, PAYMENT_GRACE_DAYS)
+  if (insuranceType === PAYMENT_LAPSE_TYPE && paymentAmount < premium && lapseDate < now) {
+    return { status: 'CANCELLED', cancelledAt: lapseDate }
+  }
+  if (expiryDate < startOfTodaySriLanka(now)) return { status: 'EXPIRED', cancelledAt: null }
+  return { status: 'ACTIVE', cancelledAt: null }
 }
 
 function decimalNumber(value: Prisma.Decimal): number { return Number(value) }
@@ -410,7 +421,7 @@ export async function convertQuotation(req: Request, res: Response): Promise<voi
           ...business,
           issueDate,
           expiryDate,
-          status: policyStatus(quotation.insuranceType, issueDate, expiryDate, payment.paymentAmount),
+          ...policyState(quotation.insuranceType, issueDate, expiryDate, payment.paymentAmount, premium),
           notes: quotation.notes,
           ...copiedSubjectData(quotation),
           ...payment,
@@ -529,7 +540,7 @@ export async function createPolicy(req: Request, res: Response): Promise<void> {
           ...data,
           issueDate,
           expiryDate,
-          status: policyStatus(data.insuranceType, issueDate, expiryDate, payment.paymentAmount),
+          ...policyState(data.insuranceType, issueDate, expiryDate, payment.paymentAmount, data.premium),
           ...payment,
           createdById: req.user!.actorId,
           createdByType: req.user!.actorType,
@@ -564,7 +575,7 @@ export async function updatePolicy(req: Request, res: Response): Promise<void> {
         ...data,
         issueDate,
         expiryDate,
-        status: policyStatus(data.insuranceType, issueDate, expiryDate, payment.paymentAmount),
+        ...policyState(data.insuranceType, issueDate, expiryDate, payment.paymentAmount, data.premium),
         ...payment,
         updatedById: req.user!.actorId,
         updatedByType: req.user!.actorType,
@@ -647,6 +658,7 @@ export async function reactivatePolicy(req: Request, res: Response): Promise<voi
         issueDate,
         expiryDate,
         status: 'ACTIVE',
+        cancelledAt: null,
         paymentAmount,
         paid: paymentAmount === premium,
         paymentUpdatedAt: new Date(),

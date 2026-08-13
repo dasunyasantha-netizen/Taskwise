@@ -258,7 +258,7 @@ function RecordFormModal({ kind, initial, onClose, onSaved }: {
                     <Field label="Payment amount (LKR)"><MoneyInput value={form.paid ? String(premium || '') : String(form.paymentAmount)} onChange={v => set('paymentAmount', v)} /></Field>
                     <div><span className="block text-xs font-semibold text-tw-text-secondary mb-1.5">Remaining amount</span><div className={`input text-sm font-bold flex items-center ${remaining > 0 ? 'text-tw-danger' : 'text-emerald-600'}`}>{money(remaining)}</div></div>
                   </div>
-                  <p className="text-xs text-tw-text-secondary mt-3">{form.insuranceType === 'MOTOR' ? 'Motor policies are cancelled automatically if no payment is recorded within 30 days of the issue date.' : 'Only motor policies are cancelled for non-payment — this policy stays active until its expiry date.'}</p>
+                  <p className="text-xs text-tw-text-secondary mt-3">{form.insuranceType === 'MOTOR' ? 'Motor policies are cancelled automatically if the full premium is not received within 30 days of the issue date. Cancellation is separate from the expiry date.' : 'Only motor policies are cancelled for non-payment — this policy stays active until its expiry date.'}</p>
                 </div>
               </>
             )}
@@ -513,6 +513,16 @@ function DetailModal({ record, kind, onClose, onEdit, onConvert, onRenew, onReac
             </div>
           )}
 
+          {policy?.cancelledAt && (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-3.5 flex items-start gap-3">
+              <span className="text-lg leading-none shrink-0">⛔</span>
+              <div className="min-w-0">
+                <div className="text-sm font-bold text-tw-danger">Cancelled on {displayDate(policy.cancelledAt)}</div>
+                <div className="text-xs text-tw-text-secondary mt-0.5">The full premium was not received within 30 days of the issue date. This is separate from the expiry date below.</div>
+              </div>
+            </div>
+          )}
+
           <div className="rounded-xl border border-tw-border p-3.5 flex items-center gap-3">
             <div className="min-w-0 flex-1">
               <div className="text-[11px] font-semibold uppercase tracking-wide text-tw-text-secondary">Issued</div>
@@ -620,7 +630,7 @@ export default function InsuranceManagementPage() {
     { status: 'RENEWED', label: 'Renewed', value: money(summary.quotationTotals.RENEWED.value), sub: `${summary.quotationTotals.RENEWED.count} quotations`, color: 'text-amber-600', icon: '🔄' },
   ] : [
     { status: 'ACTIVE', label: 'Active', value: money(summary.policyTotals.ACTIVE.value), sub: `${summary.policyTotals.ACTIVE.count} policies · GWP`, color: 'text-emerald-600', icon: '🛡️' },
-    { status: 'CANCELLED', label: 'Cancelled', value: money(summary.policyTotals.CANCELLED.value), sub: `${summary.policyTotals.CANCELLED.count} unpaid motor policies · GWP`, color: 'text-tw-danger', icon: '⛔' },
+    { status: 'CANCELLED', label: 'Cancelled', value: money(summary.policyTotals.CANCELLED.value), sub: `${summary.policyTotals.CANCELLED.count} motor policies unpaid at 30 days · GWP`, color: 'text-tw-danger', icon: '⛔' },
     { status: 'EXPIRED', label: 'Expired', value: money(summary.policyTotals.EXPIRED.value), sub: `${summary.policyTotals.EXPIRED.count} policies · GWP`, color: 'text-amber-600', icon: '⌛' },
     { status: '', label: 'Final', value: money(summary.finalPolicyGwp), sub: 'Active GWP − cancelled and expired GWP', color: summary.finalPolicyGwp < 0 ? 'text-tw-danger' : 'text-indigo-600', icon: '📊' },
   ]) : []

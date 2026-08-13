@@ -713,6 +713,52 @@ async function main() {
     assert.equal(listRes.body.find((row: any) => row.id === directPolicyId).status, 'ACTIVE')
   })
 
+  await test('A part-paid motor policy is cancelled when the balance is still outstanding at 30 days', async () => {
+    await prisma.insurancePolicy.update({
+      where: { id: motorPolicyId },
+      data: { issueDate: new Date('2026-01-01'), expiryDate: new Date('2027-09-10'), paid: false, paymentAmount: 30000, premium: 130000, status: 'ACTIVE', cancelledAt: null },
+    })
+    const listRes = mockRes()
+    await insuranceCtrl.listPolicies(mockReq({ user: ffInsuranceUser, query: {} }), listRes)
+    const row = listRes.body.find((item: any) => item.id === motorPolicyId)
+    assert.equal(row.status, 'CANCELLED')
+    // Cancelled 30 days after issue, which is not the expiry date.
+    assert.equal(new Date(row.cancelledAt).toISOString().slice(0, 10), '2026-01-31')
+  })
+
+  await test('Paying the motor premium in full clears the cancellation', async () => {
+    await prisma.insurancePolicy.update({ where: { id: motorPolicyId }, data: { paymentAmount: 130000, paid: true } })
+    const listRes = mockRes()
+    await insuranceCtrl.listPolicies(mockReq({ user: ffInsuranceUser, query: {} }), listRes)
+    const row = listRes.body.find((item: any) => item.id === motorPolicyId)
+    assert.equal(row.status, 'ACTIVE')
+    assert.equal(row.cancelledAt, null)
+  })
+
+  await test('Cancellation wins over expiry when a motor policy is both unpaid and past its expiry date', async () => {
+    await prisma.insurancePolicy.update({
+      where: { id: motorPolicyId },
+      data: { issueDate: new Date('2026-01-01'), expiryDate: new Date('2026-06-01'), paid: false, paymentAmount: 0, status: 'ACTIVE', cancelledAt: null },
+    })
+    const listRes = mockRes()
+    await insuranceCtrl.listPolicies(mockReq({ user: ffInsuranceUser, query: {} }), listRes)
+    const row = listRes.body.find((item: any) => item.id === motorPolicyId)
+    assert.equal(row.status, 'CANCELLED')
+    assert.equal(new Date(row.cancelledAt).toISOString().slice(0, 10), '2026-01-31')
+  })
+
+  await test('A part-paid non-motor policy is never cancelled for the outstanding balance', async () => {
+    await prisma.insurancePolicy.update({
+      where: { id: directPolicyId },
+      data: { issueDate: new Date('2026-01-01'), expiryDate: new Date('2027-09-10'), paid: false, paymentAmount: 1, status: 'ACTIVE', cancelledAt: null },
+    })
+    const listRes = mockRes()
+    await insuranceCtrl.listPolicies(mockReq({ user: ffInsuranceUser, query: {} }), listRes)
+    const row = listRes.body.find((item: any) => item.id === directPolicyId)
+    assert.equal(row.status, 'ACTIVE')
+    assert.equal(row.cancelledAt, null)
+  })
+
   await test('A non-motor policy already marked cancelled is restored to active', async () => {
     await prisma.insurancePolicy.update({ where: { id: directPolicyId }, data: { status: 'CANCELLED' } })
     const listRes = mockRes()
