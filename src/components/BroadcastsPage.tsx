@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { noticeApi, type Notice } from '../services/apiService'
+import Select from './Select'
+import DatePicker from './DatePicker'
 
 const AUDIENCE_LABELS: Record<string, string> = {
   ALL: 'Everyone',
@@ -81,24 +83,32 @@ export default function BroadcastsPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">Audience</label>
-              <select className="input w-full" value={audience} onChange={e => setAudience(e.target.value)}>
-                <option value="ALL">Everyone (all staff + directors)</option>
-                <option value="LAYER">Specific Level only</option>
-              </select>
+              <Select
+                value={audience}
+                onChange={setAudience}
+                options={[
+                  { value: 'ALL',   label: 'Everyone (all staff + directors)' },
+                  { value: 'LAYER', label: 'Specific Level only' },
+                ]}
+              />
             </div>
             {audience === 'LAYER' && (
               <div>
                 <label className="block text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">Level</label>
-                <select className="input w-full" value={layerNumber} onChange={e => setLayerNumber(Number(e.target.value))}>
-                  <option value={1}>Level 1 — Directors</option>
-                  <option value={2}>Level 2 — Deputy / Provincial Directors</option>
-                  <option value={3}>Level 3 — Assistant Directors</option>
-                </select>
+                <Select
+                  value={String(layerNumber)}
+                  onChange={v => setLayerNumber(Number(v))}
+                  options={[
+                    { value: '1', label: 'Level 1 — Directors' },
+                    { value: '2', label: 'Level 2 — Deputy / Provincial Directors' },
+                    { value: '3', label: 'Level 3 — Assistant Directors' },
+                  ]}
+                />
               </div>
             )}
             <div>
               <label className="block text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">Expires (optional)</label>
-              <input type="date" className="input w-full" value={expiresAt} onChange={e => setExpiresAt(e.target.value)} />
+              <DatePicker value={expiresAt} onChange={setExpiresAt} placeholder="Select date" />
               <p className="text-xs text-tw-text-secondary mt-1">Leave blank to show until manually deleted.</p>
             </div>
           </div>

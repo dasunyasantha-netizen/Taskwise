@@ -5,6 +5,12 @@ export interface SelectOption {
   value: string
   label: string
   group?: string
+  /** Optional swatch colour shown as a dot before the label (e.g. project colour) */
+  color?: string
+}
+
+function Dot({ color }: { color: string }) {
+  return <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
 }
 
 interface Props {
@@ -79,9 +85,12 @@ export default function Select({ value, onChange, options, placeholder = 'Select
         {ungrouped.map(opt => (
           <button key={opt.value} type="button"
             onMouseDown={e => { e.preventDefault(); onChange(opt.value); close() }}
-            className={`w-full text-left px-3 py-2 text-sm transition-colors flex items-center justify-between
+            className={`w-full text-left px-3 py-2 text-sm transition-colors flex items-center justify-between gap-2
               ${opt.value === value ? 'bg-tw-primary-light text-tw-primary font-medium' : 'text-tw-text hover:bg-tw-hover'}`}>
-            {opt.label}
+            <span className="flex items-center gap-2 min-w-0">
+              {opt.color && <Dot color={opt.color} />}
+              <span className="truncate">{opt.label}</span>
+            </span>
             {opt.value === value && (
               <svg className="w-4 h-4 text-tw-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
@@ -98,9 +107,12 @@ export default function Select({ value, onChange, options, placeholder = 'Select
             {opts.map(opt => (
               <button key={opt.value} type="button"
                 onMouseDown={e => { e.preventDefault(); onChange(opt.value); close() }}
-                className={`w-full text-left px-4 py-2 text-sm transition-colors flex items-center justify-between
+                className={`w-full text-left px-4 py-2 text-sm transition-colors flex items-center justify-between gap-2
                   ${opt.value === value ? 'bg-tw-primary-light text-tw-primary font-medium' : 'text-tw-text hover:bg-tw-hover'}`}>
-                {opt.label}
+                <span className="flex items-center gap-2 min-w-0">
+                  {opt.color && <Dot color={opt.color} />}
+                  <span className="truncate">{opt.label}</span>
+                </span>
                 {opt.value === value && (
                   <svg className="w-4 h-4 text-tw-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
@@ -125,8 +137,9 @@ export default function Select({ value, onChange, options, placeholder = 'Select
           ${disabled ? 'opacity-50 cursor-not-allowed border-tw-border' : 'hover:border-tw-primary cursor-pointer border-tw-border focus:outline-none focus:ring-2 focus:ring-tw-primary'}
           ${open ? 'border-tw-primary ring-2 ring-tw-primary ring-opacity-20' : ''}`}
       >
-        <span className={selected ? 'text-tw-text' : 'text-tw-text-secondary'}>
-          {selected ? selected.label : placeholder}
+        <span className={`flex items-center gap-2 min-w-0 ${selected ? 'text-tw-text' : 'text-tw-text-secondary'}`}>
+          {selected?.color && <Dot color={selected.color} />}
+          <span className="truncate">{selected ? selected.label : placeholder}</span>
         </span>
         <svg className={`w-4 h-4 text-tw-text-secondary flex-shrink-0 transition-transform ml-2 ${open ? 'rotate-180' : ''}`}
           fill="none" stroke="currentColor" viewBox="0 0 24 24">

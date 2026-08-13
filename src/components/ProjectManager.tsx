@@ -3,6 +3,7 @@ import type { Project, Task, Layer, Personnel, ProjectCategory } from '../types'
 import { projectApi, projectCategoryApi, taskApi, workspaceApi } from '../services/apiService'
 import FilterBar, { DEFAULT_FILTERS, filterTasks, computeAvailableOptions, hasActiveFilters } from './FilterBar'
 import type { ActiveFilters, AvailableOptions } from './FilterBar'
+import Select from './Select'
 
 interface Props {
   onSelectProject: (project: Project) => void
@@ -283,13 +284,12 @@ function ProjectModal({ initial, categories, onSave, onClose }: ProjectModalProp
           {error && <div className="bg-red-50 border border-red-200 text-tw-danger text-sm px-3 py-2 rounded-lg">{error}</div>}
           <div>
             <label className="block text-sm font-medium text-tw-text mb-1">Category <span className="text-tw-danger">*</span></label>
-            <select className="input" value={form.categoryId}
-              onChange={e => setForm(f => ({ ...f, categoryId: e.target.value }))}>
-              <option value="">— Select category —</option>
-              {activeCategories.map(c => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
+            <Select
+              value={form.categoryId}
+              onChange={v => setForm(f => ({ ...f, categoryId: v }))}
+              placeholder="— Select category —"
+              options={activeCategories.map(c => ({ value: c.id, label: c.name }))}
+            />
           </div>
           <div>
             <label className="block text-sm font-medium text-tw-text mb-1">Project Name <span className="text-tw-danger">*</span></label>

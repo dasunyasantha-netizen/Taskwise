@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { companyApi, type CompanyRequestDetail, type CompanyRequestSummary } from '../services/apiService'
+import Select from './Select'
+import DatePicker from './DatePicker'
 
 function fmt(d: string) {
   return new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
@@ -83,15 +85,18 @@ export default function CompanyRequestsPage() {
 
       <div className="card p-4 mb-4">
         <div className="grid md:grid-cols-5 gap-3">
-          <select className="input" value={filters.status} onChange={e => setFilters(f => ({ ...f, status: e.target.value }))}>
-            {statuses.map(s => <option key={s} value={s}>{s || 'All statuses'}</option>)}
-          </select>
+          <Select
+            value={filters.status}
+            onChange={v => setFilters(f => ({ ...f, status: v }))}
+            placeholder="All statuses"
+            options={statuses.map(s => ({ value: s, label: s || 'All statuses' }))}
+          />
           <input className="input" placeholder="Company search" value={filters.q} onChange={e => setFilters(f => ({ ...f, q: e.target.value }))} />
           <input className="input" placeholder="Reference" value={filters.reference} onChange={e => setFilters(f => ({ ...f, reference: e.target.value }))} />
-          <input className="input" type="date" value={filters.from} onChange={e => setFilters(f => ({ ...f, from: e.target.value }))} />
+          <DatePicker value={filters.from} onChange={v => setFilters(f => ({ ...f, from: v }))} placeholder="From date" />
           <div className="flex gap-2">
-            <input className="input" type="date" value={filters.to} onChange={e => setFilters(f => ({ ...f, to: e.target.value }))} />
-            <button onClick={load} className="btn-primary">Filter</button>
+            <DatePicker className="flex-1" value={filters.to} onChange={v => setFilters(f => ({ ...f, to: v }))} placeholder="To date" />
+            <button onClick={load} className="btn-primary flex-shrink-0">Filter</button>
           </div>
         </div>
       </div>

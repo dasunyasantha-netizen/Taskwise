@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { auditApi } from '../services/apiService'
+import Select from './Select'
 
 // ─── Types (mirror /reports/leaderboard) ───────────────────────────────────────
 
@@ -488,10 +489,16 @@ export default function LeaderboardPage() {
               onChange={e => setSearch(e.target.value)}
             />
           </div>
-          <select className="input text-sm max-w-[200px]" value={dept} onChange={e => setDept(e.target.value)}>
-            <option value="">All departments</option>
-            {departments.map(d => <option key={d} value={d}>{d}</option>)}
-          </select>
+          <Select
+            className="w-[200px] flex-shrink-0"
+            value={dept}
+            onChange={setDept}
+            placeholder="All departments"
+            options={[
+              { value: '', label: 'All departments' },
+              ...departments.map(d => ({ value: d, label: d })),
+            ]}
+          />
           <div className="text-xs text-tw-text-secondary hidden sm:block ml-auto">{filtered.length} user{filtered.length !== 1 ? 's' : ''}</div>
         </div>
 

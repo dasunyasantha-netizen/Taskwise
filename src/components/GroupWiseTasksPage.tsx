@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom'
 import type { Personnel, Layer, Task } from '../types'
 import { taskGroupApi, workspaceApi, projectApi } from '../services/apiService'
 import Select from './Select'
+import DatePicker from './DatePicker'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1136,8 +1137,6 @@ function AssignTaskModal({
     setSaving(false)
   }
 
-  const selectedProject = projects.find(p => p.id === form.projectId)
-
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col">
@@ -1169,31 +1168,12 @@ function AssignTaskModal({
                 Loading…
               </div>
             ) : (
-              <div className="relative">
-                <div
-                  className={`input w-full flex items-center gap-2 cursor-pointer select-none ${!form.projectId ? 'text-tw-text-secondary' : 'text-tw-text'}`}
-                  onClick={() => {}}
-                >
-                  {selectedProject ? (
-                    <>
-                      <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: selectedProject.color }} />
-                      <span className="flex-1 text-sm truncate">{selectedProject.name}</span>
-                    </>
-                  ) : (
-                    <span className="flex-1 text-sm">Select a project…</span>
-                  )}
-                </div>
-                <select
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                  value={form.projectId}
-                  onChange={e => setForm(f => ({ ...f, projectId: e.target.value }))}
-                >
-                  <option value="">— Select a project —</option>
-                  {projects.map(p => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                </select>
-              </div>
+              <Select
+                value={form.projectId}
+                onChange={v => setForm(f => ({ ...f, projectId: v }))}
+                placeholder="Select a project…"
+                options={projects.map(p => ({ value: p.id, label: p.name, color: p.color }))}
+              />
             )}
 
             {/* Inline new-project form */}
@@ -1271,8 +1251,8 @@ function AssignTaskModal({
             </div>
             <div>
               <label className="block text-sm font-semibold text-tw-text mb-1.5">Deadline <span className="text-tw-text-secondary font-normal">(optional)</span></label>
-              <input type="date" className="input w-full" value={form.deadline}
-                onChange={e => setForm(f => ({ ...f, deadline: e.target.value }))} />
+              <DatePicker value={form.deadline}
+                onChange={v => setForm(f => ({ ...f, deadline: v }))} />
             </div>
           </div>
 
