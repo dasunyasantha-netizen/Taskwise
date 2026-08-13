@@ -77,11 +77,29 @@ function addDays(date: Date, days: number): Date {
   return new Date(date.getTime() + days * 24 * 60 * 60 * 1000)
 }
 
+const SRI_LANKA_OFFSET = 330 * 60 * 1000
+
 function startOfTodaySriLanka(now = new Date()): Date {
-  const offset = 330 * 60 * 1000
-  const local = new Date(now.getTime() + offset)
-  return new Date(Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate()) - offset)
+  const local = new Date(now.getTime() + SRI_LANKA_OFFSET)
+  return new Date(Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate()) - SRI_LANKA_OFFSET)
 }
+
+// The summary cards report on the current Sri Lankan calendar month and reset
+// when it rolls over.
+function currentMonth(now = new Date()): { start: Date; end: Date; key: string; label: string } {
+  const local = new Date(now.getTime() + SRI_LANKA_OFFSET)
+  const year = local.getUTCFullYear()
+  const month = local.getUTCMonth()
+  return {
+    start: new Date(Date.UTC(year, month, 1) - SRI_LANKA_OFFSET),
+    end: new Date(Date.UTC(year, month + 1, 1) - SRI_LANKA_OFFSET),
+    key: `${year}-${String(month + 1).padStart(2, '0')}`,
+    label: new Date(Date.UTC(year, month, 1)).toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' }),
+  }
+}
+
+// A renewed policy is superseded and keeps its status permanently.
+const TERMINAL_POLICY_STATUS = 'RENEWED'
 
 function subjectData(body: Record<string, unknown>, type: InsuranceType): Record<string, string | Date | null> {
   const data: Record<string, string | Date | null> = Object.fromEntries(SUBJECT_FIELDS.map(field => [field, null]))
@@ -199,20 +217,20 @@ async function refreshPolicyStatuses(workspaceId: string) {
       UPDATE "InsurancePolicy"
       SET "status" = 'CANCELLED',
           "cancelledAt" = "issueDate" + make_interval(days => ${PAYMENT_GRACE_DAYS}::int)
-      WHERE "workspaceId" = ${workspaceId} AND ${lapsed}
+      WHERE "workspaceId" = ${workspaceId} AND "status" <> ${TERMINAL_POLICY_STATUS} AND ${lapsed}
         AND ("status" <> 'CANCELLED' OR "cancelledAt" IS NULL)
     `,
     prisma.$executeRaw`
       UPDATE "InsurancePolicy"
       SET "status" = 'EXPIRED', "cancelledAt" = NULL
-      WHERE "workspaceId" = ${workspaceId} AND NOT ${lapsed}
+      WHERE "workspaceId" = ${workspaceId} AND "status" <> ${TERMINAL_POLICY_STATUS} AND NOT ${lapsed}
         AND "expiryDate" < ${todayStart}
         AND ("status" <> 'EXPIRED' OR "cancelledAt" IS NOT NULL)
     `,
     prisma.$executeRaw`
       UPDATE "InsurancePolicy"
       SET "status" = 'ACTIVE', "cancelledAt" = NULL
-      WHERE "workspaceId" = ${workspaceId} AND NOT ${lapsed}
+      WHERE "workspaceId" = ${workspaceId} AND "status" <> ${TERMINAL_POLICY_STATUS} AND NOT ${lapsed}
         AND "expiryDate" >= ${todayStart}
         AND ("status" <> 'ACTIVE' OR "cancelledAt" IS NOT NULL)
     `,
@@ -230,6 +248,10 @@ function policyState(insuranceType: string, issueDate: Date, expiryDate: Date, p
 }
 
 function decimalNumber(value: Prisma.Decimal): number { return Number(value) }
+
+function total(values: number[]): number {
+  return Math.round(values.reduce((sum, value) => sum + value, 0) * 100) / 100
+}
 
 function quotationJson<T extends { sumInsured: Prisma.Decimal; premium: Prisma.Decimal }>(row: T) {
   return { ...row, sumInsured: decimalNumber(row.sumInsured), premium: decimalNumber(row.premium) }
@@ -276,25 +298,46 @@ function handleError(err: unknown, res: Response) {
 export async function getInsuranceSummary(req: Request, res: Response): Promise<void> {
   try {
     const { workspaceId } = req.user!
+    const month = currentMonth()
     await Promise.all([expireQuotations(workspaceId), refreshPolicyStatuses(workspaceId)])
     const [quotations, policies] = await Promise.all([
-      prisma.insuranceQuotation.findMany({ where: { workspaceId }, select: { status: true, premium: true } }),
-      prisma.insurancePolicy.findMany({ where: { workspaceId }, select: { status: true, gwp: true } }),
+      prisma.insuranceQuotation.findMany({
+        where: { workspaceId, issueDate: { gte: month.start, lt: month.end } },
+        select: { status: true, premium: true },
+      }),
+      prisma.insurancePolicy.findMany({
+        where: {
+          workspaceId,
+          OR: [
+            { issueDate: { gte: month.start, lt: month.end } },
+            { cancelledAt: { gte: month.start, lt: month.end } },
+            { status: 'EXPIRED', expiryDate: { gte: month.start, lt: month.end } },
+          ],
+        },
+        select: { status: true, gwp: true, issueDate: true, cancelledAt: true, expiryDate: true },
+      }),
     ])
     const quotationTotals = Object.fromEntries(['ACTIVE', 'EXPIRED', 'RENEWED'].map(status => {
       const rows = quotations.filter(quotation => quotation.status === status)
-      return [status, { count: rows.length, value: Math.round(rows.reduce((sum, row) => sum + Number(row.premium), 0) * 100) / 100 }]
+      return [status, { count: rows.length, value: total(rows.map(row => Number(row.premium))) }]
     }))
-    const policyTotals = Object.fromEntries(['ACTIVE', 'CANCELLED', 'EXPIRED'].map(status => {
-      const rows = policies.filter(policy => policy.status === status)
-      return [status, { count: rows.length, value: Math.round(rows.reduce((sum, row) => sum + Number(row.gwp), 0) * 100) / 100 }]
-    }))
-    const activeGwp = policyTotals.ACTIVE.value
-    const inactiveGwp = policyTotals.CANCELLED.value + policyTotals.EXPIRED.value
+    const inMonth = (value?: Date | null) => !!value && value >= month.start && value < month.end
+    // Written is every policy incepting this month, whatever became of it since;
+    // the Final figure deducts this month's cancellations from it exactly once.
+    const written = policies.filter(policy => inMonth(policy.issueDate))
+    const cancelled = policies.filter(policy => inMonth(policy.cancelledAt))
+    const expired = policies.filter(policy => policy.status === 'EXPIRED' && inMonth(policy.expiryDate))
+    const policyTotals = {
+      written: { count: written.length, value: total(written.map(row => Number(row.gwp))) },
+      cancelled: { count: cancelled.length, value: total(cancelled.map(row => Number(row.gwp))) },
+      expired: { count: expired.length, value: total(expired.map(row => Number(row.gwp))) },
+    }
     res.json({
+      month: month.key,
+      monthLabel: month.label,
       quotationTotals,
       policyTotals,
-      finalPolicyGwp: Math.round((activeGwp - inactiveGwp) * 100) / 100,
+      finalPolicyGwp: total([policyTotals.written.value, -policyTotals.cancelled.value]),
     })
   } catch (err) { handleError(err, res) }
 }
@@ -388,8 +431,8 @@ export async function updateQuotation(req: Request, res: Response): Promise<void
   } catch (err) { handleError(err, res) }
 }
 
-function copiedSubjectData(quotation: InsuranceQuotation) {
-  return Object.fromEntries(SUBJECT_FIELDS.map(field => [field, quotation[field]]))
+function copiedSubjectData(source: Record<string, unknown>) {
+  return Object.fromEntries(SUBJECT_FIELDS.map(field => [field, source[field]]))
 }
 
 export async function convertQuotation(req: Request, res: Response): Promise<void> {
@@ -503,7 +546,7 @@ export async function listPolicies(req: Request, res: Response): Promise<void> {
     }
     const rows = await prisma.insurancePolicy.findMany({
       where,
-      include: { sourceQuotation: { select: { id: true, quotationNumber: true } } },
+      include: { sourceQuotation: { select: { id: true, quotationNumber: true } }, renewedFrom: { select: { id: true, policyNumber: true } }, renewedTo: { select: { id: true, policyNumber: true } } },
       orderBy: { createdAt: 'desc' },
       take: 1000,
     })
@@ -516,7 +559,7 @@ export async function getPolicy(req: Request, res: Response): Promise<void> {
     await refreshPolicyStatuses(req.user!.workspaceId)
     const row = await prisma.insurancePolicy.findFirst({
       where: { id: req.params.id, workspaceId: req.user!.workspaceId },
-      include: { sourceQuotation: { select: { id: true, quotationNumber: true } } },
+      include: { sourceQuotation: { select: { id: true, quotationNumber: true } }, renewedFrom: { select: { id: true, policyNumber: true } }, renewedTo: { select: { id: true, policyNumber: true } } },
     })
     if (!row) { res.status(404).json({ error: 'Policy not found' }); return }
     res.json(policyJson(row))
@@ -627,6 +670,76 @@ export async function completePolicyBusinessDetails(req: Request, res: Response)
       gwp: Number(row.gwp),
     })
     res.json(policyJson(row))
+  } catch (err) { handleError(err, res) }
+}
+
+// Renewal issues a brand new policy and retires the old one, so the GWP written
+// in an earlier month is never rewritten. Allowed at any point in the policy's
+// life, including while it is still active.
+export async function renewPolicy(req: Request, res: Response): Promise<void> {
+  try {
+    const { workspaceId } = req.user!
+    await refreshPolicyStatuses(workspaceId)
+    const existing = await prisma.insurancePolicy.findFirst({ where: { id: req.params.id, workspaceId } })
+    if (!existing) { res.status(404).json({ error: 'Policy not found' }); return }
+    if (existing.status === TERMINAL_POLICY_STATUS) {
+      res.status(409).json({ error: 'This policy has already been renewed' })
+      return
+    }
+    const body = req.body as Record<string, unknown>
+    const premium = moneyValue(body.premium, 'Premium')
+    const sumInsured = body.sumInsured == null || body.sumInsured === ''
+      ? Number(existing.sumInsured)
+      : moneyValue(body.sumInsured, 'Sum insured')
+    const business = policyBusinessData(body)
+    const issueDate = dateValue(body.issueDate, 'Issue date')
+    const expiryDate = dateValue(body.expiryDate, 'Expiry date')
+    if (expiryDate < issueDate) throw new InputError('Expiry date must be on or after the issue date')
+    const payment = paymentData(body, premium)
+    const name = await actorName(req)
+    const renewed = await prisma.$transaction(async tx => {
+      const created = await tx.insurancePolicy.create({
+        data: {
+          workspaceId,
+          policyNumber: `PENDING-P-${randomUUID()}`,
+          insuranceType: existing.insuranceType,
+          customerName: existing.customerName,
+          contactNumber: existing.contactNumber,
+          introducer: existing.introducer,
+          sumInsured,
+          premium,
+          ...business,
+          issueDate,
+          expiryDate,
+          ...policyState(existing.insuranceType, issueDate, expiryDate, payment.paymentAmount, premium),
+          notes: existing.notes,
+          ...copiedSubjectData(existing as unknown as Record<string, unknown>),
+          ...payment,
+          renewedFromId: existing.id,
+          createdById: req.user!.actorId,
+          createdByType: req.user!.actorType,
+          createdByName: name,
+        },
+      })
+      const numbered = await tx.insurancePolicy.update({
+        where: { id: created.id },
+        data: { policyNumber: automaticNumber('P', created.sequenceNumber) },
+      })
+      await tx.insurancePolicy.update({
+        where: { id: existing.id },
+        data: { status: TERMINAL_POLICY_STATUS, cancelledAt: null },
+      })
+      return numbered
+    })
+    await audit(req, 'INSURANCE_POLICY_RENEWED', {
+      previousPolicyId: existing.id,
+      previousPolicyNumber: existing.policyNumber,
+      previousStatus: existing.status,
+      policyId: renewed.id,
+      policyNumber: renewed.policyNumber,
+      gwp: Number(renewed.gwp),
+    })
+    res.status(201).json(policyJson(renewed))
   } catch (err) { handleError(err, res) }
 }
 

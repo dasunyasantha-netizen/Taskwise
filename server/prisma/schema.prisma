@@ -441,7 +441,7 @@ model InsurancePolicy {
   premium          Decimal   @db.Decimal(18, 2)
   issueDate        DateTime
   expiryDate       DateTime
-  status           String    @default("ACTIVE")
+  status           String    @default("ACTIVE") // ACTIVE | CANCELLED | EXPIRED | RENEWED
   cancelledAt      DateTime?
   companyPolicyNumber String?
   salesCode        String?
@@ -472,6 +472,9 @@ model InsurancePolicy {
 
   sourceQuotationId String?             @unique
   sourceQuotation   InsuranceQuotation? @relation("QuotationPolicy", fields: [sourceQuotationId], references: [id])
+  renewedFromId     String?
+  renewedFrom       InsurancePolicy?    @relation("PolicyRenewals", fields: [renewedFromId], references: [id])
+  renewedTo         InsurancePolicy[]   @relation("PolicyRenewals")
   createdById       String
   createdByType     String
   createdByName     String
@@ -484,7 +487,10 @@ model InsurancePolicy {
   @@unique([workspaceId, policyNumber])
   @@index([workspaceId, insuranceType])
   @@index([workspaceId, expiryDate])
+  @@index([workspaceId, issueDate])
+  @@index([workspaceId, cancelledAt])
   @@index([workspaceId, paid])
+  @@index([renewedFromId])
 }
 
 model Task {

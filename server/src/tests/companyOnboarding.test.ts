@@ -664,13 +664,99 @@ async function main() {
     assert.equal(renewRes.body.renewedFromId, original.id)
   })
 
-  await test('Insurance summary returns status totals using quotation premiums and policy GWP', async () => {
+  const isoDay = (date: Date) => date.toISOString().slice(0, 10)
+  const marinePolicyBody = (extra: Record<string, unknown>) => ({
+    insuranceType: 'MARINE', customerName: 'Month Test', contactNumber: '0770000000',
+    companyPolicyNumber: `FF/MAR/${Math.floor(Math.random() * 1e6)}`, salesCode: 'SC-MONTH', businessType: 'NEW',
+    cargoDescription: 'Tea chests', transitFrom: 'Colombo', transitTo: 'Dubai', conveyance: 'Vessel',
+    sumInsured: 1000000, premium: 10000, paid: true,
+    ...extra,
+  })
+
+  await test('The summary counts only the current month and nets cancellations off written GWP', async () => {
+    const now = new Date()
+    const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
+    const lastMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 15))
+    const nextYear = new Date(Date.UTC(now.getUTCFullYear() + 1, now.getUTCMonth(), 1))
+
+    const before = mockRes()
+    await insuranceCtrl.getInsuranceSummary(mockReq({ user: ffInsuranceUser }), before)
+    assert.equal(before.statusCode, 200)
+    assert.equal(before.body.quotationTotals.ACTIVE.value, 267500)
+    const baseWritten = before.body.policyTotals.written.value
+
+    const thisMonth = mockRes()
+    await insuranceCtrl.createPolicy(mockReq({
+      user: ffInsuranceUser,
+      body: marinePolicyBody({ gwp: 1000, issueDate: isoDay(monthStart), expiryDate: isoDay(nextYear) }),
+    }), thisMonth)
+    assert.equal(thisMonth.statusCode, 201)
+
+    // Issued last month, so it must not move this month's figures at all.
+    const priorMonth = mockRes()
+    await insuranceCtrl.createPolicy(mockReq({
+      user: ffInsuranceUser,
+      body: marinePolicyBody({ gwp: 5000, issueDate: isoDay(lastMonth), expiryDate: isoDay(nextYear) }),
+    }), priorMonth)
+    assert.equal(priorMonth.statusCode, 201)
+
+    const after = mockRes()
+    await insuranceCtrl.getInsuranceSummary(mockReq({ user: ffInsuranceUser }), after)
+    assert.equal(after.body.month, `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`)
+    assert.equal(after.body.policyTotals.written.value, Math.round((baseWritten + 1000) * 100) / 100)
+    assert.equal(
+      after.body.finalPolicyGwp,
+      Math.round((after.body.policyTotals.written.value - after.body.policyTotals.cancelled.value) * 100) / 100,
+    )
+  })
+
+  await test('An active policy can be renewed into a new record, leaving the old month untouched', async () => {
+    const now = new Date()
+    const nextYear = new Date(Date.UTC(now.getUTCFullYear() + 1, now.getUTCMonth(), 1))
+    const seed = mockRes()
+    await insuranceCtrl.createPolicy(mockReq({
+      user: ffInsuranceUser,
+      body: marinePolicyBody({ gwp: 2000, issueDate: isoDay(now), expiryDate: isoDay(nextYear) }),
+    }), seed)
+    assert.equal(seed.statusCode, 201)
+    assert.equal(seed.body.status, 'ACTIVE')
+    const originalId = seed.body.id
+
     const res = mockRes()
-    await insuranceCtrl.getInsuranceSummary(mockReq({ user: ffInsuranceUser }), res)
-    assert.equal(res.statusCode, 200)
-    assert.equal(res.body.quotationTotals.ACTIVE.value, 267500)
-    assert.equal(res.body.policyTotals.ACTIVE.value, 139000)
-    assert.equal(res.body.finalPolicyGwp, 139000)
+    await insuranceCtrl.renewPolicy(mockReq({
+      user: ffInsuranceUser,
+      params: { id: originalId },
+      body: {
+        companyPolicyNumber: 'FF/MAR/RENEW1', salesCode: 'SC-RENEW', businessType: 'RENEWAL',
+        premium: 12000, gwp: 2500, issueDate: isoDay(now), expiryDate: isoDay(nextYear), paid: true,
+      },
+    }), res)
+    assert.equal(res.statusCode, 201)
+    assert.notEqual(res.body.id, originalId)
+    assert.equal(res.body.renewedFromId, originalId)
+    assert.equal(res.body.gwp, 2500)
+    assert.equal(res.body.customerName, 'Month Test')
+    assert.match(res.body.policyNumber, /^P-\d{6,}$/)
+
+    const previous = await prisma.insurancePolicy.findUniqueOrThrow({ where: { id: originalId } })
+    assert.equal(previous.status, 'RENEWED')
+    assert.equal(Number(previous.gwp), 2000)
+
+    // RENEWED is terminal: the status refresh must never move it back.
+    const listRes = mockRes()
+    await insuranceCtrl.listPolicies(mockReq({ user: ffInsuranceUser, query: {} }), listRes)
+    assert.equal(listRes.body.find((row: any) => row.id === originalId).status, 'RENEWED')
+
+    const again = mockRes()
+    await insuranceCtrl.renewPolicy(mockReq({
+      user: ffInsuranceUser,
+      params: { id: originalId },
+      body: {
+        companyPolicyNumber: 'FF/MAR/RENEW2', salesCode: 'SC-RENEW', businessType: 'RENEWAL',
+        premium: 12000, gwp: 2500, issueDate: isoDay(now), expiryDate: isoDay(nextYear), paid: true,
+      },
+    }), again)
+    assert.equal(again.statusCode, 409)
   })
 
   await test('Converted quotations are hidden from quotation listings', async () => {

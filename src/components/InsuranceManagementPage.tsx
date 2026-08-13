@@ -52,6 +52,7 @@ const POLICY_STATUSES = [
   { value: 'ACTIVE', label: 'Active' },
   { value: 'CANCELLED', label: 'Cancelled' },
   { value: 'EXPIRED', label: 'Expired' },
+  { value: 'RENEWED', label: 'Renewed' },
 ]
 
 const BUSINESS_TYPES = [
@@ -73,6 +74,11 @@ const emptyForm = (): FormData => ({
 const dateInput = (value?: string | null) => value ? value.slice(0, 10) : ''
 const money = (value: number) => new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR', maximumFractionDigits: 2 }).format(value)
 const displayDate = (value?: string | null) => value ? new Date(value).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
+const monthKey = (value?: string | null) => {
+  if (!value) return ''
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? '' : `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+}
 const typeLabel = (type: string) => INSURANCE_TYPES.find(item => item.value === type)?.label || type
 
 function recordForm(record: InsuranceQuotation | InsurancePolicy): FormData {
@@ -366,6 +372,55 @@ function ReactivatePolicyModal({ policy, onClose, onSaved }: { policy: Insurance
 
 const badgeClass: Record<string, string> = { ACTIVE: 'badge-success', CONVERTED: 'badge-primary', EXPIRED: 'badge-danger', CANCELLED: 'badge-danger', RENEWED: 'badge-warning' }
 
+function RenewPolicyModal({ policy, onClose, onSaved }: { policy: InsurancePolicy; onClose: () => void; onSaved: () => Promise<void> }) {
+  const today = new Date().toISOString().slice(0, 10)
+  const nextYear = new Date(); nextYear.setFullYear(nextYear.getFullYear() + 1)
+  const [form, setForm] = useState<FormData>({
+    companyPolicyNumber: '', salesCode: policy.salesCode || '', businessType: 'RENEWAL',
+    premium: String(policy.premium), sumInsured: String(policy.sumInsured), gwp: '',
+    issueDate: today, expiryDate: nextYear.toISOString().slice(0, 10), paid: false, paymentAmount: '',
+  })
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const set = (key: string, value: string | boolean) => setForm(current => ({ ...current, [key]: value }))
+  const premium = Number(form.premium) || 0
+  const payment = form.paid ? premium : Number(form.paymentAmount) || 0
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault(); setSaving(true); setError('')
+    try {
+      await insuranceApi.renewPolicy(policy.id, { ...form, paymentAmount: form.paid ? form.premium : form.paymentAmount })
+      await onSaved(); onClose()
+    } catch (err) { setError(err instanceof Error ? err.message : 'Unable to renew policy') }
+    setSaving(false)
+  }
+  return (
+    <div className="fixed inset-0 z-[60] bg-black/40 p-3 sm:p-4 flex items-center justify-center" onClick={onClose}>
+      <form onSubmit={submit} className="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[94dvh] overflow-y-auto p-5" onClick={event => event.stopPropagation()}>
+        <h2 className="font-bold text-tw-text text-lg">Renew Policy</h2>
+        <p className="text-sm text-tw-text-secondary mb-1">{policy.policyNumber} · {policy.customerName}</p>
+        <p className="text-xs text-tw-text-secondary mb-4">A new policy is issued with its own number. {policy.policyNumber} is kept and marked as renewed, so the GWP already counted in its month stays unchanged.</p>
+        {error && <div className="mb-3 bg-red-50 border border-red-200 text-tw-danger text-sm px-3 py-2 rounded-lg">{error}</div>}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="sm:col-span-2"><Field label="Company policy number" required><TextInput value={String(form.companyPolicyNumber)} onChange={value => set('companyPolicyNumber', value)} placeholder="Policy number issued by Fairfirst" required /></Field></div>
+          <Field label="Sales code" required><TextInput value={String(form.salesCode)} onChange={value => set('salesCode', value)} required /></Field>
+          <Field label="Business type" required><Select value={String(form.businessType)} onChange={value => set('businessType', value)} options={BUSINESS_TYPES} /></Field>
+          <Field label="Sum insured (LKR)" required><MoneyInput value={String(form.sumInsured)} onChange={value => set('sumInsured', value)} required /></Field>
+          <Field label="Premium (LKR)" required><MoneyInput value={String(form.premium)} onChange={value => set('premium', value)} required /></Field>
+          <Field label="GWP (LKR)" required><MoneyInput value={String(form.gwp)} onChange={value => set('gwp', value)} required /></Field>
+          <Field label="Payment amount (LKR)"><MoneyInput value={form.paid ? String(premium || '') : String(form.paymentAmount)} onChange={value => set('paymentAmount', value)} /></Field>
+          <Field label="New issue date" required><DatePicker compact value={String(form.issueDate)} onChange={value => set('issueDate', value)} placeholder="Select issue date" /></Field>
+          <Field label="New expiry date" required><DatePicker compact value={String(form.expiryDate)} onChange={value => set('expiryDate', value)} minDate={String(form.issueDate)} placeholder="Select expiry date" /></Field>
+          <label className="sm:col-span-2 flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-2 text-sm font-semibold"><input type="checkbox" checked={Boolean(form.paid)} onChange={event => set('paid', event.target.checked)} /> Paid in full <span className="ml-auto text-xs text-tw-text-secondary">Balance: {money(Math.max(0, premium - payment))}</span></label>
+        </div>
+        <div className="grid grid-cols-2 sm:flex sm:justify-end gap-2 mt-5">
+          <button type="button" className="btn-secondary" onClick={onClose} disabled={saving}>Cancel</button>
+          <button className="btn-primary" disabled={saving}>{saving ? 'Renewing…' : 'Renew Policy'}</button>
+        </div>
+      </form>
+    </div>
+  )
+}
+
 const TYPE_STYLE: Record<InsuranceType, { icon: string; tint: string }> = {
   MOTOR: { icon: '🚗', tint: 'bg-tw-indigo-light' },
   FIRE: { icon: '🔥', tint: 'bg-tw-orange-light' },
@@ -452,8 +507,8 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   )
 }
 
-function DetailModal({ record, kind, onClose, onEdit, onConvert, onRenew, onReactivate }: {
-  record: InsuranceQuotation | InsurancePolicy; kind: 'quotation' | 'policy'; onClose: () => void; onEdit: () => void; onConvert?: () => void; onRenew?: () => void; onReactivate?: () => void
+function DetailModal({ record, kind, onClose, onEdit, onConvert, onRenew, onReactivate, onRenewPolicy }: {
+  record: InsuranceQuotation | InsurancePolicy; kind: 'quotation' | 'policy'; onClose: () => void; onEdit: () => void; onConvert?: () => void; onRenew?: () => void; onReactivate?: () => void; onRenewPolicy?: () => void
 }) {
   const quote = kind === 'quotation' ? record as InsuranceQuotation : null
   const policy = kind === 'policy' ? record as InsurancePolicy : null
@@ -464,6 +519,8 @@ function DetailModal({ record, kind, onClose, onEdit, onConvert, onRenew, onReac
   const settledPct = policy && policy.premium > 0 ? Math.min(100, Math.round((policy.paymentAmount / policy.premium) * 100)) : 0
   const links: Array<[string, string]> = [
     ...(policy?.sourceQuotation ? [['Created from quotation', policy.sourceQuotation.quotationNumber]] as Array<[string, string]> : []),
+    ...(policy?.renewedFrom ? [['Renewed from policy', policy.renewedFrom.policyNumber]] as Array<[string, string]> : []),
+    ...(policy?.renewedTo?.length ? [['Renewed into policy', policy.renewedTo.map(item => item.policyNumber).join(', ')]] as Array<[string, string]> : []),
     ...(quote?.convertedPolicy ? [['Converted to policy', quote.convertedPolicy.policyNumber]] as Array<[string, string]> : []),
     ...(quote?.renewedFrom ? [['Renewed from', quote.renewedFrom.quotationNumber]] as Array<[string, string]> : []),
     ...(quote?.renewedTo?.length ? [['Renewed to', quote.renewedTo.map(item => item.quotationNumber).join(', ')]] as Array<[string, string]> : []),
@@ -570,6 +627,7 @@ function DetailModal({ record, kind, onClose, onEdit, onConvert, onRenew, onReac
         </div>
 
         <div className="shrink-0 px-5 sm:px-6 py-4 border-t border-tw-border bg-gray-50 flex flex-wrap justify-end gap-2">
+          {policy && policy.status !== 'RENEWED' && onRenewPolicy && <button className="btn-secondary" onClick={onRenewPolicy}>Renew Policy</button>}
           {quote?.status === 'ACTIVE' && <button className="btn-secondary" onClick={onEdit}>Edit</button>}
           {policy?.status === 'ACTIVE' && <button className="btn-secondary" onClick={onEdit}>Edit Policy / Payment</button>}
           {policy && ['CANCELLED', 'EXPIRED'].includes(policy.status) && onReactivate && <button className="btn-primary" onClick={onReactivate}>Reactivate Policy</button>}
@@ -593,6 +651,8 @@ export default function InsuranceManagementPage() {
   const [editing, setEditing] = useState<InsuranceQuotation | InsurancePolicy | null>(null)
   const [convert, setConvert] = useState<InsuranceQuotation | null>(null); const [renew, setRenew] = useState<InsuranceQuotation | null>(null)
   const [reactivate, setReactivate] = useState<InsurancePolicy | null>(null)
+  const [renewPolicy, setRenewPolicy] = useState<InsurancePolicy | null>(null)
+  const [cardFilter, setCardFilter] = useState('')
 
   const load = async () => {
     setLoading(true); setError('')
@@ -612,7 +672,24 @@ export default function InsuranceManagementPage() {
     window.addEventListener('taskwise:insurance-updated', refresh)
     return () => window.removeEventListener('taskwise:insurance-updated', refresh)
   }, [])
-  useEffect(() => { setStatus(''); setSelected(null) }, [tab])
+  useEffect(() => { setStatus(''); setSelected(null); setCardFilter('') }, [tab])
+
+  // Cards summarise the current month, so clicking one scopes the list to the
+  // same window rather than to a bare status.
+  const cardMatch = (record: InsuranceQuotation | InsurancePolicy) => {
+    if (!cardFilter || !summary) return true
+    const policy = record as InsurancePolicy
+    const quote = record as InsuranceQuotation
+    switch (cardFilter) {
+      case 'p-written': case 'p-final': return monthKey(policy.issueDate) === summary.month
+      case 'p-cancelled': return monthKey(policy.cancelledAt) === summary.month
+      case 'p-expired': return policy.status === 'EXPIRED' && monthKey(policy.expiryDate) === summary.month
+      case 'q-active': return monthKey(quote.issueDate) === summary.month && quote.status === 'ACTIVE'
+      case 'q-expired': return monthKey(quote.issueDate) === summary.month && quote.status === 'EXPIRED'
+      case 'q-renewed': return monthKey(quote.issueDate) === summary.month && quote.status === 'RENEWED'
+      default: return true
+    }
+  }
 
   const records = useMemo(() => {
     const source = tab === 'quotations' ? quotations : policies
@@ -620,19 +697,19 @@ export default function InsuranceManagementPage() {
     return source.filter(record => {
       const haystack = Object.values(record).filter(value => typeof value === 'string' || typeof value === 'number').join(' ').toLowerCase()
       const statusMatch = !status || record.status === status
-      return (!q || haystack.includes(q)) && (!type || record.insuranceType === type) && statusMatch
+      return (!q || haystack.includes(q)) && (!type || record.insuranceType === type) && statusMatch && cardMatch(record)
     })
-  }, [tab, quotations, policies, search, type, status])
+  }, [tab, quotations, policies, search, type, status, cardFilter, summary])
 
   const cards = summary ? (tab === 'quotations' ? [
-    { status: 'ACTIVE', label: 'Active', value: money(summary.quotationTotals.ACTIVE.value), sub: `${summary.quotationTotals.ACTIVE.count} quotations`, color: 'text-emerald-600', icon: '📝' },
-    { status: 'EXPIRED', label: 'Expired', value: money(summary.quotationTotals.EXPIRED.value), sub: `${summary.quotationTotals.EXPIRED.count} quotations`, color: 'text-tw-danger', icon: '⌛' },
-    { status: 'RENEWED', label: 'Renewed', value: money(summary.quotationTotals.RENEWED.value), sub: `${summary.quotationTotals.RENEWED.count} quotations`, color: 'text-amber-600', icon: '🔄' },
+    { key: 'q-active', label: 'Active', value: money(summary.quotationTotals.ACTIVE.value), sub: `${summary.quotationTotals.ACTIVE.count} quotations raised this month`, color: 'text-emerald-600', icon: '📝' },
+    { key: 'q-expired', label: 'Expired', value: money(summary.quotationTotals.EXPIRED.value), sub: `${summary.quotationTotals.EXPIRED.count} quotations raised this month`, color: 'text-tw-danger', icon: '⌛' },
+    { key: 'q-renewed', label: 'Renewed', value: money(summary.quotationTotals.RENEWED.value), sub: `${summary.quotationTotals.RENEWED.count} quotations raised this month`, color: 'text-amber-600', icon: '🔄' },
   ] : [
-    { status: 'ACTIVE', label: 'Active', value: money(summary.policyTotals.ACTIVE.value), sub: `${summary.policyTotals.ACTIVE.count} policies · GWP`, color: 'text-emerald-600', icon: '🛡️' },
-    { status: 'CANCELLED', label: 'Cancelled', value: money(summary.policyTotals.CANCELLED.value), sub: `${summary.policyTotals.CANCELLED.count} motor policies unpaid at 30 days · GWP`, color: 'text-tw-danger', icon: '⛔' },
-    { status: 'EXPIRED', label: 'Expired', value: money(summary.policyTotals.EXPIRED.value), sub: `${summary.policyTotals.EXPIRED.count} policies · GWP`, color: 'text-amber-600', icon: '⌛' },
-    { status: '', label: 'Final', value: money(summary.finalPolicyGwp), sub: 'Active GWP − cancelled and expired GWP', color: summary.finalPolicyGwp < 0 ? 'text-tw-danger' : 'text-indigo-600', icon: '📊' },
+    { key: 'p-written', label: 'Written', value: money(summary.policyTotals.written.value), sub: `${summary.policyTotals.written.count} policies issued or renewed · GWP`, color: 'text-emerald-600', icon: '🛡️' },
+    { key: 'p-cancelled', label: 'Cancelled', value: money(summary.policyTotals.cancelled.value), sub: `${summary.policyTotals.cancelled.count} motor policies unpaid at 30 days · GWP`, color: 'text-tw-danger', icon: '⛔' },
+    { key: 'p-expired', label: 'Expired', value: money(summary.policyTotals.expired.value), sub: `${summary.policyTotals.expired.count} policies reached expiry · GWP`, color: 'text-amber-600', icon: '⌛' },
+    { key: 'p-final', label: 'Final', value: money(summary.finalPolicyGwp), sub: 'GWP written − cancelled this month', color: summary.finalPolicyGwp < 0 ? 'text-tw-danger' : 'text-indigo-600', icon: '📊' },
   ]) : []
 
   return (
@@ -642,7 +719,13 @@ export default function InsuranceManagementPage() {
         <div className="flex gap-2"><button className="btn-secondary flex-1 sm:flex-none" onClick={() => { setEditing(null); setFormKind('policy') }}>+ Add Policy</button><button className="btn-primary flex-1 sm:flex-none" onClick={() => { setEditing(null); setFormKind('quotation') }}>+ Create Quotation</button></div>
       </div>
       {error && <div className="bg-red-50 border border-red-200 text-tw-danger text-sm px-4 py-3 rounded-xl">{error}</div>}
-      <div className={`grid grid-cols-2 ${tab === 'quotations' ? 'xl:grid-cols-3' : 'xl:grid-cols-4'} gap-3`}>{cards.map(card => <button type="button" key={card.label} onClick={() => setStatus(card.status)} className={`card p-4 text-left transition-all hover:border-tw-primary ${status === card.status ? 'ring-2 ring-tw-primary border-tw-primary' : ''}`}><div className="flex items-center gap-2 text-xs text-tw-text-secondary mb-1"><span>{card.icon}</span>{card.label}</div><div className={`text-lg md:text-xl font-bold truncate ${card.color}`}>{card.value}</div><div className="text-xs text-tw-text-secondary mt-1 truncate">{card.sub}</div></button>)}</div>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="text-xs font-semibold text-tw-text-secondary">
+          Showing <span className="text-tw-text">{summary?.monthLabel || 'this month'}</span> only · resets when the month rolls over
+        </div>
+        {cardFilter && <button type="button" className="badge badge-primary" onClick={() => setCardFilter('')}>Clear card filter ×</button>}
+      </div>
+      <div className={`grid grid-cols-2 ${tab === 'quotations' ? 'xl:grid-cols-3' : 'xl:grid-cols-4'} gap-3`}>{cards.map(card => <button type="button" key={card.key} onClick={() => setCardFilter(cardFilter === card.key ? '' : card.key)} className={`card p-4 text-left transition-all hover:border-tw-primary ${cardFilter === card.key ? 'ring-2 ring-tw-primary border-tw-primary' : ''}`}><div className="flex items-center gap-2 text-xs text-tw-text-secondary mb-1"><span>{card.icon}</span>{card.label}</div><div className={`text-lg md:text-xl font-bold truncate ${card.color}`}>{card.value}</div><div className="text-xs text-tw-text-secondary mt-1 truncate">{card.sub}</div></button>)}</div>
       <div className="card overflow-hidden">
         <div className="p-3 md:p-4 border-b border-tw-border space-y-3">
           <div className="inline-flex rounded-xl border border-tw-border bg-gray-50 p-1 w-full sm:w-auto">
@@ -673,10 +756,11 @@ export default function InsuranceManagementPage() {
         )}
       </div>
       {formKind && <RecordFormModal kind={formKind} initial={editing} onClose={() => { setFormKind(null); setEditing(null) }} onSaved={load} />}
-      {selected && <DetailModal record={selected} kind={'quotationNumber' in selected ? 'quotation' : 'policy'} onClose={() => setSelected(null)} onEdit={() => { setEditing(selected); setFormKind('quotationNumber' in selected ? 'quotation' : 'policy'); setSelected(null) }} onConvert={'quotationNumber' in selected ? () => { setConvert(selected); setSelected(null) } : undefined} onRenew={'quotationNumber' in selected ? () => { setRenew(selected); setSelected(null) } : undefined} onReactivate={'policyNumber' in selected ? () => { setReactivate(selected); setSelected(null) } : undefined} />}
+      {selected && <DetailModal record={selected} kind={'quotationNumber' in selected ? 'quotation' : 'policy'} onClose={() => setSelected(null)} onEdit={() => { setEditing(selected); setFormKind('quotationNumber' in selected ? 'quotation' : 'policy'); setSelected(null) }} onConvert={'quotationNumber' in selected ? () => { setConvert(selected); setSelected(null) } : undefined} onRenew={'quotationNumber' in selected ? () => { setRenew(selected); setSelected(null) } : undefined} onReactivate={'policyNumber' in selected ? () => { setReactivate(selected); setSelected(null) } : undefined} onRenewPolicy={'policyNumber' in selected ? () => { setRenewPolicy(selected as InsurancePolicy); setSelected(null) } : undefined} />}
       {convert && <ConvertModal quotation={convert} onClose={() => setConvert(null)} onSaved={load} />}
       {renew && <RenewModal quotation={renew} onClose={() => setRenew(null)} onSaved={load} />}
       {reactivate && <ReactivatePolicyModal policy={reactivate} onClose={() => setReactivate(null)} onSaved={load} />}
+      {renewPolicy && <RenewPolicyModal policy={renewPolicy} onClose={() => setRenewPolicy(null)} onSaved={load} />}
     </div>
   )
 }

@@ -39,7 +39,7 @@ export interface AuthUser {
 
 export type InsuranceType = 'MOTOR' | 'FIRE' | 'CASUALTY' | 'MARINE' | 'TRAVEL'
 export type QuotationStatus = 'ACTIVE' | 'CONVERTED' | 'EXPIRED' | 'RENEWED'
-export type PolicyStatus = 'ACTIVE' | 'CANCELLED' | 'EXPIRED'
+export type PolicyStatus = 'ACTIVE' | 'CANCELLED' | 'EXPIRED' | 'RENEWED'
 export type InsuranceBusinessType = 'NEW' | 'RENEWAL'
 
 export interface InsuranceSubjectDetails {
@@ -112,11 +112,15 @@ export interface InsurancePolicy extends InsuranceSubjectDetails {
   createdAt: string
   updatedAt: string
   sourceQuotation?: { id: string; quotationNumber: string } | null
+  renewedFrom?: { id: string; policyNumber: string } | null
+  renewedTo?: Array<{ id: string; policyNumber: string }>
 }
 
 export interface InsuranceSummary {
+  month: string
+  monthLabel: string
   quotationTotals: Record<'ACTIVE' | 'EXPIRED' | 'RENEWED', { count: number; value: number }>
-  policyTotals: Record<PolicyStatus, { count: number; value: number }>
+  policyTotals: Record<'written' | 'cancelled' | 'expired', { count: number; value: number }>
   finalPolicyGwp: number
 }
 

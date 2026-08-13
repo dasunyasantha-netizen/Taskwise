@@ -173,6 +173,7 @@ export const insuranceApi = {
   incompletePolicies: () => api.get('/insurance/policies/incomplete'),
   completePolicyBusinessDetails: (id: string, data: unknown) => api.put(`/insurance/policies/${id}/complete-business-details`, data),
   reactivatePolicy:  (id: string, data: unknown) => api.post(`/insurance/policies/${id}/reactivate`, data),
+  renewPolicy:       (id: string, data: unknown) => api.post(`/insurance/policies/${id}/renew`, data),
 }
 
 export const notificationApi = {

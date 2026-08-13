@@ -16,6 +16,7 @@ import {
   listIncompletePolicies,
   completePolicyBusinessDetails,
   reactivatePolicy,
+  renewPolicy,
 } from '../controllers/insuranceController'
 
 const router = Router()
@@ -36,5 +37,6 @@ router.get('/policies/:id', getPolicy)
 router.put('/policies/:id', updatePolicy)
 router.put('/policies/:id/complete-business-details', requireDirector, completePolicyBusinessDetails)
 router.post('/policies/:id/reactivate', reactivatePolicy)
+router.post('/policies/:id/renew', renewPolicy)
 
 export default router
