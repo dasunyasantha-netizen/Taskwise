@@ -205,7 +205,7 @@ interface PillSelectProps {
   width?: number
 }
 
-function PillSelect({ value, options, placeholder, onChange, active, width }: PillSelectProps) {
+export function PillSelect({ value, options, placeholder, onChange, active, width }: PillSelectProps) {
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState({ top: 0, left: 0, w: 0, openUpward: false })
   const ref = useRef<HTMLButtonElement>(null)
