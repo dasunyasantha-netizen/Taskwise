@@ -8,6 +8,8 @@ import NotificationsMenu from './NotificationsMenu'
 import { usePWA } from '../hooks/usePWA'
 import HierarchyPanel from './HierarchyPanel'
 import ProjectManager from './ProjectManager'
+import TasksPage, { DEFAULT_TASK_SORT } from './TasksPage'
+import type { TaskSort } from './TasksPage'
 import BoardView from './BoardView'
 import FlowchartView from './FlowchartView'
 import ProfilePage from './ProfilePage'
@@ -804,6 +806,24 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
     try { sessionStorage.setItem('tw_pm_filters', JSON.stringify(f)) } catch { /* ignore */ }
   }
 
+  // ── Lifted TasksPage state (filters + sort survive view switches) ────────
+  const [tasksFilters, setTasksFilters] = useState<import('./FilterBar').ActiveFilters>(
+    () => { try { const s = sessionStorage.getItem('tw_tasks_filters'); return s ? JSON.parse(s) : { layerFilters: {}, extra: { status: null, priority: null, assignedTo: null, createdFrom: null, createdTo: null, deadlineFrom: null, deadlineTo: null } } } catch { return { layerFilters: {}, extra: { status: null, priority: null, assignedTo: null, createdFrom: null, createdTo: null, deadlineFrom: null, deadlineTo: null } } } }
+  )
+  const [tasksSort, setTasksSort] = useState<TaskSort>(
+    () => { try { return (sessionStorage.getItem('tw_tasks_sort') as TaskSort) || DEFAULT_TASK_SORT } catch { return DEFAULT_TASK_SORT } }
+  )
+  const [tasksRefreshKey, setTasksRefreshKey] = useState(0)
+
+  const handleTasksFiltersChange = (f: import('./FilterBar').ActiveFilters) => {
+    setTasksFilters(f)
+    try { sessionStorage.setItem('tw_tasks_filters', JSON.stringify(f)) } catch { /* ignore */ }
+  }
+  const handleTasksSortChange = (s: TaskSort) => {
+    setTasksSort(s)
+    try { sessionStorage.setItem('tw_tasks_sort', s) } catch { /* ignore */ }
+  }
+
   // ── Lifted ReportsPage state ───────────────────────────────────────────────
   const [reportsState, setReportsState] = useState<ReportsState>(DEFAULT_REPORTS_STATE)
 
@@ -894,6 +914,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
     ...(insuranceEnabled ? [{ label: 'Insurance', view: 'insurance_management' as ViewMode, icon: '🛡️' }] : []),
     { label: 'Dashboard',      view: 'director_dashboard' as ViewMode, icon: '⊞' },
     { label: 'Projects',       view: 'project_board'      as ViewMode, icon: '📋' },
+    { label: 'Tasks',          view: 'tasks'              as ViewMode, icon: '🗂️' },
     { label: 'Approval Queue', view: 'approval_queue'     as ViewMode, icon: '✅', badge: stats.pending_approval },
     { label: 'Overdue Tasks',   view: 'overdue'          as ViewMode, icon: '⏰', badge: stats.overdue },
     { label: 'Recent Updates',  view: 'recent_updates'   as ViewMode, icon: '🕐' },
@@ -928,6 +949,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
   const [showMobileMore, setShowMobileMore] = useState(false)
   const mobileMoreItems = [
     ...(insuranceEnabled ? [{ label: 'Insurance', view: 'insurance_management' as ViewMode, icon: '🛡️' }] : []),
+    { label: 'Tasks',           view: 'tasks'             as ViewMode, icon: '🗂️' },
     { label: 'Team Hierarchy',  view: 'hierarchy_manager' as ViewMode, icon: '👥' },
     { label: 'Reports',         view: 'reports'           as ViewMode, icon: '📊' },
     { label: 'Recent Updates',  view: 'recent_updates'    as ViewMode, icon: '🕐' },
@@ -1040,6 +1062,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
                   : currentView === 'broadcasts' ? 'Broadcasts'
                   : currentView === 'settings' ? 'Settings'
                   : currentView === 'project_board' ? 'Projects'
+                  : currentView === 'tasks' ? 'Tasks'
                   : currentView === 'recent_updates' ? 'Recent Updates'
                   : currentView === 'group_tasks' ? 'Group Tasks'
                   : currentView === 'reports' ? 'Reports'
@@ -1223,6 +1246,18 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
               project={selectedProject}
               user={user}
               onTaskClick={task => { setSelectedTask(task); setProjectSubView('board') }}
+            />
+          )}
+
+          {/* TASKS */}
+          {currentView === 'tasks' && (
+            <TasksPage
+              filters={tasksFilters}
+              onFiltersChange={handleTasksFiltersChange}
+              sort={tasksSort}
+              onSortChange={handleTasksSortChange}
+              onSelectTask={setSelectedTask}
+              refreshKey={tasksRefreshKey}
             />
           )}
 
@@ -1433,6 +1468,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
           onClose={() => setSelectedTask(null)}
           onRefresh={async () => {
             await loadDashboard()
+            setTasksRefreshKey(k => k + 1)
             if (selectedTask) {
               try { setSelectedTask(await taskApi.get(selectedTask.id) as Task) } catch { /* panel will close on 404 */ }
             }

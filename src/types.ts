@@ -383,6 +383,7 @@ export type ViewMode =
   | 'director_dashboard'
   | 'project_board'
   | 'project_list'
+  | 'tasks'
   | 'hierarchy_manager'
   | 'approval_queue'
   | 'personnel_queue'
