@@ -132,7 +132,6 @@ function TaskCard({ task, instances, onSelect }: { task: Task; instances: Task[]
   const [loadingSubs, setLoadingSubs] = useState(false)
 
   const subtaskCount = task._count?.subtasks ?? 0
-  const expandable   = subtaskCount > 0 || instances.length > 0
   const childCount   = subtaskCount + instances.length
   const overdue      = isOverdue(task)
   const assignee     = assigneeLabel(task)
@@ -158,59 +157,60 @@ function TaskCard({ task, instances, onSelect }: { task: Task; instances: Task[]
           title={task.project?.name ?? 'No project'}
         />
         <div className="flex-1 min-w-0">
+          {/* Card face — title only; everything else lives in the expansion */}
           <div
-            onClick={() => onSelect?.(task)}
-            className={`flex items-center gap-3 px-3 py-2.5 ${onSelect ? 'cursor-pointer hover:bg-tw-hover' : ''} transition-colors`}
+            onClick={toggle}
+            className="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-tw-hover transition-colors"
           >
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className={`text-xs font-bold flex-shrink-0 ${PRIORITY_STYLES[task.priority] ?? 'text-gray-400'}`}
-                  title={task.priority}>
-                  {PRIORITY_MARK[task.priority] ?? '–'}
-                </span>
-                <span className="font-medium text-tw-text text-sm truncate">{task.title}</span>
-              </div>
-              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 mt-0.5 text-[11px] text-tw-text-secondary">
-                {task.project && (
-                  <span className="truncate max-w-[45%]">{task.project.name}</span>
-                )}
-                {instances.length > 0
-                  ? <span>👥 Group · {instances.length} member{instances.length !== 1 ? 's' : ''}</span>
-                  : assignee && <span className="truncate max-w-[45%]">👤 {assignee}</span>
-                }
-                <span>Created {shortDate(task.createdAt)}</span>
-                {task.deadline && (
-                  <span className={overdue ? 'text-tw-danger font-semibold' : ''}>
-                    {overdue ? 'Overdue · ' : 'Due '}{shortDate(task.deadline)}
-                  </span>
-                )}
-              </div>
-            </div>
-
-            <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${STATUS_STYLES[task.status] ?? 'bg-gray-100 text-gray-600'}`}>
-              {STATUS_LABELS[task.status] ?? task.status}
-            </span>
-
-            {expandable && (
-              <button
-                onClick={e => { e.stopPropagation(); toggle() }}
-                className="flex items-center gap-1 flex-shrink-0 text-tw-text-secondary hover:text-tw-primary transition-colors p-1 rounded-md"
-                title={expanded ? 'Hide breakdown' : `Show ${childCount} item${childCount !== 1 ? 's' : ''}`}
-              >
-                <span className="text-[11px] font-semibold">{childCount}</span>
-                <svg className={`w-4 h-4 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
-                  fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
+            <span className="font-medium text-tw-text text-sm truncate flex-1 min-w-0">{task.title}</span>
+            {childCount > 0 && (
+              <span className="text-[11px] font-semibold text-tw-text-secondary flex-shrink-0">{childCount}</span>
             )}
+            <svg className={`w-4 h-4 flex-shrink-0 text-tw-text-secondary transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
+              fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
           </div>
 
-          {/* Breakdown — subtasks and group member instances */}
+          {/* Breakdown — details, then subtasks and group member instances */}
           {expanded && (
             <div className="border-t border-tw-border bg-[#f8f9ff]">
+              {/* Details */}
+              <div className="px-3 py-3 space-y-2.5">
+                {task.description && (
+                  <p className="text-xs text-tw-text leading-relaxed whitespace-pre-wrap line-clamp-4">{task.description}</p>
+                )}
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] text-tw-text-secondary">
+                  <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${STATUS_STYLES[task.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                    {STATUS_LABELS[task.status] ?? task.status}
+                  </span>
+                  <span className={`font-semibold ${PRIORITY_STYLES[task.priority] ?? 'text-gray-400'}`} title="Priority">
+                    {PRIORITY_MARK[task.priority] ?? '–'} {task.priority}
+                  </span>
+                  {task.project && <span className="truncate max-w-[45%]">{task.project.name}</span>}
+                  {instances.length > 0
+                    ? <span>👥 Group · {instances.length} member{instances.length !== 1 ? 's' : ''}</span>
+                    : assignee && <span className="truncate max-w-[45%]">👤 {assignee}</span>
+                  }
+                  <span>Created {shortDate(task.createdAt)}</span>
+                  {task.deadline && (
+                    <span className={overdue ? 'text-tw-danger font-semibold' : ''}>
+                      {overdue ? 'Overdue · ' : 'Due '}{shortDate(task.deadline)}
+                    </span>
+                  )}
+                </div>
+                {onSelect && (
+                  <button
+                    onClick={e => { e.stopPropagation(); onSelect(task) }}
+                    className="text-xs font-semibold text-tw-primary hover:underline"
+                  >
+                    Open task →
+                  </button>
+                )}
+              </div>
+
               {instances.length > 0 && (
-                <div className="divide-y divide-tw-border/60">
+                <div className="divide-y divide-tw-border/60 border-t border-tw-border/60">
                   <div className="px-3 pt-2 pb-1 text-[10px] font-bold text-tw-text-secondary uppercase tracking-wider">
                     Group members ({instances.length})
                   </div>
@@ -218,7 +218,7 @@ function TaskCard({ task, instances, onSelect }: { task: Task; instances: Task[]
                 </div>
               )}
               {subtaskCount > 0 && (
-                <div className="divide-y divide-tw-border/60">
+                <div className="divide-y divide-tw-border/60 border-t border-tw-border/60">
                   <div className="px-3 pt-2 pb-1 text-[10px] font-bold text-tw-text-secondary uppercase tracking-wider">
                     Subtasks ({subtaskCount})
                   </div>
