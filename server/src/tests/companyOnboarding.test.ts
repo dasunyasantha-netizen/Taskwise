@@ -525,7 +525,7 @@ async function main() {
   })
 
   let motorQuotationId = ''
-  await test('Any Fairfirst user can create a one-month motor quotation', async () => {
+  await test('Any Fairfirst user can create a motor quotation valid for 30 days', async () => {
     const res = mockRes()
     await insuranceCtrl.createQuotation(mockReq({
       user: ffInsuranceUser,
@@ -546,8 +546,7 @@ async function main() {
     motorQuotationId = res.body.id
     const issue = new Date(res.body.issueDate)
     const expiry = new Date(res.body.expiresAt)
-    assert.ok(expiry > issue)
-    assert.ok(expiry.getTime() - issue.getTime() >= 28 * 24 * 60 * 60 * 1000)
+    assert.equal(expiry.getTime() - issue.getTime(), 30 * 24 * 60 * 60 * 1000)
   })
 
   await test('A different Fairfirst user can edit the quotation', async () => {
@@ -581,6 +580,7 @@ async function main() {
     assert.equal(res.body.vehicleNumber, null)
   })
 
+  let motorPolicyId = ''
   await test('An active quotation converts to a policy with a partial-payment balance', async () => {
     const res = mockRes()
     await insuranceCtrl.convertQuotation(mockReq({
@@ -597,6 +597,7 @@ async function main() {
     assert.equal(res.body.introducer, 'Nimal Perera')
     const quote = await prisma.insuranceQuotation.findUniqueOrThrow({ where: { id: motorQuotationId } })
     assert.equal(quote.status, 'CONVERTED')
+    motorPolicyId = res.body.id
   })
 
   let directPolicyId = ''
@@ -680,9 +681,9 @@ async function main() {
     assert.equal(res.body.some((quotation: any) => quotation.status === 'CONVERTED'), false)
   })
 
-  await test('Policies with no payment after 30 days are cancelled and can be reactivated with payment', async () => {
+  await test('Motor policies with no payment after 30 days are cancelled and can be reactivated with payment', async () => {
     const policy = await prisma.insurancePolicy.update({
-      where: { id: directPolicyId },
+      where: { id: motorPolicyId },
       data: { issueDate: new Date('2026-01-01'), expiryDate: new Date('2027-09-10'), paid: false, paymentAmount: 0, status: 'ACTIVE' },
     })
     const listRes = mockRes()
@@ -693,12 +694,61 @@ async function main() {
     await insuranceCtrl.reactivatePolicy(mockReq({
       user: ffInsuranceUser,
       params: { id: policy.id },
-      body: { companyPolicyNumber: 'FF/TRV/201', salesCode: 'SC-201', businessType: 'RENEWAL', premium: 18000, gwp: 17000, issueDate: '2026-08-11', expiryDate: '2027-08-10', paymentAmount: 5000 },
+      body: { companyPolicyNumber: 'FF/MOT/201', salesCode: 'SC-201', businessType: 'RENEWAL', premium: 18000, gwp: 17000, issueDate: '2026-08-11', expiryDate: '2027-08-10', paymentAmount: 5000 },
     }), reactivateRes)
     assert.equal(reactivateRes.statusCode, 200)
     assert.equal(reactivateRes.body.status, 'ACTIVE')
     assert.equal(reactivateRes.body.paymentAmount, 5000)
     assert.equal(reactivateRes.body.gwp, 17000)
+  })
+
+  await test('Non-motor policies stay active when no payment is made, until their expiry date', async () => {
+    // Same unpaid, long-overdue shape as the motor case above — but travel, so it must not lapse.
+    await prisma.insurancePolicy.update({
+      where: { id: directPolicyId },
+      data: { issueDate: new Date('2026-01-01'), expiryDate: new Date('2027-09-10'), paid: false, paymentAmount: 0, status: 'ACTIVE' },
+    })
+    const listRes = mockRes()
+    await insuranceCtrl.listPolicies(mockReq({ user: ffInsuranceUser, query: {} }), listRes)
+    assert.equal(listRes.body.find((row: any) => row.id === directPolicyId).status, 'ACTIVE')
+  })
+
+  await test('A non-motor policy already marked cancelled is restored to active', async () => {
+    await prisma.insurancePolicy.update({ where: { id: directPolicyId }, data: { status: 'CANCELLED' } })
+    const listRes = mockRes()
+    await insuranceCtrl.listPolicies(mockReq({ user: ffInsuranceUser, query: {} }), listRes)
+    assert.equal(listRes.body.find((row: any) => row.id === directPolicyId).status, 'ACTIVE')
+  })
+
+  await test('A motor policy issued more than 30 days ago with no payment is created cancelled', async () => {
+    const staleIssue = new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+    const futureExpiry = new Date(Date.now() + 300 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+    const motorRes = mockRes()
+    await insuranceCtrl.createPolicy(mockReq({
+      user: ffInsuranceUser,
+      body: {
+        insuranceType: 'MOTOR', customerName: 'Stale Motor', contactNumber: '0771110000',
+        companyPolicyNumber: 'FF/MOT/300', salesCode: 'SC-300', businessType: 'NEW', gwp: 12000,
+        vehicleNumber: 'WP CAB-9999', vehicleMakeModel: 'Toyota Aqua', fuelType: 'Petrol', vehicleUsage: 'Private',
+        sumInsured: 2000000, premium: 15000, issueDate: staleIssue, expiryDate: futureExpiry, paymentAmount: 0,
+      },
+    }), motorRes)
+    assert.equal(motorRes.statusCode, 201)
+    assert.equal(motorRes.body.status, 'CANCELLED')
+
+    // The identical shape as a marine policy must be created active instead.
+    const marineRes = mockRes()
+    await insuranceCtrl.createPolicy(mockReq({
+      user: ffInsuranceUser,
+      body: {
+        insuranceType: 'MARINE', customerName: 'Stale Marine', contactNumber: '0771110001',
+        companyPolicyNumber: 'FF/MAR/300', salesCode: 'SC-300', businessType: 'NEW', gwp: 12000,
+        cargoDescription: 'Tea chests', transitFrom: 'Colombo', transitTo: 'Dubai', conveyance: 'Vessel',
+        sumInsured: 2000000, premium: 15000, issueDate: staleIssue, expiryDate: futureExpiry, paymentAmount: 0,
+      },
+    }), marineRes)
+    assert.equal(marineRes.statusCode, 201)
+    assert.equal(marineRes.body.status, 'ACTIVE')
   })
 
   await test('Past-expiry policies become expired and can also be reactivated', async () => {

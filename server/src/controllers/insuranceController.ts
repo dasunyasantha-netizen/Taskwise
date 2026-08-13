@@ -65,19 +65,15 @@ function automaticNumber(prefix: 'Q' | 'P', sequenceNumber: number): string {
   return `${prefix}-${String(sequenceNumber).padStart(6, '0')}`
 }
 
-function addCalendarMonthSriLanka(date: Date): Date {
-  const offset = 330 * 60 * 1000
-  const local = new Date(date.getTime() + offset)
-  const year = local.getUTCFullYear()
-  const month = local.getUTCMonth()
-  const day = local.getUTCDate()
-  const hour = local.getUTCHours()
-  const minute = local.getUTCMinutes()
-  const second = local.getUTCSeconds()
-  const ms = local.getUTCMilliseconds()
-  const lastDayNextMonth = new Date(Date.UTC(year, month + 2, 0)).getUTCDate()
-  const targetLocal = Date.UTC(year, month + 1, Math.min(day, lastDayNextMonth), hour, minute, second, ms)
-  return new Date(targetLocal - offset)
+// A quotation is valid for 30 days from its issue date.
+const QUOTATION_VALIDITY_DAYS = 30
+// A policy lapses for non-payment 30 days after issue — motor only, see policyStatus.
+const PAYMENT_GRACE_DAYS = 30
+// Every other insurance type stays active until its expiry date, paid or not.
+const PAYMENT_LAPSE_TYPE: InsuranceType = 'MOTOR'
+
+function addDays(date: Date, days: number): Date {
+  return new Date(date.getTime() + days * 24 * 60 * 60 * 1000)
 }
 
 function startOfTodaySriLanka(now = new Date()): Date {
@@ -183,7 +179,7 @@ async function expireQuotations(workspaceId: string) {
 async function refreshPolicyStatuses(workspaceId: string) {
   const now = new Date()
   const todayStart = startOfTodaySriLanka(now)
-  const paymentDeadline = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+  const paymentDeadline = addDays(now, -PAYMENT_GRACE_DAYS)
   await prisma.$transaction([
     prisma.insurancePolicy.updateMany({
       where: { workspaceId, expiryDate: { lt: todayStart }, status: { not: 'EXPIRED' } },
@@ -192,6 +188,7 @@ async function refreshPolicyStatuses(workspaceId: string) {
     prisma.insurancePolicy.updateMany({
       where: {
         workspaceId,
+        insuranceType: PAYMENT_LAPSE_TYPE,
         expiryDate: { gte: todayStart },
         paymentAmount: { equals: 0 },
         issueDate: { lt: paymentDeadline },
@@ -203,7 +200,11 @@ async function refreshPolicyStatuses(workspaceId: string) {
       where: {
         workspaceId,
         expiryDate: { gte: todayStart },
-        OR: [{ paymentAmount: { gt: 0 } }, { issueDate: { gte: paymentDeadline } }],
+        OR: [
+          { insuranceType: { not: PAYMENT_LAPSE_TYPE } },
+          { paymentAmount: { gt: 0 } },
+          { issueDate: { gte: paymentDeadline } },
+        ],
         status: { not: 'ACTIVE' },
       },
       data: { status: 'ACTIVE' },
@@ -211,9 +212,9 @@ async function refreshPolicyStatuses(workspaceId: string) {
   ])
 }
 
-function policyStatus(issueDate: Date, expiryDate: Date, paymentAmount: number, now = new Date()): 'ACTIVE' | 'CANCELLED' | 'EXPIRED' {
+function policyStatus(insuranceType: string, issueDate: Date, expiryDate: Date, paymentAmount: number, now = new Date()): 'ACTIVE' | 'CANCELLED' | 'EXPIRED' {
   if (expiryDate < startOfTodaySriLanka(now)) return 'EXPIRED'
-  if (paymentAmount <= 0 && issueDate.getTime() < now.getTime() - 30 * 24 * 60 * 60 * 1000) return 'CANCELLED'
+  if (insuranceType === PAYMENT_LAPSE_TYPE && paymentAmount <= 0 && issueDate < addDays(now, -PAYMENT_GRACE_DAYS)) return 'CANCELLED'
   return 'ACTIVE'
 }
 
@@ -336,7 +337,7 @@ export async function createQuotation(req: Request, res: Response): Promise<void
           quotationNumber: `PENDING-Q-${randomUUID()}`,
           ...data,
           issueDate,
-          expiresAt: addCalendarMonthSriLanka(issueDate),
+          expiresAt: addDays(issueDate, QUOTATION_VALIDITY_DAYS),
           createdById: req.user!.actorId,
           createdByType: req.user!.actorType,
           createdByName: name,
@@ -409,7 +410,7 @@ export async function convertQuotation(req: Request, res: Response): Promise<voi
           ...business,
           issueDate,
           expiryDate,
-          status: policyStatus(issueDate, expiryDate, payment.paymentAmount),
+          status: policyStatus(quotation.insuranceType, issueDate, expiryDate, payment.paymentAmount),
           notes: quotation.notes,
           ...copiedSubjectData(quotation),
           ...payment,
@@ -455,7 +456,7 @@ export async function renewQuotation(req: Request, res: Response): Promise<void>
           sumInsured: quotation.sumInsured,
           premium,
           issueDate,
-          expiresAt: addCalendarMonthSriLanka(issueDate),
+          expiresAt: addDays(issueDate, QUOTATION_VALIDITY_DAYS),
           notes: quotation.notes,
           ...copiedSubjectData(quotation),
           renewedFromId: quotation.id,
@@ -528,7 +529,7 @@ export async function createPolicy(req: Request, res: Response): Promise<void> {
           ...data,
           issueDate,
           expiryDate,
-          status: policyStatus(issueDate, expiryDate, payment.paymentAmount),
+          status: policyStatus(data.insuranceType, issueDate, expiryDate, payment.paymentAmount),
           ...payment,
           createdById: req.user!.actorId,
           createdByType: req.user!.actorType,
@@ -563,7 +564,7 @@ export async function updatePolicy(req: Request, res: Response): Promise<void> {
         ...data,
         issueDate,
         expiryDate,
-        status: policyStatus(issueDate, expiryDate, payment.paymentAmount),
+        status: policyStatus(data.insuranceType, issueDate, expiryDate, payment.paymentAmount),
         ...payment,
         updatedById: req.user!.actorId,
         updatedByType: req.user!.actorType,

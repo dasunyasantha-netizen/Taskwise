@@ -258,6 +258,7 @@ function RecordFormModal({ kind, initial, onClose, onSaved }: {
                     <Field label="Payment amount (LKR)"><MoneyInput value={form.paid ? String(premium || '') : String(form.paymentAmount)} onChange={v => set('paymentAmount', v)} /></Field>
                     <div><span className="block text-xs font-semibold text-tw-text-secondary mb-1.5">Remaining amount</span><div className={`input text-sm font-bold flex items-center ${remaining > 0 ? 'text-tw-danger' : 'text-emerald-600'}`}>{money(remaining)}</div></div>
                   </div>
+                  <p className="text-xs text-tw-text-secondary mt-3">{form.insuranceType === 'MOTOR' ? 'Motor policies are cancelled automatically if no payment is recorded within 30 days of the issue date.' : 'Only motor policies are cancelled for non-payment — this policy stays active until its expiry date.'}</p>
                 </div>
               </>
             )}
@@ -314,7 +315,7 @@ function RenewModal({ quotation, onClose, onSaved }: { quotation: InsuranceQuota
   return (
     <div className="fixed inset-0 z-[60] bg-black/40 p-4 flex items-center justify-center" onClick={onClose}>
       <form onSubmit={submit} className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-5" onClick={e => e.stopPropagation()}>
-        <h2 className="font-bold text-tw-text text-lg">Renew Quotation</h2><p className="text-sm text-tw-text-secondary mb-4">A new quotation will be valid for one calendar month.</p>
+        <h2 className="font-bold text-tw-text text-lg">Renew Quotation</h2><p className="text-sm text-tw-text-secondary mb-4">A new quotation will be valid for 30 days.</p>
         {error && <div className="mb-3 bg-red-50 border border-red-200 text-tw-danger text-sm px-3 py-2 rounded-lg">{error}</div>}
         <div className="space-y-4"><Field label="New quotation number"><div className="input text-sm flex items-center bg-gray-50 text-tw-text-secondary">Assigned automatically when renewed</div></Field><Field label="Premium (LKR)" required><MoneyInput value={premium} onChange={setPremium} required /></Field></div>
         <div className="flex justify-end gap-2 mt-5"><button type="button" className="btn-secondary" onClick={onClose}>Cancel</button><button className="btn-primary" disabled={saving}>{saving ? 'Renewing…' : 'Create Renewal'}</button></div>
@@ -453,7 +454,7 @@ export default function InsuranceManagementPage() {
     { status: 'RENEWED', label: 'Renewed', value: money(summary.quotationTotals.RENEWED.value), sub: `${summary.quotationTotals.RENEWED.count} quotations`, color: 'text-amber-600', icon: '🔄' },
   ] : [
     { status: 'ACTIVE', label: 'Active', value: money(summary.policyTotals.ACTIVE.value), sub: `${summary.policyTotals.ACTIVE.count} policies · GWP`, color: 'text-emerald-600', icon: '🛡️' },
-    { status: 'CANCELLED', label: 'Cancelled', value: money(summary.policyTotals.CANCELLED.value), sub: `${summary.policyTotals.CANCELLED.count} policies · GWP`, color: 'text-tw-danger', icon: '⛔' },
+    { status: 'CANCELLED', label: 'Cancelled', value: money(summary.policyTotals.CANCELLED.value), sub: `${summary.policyTotals.CANCELLED.count} unpaid motor policies · GWP`, color: 'text-tw-danger', icon: '⛔' },
     { status: 'EXPIRED', label: 'Expired', value: money(summary.policyTotals.EXPIRED.value), sub: `${summary.policyTotals.EXPIRED.count} policies · GWP`, color: 'text-amber-600', icon: '⌛' },
     { status: '', label: 'Final', value: money(summary.finalPolicyGwp), sub: 'Active GWP − cancelled and expired GWP', color: summary.finalPolicyGwp < 0 ? 'text-tw-danger' : 'text-indigo-600', icon: '📊' },
   ]) : []
