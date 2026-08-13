@@ -366,12 +366,90 @@ function ReactivatePolicyModal({ policy, onClose, onSaved }: { policy: Insurance
 
 const badgeClass: Record<string, string> = { ACTIVE: 'badge-success', CONVERTED: 'badge-primary', EXPIRED: 'badge-danger', CANCELLED: 'badge-danger', RENEWED: 'badge-warning' }
 
-function subjectPairs(record: InsuranceQuotation | InsurancePolicy): Array<[string, string]> {
-  if (record.insuranceType === 'MOTOR') return [['Vehicle number', record.vehicleNumber || '—'], ['Make and model', record.vehicleMakeModel || '—'], ['Fuel type', record.fuelType || '—'], ['Usage', record.vehicleUsage || '—']]
-  if (record.insuranceType === 'FIRE') return [['Property address', record.propertyAddress || '—'], ['Property type', record.propertyType || '—'], ['Property usage', record.propertyUsage || '—']]
-  if (record.insuranceType === 'CASUALTY') return [['Business / occupation', record.businessActivity || '—'], ['Risk / coverage', record.riskDescription || '—']]
-  if (record.insuranceType === 'MARINE') return [['Cargo / subject', record.cargoDescription || '—'], ['Transit from', record.transitFrom || '—'], ['Transit to', record.transitTo || '—'], ['Conveyance', record.conveyance || '—']]
-  return [['Passport number', record.passportNumber || '—'], ['Destination', record.destination || '—'], ['Travel start', displayDate(record.travelStartDate)], ['Travel end', displayDate(record.travelEndDate)]]
+const TYPE_STYLE: Record<InsuranceType, { icon: string; tint: string }> = {
+  MOTOR: { icon: '🚗', tint: 'bg-tw-indigo-light' },
+  FIRE: { icon: '🔥', tint: 'bg-tw-orange-light' },
+  CASUALTY: { icon: '⚖️', tint: 'bg-tw-purple-light' },
+  MARINE: { icon: '🚢', tint: 'bg-tw-teal-light' },
+  TRAVEL: { icon: '✈️', tint: 'bg-tw-success-light' },
+}
+
+type SubjectDetail = { label: string; value: string; wide?: boolean }
+
+function subjectDetails(record: InsuranceQuotation | InsurancePolicy): SubjectDetail[] {
+  if (record.insuranceType === 'MOTOR') return [
+    { label: 'Vehicle number', value: record.vehicleNumber || '—' },
+    { label: 'Make and model', value: record.vehicleMakeModel || '—' },
+    { label: 'Fuel type', value: record.fuelType || '—' },
+    { label: 'Usage', value: record.vehicleUsage || '—' },
+  ]
+  if (record.insuranceType === 'FIRE') return [
+    { label: 'Property address', value: record.propertyAddress || '—', wide: true },
+    { label: 'Property type', value: record.propertyType || '—' },
+    { label: 'Property usage', value: record.propertyUsage || '—' },
+  ]
+  if (record.insuranceType === 'CASUALTY') return [
+    { label: 'Business / occupation', value: record.businessActivity || '—' },
+    { label: 'Risk / coverage', value: record.riskDescription || '—', wide: true },
+  ]
+  if (record.insuranceType === 'MARINE') return [
+    { label: 'Cargo / subject', value: record.cargoDescription || '—', wide: true },
+    { label: 'Transit from', value: record.transitFrom || '—' },
+    { label: 'Transit to', value: record.transitTo || '—' },
+    { label: 'Conveyance', value: record.conveyance || '—' },
+  ]
+  return [
+    { label: 'Passport number', value: record.passportNumber || '—' },
+    { label: 'Destination', value: record.destination || '—' },
+    { label: 'Travel start', value: displayDate(record.travelStartDate) },
+    { label: 'Travel end', value: displayDate(record.travelEndDate) },
+  ]
+}
+
+function daysUntil(value?: string | null): number | null {
+  if (!value) return null
+  const target = new Date(value)
+  if (Number.isNaN(target.getTime())) return null
+  const today = new Date()
+  const from = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate())
+  const to = Date.UTC(target.getFullYear(), target.getMonth(), target.getDate())
+  return Math.round((to - from) / 86400000)
+}
+
+function validityBadge(days: number | null): { text: string; className: string } | null {
+  if (days === null) return null
+  if (days < 0) return { text: `Lapsed ${Math.abs(days)} day${Math.abs(days) === 1 ? '' : 's'} ago`, className: 'badge-danger' }
+  if (days === 0) return { text: 'Last day', className: 'badge-danger' }
+  if (days <= 30) return { text: `${days} day${days === 1 ? '' : 's'} left`, className: 'badge-warning' }
+  return { text: `${days} days left`, className: 'badge-success' }
+}
+
+function Stat({ label, value, tone }: { label: string; value: string; tone?: 'danger' | 'success' | 'primary' }) {
+  const toneClass = tone === 'danger' ? 'text-tw-danger' : tone === 'success' ? 'text-emerald-600' : tone === 'primary' ? 'text-tw-primary' : 'text-tw-text'
+  return (
+    <div className="rounded-xl border border-tw-border bg-gray-50 px-3 py-2.5 min-w-0">
+      <div className="text-[11px] font-semibold uppercase tracking-wide text-tw-text-secondary truncate">{label}</div>
+      <div className={`text-sm md:text-base font-bold mt-0.5 truncate ${toneClass}`} title={value}>{value}</div>
+    </div>
+  )
+}
+
+function Detail({ label, value, wide, tone }: { label: string; value: React.ReactNode; wide?: boolean; tone?: string }) {
+  return (
+    <div className={wide ? 'sm:col-span-2' : 'min-w-0'}>
+      <dt className="text-xs font-semibold text-tw-text-secondary mb-0.5">{label}</dt>
+      <dd className={`text-sm font-medium break-words ${tone || 'text-tw-text'}`}>{value}</dd>
+    </div>
+  )
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section>
+      <h3 className="text-[11px] font-bold uppercase tracking-wider text-tw-text-secondary pb-2 mb-3 border-b border-tw-border">{title}</h3>
+      <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3.5">{children}</dl>
+    </section>
+  )
 }
 
 function DetailModal({ record, kind, onClose, onEdit, onConvert, onRenew, onReactivate }: {
@@ -379,21 +457,109 @@ function DetailModal({ record, kind, onClose, onEdit, onConvert, onRenew, onReac
 }) {
   const quote = kind === 'quotation' ? record as InsuranceQuotation : null
   const policy = kind === 'policy' ? record as InsurancePolicy : null
-  const pairs: Array<[string, React.ReactNode]> = [
-    [kind === 'quotation' ? 'Quotation number' : 'Policy number', kind === 'quotation' ? quote!.quotationNumber : policy!.policyNumber],
-    ['Insurance type', typeLabel(record.insuranceType)], ['Customer', record.customerName], ['Contact number', record.contactNumber],
-    ['Introducer', record.introducer || '—'], ...(quote ? [['Partner', quote.partner || '—']] as Array<[string, string]> : []),
-    ...subjectPairs(record), ['Sum insured', money(record.sumInsured)], ['Premium', money(record.premium)],
-    ...(quote ? [['Issue date', displayDate(quote.issueDate)], ['Valid until', displayDate(quote.expiresAt)]] as Array<[string, string]> : []),
-    ...(policy ? [['Company policy number', policy.companyPolicyNumber || '—'], ['Sales code', policy.salesCode || '—'], ['Business type', policy.businessType || '—'], ['GWP', money(policy.gwp)], ['Issue date', displayDate(policy.issueDate)], ['Expiry date', displayDate(policy.expiryDate)], ['Payment received', money(policy.paymentAmount)], ['Remaining amount', money(policy.remainingAmount)]] as Array<[string, string]> : []),
-    ['Created by', record.createdByName], ['Notes', record.notes || '—'],
+  const style = TYPE_STYLE[record.insuranceType] || TYPE_STYLE.MOTOR
+  const number = quote ? quote.quotationNumber : policy!.policyNumber
+  const periodEnd = quote ? quote.expiresAt : policy!.expiryDate
+  const validity = validityBadge(daysUntil(periodEnd))
+  const settledPct = policy && policy.premium > 0 ? Math.min(100, Math.round((policy.paymentAmount / policy.premium) * 100)) : 0
+  const links: Array<[string, string]> = [
+    ...(policy?.sourceQuotation ? [['Created from quotation', policy.sourceQuotation.quotationNumber]] as Array<[string, string]> : []),
+    ...(quote?.convertedPolicy ? [['Converted to policy', quote.convertedPolicy.policyNumber]] as Array<[string, string]> : []),
+    ...(quote?.renewedFrom ? [['Renewed from', quote.renewedFrom.quotationNumber]] as Array<[string, string]> : []),
+    ...(quote?.renewedTo?.length ? [['Renewed to', quote.renewedTo.map(item => item.quotationNumber).join(', ')]] as Array<[string, string]> : []),
   ]
+
   return (
     <div className="fixed inset-0 z-50 bg-black/40 p-3 md:p-6 flex items-center justify-center" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col" onClick={e => e.stopPropagation()}>
-        <div className="px-5 py-4 border-b border-tw-border flex items-start justify-between gap-3"><div><div className="flex items-center gap-2"><h2 className="font-bold text-tw-text text-lg">{kind === 'quotation' ? quote!.quotationNumber : policy!.policyNumber}</h2><span className={`badge ${badgeClass[record.status] || 'badge-gray'}`}>{record.status.replace('_', ' ')}</span></div><p className="text-sm text-tw-text-secondary mt-0.5">{record.customerName}</p></div><button onClick={onClose} className="w-8 h-8 rounded-lg hover:bg-tw-hover text-tw-text-secondary text-xl">×</button></div>
-        <div className="flex-1 overflow-y-auto p-5"><div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">{pairs.map(([label, value]) => <div key={label} className={label === 'Notes' || label.includes('Risk') || label.includes('Cargo') || label.includes('Property address') ? 'sm:col-span-2' : ''}><div className="text-xs font-semibold text-tw-text-secondary mb-1">{label}</div><div className={`text-sm font-medium break-words ${label === 'Remaining amount' && policy && policy.remainingAmount > 0 ? 'text-tw-danger' : 'text-tw-text'}`}>{value}</div></div>)}</div></div>
-        <div className="px-5 py-4 border-t border-tw-border flex flex-wrap justify-end gap-2">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92dvh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className={`shrink-0 px-5 sm:px-6 py-4 ${style.tint}`}>
+          <div className="flex items-start gap-3">
+            <div className="w-11 h-11 rounded-xl bg-white/70 flex items-center justify-center text-xl shrink-0">{style.icon}</div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="font-bold text-tw-text text-lg leading-tight">{number}</h2>
+                <span className={`badge ${badgeClass[record.status] || 'badge-gray'}`}>{record.status.replace('_', ' ')}</span>
+              </div>
+              <p className="text-sm font-semibold text-tw-text mt-1 truncate">{record.customerName}</p>
+              <p className="text-xs text-tw-text-secondary mt-0.5">{typeLabel(record.insuranceType)} {kind} · {record.contactNumber}</p>
+            </div>
+            <button onClick={onClose} className="w-8 h-8 rounded-lg hover:bg-white/60 text-tw-text-secondary text-xl leading-none shrink-0">×</button>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-5 sm:px-6 py-5 space-y-6">
+          <div className={`grid gap-2.5 ${policy ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-2'}`}>
+            <Stat label="Sum insured" value={money(record.sumInsured)} />
+            <Stat label="Premium" value={money(record.premium)} />
+            {policy && <Stat label="GWP" value={money(policy.gwp)} tone="primary" />}
+            {policy && <Stat label={policy.remainingAmount > 0 ? 'Balance due' : 'Settled'} value={policy.remainingAmount > 0 ? money(policy.remainingAmount) : 'Paid in full'} tone={policy.remainingAmount > 0 ? 'danger' : 'success'} />}
+          </div>
+
+          {policy && (
+            <div className="rounded-xl border border-tw-border p-3.5">
+              <div className="flex items-center justify-between gap-3 text-xs mb-2">
+                <span className="font-semibold text-tw-text-secondary">Payment received</span>
+                <span className="font-bold text-tw-text">{money(policy.paymentAmount)} of {money(policy.premium)}</span>
+              </div>
+              <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+                <div className={`h-full rounded-full transition-all ${policy.remainingAmount > 0 ? 'bg-tw-warning' : 'bg-tw-success'}`} style={{ width: `${settledPct}%` }} />
+              </div>
+              <div className="flex items-center justify-between gap-3 text-xs mt-2">
+                <span className="text-tw-text-secondary">{settledPct}% settled</span>
+                {policy.remainingAmount > 0
+                  ? <span className="font-semibold text-tw-danger">{money(policy.remainingAmount)} outstanding</span>
+                  : <span className="font-semibold text-emerald-600">Paid in full</span>}
+              </div>
+            </div>
+          )}
+
+          <div className="rounded-xl border border-tw-border p-3.5 flex items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-tw-text-secondary">Issued</div>
+              <div className="text-sm font-bold text-tw-text truncate">{displayDate(quote ? quote.issueDate : policy!.issueDate)}</div>
+            </div>
+            <div className="text-tw-text-secondary shrink-0">→</div>
+            <div className="min-w-0 flex-1">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-tw-text-secondary">{quote ? 'Valid until' : 'Expires'}</div>
+              <div className="text-sm font-bold text-tw-text truncate">{displayDate(periodEnd)}</div>
+            </div>
+            {validity && <span className={`badge ${validity.className} shrink-0`}>{validity.text}</span>}
+          </div>
+
+          <Section title="Customer and introducer">
+            <Detail label="Customer" value={record.customerName} />
+            <Detail label="Contact number" value={record.contactNumber} />
+            <Detail label="Introducer" value={record.introducer || '—'} />
+            {quote && <Detail label="Partner" value={quote.partner || '—'} />}
+          </Section>
+
+          <Section title={`${typeLabel(record.insuranceType)} details`}>
+            {subjectDetails(record).map(item => <Detail key={item.label} label={item.label} value={item.value} wide={item.wide} />)}
+          </Section>
+
+          {policy && (
+            <Section title="Fairfirst administration">
+              <Detail label="Company policy number" value={policy.companyPolicyNumber || '—'} tone={policy.companyPolicyNumber?.startsWith('SAMPLE-') ? 'text-tw-danger' : undefined} />
+              <Detail label="Sales code" value={policy.salesCode || '—'} />
+              <Detail label="Business type" value={policy.businessType || '—'} />
+              <Detail label="Internal policy number" value={policy.policyNumber} />
+            </Section>
+          )}
+
+          {links.length > 0 && (
+            <Section title="Linked records">
+              {links.map(([label, value]) => <Detail key={label} label={label} value={value} />)}
+            </Section>
+          )}
+
+          <Section title="Record">
+            <Detail label="Created by" value={record.createdByName} />
+            <Detail label="Created on" value={displayDate(record.createdAt)} />
+            <Detail label="Notes" value={record.notes || '—'} wide />
+          </Section>
+        </div>
+
+        <div className="shrink-0 px-5 sm:px-6 py-4 border-t border-tw-border bg-gray-50 flex flex-wrap justify-end gap-2">
           {quote?.status === 'ACTIVE' && <button className="btn-secondary" onClick={onEdit}>Edit</button>}
           {policy?.status === 'ACTIVE' && <button className="btn-secondary" onClick={onEdit}>Edit Policy / Payment</button>}
           {policy && ['CANCELLED', 'EXPIRED'].includes(policy.status) && onReactivate && <button className="btn-primary" onClick={onReactivate}>Reactivate Policy</button>}
