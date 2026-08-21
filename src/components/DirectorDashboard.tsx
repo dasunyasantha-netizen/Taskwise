@@ -27,6 +27,7 @@ import ChairmanUserManagementPage from './ChairmanUserManagementPage'
 import LeaderboardPage from './LeaderboardPage'
 import CompanyRequestsPage from './CompanyRequestsPage'
 import InsuranceManagementPage from './InsuranceManagementPage'
+import { launcherHomeUrl, launcherName, type LaunchSource } from '../services/launchSource'
 
 interface Props {
   user: AuthUser
@@ -35,6 +36,7 @@ interface Props {
   onLogout: () => void
   onUserUpdate: (updated: Partial<AuthUser>) => void
   onImpersonationStart?: (token: string, impersonatedUser: AuthUser) => void
+  launchSource: LaunchSource
 }
 
 type ProjectSubView = 'board' | 'flowchart'
@@ -786,7 +788,7 @@ function MobileUserMenu({ user, onProfile, onSettings, onLogout }: { user: AuthU
 }
 
 // ─── Director Dashboard ───────────────────────────────────────────────────────
-export default function DirectorDashboard({ user, currentView, setView, onLogout, onUserUpdate, onImpersonationStart }: Props) {
+export default function DirectorDashboard({ user, currentView, setView, onLogout, onUserUpdate, onImpersonationStart, launchSource }: Props) {
   const insuranceEnabled = user.features?.includes('insurance_management') === true
   // ── Navigation history (view + scroll position) ───────────────────────────
   const [viewHistory, setViewHistory] = useState<Array<{ view: ViewMode; scrollTop: number }>>([])
@@ -1135,6 +1137,16 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
                 <span className="hidden xs:inline">Notify</span>
               </button>
             )}
+            <a
+              href={launcherHomeUrl(launchSource)}
+              title={`Back to ${launcherName(launchSource)}`}
+              aria-label={`Back to ${launcherName(launchSource)}`}
+              className="flex items-center justify-center text-white/70 md:text-tw-text-secondary hover:text-white md:hover:text-tw-primary transition-colors p-1.5 rounded-lg"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </a>
             <NotificationsMenu
               onOpenTask={async taskId => {
                 try {

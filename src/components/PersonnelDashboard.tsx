@@ -9,6 +9,7 @@ import ElapsedDays from './ElapsedDays'
 import { usePWA } from '../hooks/usePWA'
 import ProgressUpdateSheet from './ProgressUpdateSheet'
 import InsuranceManagementPage from './InsuranceManagementPage'
+import { launcherHomeUrl, launcherName, type LaunchSource } from '../services/launchSource'
 
 interface Props {
   user: AuthUser
@@ -16,6 +17,7 @@ interface Props {
   setView: (v: ViewMode) => void
   onLogout: () => void
   onUserUpdate: (updated: Partial<AuthUser>) => void
+  launchSource: LaunchSource
 }
 
 // ── shared lookup maps ────────────────────────────────────────────────────────
@@ -783,7 +785,7 @@ function MobileUserMenu({ user, onProfile, onLogout }: { user: AuthUser; onProfi
 }
 
 // ── Main dashboard ────────────────────────────────────────────────────────────
-export default function PersonnelDashboard({ user, currentView, setView, onLogout, onUserUpdate }: Props) {
+export default function PersonnelDashboard({ user, currentView, setView, onLogout, onUserUpdate, launchSource }: Props) {
   const insuranceEnabled = user.features?.includes('insurance_management') === true
   const { canInstall, isIOS, installApp, pushEnabled, enablePush } = usePWA()
   const [showIOSGuide, setShowIOSGuide] = useState(false)
@@ -1042,6 +1044,16 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
                 <span className="hidden xs:inline">Notify</span>
               </button>
             )}
+            <a
+              href={launcherHomeUrl(launchSource)}
+              title={`Back to ${launcherName(launchSource)}`}
+              aria-label={`Back to ${launcherName(launchSource)}`}
+              className="flex items-center justify-center text-white/70 md:text-tw-text-secondary hover:text-white md:hover:text-tw-primary transition-colors p-1.5 rounded-lg"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </a>
             <NotificationsMenu
               onOpenTask={async taskId => {
                 try {

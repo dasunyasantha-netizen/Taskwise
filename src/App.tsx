@@ -9,6 +9,7 @@ import ImpersonationBanner from './components/ImpersonationBanner'
 import SetupPrompt from './components/SetupPrompt'
 import InsurancePolicyCompletionPrompt from './components/InsurancePolicyCompletionPrompt'
 import { authApi, noticeApi, type Notice } from './services/apiService'
+import { captureLaunchSource, type LaunchSource } from './services/launchSource'
 
 function NoticeBanner({ loggedIn }: { loggedIn: boolean }) {
   const [notices, setNotices] = useState<Notice[]>([])
@@ -57,6 +58,7 @@ const REAL_TOKEN_KEY = 'taskwise_real_token'
 const REAL_USER_KEY  = 'taskwise_real_user'
 
 export default function App() {
+  const [launchSource] = useState<LaunchSource>(() => captureLaunchSource())
   const [user, setUser]         = useState<AuthUser | null>(null)
   const [view, setView]         = useState<ViewMode>('login')
   const [loading, setLoading]   = useState(true)
@@ -74,6 +76,11 @@ export default function App() {
   }
 
   useEffect(() => {
+    const launchUrl = new URL(window.location.href)
+    if (launchUrl.searchParams.has('source')) {
+      launchUrl.searchParams.delete('source')
+      window.history.replaceState({}, '', launchUrl.pathname + launchUrl.search + launchUrl.hash)
+    }
     const token    = localStorage.getItem(TOKEN_KEY)
     const userData = localStorage.getItem(USER_KEY)
     if (token && userData) {
@@ -256,6 +263,7 @@ export default function App() {
             onLogout={handleLogout}
             onUserUpdate={handleUserUpdate}
             onImpersonationStart={handleImpersonationStart}
+            launchSource={launchSource}
           />
         </div>
       </>
@@ -282,6 +290,7 @@ export default function App() {
           setView={persistView}
           onLogout={handleLogout}
           onUserUpdate={handleUserUpdate}
+          launchSource={launchSource}
         />
       </div>
       <VersionBanner />
