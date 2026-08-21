@@ -257,15 +257,31 @@ export default function TasksPage({ filters, onFiltersChange, sort, onSortChange
   const [loading, setLoading]     = useState(true)
   const [error, setError]         = useState('')
 
-  // Reloads on mount and whenever the parent bumps refreshKey (e.g. after a
-  // task action in the detail panel).
+  // Completed/dead work is hidden by default; users can opt each status back in.
+  // Reset on every mount so a fresh visit never surfaces Approved/Cancelled (req #1).
+  const [includeApproved,  setIncludeApproved]  = useState(false)
+  const [includeCancelled, setIncludeCancelled] = useState(false)
+
+  // Statuses to omit from the server fetch. Picking a status explicitly in the
+  // filter (e.g. "Approved") re-includes it so the query can actually return it.
+  const excludedStatuses = [
+    ...(!includeApproved  && filters.extra.status !== 'APPROVED'  ? ['APPROVED']  : []),
+    ...(!includeCancelled && filters.extra.status !== 'CANCELLED' ? ['CANCELLED'] : []),
+  ]
+  const fetchParams = 'parentTaskId=null'
+    + (excludedStatuses.length ? `&excludeStatus=${excludedStatuses.join(',')}` : '')
+
+  // Reloads on mount, whenever the parent bumps refreshKey (e.g. after a task
+  // action in the detail panel), and whenever the default-exclusion changes so
+  // the API — not just the UI — drops Approved/Cancelled (req: query layer).
   useEffect(() => {
     let cancelled = false
     const load = async () => {
+      setLoading(true)
       setError('')
       try {
         // Top-level tasks only; subtasks are loaded on demand when a card expands.
-        const list = await taskApi.list('parentTaskId=null') as Task[]
+        const list = await taskApi.list(fetchParams) as Task[]
         if (!cancelled) setTasks(list)
       } catch {
         if (!cancelled) setError('Failed to load tasks')
@@ -274,7 +290,7 @@ export default function TasksPage({ filters, onFiltersChange, sort, onSortChange
     }
     load()
     return () => { cancelled = true }
-  }, [refreshKey])
+  }, [refreshKey, fetchParams])
 
   useEffect(() => {
     Promise.all([
@@ -336,6 +352,38 @@ export default function TasksPage({ filters, onFiltersChange, sort, onSortChange
         availableOptions={availableOptions}
         onChange={onFiltersChange}
       />
+
+      {/* Approved / Cancelled are hidden by default — opt them back in here. */}
+      <div className="flex items-center gap-2 flex-wrap mt-2 mb-1">
+        <span className="text-[11px] font-semibold text-tw-text-secondary uppercase tracking-wide">Include</span>
+        <button
+          type="button"
+          aria-pressed={includeApproved}
+          onClick={() => setIncludeApproved(v => !v)}
+          className={`text-xs font-medium px-3 py-1.5 rounded-full border transition-colors ${
+            includeApproved
+              ? 'bg-green-50 border-green-300 text-green-700'
+              : 'bg-white border-tw-border text-tw-text-secondary hover:bg-tw-hover'
+          }`}
+        >
+          {includeApproved ? '✓ ' : ''}Approved
+        </button>
+        <button
+          type="button"
+          aria-pressed={includeCancelled}
+          onClick={() => setIncludeCancelled(v => !v)}
+          className={`text-xs font-medium px-3 py-1.5 rounded-full border transition-colors ${
+            includeCancelled
+              ? 'bg-red-50 border-red-300 text-red-600'
+              : 'bg-white border-tw-border text-tw-text-secondary hover:bg-tw-hover'
+          }`}
+        >
+          {includeCancelled ? '✓ ' : ''}Cancelled
+        </button>
+        <span className="text-[11px] text-tw-text-secondary/70 hidden sm:inline">
+          Hidden by default
+        </span>
+      </div>
 
       {loading ? (
         <div className="text-sm text-tw-text-secondary">Loading…</div>

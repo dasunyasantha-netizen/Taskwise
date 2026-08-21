@@ -9,7 +9,7 @@
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
     "db:studio": "prisma studio",
-    "test": "tsx src/tests/companyHelpers.test.ts && tsx src/tests/companyOnboarding.test.ts",
+    "test": "tsx src/tests/companyHelpers.test.ts && tsx src/tests/taskFilters.test.ts && tsx src/tests/companyOnboarding.test.ts",
     "test:helpers": "tsx src/tests/companyHelpers.test.ts",
     "test:integration": "tsx src/tests/companyOnboarding.test.ts"
   },

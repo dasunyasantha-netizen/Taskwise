@@ -2,6 +2,7 @@ import { Request, Response } from 'express'
 import prisma from '../prisma'
 import { buildTaskVisibilityFilter } from '../helpers/visibility'
 import { sendPushToActor } from '../helpers/push'
+import { resolveTaskStatusWhere } from '../helpers/taskFilters'
 import type { AuthPayload } from '../middleware/authMiddleware'
 
 const TASK_INCLUDE = {
@@ -173,14 +174,16 @@ export async function listTasks(req: Request, res: Response): Promise<void> {
   try {
     const { actorId, actorType, workspaceId, layerNumber, departmentId } = req.user!
     const {
-      projectId, status, parentTaskId, overdue,
+      projectId, status, excludeStatus, parentTaskId, overdue,
       filterPersonnelId, filterDepartmentId, filterLayerNumber,
       deadlineFrom, deadlineTo, createdFrom, createdTo,
     } = req.query as Record<string, string>
 
     const baseWhere: Record<string, unknown> = { workspaceId, deletedAt: null }
     if (projectId) baseWhere.projectId = projectId
-    if (status)    baseWhere.status    = status
+    // Explicit `status` wins; otherwise `excludeStatus` (comma-separated) becomes a NOT IN.
+    const statusWhere = resolveTaskStatusWhere(status, excludeStatus)
+    if (statusWhere !== undefined) baseWhere.status = statusWhere
     if (parentTaskId === 'null') baseWhere.parentTaskId = null
     else if (parentTaskId)       baseWhere.parentTaskId = parentTaskId
     if (overdue === 'true') baseWhere.deadline = { lt: new Date() }

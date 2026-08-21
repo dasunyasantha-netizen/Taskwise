@@ -607,7 +607,11 @@ const STATUS_PROJ = [{ value: 'active', label: 'Active' }, { value: 'archived', 
 function ExtraGroupInline({ filter, personnel, mode, availableStatuses, availablePriorities, onChange }: ExtraGroupProps) {
   const DC = DATE_PILL
   const statusOpts = mode === 'task'
-    ? (availableStatuses ? ALL_STATUSES.filter(s => availableStatuses.has(s.value)) : ALL_STATUSES)
+    // Approved/Cancelled are hidden from the list by default, so they may not be
+    // among the loaded statuses — always keep them selectable so users can filter to them.
+    ? (availableStatuses
+        ? ALL_STATUSES.filter(s => availableStatuses.has(s.value) || s.value === 'APPROVED' || s.value === 'CANCELLED')
+        : ALL_STATUSES)
     : STATUS_PROJ
   const priorityOpts = availablePriorities ? ALL_PRIORITIES.filter(p => availablePriorities.has(p.value)) : ALL_PRIORITIES
 
@@ -658,7 +662,11 @@ function ExtraGroupInline({ filter, personnel, mode, availableStatuses, availabl
 function ExtraGroupMobile({ filter, personnel, mode, availableStatuses, availablePriorities, onChange }: ExtraGroupProps) {
   const DC = DATE_PILL
   const statusOpts = mode === 'task'
-    ? (availableStatuses ? ALL_STATUSES.filter(s => availableStatuses.has(s.value)) : ALL_STATUSES)
+    // Approved/Cancelled are hidden from the list by default, so they may not be
+    // among the loaded statuses — always keep them selectable so users can filter to them.
+    ? (availableStatuses
+        ? ALL_STATUSES.filter(s => availableStatuses.has(s.value) || s.value === 'APPROVED' || s.value === 'CANCELLED')
+        : ALL_STATUSES)
     : STATUS_PROJ
   const priorityOpts = availablePriorities ? ALL_PRIORITIES.filter(p => availablePriorities.has(p.value)) : ALL_PRIORITIES
 
