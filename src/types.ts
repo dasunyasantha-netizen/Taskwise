@@ -273,6 +273,8 @@ export interface DeadlineExtension {
   extendedById: string
   extendedByType: ActorType
   extendedByName: string
+  pointsDeducted?: number
+  penalizedPersonnelId?: string | null
   createdAt: string
 }
 

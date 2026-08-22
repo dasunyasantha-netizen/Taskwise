@@ -141,9 +141,11 @@ export const taskApi = {
   progressLogs:      (id: string)      => api.get(`/tasks/${id}/progress-logs`),
   addProgressLog:    (id: string, note: string) => api.post(`/tasks/${id}/progress-logs`, { note }),
   updateProgressLog: (id: string, logId: string, note: string) => api.put(`/tasks/${id}/progress-logs/${logId}`, { note }),
-  extendDeadline:    (id: string, data: { newDeadline: string; reason: string; note?: string }) =>
+  extendDeadline:    (id: string, data: { newDeadline: string; reason: string; note?: string; pointsToDeduct?: number }) =>
     api.post(`/tasks/${id}/extend-deadline`, data),
   deadlineExtensions:(id: string)      => api.get(`/tasks/${id}/deadline-extensions`),
+  deductionContext:  (id: string)      =>
+    api.get<{ assignee: { id: string; name: string } | null; availablePoints: number }>(`/tasks/${id}/deduction-context`),
   assignNext: (id: string, data: {
     nextTasks: Array<{
       title: string; description?: string; projectId?: string; priority?: string;

@@ -804,10 +804,14 @@ model DeadlineExtension {
   extendedById   String // Director.id or Personnel.id
   extendedByType String // "director" | "personnel"
   extendedByName String // snapshot of name at time of extension
+  // Optional director-applied point penalty, deducted atomically with the extension.
+  pointsDeducted       Int     @default(0)
+  penalizedPersonnelId String? // the assignee whose points were deducted (null when no deduction)
   createdAt      DateTime @default(now())
 
   @@index([taskId])
   @@index([workspaceId])
+  @@index([workspaceId, penalizedPersonnelId])
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

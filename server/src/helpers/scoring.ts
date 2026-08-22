@@ -115,12 +115,15 @@ export interface UserScore {
   overdueDays: number
   rejectionCount: number
   cancellationCount: number
+  deadlineDeductionCount: number
   loginPoints: number
   taskUpdatePoints: number
   onTimePoints: number
   overduePoints: number
   rejectionPoints: number
   cancellationPoints: number
+  /** Points removed by director deadline-extension deductions (positive magnitude). */
+  deadlineDeductionPoints: number
   /** Positive points only (logins + updates + on-time). */
   earned: number
   /** Negative points only (overdue + rejections), as a positive magnitude. */
@@ -140,12 +143,14 @@ interface RawRow {
   overdue_days: bigint | number
   rejection_count: bigint | number
   cancellation_count: bigint | number
+  deadline_deduction_count: bigint | number
   login_points: bigint | number
   task_update_points: bigint | number
   ontime_points: bigint | number
   overdue_points: bigint | number
   rejection_points: bigint | number
   cancellation_points: bigint | number
+  deadline_deduction_points: bigint | number
 }
 
 const n = (v: bigint | number | null): number => (v == null ? 0 : Number(v))
@@ -250,6 +255,17 @@ export async function computeWorkspaceScores(
       WHERE r."workspaceId" = ${workspaceId} AND r.status = 'DEDUCTED'
         AND r."decidedAt" >= ${start} AND r."decidedAt" < ${endExclusive}
       GROUP BY cr."personnelId"
+    ),
+    deadline_deduction_pts AS (
+      SELECT "penalizedPersonnelId" AS pid,
+        COUNT(*) AS deadline_deduction_count,
+        SUM("pointsDeducted") AS deadline_deduction_points
+      FROM "DeadlineExtension"
+      WHERE "workspaceId" = ${workspaceId}
+        AND "penalizedPersonnelId" IS NOT NULL
+        AND "pointsDeducted" > 0
+        AND "createdAt" >= ${start} AND "createdAt" < ${endExclusive}
+      GROUP BY "penalizedPersonnelId"
     )
     SELECT
       p.id, p.name, p."avatarUrl", d.name AS department,
@@ -259,12 +275,14 @@ export async function computeWorkspaceScores(
       COALESCE(s.overdue_days, 0)     AS overdue_days,
       COALESCE(r.rejection_count, 0)  AS rejection_count,
       COALESCE(c.cancellation_count, 0) AS cancellation_count,
+      COALESCE(dd.deadline_deduction_count, 0) AS deadline_deduction_count,
       COALESCE(l.login_points, 0) AS login_points,
       COALESCE(u.task_update_points, 0) AS task_update_points,
       COALESCE(s.ontime_points, 0) AS ontime_points,
       COALESCE(s.overdue_points, 0) AS overdue_points,
       COALESCE(r.rejection_points, 0) AS rejection_points,
-      COALESCE(c.cancellation_points, 0) AS cancellation_points
+      COALESCE(c.cancellation_points, 0) AS cancellation_points,
+      COALESCE(dd.deadline_deduction_points, 0) AS deadline_deduction_points
     FROM "Personnel" p
     LEFT JOIN "Department" d ON d.id = p."departmentId"
     LEFT JOIN login_pts  l ON l.pid = p.id
@@ -272,6 +290,7 @@ export async function computeWorkspaceScores(
     LEFT JOIN submit_pts s ON s.pid = p.id
     LEFT JOIN reject_pts r ON r.pid = p.id
     LEFT JOIN cancellation_pts c ON c.pid = p.id
+    LEFT JOIN deadline_deduction_pts dd ON dd.pid = p.id
     WHERE p."workspaceId" = ${workspaceId} AND p."deletedAt" IS NULL
   `)
 
@@ -283,27 +302,39 @@ export async function computeWorkspaceScores(
       const overdueDays    = n(r.overdue_days)
       const rejectionCount = n(r.rejection_count)
       const cancellationCount = n(r.cancellation_count)
+      const deadlineDeductionCount = n(r.deadline_deduction_count)
       const loginPoints = n(r.login_points)
       const taskUpdatePoints = n(r.task_update_points)
       const onTimePoints = n(r.ontime_points)
       const overduePoints = n(r.overdue_points)
       const rejectionPoints = n(r.rejection_points)
       const cancellationPoints = n(r.cancellation_points)
+      // Stored as a positive magnitude (the number a director chose to deduct).
+      const deadlineDeductionPoints = n(r.deadline_deduction_points)
 
       const earned = loginPoints + taskUpdatePoints + onTimePoints
-      const deductions = -(overduePoints + rejectionPoints + cancellationPoints)
+      const deductions = -(overduePoints + rejectionPoints + cancellationPoints) + deadlineDeductionPoints
 
       return {
         id: r.id,
         name: r.name,
         department: r.department ?? '—',
         avatarUrl: r.avatarUrl,
-        loginDays, taskUpdates, onTimeCount, overdueDays, rejectionCount, cancellationCount,
-        loginPoints, taskUpdatePoints, onTimePoints, overduePoints, rejectionPoints, cancellationPoints,
+        loginDays, taskUpdates, onTimeCount, overdueDays, rejectionCount, cancellationCount, deadlineDeductionCount,
+        loginPoints, taskUpdatePoints, onTimePoints, overduePoints, rejectionPoints, cancellationPoints, deadlineDeductionPoints,
         earned,
         deductions,
         totalPoints: earned - deductions,
       }
     })
     .sort((a, b) => b.totalPoints - a.totalPoints)
+}
+
+/**
+ * Current available point balance (all-time) for one personnel — used to validate
+ * and preview a deadline-extension deduction. Returns 0 when the person has no score.
+ */
+export async function getPersonnelAvailablePoints(workspaceId: string, personnelId: string): Promise<number> {
+  const scores = await computeWorkspaceScores(workspaceId)
+  return scores.find(s => s.id === personnelId)?.totalPoints ?? 0
 }

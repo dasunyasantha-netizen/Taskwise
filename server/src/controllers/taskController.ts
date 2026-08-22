@@ -3,6 +3,8 @@ import prisma from '../prisma'
 import { buildTaskVisibilityFilter } from '../helpers/visibility'
 import { sendPushToActor } from '../helpers/push'
 import { resolveTaskStatusWhere } from '../helpers/taskFilters'
+import { validatePointsToDeduct } from '../helpers/deduction'
+import { getPersonnelAvailablePoints } from '../helpers/scoring'
 import type { AuthPayload } from '../middleware/authMiddleware'
 
 const TASK_INCLUDE = {
@@ -1109,6 +1111,45 @@ export async function getProgressLogs(req: Request, res: Response): Promise<void
   } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
 }
 
+// Resolve the assignee a deadline-extension deduction targets: the person who
+// acted on the task, else the first personnel assignee. Null when neither exists.
+async function resolvePenalizedAssignee(
+  taskId: string,
+  actedById: string | null,
+  actedByType: string | null,
+): Promise<{ id: string; name: string } | null> {
+  let personnelId: string | null = actedByType === 'personnel' ? actedById : null
+  if (!personnelId) {
+    const a = await prisma.taskAssignment.findFirst({
+      where: { taskId, personnelId: { not: null } },
+      select: { personnelId: true },
+    })
+    personnelId = a?.personnelId ?? null
+  }
+  if (!personnelId) return null
+  return prisma.personnel.findUnique({ where: { id: personnelId }, select: { id: true, name: true } })
+}
+
+// GET /api/tasks/:id/deduction-context
+// Director-only: the task's assignee and their current point balance, so the
+// deadline-extension modal can show current points and the resulting balance.
+export async function getExtensionDeductionContext(req: Request, res: Response): Promise<void> {
+  try {
+    const { actorType, workspaceId } = req.user!
+    if (actorType !== 'director') { res.status(403).json({ error: 'Director only' }); return }
+
+    const task = await prisma.task.findFirst({
+      where: { id: req.params.id, workspaceId, deletedAt: null },
+      select: { id: true, actedById: true, actedByType: true },
+    })
+    if (!task) { res.status(404).json({ error: 'Task not found' }); return }
+
+    const assignee = await resolvePenalizedAssignee(task.id, task.actedById, task.actedByType)
+    const availablePoints = assignee ? await getPersonnelAvailablePoints(workspaceId, assignee.id) : 0
+    res.json({ assignee, availablePoints })
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
+}
+
 // POST /api/tasks/:id/extend-deadline
 export async function extendDeadline(req: Request, res: Response): Promise<void> {
   try {
@@ -1157,6 +1198,28 @@ export async function extendDeadline(req: Request, res: Response): Promise<void>
 
     const oldDeadline = task.deadline ?? new Date()
 
+    // Optional director-only point deduction. Zero / empty preserves existing behaviour.
+    const rawPoints = (req.body as { pointsToDeduct?: unknown }).pointsToDeduct
+    let deductPoints = 0
+    let penalizedPersonnelId: string | null = null
+    const wantsDeduction = rawPoints !== undefined && rawPoints !== null && rawPoints !== '' && Number(rawPoints) !== 0
+    if (wantsDeduction) {
+      if (actorType !== 'director') {
+        res.status(403).json({ error: 'Only a director can deduct points' }); return
+      }
+      const assignee = await resolvePenalizedAssignee(task.id, task.actedById, task.actedByType)
+      if (!assignee) {
+        res.status(400).json({ error: 'This task has no assignee to deduct points from' }); return
+      }
+      const availablePoints = await getPersonnelAvailablePoints(workspaceId, assignee.id)
+      const check = validatePointsToDeduct(rawPoints, availablePoints)
+      if (check.error) { res.status(400).json({ error: check.error }); return }
+      deductPoints = check.points
+      penalizedPersonnelId = check.points > 0 ? assignee.id : null
+    }
+
+    // Deadline update + point deduction share one transaction: if either write
+    // throws, neither the deadline nor the recorded deduction is committed.
     await prisma.$transaction(async tx => {
       await startAssignedTaskForActivity(tx, task.id, workspaceId, req.user!, 'deadline_extension')
       await tx.task.update({
@@ -1179,6 +1242,8 @@ export async function extendDeadline(req: Request, res: Response): Promise<void>
           extendedById:   actorId,
           extendedByType: actorType,
           extendedByName,
+          pointsDeducted: deductPoints,
+          penalizedPersonnelId,
         }
       })
 
@@ -1188,6 +1253,8 @@ export async function extendDeadline(req: Request, res: Response): Promise<void>
         reason: reason.trim(),
         note: note?.trim(),
         extendedBy: extendedByName,
+        pointsDeducted: deductPoints,
+        penalizedPersonnelId: penalizedPersonnelId ?? undefined,
       }, req.user!)
 
       // Notify all personnel assigned to this task

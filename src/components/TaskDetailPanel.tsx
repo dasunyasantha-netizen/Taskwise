@@ -106,8 +106,9 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
 
   // Extend deadline modal state
   const [showExtendModal, setShowExtendModal] = useState(false)
-  const [extendForm, setExtendForm] = useState({ newDeadline: '', reason: '', note: '' })
+  const [extendForm, setExtendForm] = useState({ newDeadline: '', reason: '', note: '', pointsToDeduct: '' })
   const [extendSaving, setExtendSaving] = useState(false)
+  const [deductCtx, setDeductCtx] = useState<{ assignee: { id: string; name: string } | null; availablePoints: number } | null>(null)
   const [extendError, setExtendError] = useState('')
   const [deadlineExtensions, setDeadlineExtensions] = useState<DeadlineExtension[]>([])
 
@@ -238,8 +239,32 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
     setEditSaving(false)
   }
 
+  const openExtendModal = () => {
+    setExtendForm({ newDeadline: '', reason: '', note: '', pointsToDeduct: '' })
+    setExtendError('')
+    setDeductCtx(null)
+    setShowExtendModal(true)
+    // Directors can deduct points — load the assignee's current balance for the modal.
+    if (isDirector) {
+      taskApi.deductionContext(task.id).then(setDeductCtx).catch(() => setDeductCtx(null))
+    }
+  }
+
+  // Derived deduction state for the extend modal (directors only).
+  const pointsRaw = extendForm.pointsToDeduct.trim()
+  const pointsToDeductNum = pointsRaw === '' ? 0 : Number(pointsRaw)
+  const availablePoints = deductCtx?.availablePoints ?? 0
+  const deductionError: string | null =
+    pointsRaw === '' || pointsToDeductNum === 0 ? null
+      : !Number.isInteger(pointsToDeductNum) ? 'Points to deduct must be a whole number'
+      : pointsToDeductNum < 0 ? 'Points to deduct cannot be negative'
+      : !deductCtx?.assignee ? 'This task has no assignee to deduct points from'
+      : pointsToDeductNum > availablePoints ? `Cannot deduct more than ${availablePoints} available points`
+      : null
+
   const handleExtendDeadline = async () => {
     if (!extendForm.newDeadline || !extendForm.reason.trim()) return
+    if (deductionError) { setExtendError(deductionError); return }
     setExtendSaving(true)
     setExtendError('')
     try {
@@ -247,9 +272,10 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
         newDeadline: extendForm.newDeadline,
         reason: extendForm.reason.trim(),
         note: extendForm.note.trim() || undefined,
+        ...(pointsToDeductNum > 0 ? { pointsToDeduct: pointsToDeductNum } : {}),
       })
       setShowExtendModal(false)
-      setExtendForm({ newDeadline: '', reason: '', note: '' })
+      setExtendForm({ newDeadline: '', reason: '', note: '', pointsToDeduct: '' })
       await onRefresh()
     } catch (e: unknown) {
       setExtendError(e instanceof Error ? e.message : 'Failed to extend deadline')
@@ -422,7 +448,7 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
             {canAssign    && <button disabled={actionLoading} onClick={() => setShowAssignModal(true)} className="btn-secondary text-xs py-1.5">👤 Assign</button>}
             {canSubtask   && <button onClick={() => setShowSubtaskModal(true)} className="btn-secondary text-xs py-1.5">+ Subtask</button>}
             {canExtend  && (
-              <button onClick={() => { setExtendForm({ newDeadline: '', reason: '', note: '' }); setExtendError(''); setShowExtendModal(true) }}
+              <button onClick={openExtendModal}
                 className="btn-secondary text-xs py-1.5 text-amber-700 border-amber-300 hover:bg-amber-50">
                 📅 Extend Deadline
               </button>
@@ -759,6 +785,11 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-sm font-semibold text-tw-text">Deadline extended</span>
                             <span className="text-sm text-amber-700 font-medium">{ext.extendedByName}</span>
+                            {!!ext.pointsDeducted && ext.pointsDeducted > 0 && (
+                              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-red-50 text-tw-danger">
+                                −{ext.pointsDeducted} pts
+                              </span>
+                            )}
                           </div>
                           <div className="text-xs text-tw-text-secondary mt-0.5">
                             {new Date(ext.oldDeadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
@@ -877,15 +908,48 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
                   value={extendForm.note}
                   onChange={e => setExtendForm(f => ({ ...f, note: e.target.value }))} />
               </div>
+
+              {/* Director-only: deduct points from the assignee alongside the extension */}
+              {isDirector && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50/60 px-3 py-2.5">
+                  <label className="block text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">
+                    Points to deduct <span className="text-tw-text-secondary font-normal">(optional)</span>
+                  </label>
+                  <input
+                    type="number" min={0} step={1}
+                    className="input"
+                    placeholder="0"
+                    value={extendForm.pointsToDeduct}
+                    onChange={e => setExtendForm(f => ({ ...f, pointsToDeduct: e.target.value }))}
+                  />
+                  <div className="text-[11px] text-tw-text-secondary mt-1.5">
+                    {deductCtx === null ? (
+                      'Loading assignee balance…'
+                    ) : !deductCtx.assignee ? (
+                      <span className="text-tw-danger">No assignee to deduct points from.</span>
+                    ) : (
+                      <span>
+                        <span className="font-medium text-tw-text">{deductCtx.assignee.name}</span> · current{' '}
+                        <span className="font-semibold text-tw-text">{availablePoints}</span> pts
+                        {pointsToDeductNum > 0 && !deductionError && (
+                          <> → after <span className="font-semibold text-tw-danger">{availablePoints - pointsToDeductNum}</span> pts</>
+                        )}
+                      </span>
+                    )}
+                  </div>
+                  {deductionError && <div className="text-[11px] text-tw-danger mt-1">{deductionError}</div>}
+                </div>
+              )}
+
               {extendError && (
                 <div className="text-xs text-tw-danger bg-red-50 border border-red-200 rounded-lg px-3 py-2">{extendError}</div>
               )}
               <div className="flex gap-2 justify-end pt-1">
-                <button onClick={() => { setShowExtendModal(false); setExtendForm({ newDeadline: '', reason: '', note: '' }); setExtendError('') }} className="btn-secondary">
+                <button onClick={() => { setShowExtendModal(false); setExtendForm({ newDeadline: '', reason: '', note: '', pointsToDeduct: '' }); setExtendError('') }} className="btn-secondary">
                   Cancel
                 </button>
                 <button
-                  disabled={!extendForm.newDeadline || !extendForm.reason.trim() || extendSaving}
+                  disabled={!extendForm.newDeadline || !extendForm.reason.trim() || extendSaving || !!deductionError}
                   onClick={handleExtendDeadline}
                   className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold disabled:opacity-50 transition-colors">
                   {extendSaving ? 'Saving…' : 'Extend Deadline'}

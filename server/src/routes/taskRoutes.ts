@@ -8,7 +8,7 @@ import {
   assignNextTasks, getTaskChain, getPreviousHistory,
   getSubtasks, getComments, addComment, getTaskHistory,
   getProgressLogs, addProgressLog, updateProgressLog,
-  extendDeadline, getDeadlineExtensions,
+  extendDeadline, getDeadlineExtensions, getExtensionDeductionContext,
 } from '../controllers/taskController'
 
 const router = Router()
@@ -41,6 +41,7 @@ router.post('/:id/progress-logs',       addProgressLog)
 router.put('/:id/progress-logs/:logId', updateProgressLog)
 router.post('/:id/extend-deadline',     extendDeadline)
 router.get('/:id/deadline-extensions',  getDeadlineExtensions)
+router.get('/:id/deduction-context',    getExtensionDeductionContext)
 router.post('/:id/assign-next',         assignNextTasks)
 router.get('/:id/chain',                getTaskChain)
 router.get('/:id/previous-history',     getPreviousHistory)
