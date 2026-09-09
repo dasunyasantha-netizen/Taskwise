@@ -42,8 +42,6 @@ export default function HierarchyPanel({ user }: { user: AuthUser }) {
   const [editingLayerName, setEditingLayerName] = useState('')
   const [movingPersonnel, setMovingPersonnel] = useState<Personnel | null>(null)
   const [moveTarget, setMoveTarget] = useState('')
-  const [settingSupervisorFor, setSettingSupervisorFor] = useState<Personnel | null>(null)
-  const [supervisorTarget, setSupervisorTarget] = useState('')
 
   const [allPersonnel, setAllPersonnel] = useState<Personnel[]>([])
   const [error, setError] = useState('')
@@ -303,16 +301,6 @@ export default function HierarchyPanel({ user }: { user: AuthUser }) {
         ...(moveNeedsManager ? { supervisorId: moveSupervisorId } : {}),
       })
       setShowMoveModal(false); setMovingPersonnel(null); setMoveTarget(''); setMoveSupervisorId(''); await load()
-    } catch (e: unknown) { setError(e instanceof Error ? e.message : 'Error') }
-    setSaving(false)
-  }
-
-  const saveSupervisor = async () => {
-    if (!settingSupervisorFor) return
-    setSaving(true)
-    try {
-      await workspaceApi.setSupervisor(settingSupervisorFor.id, supervisorTarget || null)
-      setSettingSupervisorFor(null); setSupervisorTarget(''); await load()
     } catch (e: unknown) { setError(e instanceof Error ? e.message : 'Error') }
     setSaving(false)
   }
@@ -824,40 +812,6 @@ export default function HierarchyPanel({ user }: { user: AuthUser }) {
               <button onClick={() => { setShowEditModal(false); setEditingPersonnel(null) }} className="btn-secondary">Cancel</button>
               <button onClick={saveEdit} disabled={saving || !editForm.name || !editForm.phone} className="btn-primary">
                 {saving ? 'Saving...' : 'Save Changes'}
-              </button>
-            </div>
-          </div>
-        </Modal>
-      )}
-
-      {/* MODAL: Set Supervisor */}
-      {settingSupervisorFor && (
-        <Modal title={`Set Supervisor — ${settingSupervisorFor.name}`} onClose={() => { setSettingSupervisorFor(null); setSupervisorTarget('') }}>
-          <div className="space-y-4">
-            <p className="text-sm text-tw-text-secondary">
-              Select the person who directly supervises <strong>{settingSupervisorFor.name}</strong>.
-              When they submit a task, it will go to this person for approval.
-            </p>
-            <Select
-              value={supervisorTarget}
-              onChange={val => setSupervisorTarget(val)}
-              placeholder="Select supervisor…"
-              options={supervisorOptionsFor(settingSupervisorFor)}
-            />
-            {supervisorTarget && (
-              <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-700">
-                Tasks submitted by <strong>{settingSupervisorFor.name}</strong> will route to <strong>{allPersonnel.find(p => p.id === supervisorTarget)?.name}</strong> for approval.
-              </div>
-            )}
-            <div className="flex gap-2 justify-end">
-              {settingSupervisorFor.supervisorId && !managerRequiredFor(settingSupervisorFor) && (
-                <button onClick={() => { setSupervisorTarget(''); saveSupervisor() }} disabled={saving} className="btn-secondary text-xs text-tw-danger border-tw-danger">
-                  Clear Supervisor
-                </button>
-              )}
-              <button onClick={() => { setSettingSupervisorFor(null); setSupervisorTarget('') }} className="btn-secondary">Cancel</button>
-              <button onClick={saveSupervisor} disabled={saving || !supervisorTarget} className="btn-primary">
-                {saving ? 'Saving…' : 'Set Supervisor'}
               </button>
             </div>
           </div>

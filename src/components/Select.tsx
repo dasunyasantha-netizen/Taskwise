@@ -22,24 +22,37 @@ interface Props {
   disabled?: boolean
 }
 
+/** Below this many options a search box is more clutter than help. */
+const SEARCH_THRESHOLD = 8
+
 export default function Select({ value, onChange, options, placeholder = 'Select...', className = '', disabled = false }: Props) {
   const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
   const [dropPos, setDropPos] = useState({ top: 0, left: 0, width: 0, openUpward: false })
   const ref = useRef<HTMLDivElement>(null)
+  const dropRef = useRef<HTMLDivElement>(null)
+  const searchRef = useRef<HTMLInputElement>(null)
 
-  const close = useCallback(() => setOpen(false), [])
+  const close = useCallback(() => { setOpen(false); setQuery('') }, [])
 
   useEffect(() => {
     if (!open) return
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) close()
+      const target = e.target as Node
+      // The dropdown is portalled out of this subtree, so it has to be checked
+      // separately — otherwise clicking the search box would close the list.
+      if (ref.current?.contains(target) || dropRef.current?.contains(target)) return
+      close()
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [open, close])
 
+  useEffect(() => { if (open) searchRef.current?.focus() }, [open])
+
   const handleOpen = () => {
     if (disabled) return
+    setQuery('')
     if (!open && ref.current) {
       const rect = ref.current.getBoundingClientRect()
       const spaceBelow = window.innerHeight - rect.bottom
@@ -56,10 +69,17 @@ export default function Select({ value, onChange, options, placeholder = 'Select
 
   const selected = options.find(o => o.value === value)
 
+  const showSearch = options.length > SEARCH_THRESHOLD
+  const needle = query.trim().toLowerCase()
+  // Matching the group too means a department or tier name finds its people.
+  const visible = needle
+    ? options.filter(o => `${o.label} ${o.group ?? ''}`.toLowerCase().includes(needle))
+    : options
+
   // Group options
   const groups: Record<string, SelectOption[]> = {}
   const ungrouped: SelectOption[] = []
-  for (const opt of options) {
+  for (const opt of visible) {
     if (opt.group) {
       if (!groups[opt.group]) groups[opt.group] = []
       groups[opt.group].push(opt)
@@ -68,6 +88,14 @@ export default function Select({ value, onChange, options, placeholder = 'Select
     }
   }
   const hasGroups = Object.keys(groups).length > 0
+
+  const pick = (val: string) => { onChange(val); close() }
+
+  const onSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Escape') { e.preventDefault(); close() }
+    // Enter takes the only sensible choice: the first thing still on screen.
+    if (e.key === 'Enter' && visible.length > 0) { e.preventDefault(); pick(visible[0].value) }
+  }
 
   const dropdown = open ? createPortal(
     <div
@@ -79,12 +107,29 @@ export default function Select({ value, onChange, options, placeholder = 'Select
         width: dropPos.width,
         zIndex: 9999,
       }}
+      ref={dropRef}
       className="bg-white border border-tw-border rounded-xl shadow-panel overflow-hidden"
     >
+      {showSearch && (
+        <div className="p-2 border-b border-tw-border">
+          <input
+            ref={searchRef}
+            type="text"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            onKeyDown={onSearchKeyDown}
+            placeholder={`Search ${options.length} options…`}
+            className="w-full border border-tw-border rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:border-tw-primary"
+          />
+        </div>
+      )}
       <div className="max-h-56 overflow-y-auto py-1">
+        {visible.length === 0 && (
+          <div className="px-3 py-4 text-sm text-tw-text-secondary text-center">No matches for “{query.trim()}”</div>
+        )}
         {ungrouped.map(opt => (
           <button key={opt.value} type="button"
-            onMouseDown={e => { e.preventDefault(); onChange(opt.value); close() }}
+            onMouseDown={e => { e.preventDefault(); pick(opt.value) }}
             className={`w-full text-left px-3 py-2 text-sm transition-colors flex items-center justify-between gap-2
               ${opt.value === value ? 'bg-tw-primary-light text-tw-primary font-medium' : 'text-tw-text hover:bg-tw-hover'}`}>
             <span className="flex items-center gap-2 min-w-0">
@@ -106,7 +151,7 @@ export default function Select({ value, onChange, options, placeholder = 'Select
             </div>
             {opts.map(opt => (
               <button key={opt.value} type="button"
-                onMouseDown={e => { e.preventDefault(); onChange(opt.value); close() }}
+                onMouseDown={e => { e.preventDefault(); pick(opt.value) }}
                 className={`w-full text-left px-4 py-2 text-sm transition-colors flex items-center justify-between gap-2
                   ${opt.value === value ? 'bg-tw-primary-light text-tw-primary font-medium' : 'text-tw-text hover:bg-tw-hover'}`}>
                 <span className="flex items-center gap-2 min-w-0">
