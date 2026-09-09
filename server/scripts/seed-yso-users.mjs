@@ -18,7 +18,8 @@
  *     --count    5 \
  *     --phone    0781000001 \
  *     --user-password 'YSO@1234' \
- *     [--manager "<level 3 manager name or login ID>"] \
+ *     [--manager "<login ID>"]            one level 3 manager for everyone, or
+ *     [--manager "<id1>,<id2>,<id3>"]     one per user, matched in order \
  *     [--force-password-change] \
  *     [--apply]
  */
@@ -109,24 +110,47 @@ const managers = await call('GET', `/workspace/managers?level=${LEVEL}`)
 if (managers.length === 0) {
   die('there are no level 3 users to report to. Level 4 users must have a level 3 manager, so create one first.')
 }
-let manager
-if (MANAGER) {
-  const needle = String(MANAGER).toLowerCase()
+// Each level 4 user reports to their own level 3 official, so --manager takes
+// either one value for the whole batch or a comma-separated list matched to the
+// users in order.
+function resolveManager(needleRaw) {
+  const needle = String(needleRaw).trim().toLowerCase()
   const matches = managers.filter(m => m.name.toLowerCase() === needle || (m.loginId || '').toLowerCase() === needle)
-  if (matches.length === 0) die(`no level 3 manager matches "${MANAGER}". Available: ${managers.map(m => `${m.name} (${m.loginId})`).join(', ')}`)
-  if (matches.length > 1) die(`"${MANAGER}" matches more than one manager; pass a login ID instead`)
-  manager = matches[0]
+  if (matches.length === 0) die(`no level 3 manager matches "${needleRaw}". Available: ${managers.map(m => `${m.name} (${m.loginId})`).join(', ')}`)
+  if (matches.length > 1) die(`"${needleRaw}" matches more than one manager; pass a login ID instead`)
+  return matches[0]
+}
+
+let assignedManagers
+if (MANAGER) {
+  const wanted = String(MANAGER).split(',').map(s => s.trim()).filter(Boolean)
+  if (wanted.length !== 1 && wanted.length !== COUNT) {
+    die(`--manager takes either one manager for everyone or exactly ${COUNT} (one per user); got ${wanted.length}`)
+  }
+  const resolved = wanted.map(resolveManager)
+  assignedManagers = resolved.length === 1
+    ? Array.from({ length: COUNT }, () => resolved[0])
+    : resolved
 } else if (managers.length === 1) {
-  manager = managers[0]
+  assignedManagers = Array.from({ length: COUNT }, () => managers[0])
 } else {
-  die(`several level 3 managers exist — pass --manager to choose one: ${managers.map(m => `${m.name} (${m.loginId})`).join(', ')}`)
+  die(`several level 3 managers exist — pass --manager to choose one for everyone, or ${COUNT} comma-separated for one each: ${managers.map(m => `${m.name} (${m.loginId})`).join(', ')}`)
 }
 
 // ── Plan ────────────────────────────────────────────────────────────────────
-const planned = Array.from({ length: COUNT }, (_, i) => ({ name: `YSO ${i + 1}`, phone: phoneAt(i) }))
+const planned = Array.from({ length: COUNT }, (_, i) => ({
+  name: `YSO ${i + 1}`, phone: phoneAt(i), manager: assignedManagers[i],
+}))
 console.log(`\nPlan${APPLY ? '' : ' (dry run — nothing will be written)'}:`)
 console.log(`  Department  ${DEPARTMENT} — level 4 (job role)${dept ? ' [already exists]' : ' [will be created]'}`)
-console.log(`  Manager     ${manager.name} — ${manager.department.name}, level ${manager.department.layer.number}`)
+const distinctManagers = new Set(assignedManagers.map(m => m.id))
+if (distinctManagers.size > 1) {
+  console.log('  Managers    one per user:')
+  for (const p of planned) console.log(`                ${p.name} → ${p.manager.name} (${p.manager.loginId})`)
+} else {
+  const only = assignedManagers[0]
+  console.log(`  Manager     ${only.name} — ${only.department.name}, level ${only.department.layer.number} (all users)`)
+}
 console.log(`  Password    ${'•'.repeat(USER_PASSWORD.length)} (${USER_PASSWORD.length} chars, shared)${FORCE_CHANGE ? ', must change at first login' : ', permanent until the user changes it'}`)
 console.log(`  Users       ${planned.map(p => `${p.name} (${p.phone})`).join(', ')}`)
 
@@ -149,7 +173,7 @@ for (const p of planned) {
     name: p.name,
     phone: p.phone,
     departmentId: dept.id,
-    supervisorId: manager.id,
+    supervisorId: p.manager.id,
     password: USER_PASSWORD,
     mustChangePassword: FORCE_CHANGE,
   })

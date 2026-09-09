@@ -230,6 +230,27 @@ async function main() {
     assert.equal(good.body.supervisorId, l3Person)
   })
 
+  await test('Level 4 users in one job-role department each report to their own level 3 manager', async () => {
+    // A job-role department such as Doctors spans the whole company, so its
+    // members answer to different level 3 officials. The manager is per person,
+    // never per department.
+    const secondL3 = await createPerson(ycUser, { name: 'Other Three', phone: '0711000020', departmentId: l3Prov, supervisorId: l2ProvPerson })
+    assert.equal(secondL3.statusCode, 201)
+
+    const a = await createPerson(ycUser, { name: 'Doctor A', phone: '0711000021', departmentId: l4Doctors, supervisorId: l3Person })
+    const b = await createPerson(ycUser, { name: 'Doctor B', phone: '0711000022', departmentId: l4Doctors, supervisorId: secondL3.body.id })
+    assert.equal(a.statusCode, 201)
+    assert.equal(b.statusCode, 201)
+    assert.equal(a.body.departmentId, b.body.departmentId)
+    assert.notEqual(a.body.supervisorId, b.body.supervisorId)
+
+    // And an existing member can be moved to a different level 3 official.
+    const res = mockRes()
+    await ws.updatePersonnel(mockReq({ params: { id: a.body.id }, body: { name: 'Doctor A', phone: '0711000021', supervisorId: secondL3.body.id }, user: ycUser }), res)
+    assert.equal(res.statusCode, 200)
+    assert.equal(res.body.supervisorId, secondL3.body.id)
+  })
+
   await test('A company without the feature still creates users with no manager', async () => {
     const dept = await prisma.department.findFirst({ where: { workspaceId: ffWs.id } })
     const res = await createPerson(ffUser, { name: 'FF Staff', phone: '0713000001', departmentId: dept!.id })
@@ -290,9 +311,10 @@ async function main() {
     const res = mockRes()
     await ws.getManagerCandidates(mockReq({ query: { level: '4' }, user: ycUser }), res)
     assert.equal(res.statusCode, 200)
-    assert.equal(res.body.length, 1)
-    assert.equal(res.body[0].id, l3Person)
-    assert.equal(res.body[0].department.layer.number, 3)
+    assert.ok(res.body.length > 0, 'expected at least one level 3 candidate')
+    // Every candidate sits at level 3 — never the caller's own level or higher.
+    assert.equal(res.body.every((m: any) => m.department.layer.number === 3), true)
+    assert.ok(res.body.some((m: any) => m.id === l3Person))
   })
 
   await test('Level 1 has no candidates — it reports to the Director', async () => {
