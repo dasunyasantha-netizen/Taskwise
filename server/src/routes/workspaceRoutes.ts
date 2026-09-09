@@ -4,7 +4,7 @@ import {
   getWorkspace, updateWorkspace, updateProfile, getLayers, updateLayer, uploadAvatar,
   getDepartments, createDepartment, updateDepartment, deleteDepartment,
   getPersonnel, createPersonnel, updatePersonnel, movePersonnel, deletePersonnel, getPersonnelQueue,
-  getPersonnelAboveMe, getManagedUsers, resetManagedUserPassword,
+  getPersonnelAboveMe, getManagedUsers, resetManagedUserPassword, getManagerCandidates,
 } from '../controllers/workspaceController'
 
 const router = Router()
@@ -24,6 +24,7 @@ router.delete('/departments/:id',                  requireDirector, deleteDepart
 
 router.get('/personnel',                           getPersonnel)
 router.get('/personnel/above-me',                  getPersonnelAboveMe)
+router.get('/managers',                            requireDirector, getManagerCandidates)
 router.post('/personnel',                          requireDirector, createPersonnel)
 router.put('/personnel/:id',                       updatePersonnel)
 router.put('/personnel/:id/move',                  requireDirector, movePersonnel)

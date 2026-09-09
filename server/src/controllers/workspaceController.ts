@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs'
 import { randomBytes } from 'crypto'
 import prisma from '../prisma'
 import { makeLoginId, normalizeSriLankanPhone, companyLoginPrefix } from '../helpers/phone'
+import { isFourLevelWorkspace, resolveDepartmentCategory, resolveSupervisor } from '../helpers/hierarchy'
 
 // GET /api/workspace
 export async function getWorkspace(req: Request, res: Response): Promise<void> {
@@ -65,11 +66,16 @@ export async function getDepartments(req: Request, res: Response): Promise<void>
 // POST /api/workspace/departments
 export async function createDepartment(req: Request, res: Response): Promise<void> {
   try {
-    const { name, layerId } = req.body
+    const { name, layerId, officeCategory } = req.body
     if (!name || !layerId) { res.status(400).json({ error: 'name and layerId required' }); return }
     const layer = await prisma.layer.findFirst({ where: { id: layerId, workspaceId: req.user!.workspaceId } })
     if (!layer) { res.status(404).json({ error: 'Layer not found' }); return }
-    const dept = await prisma.department.create({ data: { name, layerId, workspaceId: req.user!.workspaceId } })
+    const fourLevel = await isFourLevelWorkspace(req.user!.workspaceId)
+    const category = resolveDepartmentCategory({ fourLevel, level: layer.number, provided: officeCategory, isCreate: true })
+    if ('error' in category) { res.status(400).json({ error: category.error }); return }
+    const dept = await prisma.department.create({
+      data: { name, layerId, workspaceId: req.user!.workspaceId, officeCategory: category.value },
+    })
     res.status(201).json(dept)
   } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
 }
@@ -77,9 +83,43 @@ export async function createDepartment(req: Request, res: Response): Promise<voi
 // PUT /api/workspace/departments/:id
 export async function updateDepartment(req: Request, res: Response): Promise<void> {
   try {
-    const dept = await prisma.department.findFirst({ where: { id: req.params.id, workspaceId: req.user!.workspaceId, deletedAt: null } })
+    const dept = await prisma.department.findFirst({
+      where: { id: req.params.id, workspaceId: req.user!.workspaceId, deletedAt: null },
+      include: { layer: { select: { number: true } } },
+    })
     if (!dept) { res.status(404).json({ error: 'Department not found' }); return }
-    const updated = await prisma.department.update({ where: { id: req.params.id }, data: { name: req.body.name } })
+    const fourLevel = await isFourLevelWorkspace(req.user!.workspaceId)
+    const category = resolveDepartmentCategory({
+      fourLevel,
+      level: dept.layer.number,
+      provided: req.body.officeCategory,
+      current: dept.officeCategory,
+      isCreate: false,
+    })
+    if ('error' in category) { res.status(400).json({ error: category.error }); return }
+
+    // Retagging moves everyone in the department between Head Office and
+    // Provincial, so it is recorded even though no permission changes with it.
+    const retagged = category.value !== dept.officeCategory
+    const updated = await prisma.$transaction(async tx => {
+      const d = await tx.department.update({
+        where: { id: req.params.id },
+        data: { name: req.body.name, officeCategory: category.value },
+      })
+      if (retagged) {
+        const affected = await tx.personnel.count({ where: { departmentId: d.id, deletedAt: null } })
+        await tx.auditLog.create({
+          data: {
+            workspaceId: req.user!.workspaceId,
+            event: 'DEPARTMENT_RETAGGED',
+            actorDirectorId: req.user!.actorId,
+            actorType: 'director',
+            payload: { departmentId: d.id, name: d.name, from: dept.officeCategory, to: category.value, affectedPersonnel: affected },
+          },
+        })
+      }
+      return d
+    })
     res.json(updated)
   } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
 }
@@ -104,7 +144,11 @@ export async function getPersonnel(req: Request, res: Response): Promise<void> {
       const depts = await prisma.department.findMany({ where: { layerId, workspaceId: req.user!.workspaceId, deletedAt: null }, select: { id: true } })
       where.departmentId = { in: depts.map(d => d.id) }
     }
-    const personnel = await prisma.personnel.findMany({ where, include: { department: { include: { layer: true } } }, orderBy: { name: 'asc' } })
+    const personnel = await prisma.personnel.findMany({
+      where,
+      include: { department: { include: { layer: true } }, supervisor: { select: { id: true, name: true } } },
+      orderBy: { name: 'asc' },
+    })
     // Never expose passwords
     res.json(personnel.map(({ password: _p, ...p }) => p))
   } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
@@ -126,7 +170,9 @@ export async function getManagedUsers(req: Request, res: Response): Promise<void
         mustChangePassword: true,
         createdAt: true,
         updatedAt: true,
-        department: { select: { id: true, name: true, layer: { select: { number: true, name: true } } } },
+        supervisorId: true,
+        supervisor: { select: { id: true, name: true } },
+        department: { select: { id: true, name: true, officeCategory: true, layer: { select: { number: true, name: true } } } },
       },
       orderBy: { name: 'asc' },
     })
@@ -179,10 +225,22 @@ export async function resetManagedUserPassword(req: Request, res: Response): Pro
 // POST /api/workspace/personnel
 export async function createPersonnel(req: Request, res: Response): Promise<void> {
   try {
-    const { name, phone, email, nic, departmentId, password, mustChangePassword, isActive } = req.body
+    const { name, phone, email, nic, departmentId, password, mustChangePassword, isActive, supervisorId } = req.body
     if (!name || !phone || !departmentId) { res.status(400).json({ error: 'name, phone, departmentId required' }); return }
-    const dept = await prisma.department.findFirst({ where: { id: departmentId, workspaceId: req.user!.workspaceId, deletedAt: null } })
+    const dept = await prisma.department.findFirst({
+      where: { id: departmentId, workspaceId: req.user!.workspaceId, deletedAt: null },
+      include: { layer: { select: { number: true } } },
+    })
     if (!dept) { res.status(404).json({ error: 'Department not found' }); return }
+    const fourLevel = await isFourLevelWorkspace(req.user!.workspaceId)
+    const supervisor = await resolveSupervisor({
+      fourLevel,
+      workspaceId: req.user!.workspaceId,
+      level: dept.layer.number,
+      provided: supervisorId,
+      isCreate: true,
+    })
+    if ('error' in supervisor) { res.status(400).json({ error: supervisor.error }); return }
     const normalized = normalizeSriLankanPhone(phone)
     const director = req.user!.actorType === 'director'
       ? await prisma.director.findUnique({ where: { id: req.user!.actorId }, include: { company: true } })
@@ -221,6 +279,7 @@ export async function createPersonnel(req: Request, res: Response): Promise<void
         nic,
         password: hashed,
         departmentId,
+        supervisorId: supervisor.value,
         workspaceId: req.user!.workspaceId,
         companyId,
         mustChangePassword: mustChangePassword ?? !password,
@@ -315,7 +374,10 @@ export async function updatePersonnel(req: Request, res: Response): Promise<void
     if (actorType === 'personnel' && actorId !== req.params.id) {
       res.status(403).json({ error: 'You can only update your own profile' }); return
     }
-    const person = await prisma.personnel.findFirst({ where: { id: req.params.id, workspaceId, deletedAt: null }, include: { company: true } })
+    const person = await prisma.personnel.findFirst({
+      where: { id: req.params.id, workspaceId, deletedAt: null },
+      include: { company: true, department: { include: { layer: { select: { number: true } } } } },
+    })
     if (!person) { res.status(404).json({ error: 'Personnel not found' }); return }
     const { name, phone, nic, email, supervisorId, departmentId } = req.body
 
@@ -343,7 +405,33 @@ export async function updatePersonnel(req: Request, res: Response): Promise<void
     }
 
     // Directors can set any supervisorId; personnel can set their own supervisorId (for approval chain setup)
-    const supervisorUpdate = supervisorId !== undefined ? { supervisorId: supervisorId || null } : {}
+    const movingDepartment = actorType === 'director' && !!departmentId && departmentId !== person.departmentId
+    let targetLevel = person.department?.layer?.number ?? 0
+    if (movingDepartment) {
+      const target = await prisma.department.findFirst({
+        where: { id: departmentId, workspaceId, deletedAt: null },
+        include: { layer: { select: { number: true } } },
+      })
+      if (!target) { res.status(404).json({ error: 'Target department not found' }); return }
+      targetLevel = target.layer.number
+    }
+    const levelChanged = movingDepartment && targetLevel !== (person.department?.layer?.number ?? 0)
+
+    const fourLevel = await isFourLevelWorkspace(workspaceId)
+    // A move that changes level can strand an existing manager who is no longer
+    // one level up, so the manager is re-validated rather than carried over.
+    const supervisor = await resolveSupervisor({
+      fourLevel,
+      workspaceId,
+      level: targetLevel,
+      subjectId: person.id,
+      provided: levelChanged && supervisorId === undefined ? person.supervisorId : supervisorId,
+      current: person.supervisorId,
+      isCreate: levelChanged,
+    })
+    if ('error' in supervisor) { res.status(400).json({ error: supervisor.error }); return }
+
+    const supervisorUpdate = supervisorId !== undefined || levelChanged ? { supervisorId: supervisor.value } : {}
     const deptUpdate = actorType === 'director' && departmentId ? { departmentId } : {}
 
     const normalizedUpdate = phone ? normalizeSriLankanPhone(phone) : null
@@ -414,10 +502,39 @@ export async function getPersonnelAboveMe(req: Request, res: Response): Promise<
     })
     const abovePersonnel = await prisma.personnel.findMany({
       where: { workspaceId, deletedAt: null, departmentId: { in: aboveDepts.map(d => d.id) } },
-      select: { id: true, name: true, phone: true, email: true, departmentId: true, department: { select: { name: true } } },
+      select: { id: true, name: true, phone: true, email: true, departmentId: true, department: { select: { name: true, officeCategory: true } } },
       orderBy: { name: 'asc' }
     })
     res.json({ type: 'personnel', items: abovePersonnel })
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
+}
+
+// GET /api/workspace/managers?level=N  (Director only)
+// Candidate reporting managers for someone at level N — everyone one level up.
+// Level 1 reports to the Director, so it has no candidates.
+export async function getManagerCandidates(req: Request, res: Response): Promise<void> {
+  try {
+    const { workspaceId } = req.user!
+    const level = Number((req.query as Record<string, string>).level)
+    if (!Number.isInteger(level) || level < 1) { res.status(400).json({ error: 'level required' }); return }
+    if (level === 1) { res.json([]); return }
+
+    const managers = await prisma.personnel.findMany({
+      where: {
+        workspaceId,
+        deletedAt: null,
+        isActive: true,
+        department: { deletedAt: null, layer: { number: level - 1 } },
+      },
+      select: {
+        id: true,
+        name: true,
+        loginId: true,
+        department: { select: { id: true, name: true, officeCategory: true, layer: { select: { number: true, name: true } } } },
+      },
+      orderBy: { name: 'asc' },
+    })
+    res.json(managers)
   } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
 }
 
@@ -425,13 +542,35 @@ export async function getPersonnelAboveMe(req: Request, res: Response): Promise<
 export async function movePersonnel(req: Request, res: Response): Promise<void> {
   try {
     if (req.user!.actorType !== 'director') { res.status(403).json({ error: 'Director only' }); return }
-    const { departmentId } = req.body
-    const person = await prisma.personnel.findFirst({ where: { id: req.params.id, workspaceId: req.user!.workspaceId, deletedAt: null } })
+    const { departmentId, supervisorId } = req.body
+    const person = await prisma.personnel.findFirst({
+      where: { id: req.params.id, workspaceId: req.user!.workspaceId, deletedAt: null },
+      include: { department: { include: { layer: { select: { number: true } } } } },
+    })
     if (!person) { res.status(404).json({ error: 'Personnel not found' }); return }
-    const dept = await prisma.department.findFirst({ where: { id: departmentId, workspaceId: req.user!.workspaceId, deletedAt: null } })
+    const dept = await prisma.department.findFirst({
+      where: { id: departmentId, workspaceId: req.user!.workspaceId, deletedAt: null },
+      include: { layer: { select: { number: true } } },
+    })
     if (!dept) { res.status(404).json({ error: 'Target department not found' }); return }
+
+    // Moving across levels re-opens the reporting line: the manager must still
+    // sit exactly one level above where this person lands.
+    const levelChanged = dept.layer.number !== (person.department?.layer?.number ?? 0)
+    const fourLevel = await isFourLevelWorkspace(req.user!.workspaceId)
+    const supervisor = await resolveSupervisor({
+      fourLevel,
+      workspaceId: req.user!.workspaceId,
+      level: dept.layer.number,
+      subjectId: person.id,
+      provided: supervisorId !== undefined ? supervisorId : person.supervisorId,
+      current: person.supervisorId,
+      isCreate: levelChanged,
+    })
+    if ('error' in supervisor) { res.status(400).json({ error: supervisor.error }); return }
+
     const updated = await prisma.$transaction(async tx => {
-      const p = await tx.personnel.update({ where: { id: req.params.id }, data: { departmentId } })
+      const p = await tx.personnel.update({ where: { id: req.params.id }, data: { departmentId, supervisorId: supervisor.value } })
       await tx.auditLog.create({ data: { workspaceId: req.user!.workspaceId, event: 'PERSONNEL_MOVED', actorDirectorId: req.user!.actorId, actorType: 'director', payload: { personnelId: p.id, from: person.departmentId, to: departmentId } } })
       return p
     })

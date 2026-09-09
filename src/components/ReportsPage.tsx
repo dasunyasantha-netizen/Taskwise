@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import type { Task, Layer, Personnel } from '../types'
+import { OFFICE_CATEGORY_OPTIONS, officeCategoryLabel } from '../hierarchy'
 import { taskApi, auditApi, workspaceApi } from '../services/apiService'
 import FilterBar, { DEFAULT_FILTERS, filterTasks, computeAvailableOptions, hasActiveFilters } from './FilterBar'
 import type { ActiveFilters, AvailableOptions } from './FilterBar'
@@ -613,8 +614,13 @@ function ByOfficerReport({ tasks, personnel, onTaskClick }: { tasks: Task[]; per
 function ByDepartmentReport({ tasks, layers, onTaskClick }: { tasks: Task[]; layers: Layer[]; onTaskClick: (t: Task) => void }) {
   const now = new Date()
   const allDepts = layers.flatMap(l => (l.departments ?? []).map(d => ({ ...d, layerName: l.name })))
+  // Only companies that actually use Head Office / Provincial get the column.
+  const showCategory = allDepts.some(d => d.officeCategory)
+  // A fourth tier only exists for companies on the four-level hierarchy, which
+  // is also where the wording changes from "Layer" to "Level".
+  const tier = layers.some(l => l.number >= 4) ? 'Level' : 'Layer'
 
-  const map = new Map<string, { name: string; layerName: string; tasks: Task[] }>()
+  const map = new Map<string, { name: string; layerName: string; category: string | null; tasks: Task[] }>()
   for (const t of tasks) {
     for (const a of t.assignments ?? []) {
       const deptId = a.departmentId ?? a.personnel?.departmentId
@@ -622,7 +628,7 @@ function ByDepartmentReport({ tasks, layers, onTaskClick }: { tasks: Task[]; lay
         const dept = allDepts.find(d => d.id === deptId)
         const name = dept?.name ?? deptId
         const layerName = dept?.layerName ?? '—'
-        if (!map.has(deptId)) map.set(deptId, { name, layerName, tasks: [] })
+        if (!map.has(deptId)) map.set(deptId, { name, layerName, category: dept?.officeCategory ?? null, tasks: [] })
         if (!map.get(deptId)!.tasks.find(x => x.id === t.id))
           map.get(deptId)!.tasks.push(t)
       }
@@ -630,8 +636,8 @@ function ByDepartmentReport({ tasks, layers, onTaskClick }: { tasks: Task[]; lay
   }
 
   const rows = [...map.entries()]
-    .map(([id, { name, layerName, tasks: ts }]) => ({
-      id, name, layerName,
+    .map(([id, { name, layerName, category, tasks: ts }]) => ({
+      id, name, layerName, category,
       total: ts.length,
       completed: ts.filter(t => t.status === 'APPROVED').length,
       pending: ts.filter(t => !['APPROVED', 'CANCELLED'].includes(t.status)).length,
@@ -649,12 +655,31 @@ function ByDepartmentReport({ tasks, layers, onTaskClick }: { tasks: Task[]; lay
         <h2 className="text-base font-bold text-tw-text">Tasks by Department</h2>
         <span className="text-xs text-tw-text-secondary">{rows.length} departments</span>
       </div>
+      {showCategory && (
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          {OFFICE_CATEGORY_OPTIONS.map(option => {
+            const inCategory = rows.filter(r => r.category === option.value)
+            const total = inCategory.reduce((sum, r) => sum + r.total, 0)
+            const overdue = inCategory.reduce((sum, r) => sum + r.overdue, 0)
+            return (
+              <div key={option.value} className="card px-4 py-3">
+                <div className="text-xs text-tw-text-secondary">{option.label}</div>
+                <div className="text-2xl font-bold text-tw-primary mt-1">{total}</div>
+                <div className="text-xs text-tw-text-secondary mt-0.5">
+                  {inCategory.length} {inCategory.length === 1 ? 'department' : 'departments'}
+                  {overdue > 0 && <span className="text-tw-danger font-semibold"> · {overdue} overdue</span>}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
       <div className="card overflow-hidden">
         <div className="hidden sm:block overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-[#f0f4ff] border-b-2 border-tw-primary/20">
-                {['Department', 'Layer', 'Total', 'Completed', 'Pending', 'Overdue'].map(h => (
+                {['Department', tier, ...(showCategory ? ['Category'] : []), 'Total', 'Completed', 'Pending', 'Overdue'].map(h => (
                   <th key={h} className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider">{h}</th>
                 ))}
               </tr>
@@ -671,6 +696,9 @@ function ByDepartmentReport({ tasks, layers, onTaskClick }: { tasks: Task[]; lay
                       </div>
                     </td>
                     <td className="px-4 py-3 text-xs text-tw-text-secondary">{r.layerName}</td>
+                    {showCategory && (
+                      <td className="px-4 py-3 text-xs text-tw-text-secondary">{officeCategoryLabel(r.category) ?? '—'}</td>
+                    )}
                     <td className="px-4 py-3 font-semibold text-tw-text">{r.total}</td>
                     <td className="px-4 py-3 text-green-600 font-semibold">{r.completed}</td>
                     <td className="px-4 py-3 text-blue-600 font-semibold">{r.pending}</td>
@@ -678,7 +706,7 @@ function ByDepartmentReport({ tasks, layers, onTaskClick }: { tasks: Task[]; lay
                   </tr>
                   {expandedId === r.id && (
                     <tr>
-                      <td colSpan={6} className="px-4 pb-3 pt-0 bg-tw-hover/30">
+                      <td colSpan={showCategory ? 7 : 6} className="px-4 pb-3 pt-0 bg-tw-hover/30">
                         <div className="space-y-1.5 pt-2">
                           {map.get(r.id)!.tasks.map(t => (
                             <div key={t.id} onClick={() => onTaskClick(t)}
@@ -704,7 +732,9 @@ function ByDepartmentReport({ tasks, layers, onTaskClick }: { tasks: Task[]; lay
               <button className="w-full flex items-center gap-3 px-4 py-3 text-left" onClick={() => setExpandedId(expandedId === r.id ? null : r.id)}>
                 <div className="flex-1 min-w-0">
                   <div className="font-semibold text-tw-text text-sm">{r.name}</div>
-                  <div className="text-xs text-tw-text-secondary">{r.layerName} · {r.total} tasks{r.overdue > 0 ? ` · ${r.overdue} overdue` : ''}</div>
+                  <div className="text-xs text-tw-text-secondary">
+                    {[r.layerName, showCategory ? officeCategoryLabel(r.category) : null].filter(Boolean).join(' · ')} · {r.total} tasks{r.overdue > 0 ? ` · ${r.overdue} overdue` : ''}
+                  </div>
                 </div>
                 <svg className={`w-4 h-4 text-tw-text-secondary flex-shrink-0 transition-transform ${expandedId === r.id ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/></svg>
               </button>

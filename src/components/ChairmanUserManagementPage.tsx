@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { workspaceApi } from '../services/apiService'
+import { levelNeedsManager, officeCategoryLabel } from '../hierarchy'
 
 interface ManagedUser {
   id: string
@@ -11,9 +12,12 @@ interface ManagedUser {
   isActive: boolean
   mustChangePassword: boolean
   createdAt: string
+  supervisorId: string | null
+  supervisor: { id: string; name: string } | null
   department: {
     id: string
     name: string
+    officeCategory?: string | null
     layer: { number: number; name: string }
   }
 }
@@ -82,6 +86,12 @@ export default function ChairmanUserManagementPage() {
 
   const activeCount = users.filter(user => user.isActive).length
   const forcedChangeCount = users.filter(user => user.mustChangePassword).length
+  // Only meaningful once a company is on the four-level hierarchy, which is
+  // also the only place a fourth tier or an office category exists.
+  const fourLevel = users.some(user => user.department.layer.number >= 4 || !!user.department.officeCategory)
+  const missingManager = (user: ManagedUser) =>
+    fourLevel && levelNeedsManager(user.department.layer.number) && !user.supervisorId
+  const missingManagerCount = users.filter(missingManager).length
 
   if (loading) return <div className="flex h-48 items-center justify-center text-sm text-tw-text-secondary">Loading users…</div>
 
@@ -107,6 +117,13 @@ export default function ChairmanUserManagementPage() {
         </div>
       </div>
 
+      {missingManagerCount > 0 && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <strong>{missingManagerCount}</strong> {missingManagerCount === 1 ? 'user has' : 'users have'} no reporting manager.
+          A director can set one from Team Hierarchy.
+        </div>
+      )}
+
       {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-tw-danger">{error}</div>}
 
       <div className="card overflow-hidden">
@@ -131,7 +148,10 @@ export default function ChairmanUserManagementPage() {
                 <div className="w-10 h-10 rounded-full bg-tw-primary/10 text-tw-primary font-bold text-sm flex items-center justify-center flex-shrink-0">{initials(user.name)}</div>
                 <div className="flex-1 min-w-0">
                   <div className="font-semibold text-sm text-tw-text truncate">{user.name}</div>
-                  <div className="text-xs text-tw-text-secondary truncate">{user.department.name}</div>
+                  <div className="text-xs text-tw-text-secondary truncate">
+                    {[user.department.name, officeCategoryLabel(user.department.officeCategory)].filter(Boolean).join(' · ')}
+                  </div>
+                  {missingManager(user) && <div className="text-xs text-amber-700 mt-0.5">⚠ No reporting manager</div>}
                   <div className="text-xs font-mono text-tw-primary mt-1 truncate">{user.loginId || user.phone}</div>
                 </div>
                 <span className={`text-[10px] font-semibold rounded-full px-2 py-1 ${user.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
@@ -169,7 +189,13 @@ export default function ChairmanUserManagementPage() {
                     </div>
                   </td>
                   <td className="px-4 py-3 font-mono text-xs font-semibold text-tw-primary whitespace-nowrap">{user.loginId || user.phone}</td>
-                  <td className="px-4 py-3 text-xs text-tw-text-secondary">{user.department.name}</td>
+                  <td className="px-4 py-3 text-xs text-tw-text-secondary">
+                    <div>{user.department.name}</div>
+                    {officeCategoryLabel(user.department.officeCategory) && (
+                      <div className="text-[11px]">{officeCategoryLabel(user.department.officeCategory)}</div>
+                    )}
+                    {missingManager(user) && <div className="text-[11px] text-amber-700">⚠ No reporting manager</div>}
+                  </td>
                   <td className="px-4 py-3 text-xs text-tw-text-secondary">
                     <div>{user.phone}</div>
                     {user.email && <div className="max-w-[180px] truncate">{user.email}</div>}

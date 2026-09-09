@@ -1,13 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import type { Layer, Task, Project, Personnel } from '../types'
+import { OFFICE_CATEGORY_OPTIONS, levelTakesCategory, officeCategoryLabel } from '../hierarchy'
 import DatePicker from './DatePicker'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type LayerFilter = {
   layerNumber: number
-  targetType: 'department' | 'personnel' | null
+  /** 'category' narrows a level to its Head Office or Provincial departments. */
+  targetType: 'department' | 'personnel' | 'category' | null
   targetId: string | null
 }
 
@@ -43,8 +45,17 @@ function applyOneLayerFilter(tasks: Task[], lf: LayerFilter, layers: Layer[], pe
   const layer = layers.find(l => l.number === lf.layerNumber)
   if (!layer) return tasks
   const layerDeptIds = (layer.departments ?? []).map(d => d.id)
+  const deptIdOf = (a: { departmentId?: string; personnelId?: string }): string | undefined =>
+    a.departmentId ?? (a.personnelId ? personnel.find(p => p.id === a.personnelId)?.departmentId : undefined)
   return tasks.filter(task => {
     const assignments = task.assignments ?? []
+    if (lf.targetType === 'category' && lf.targetId) {
+      const categoryDeptIds = (layer.departments ?? []).filter(d => d.officeCategory === lf.targetId).map(d => d.id)
+      return assignments.some(a => {
+        const deptId = deptIdOf(a)
+        return !!deptId && categoryDeptIds.includes(deptId)
+      })
+    }
     if (lf.targetType === 'personnel' && lf.targetId)
       return assignments.some(a => a.personnelId === lf.targetId)
     if (lf.targetType === 'department' && lf.targetId)
@@ -298,6 +309,12 @@ function LayerDropdown({
     ? depts.flatMap(d => (d.personnel ?? []).filter(p => available.personnelIds.has(p.id)).map(p => ({ p, dName: d.name })))
     : depts.flatMap(d => (d.personnel ?? []).map(p => ({ p, dName: d.name })))
 
+  // Head Office / Provincial only appear on levels that actually carry them,
+  // and only for categories present in the visible departments.
+  const visibleCategories = levelTakesCategory(layer.number)
+    ? OFFICE_CATEGORY_OPTIONS.filter(o => visibleDepts.some(d => d.officeCategory === o.value))
+    : []
+
   return createPortal(
     <div style={{ position: 'fixed', top: pos.top, left: pos.left, width: pos.w, zIndex: 9999 }}
       className="bg-white border border-tw-border rounded-xl shadow-panel overflow-y-auto max-h-72 py-1"
@@ -306,12 +323,22 @@ function LayerDropdown({
         className={`w-full text-left px-3 py-2 text-xs hover:bg-tw-hover transition-colors ${!filter ? 'text-tw-primary font-semibold bg-[#f0f6ff]' : 'text-tw-text'}`}>
         All
       </button>
+      {visibleCategories.length > 0 && <>
+        <div className="px-3 pt-2 pb-1 border-t border-tw-border/30 mt-1"><span className="text-[10px] font-bold text-tw-text-secondary uppercase tracking-wider">Category</span></div>
+        {visibleCategories.map(option => (
+          <button key={option.value} onMouseDown={() => { onSelect({ layerNumber: layer.number, targetType: 'category', targetId: option.value }); onClose() }}
+            className={`w-full text-left px-3 py-2 text-xs hover:bg-tw-hover transition-colors ${filter?.targetType === 'category' && filter.targetId === option.value ? 'text-tw-primary font-semibold bg-[#f0f6ff]' : 'text-tw-text'}`}>
+            {option.label}
+          </button>
+        ))}
+      </>}
       {visibleDepts.length > 0 && <>
         <div className="px-3 pt-2 pb-1"><span className="text-[10px] font-bold text-tw-text-secondary uppercase tracking-wider">Departments</span></div>
         {visibleDepts.map(d => (
           <button key={d.id} onMouseDown={() => { onSelect({ layerNumber: layer.number, targetType: 'department', targetId: d.id }); onClose() }}
             className={`w-full text-left px-3 py-2 text-xs hover:bg-tw-hover transition-colors ${filter?.targetType === 'department' && filter.targetId === d.id ? 'text-tw-primary font-semibold bg-[#f0f6ff]' : 'text-tw-text'}`}>
             {d.name}
+            {officeCategoryLabel(d.officeCategory) && <span className="ml-1.5 text-tw-text-secondary text-[10px]">· {officeCategoryLabel(d.officeCategory)}</span>}
           </button>
         ))}
       </>}
@@ -351,7 +378,9 @@ function LayerGroup({ layer, filter, available, onChange }: LayerGroupProps) {
 
   let displayLabel = 'All'
   if (filter) {
-    if (filter.targetType === 'department' && filter.targetId)
+    if (filter.targetType === 'category' && filter.targetId)
+      displayLabel = officeCategoryLabel(filter.targetId) ?? 'Category'
+    else if (filter.targetType === 'department' && filter.targetId)
       displayLabel = depts.find(d => d.id === filter.targetId)?.name ?? 'Dept'
     else if (filter.targetType === 'personnel' && filter.targetId) {
       for (const dept of depts) { const p = dept.personnel?.find(p => p.id === filter.targetId); if (p) { displayLabel = p.name; break } }

@@ -1,13 +1,27 @@
 import { Request, Response } from 'express'
 import { PrismaClient } from '@prisma/client'
+import { isOfficeCategory, levelTakesCategory } from '../helpers/hierarchy'
 
 const prisma = new PrismaClient()
 
 // GET /api/notices — active notices for the current user
 export async function getActiveNotices(req: Request, res: Response): Promise<void> {
-  const { actorId, actorType, workspaceId, layerNumber } = req.user!
+  const { actorId, actorType, workspaceId, layerNumber, departmentId } = req.user!
   try {
     const now = new Date()
+
+    // A LAYER notice may be narrowed to one office category. Directors see
+    // every notice; personnel see the untargeted ones plus their own category.
+    let categoryClause: Record<string, unknown> = {}
+    if (actorType !== 'director') {
+      const dept = departmentId
+        ? await prisma.department.findUnique({ where: { id: departmentId }, select: { officeCategory: true } })
+        : null
+      categoryClause = dept?.officeCategory
+        ? { OR: [{ officeCategory: null }, { officeCategory: dept.officeCategory }] }
+        : { officeCategory: null }
+    }
+
     const notices = await prisma.notice.findMany({
       where: {
         workspaceId,
@@ -16,7 +30,7 @@ export async function getActiveNotices(req: Request, res: Response): Promise<voi
           {
             OR: [
               { audience: 'ALL' },
-              { audience: 'LAYER', layerNumber: actorType === 'director' ? undefined : layerNumber },
+              { audience: 'LAYER', layerNumber: actorType === 'director' ? undefined : layerNumber, ...categoryClause },
             ],
           },
         ],
@@ -49,16 +63,23 @@ export async function getAllNotices(req: Request, res: Response): Promise<void> 
 export async function createNotice(req: Request, res: Response): Promise<void> {
   const { actorType, workspaceId } = req.user!
   if (actorType !== 'director') { res.status(403).json({ error: 'Director only' }); return }
-  const { message, audience, layerNumber, expiresAt } = req.body
+  const { message, audience, layerNumber, expiresAt, officeCategory } = req.body
   if (!message?.trim()) { res.status(400).json({ error: 'Message is required' }); return }
   if (audience === 'LAYER' && !layerNumber) { res.status(400).json({ error: 'layerNumber required for LAYER audience' }); return }
+  const targetLevel = Number(layerNumber)
+  if (officeCategory && !isOfficeCategory(officeCategory)) { res.status(400).json({ error: 'Invalid office category' }); return }
+  if (officeCategory && !(audience === 'LAYER' && levelTakesCategory(targetLevel))) {
+    res.status(400).json({ error: 'Only level 2 and 3 notices can target Head Office or Provincial' })
+    return
+  }
   try {
     const notice = await prisma.notice.create({
       data: {
         workspaceId,
         message: message.trim(),
         audience: audience || 'ALL',
-        layerNumber: audience === 'LAYER' ? Number(layerNumber) : null,
+        layerNumber: audience === 'LAYER' ? targetLevel : null,
+        officeCategory: officeCategory || null,
         expiresAt: expiresAt ? new Date(expiresAt) : null,
       },
     })

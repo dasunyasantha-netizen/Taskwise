@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react'
-import { noticeApi, type Notice } from '../services/apiService'
+import { noticeApi, workspaceApi, type Notice } from '../services/apiService'
+import type { AuthUser, Layer } from '../types'
+import { OFFICE_CATEGORY_OPTIONS, hasFourLevelHierarchy, levelTakesCategory, officeCategoryLabel } from '../hierarchy'
 import Select from './Select'
 import DatePicker from './DatePicker'
 
@@ -8,20 +10,25 @@ const AUDIENCE_LABELS: Record<string, string> = {
   LAYER: 'Specific Level',
 }
 
-export default function BroadcastsPage() {
+export default function BroadcastsPage({ user }: { user: AuthUser }) {
   const [notices, setNotices]     = useState<Notice[]>([])
+  const [layers, setLayers]       = useState<Layer[]>([])
   const [loading, setLoading]     = useState(true)
   const [showForm, setShowForm]   = useState(false)
   const [message, setMessage]     = useState('')
   const [audience, setAudience]   = useState('ALL')
   const [layerNumber, setLayerNumber] = useState<number>(1)
+  const [officeCategory, setOfficeCategory] = useState('')
   const [expiresAt, setExpiresAt] = useState('')
   const [saving, setSaving]       = useState(false)
   const [error, setError]         = useState('')
 
   const load = async () => {
     setLoading(true)
-    try { setNotices(await noticeApi.getAll()) } catch { /* silent */ }
+    try {
+      const [n, l] = await Promise.all([noticeApi.getAll(), workspaceApi.getLayers() as Promise<Layer[]>])
+      setNotices(n); setLayers(l)
+    } catch { /* silent */ }
     setLoading(false)
   }
 
@@ -35,9 +42,10 @@ export default function BroadcastsPage() {
         message: message.trim(),
         audience,
         layerNumber: audience === 'LAYER' ? layerNumber : null,
+        officeCategory: canTargetCategory && officeCategory ? officeCategory : null,
         expiresAt: expiresAt || null,
       })
-      setMessage(''); setAudience('ALL'); setLayerNumber(1); setExpiresAt('')
+      setMessage(''); setAudience('ALL'); setLayerNumber(1); setOfficeCategory(''); setExpiresAt('')
       setShowForm(false)
       await load()
     } catch (e: unknown) {
@@ -52,6 +60,16 @@ export default function BroadcastsPage() {
   }
 
   const now = new Date()
+  const fourLevel = hasFourLevelHierarchy(user)
+  // Only levels that actually split into Head Office and Provincial can be narrowed.
+  const canTargetCategory = fourLevel && audience === 'LAYER' && levelTakesCategory(layerNumber)
+  const levelOptions = layers.length > 0
+    ? layers.map(l => ({ value: String(l.number), label: l.name }))
+    : [
+        { value: '1', label: 'Level 1 — Directors' },
+        { value: '2', label: 'Level 2 — Deputy / Provincial Directors' },
+        { value: '3', label: 'Level 3 — Assistant Directors' },
+      ]
 
   return (
     <div className="p-4 md:p-6 max-w-3xl">
@@ -97,11 +115,20 @@ export default function BroadcastsPage() {
                 <label className="block text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">Level</label>
                 <Select
                   value={String(layerNumber)}
-                  onChange={v => setLayerNumber(Number(v))}
+                  onChange={v => { setLayerNumber(Number(v)); setOfficeCategory('') }}
+                  options={levelOptions}
+                />
+              </div>
+            )}
+            {canTargetCategory && (
+              <div>
+                <label className="block text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">Category</label>
+                <Select
+                  value={officeCategory}
+                  onChange={setOfficeCategory}
                   options={[
-                    { value: '1', label: 'Level 1 — Directors' },
-                    { value: '2', label: 'Level 2 — Deputy / Provincial Directors' },
-                    { value: '3', label: 'Level 3 — Assistant Directors' },
+                    { value: '', label: 'Everyone at this level' },
+                    ...OFFICE_CATEGORY_OPTIONS.map(o => ({ value: o.value, label: `${o.label} only` })),
                   ]}
                 />
               </div>
@@ -147,7 +174,9 @@ export default function BroadcastsPage() {
                         {expired ? 'Expired' : 'Active'}
                       </span>
                       <span className="text-xs text-tw-text-secondary font-medium">
-                        {n.audience === 'LAYER' ? `Level ${n.layerNumber} only` : AUDIENCE_LABELS[n.audience]}
+                        {n.audience === 'LAYER'
+                          ? `Level ${n.layerNumber}${officeCategoryLabel(n.officeCategory) ? ` · ${officeCategoryLabel(n.officeCategory)}` : ''} only`
+                          : AUDIENCE_LABELS[n.audience]}
                       </span>
                       <span className="text-xs text-tw-text-secondary">
                         · {new Date(n.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}

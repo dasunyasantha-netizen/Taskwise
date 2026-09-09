@@ -26,6 +26,7 @@ import UserAnalyticsPage from './UserAnalyticsPage'
 import ChairmanUserManagementPage from './ChairmanUserManagementPage'
 import LeaderboardPage from './LeaderboardPage'
 import CompanyRequestsPage from './CompanyRequestsPage'
+import CompanyFeaturesPage from './CompanyFeaturesPage'
 import InsuranceManagementPage from './InsuranceManagementPage'
 import { launcherHomeUrl, launcherName, type LaunchSource } from '../services/launchSource'
 
@@ -929,6 +930,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
     ...(user.isSyswiseAdmin ? [{ label: 'Support Access', view: 'impersonation' as ViewMode, icon: '🔐' }] : []),
     { label: 'Settings',       view: 'settings'           as ViewMode, icon: '⚙️' },
     ...(user.isSyswiseAdmin ? [{ label: 'Company Requests', view: 'company_requests' as ViewMode, icon: 'C' }] : []),
+    ...(user.isSyswiseAdmin ? [{ label: 'Company Features', view: 'company_features' as ViewMode, icon: '🧩' }] : []),
     { label: 'My Profile',     view: 'profile'            as ViewMode, icon: '👤' },
   ]
 
@@ -961,6 +963,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
     ...(user.isSyswiseAdmin ? [{ label: 'Support Access', view: 'impersonation' as ViewMode, icon: '🔐' }] : []),
     { label: 'Settings',        view: 'settings'          as ViewMode, icon: '⚙️' },
     ...(user.isSyswiseAdmin ? [{ label: 'Company Requests', view: 'company_requests' as ViewMode, icon: 'C' }] : []),
+    ...(user.isSyswiseAdmin ? [{ label: 'Company Features', view: 'company_features' as ViewMode, icon: '🧩' }] : []),
     { label: 'My Profile',      view: 'profile'           as ViewMode, icon: '👤' },
   ]
 
@@ -1074,6 +1077,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
                   : currentView === 'leaderboard' ? 'Leaderboard'
                   : currentView === 'insurance_management' ? 'Insurance Management'
                   : currentView === 'company_requests' ? 'Company Requests'
+                  : currentView === 'company_features' ? 'Company Features'
                   : 'My Profile'}
               </div>
             </div>
@@ -1343,7 +1347,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
           {currentView === 'recent_updates' && <RecentUpdatesView />}
 
           {/* BROADCASTS */}
-          {currentView === 'broadcasts' && <BroadcastsPage />}
+          {currentView === 'broadcasts' && <BroadcastsPage user={user} />}
 
           {/* GROUP TASKS */}
           {currentView === 'group_tasks' && <GroupWiseTasksPage />}
@@ -1378,6 +1382,10 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
 
           {currentView === 'company_requests' && user.isSyswiseAdmin && (
             <CompanyRequestsPage />
+          )}
+
+          {currentView === 'company_features' && user.isSyswiseAdmin && (
+            <CompanyFeaturesPage />
           )}
 
           {/* AUDIT LOG */}

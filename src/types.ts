@@ -148,7 +148,8 @@ export interface Workspace {
 export interface Layer {
   id: string
   workspaceId: string
-  number: 1 | 2 | 3
+  /** 1-3, plus 4 for companies with the four_level_hierarchy feature. */
+  number: number
   name: string
   departments: Department[]
 }
@@ -158,6 +159,8 @@ export interface Department {
   layerId: string
   workspaceId: string
   name: string
+  /** HEAD_OFFICE | PROVINCIAL on levels 2 and 3; null everywhere else. */
+  officeCategory?: string | null
   deletedAt: string | null
   personnel?: Personnel[]
 }
@@ -406,6 +409,7 @@ export type ViewMode =
   | 'user_management'
   | 'leaderboard'
   | 'company_requests'
+  | 'company_features'
   | 'insurance_management'
   | 'settings'
   | 'profile'

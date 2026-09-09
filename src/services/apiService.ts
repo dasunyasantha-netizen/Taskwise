@@ -83,7 +83,8 @@ export const workspaceApi = {
   updateDepartment:  (id: string, data: unknown) => api.put(`/workspace/departments/${id}`, data),
   deleteDepartment:  (id: string)    => api.delete(`/workspace/departments/${id}`),
   getPersonnel:      (params?: string) => api.get(`/workspace/personnel${params ? '?' + params : ''}`),
-  getPersonnelAboveMe: () => api.get<{ type: 'directors' | 'personnel'; items: Array<{ id: string; name: string; phone?: string; email?: string; department?: { name: string } }> }>('/workspace/personnel/above-me'),
+  getPersonnelAboveMe: () => api.get<{ type: 'directors' | 'personnel'; items: Array<{ id: string; name: string; phone?: string; email?: string; department?: { name: string; officeCategory?: string | null } }> }>('/workspace/personnel/above-me'),
+  getManagerCandidates: (level: number) => api.get<ManagerCandidate[]>(`/workspace/managers?level=${level}`),
   createPersonnel:   (data: unknown) => api.post<{
     id: string
     name: string
@@ -188,10 +189,47 @@ export const notificationApi = {
 }
 
 // ─── Notices ─────────────────────────────────────────────────────────────────
+export interface ManagerCandidate {
+  id: string
+  name: string
+  loginId: string | null
+  department: {
+    id: string
+    name: string
+    officeCategory?: string | null
+    layer: { number: number; name: string }
+  }
+}
+
+// ─── Company features (System Administrator) ─────────────────────────────────
+export interface FeatureCatalogEntry {
+  key: string
+  name: string
+  description: string
+}
+
+export interface CompanyFeatureRow {
+  id: string
+  name: string
+  legalName: string
+  prefix: string
+  status: string
+  hasWorkspace: boolean
+  features: Record<string, { enabled: boolean; updatedAt: string | null }>
+}
+
+export const adminFeatureApi = {
+  list: () => api.get<{ catalog: FeatureCatalogEntry[]; companies: CompanyFeatureRow[] }>('/admin/features'),
+  set:  (companyId: string, featureKey: string, enabled: boolean) =>
+    api.put<{ companyId: string; featureKey: string; enabled: boolean; updatedAt: string }>(
+      `/admin/features/${companyId}/${featureKey}`, { enabled },
+    ),
+}
+
 export const noticeApi = {
   getActive:  () => api.get<Notice[]>('/notices'),
   getAll:     () => api.get<Notice[]>('/notices/all'),
-  create:     (data: { message: string; audience: string; layerNumber?: number | null; expiresAt?: string | null }) =>
+  create:     (data: { message: string; audience: string; layerNumber?: number | null; officeCategory?: string | null; expiresAt?: string | null }) =>
     api.post<Notice>('/notices', data),
   delete:     (id: string) => api.delete(`/notices/${id}`),
   dismiss:    (id: string) => api.post(`/notices/${id}/dismiss`),
@@ -202,6 +240,7 @@ export interface Notice {
   message: string
   audience: string
   layerNumber: number | null
+  officeCategory?: string | null
   createdAt: string
   expiresAt: string | null
   _count?: { dismissals: number }

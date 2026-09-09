@@ -193,7 +193,7 @@ model Layer {
   id          String    @id @default(uuid())
   workspaceId String
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  number      Int // 1, 2, or 3
+  number      Int // 1, 2, or 3 — plus 4 for companies with the four_level_hierarchy feature
   name        String
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -205,20 +205,26 @@ model Layer {
 }
 
 model Department {
-  id          String    @id @default(uuid())
-  layerId     String
-  layer       Layer     @relation(fields: [layerId], references: [id], onDelete: Cascade)
-  workspaceId String
-  name        String
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  deletedAt   DateTime?
+  id             String    @id @default(uuid())
+  layerId        String
+  layer          Layer     @relation(fields: [layerId], references: [id], onDelete: Cascade)
+  workspaceId    String
+  name           String
+  // HEAD_OFFICE | PROVINCIAL — required on levels 2 and 3, and always null on
+  // levels 1 and 4, for companies with the four_level_hierarchy feature. Always
+  // null for every other company. The two categories are a classification only:
+  // they carry identical permissions and data access.
+  officeCategory String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
 
   personnel       Personnel[]
   taskAssignments TaskAssignment[]
 
   @@index([layerId])
   @@index([workspaceId])
+  @@index([workspaceId, officeCategory])
 }
 
 model Personnel {
@@ -428,29 +434,29 @@ model InsuranceQuotation {
 }
 
 model InsurancePolicy {
-  id               String    @id @default(uuid())
-  sequenceNumber   Int       @unique @default(autoincrement())
-  workspaceId      String
-  workspace        Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  policyNumber     String
-  insuranceType    String
-  customerName     String
-  contactNumber    String
-  introducer       String?
-  sumInsured       Decimal   @db.Decimal(18, 2)
-  premium          Decimal   @db.Decimal(18, 2)
-  issueDate        DateTime
-  expiryDate       DateTime
-  status           String    @default("ACTIVE") // ACTIVE | CANCELLED | EXPIRED | RENEWED
-  cancelledAt      DateTime?
+  id                  String    @id @default(uuid())
+  sequenceNumber      Int       @unique @default(autoincrement())
+  workspaceId         String
+  workspace           Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  policyNumber        String
+  insuranceType       String
+  customerName        String
+  contactNumber       String
+  introducer          String?
+  sumInsured          Decimal   @db.Decimal(18, 2)
+  premium             Decimal   @db.Decimal(18, 2)
+  issueDate           DateTime
+  expiryDate          DateTime
+  status              String    @default("ACTIVE") // ACTIVE | CANCELLED | EXPIRED | RENEWED
+  cancelledAt         DateTime?
   companyPolicyNumber String?
-  salesCode        String?
-  businessType     String?
-  gwp              Decimal   @default(0) @db.Decimal(18, 2)
-  paid             Boolean   @default(false)
-  paymentAmount    Decimal   @default(0) @db.Decimal(18, 2)
-  paymentUpdatedAt DateTime?
-  notes            String?
+  salesCode           String?
+  businessType        String?
+  gwp                 Decimal   @default(0) @db.Decimal(18, 2)
+  paid                Boolean   @default(false)
+  paymentAmount       Decimal   @default(0) @db.Decimal(18, 2)
+  paymentUpdatedAt    DateTime?
+  notes               String?
 
   vehicleNumber    String?
   vehicleMakeModel String?
@@ -764,13 +770,16 @@ model Notification {
 // ─────────────────────────────────────────────────────────────────────────────
 
 model Notice {
-  id          String    @id @default(uuid())
-  workspaceId String
-  message     String
-  audience    String    @default("ALL") // ALL | LAYER
-  layerNumber Int? // set when audience = LAYER
-  createdAt   DateTime  @default(now())
-  expiresAt   DateTime?
+  id             String    @id @default(uuid())
+  workspaceId    String
+  message        String
+  audience       String    @default("ALL") // ALL | LAYER
+  layerNumber    Int? // set when audience = LAYER
+  // HEAD_OFFICE | PROVINCIAL — optionally narrows a LAYER notice to one office
+  // category on levels 2 and 3. Null means the whole layer.
+  officeCategory String?
+  createdAt      DateTime  @default(now())
+  expiresAt      DateTime?
 
   dismissals NoticeDismissal[]
 
@@ -793,21 +802,21 @@ model NoticeDismissal {
 // ─────────────────────────────────────────────────────────────────────────────
 
 model DeadlineExtension {
-  id             String   @id @default(uuid())
-  taskId         String
-  task           Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  workspaceId    String
-  oldDeadline    DateTime
-  newDeadline    DateTime
-  reason         String
-  note           String?
-  extendedById   String // Director.id or Personnel.id
-  extendedByType String // "director" | "personnel"
-  extendedByName String // snapshot of name at time of extension
+  id                   String   @id @default(uuid())
+  taskId               String
+  task                 Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  workspaceId          String
+  oldDeadline          DateTime
+  newDeadline          DateTime
+  reason               String
+  note                 String?
+  extendedById         String // Director.id or Personnel.id
+  extendedByType       String // "director" | "personnel"
+  extendedByName       String // snapshot of name at time of extension
   // Optional director-applied point penalty, deducted atomically with the extension.
-  pointsDeducted       Int     @default(0)
+  pointsDeducted       Int      @default(0)
   penalizedPersonnelId String? // the assignee whose points were deducted (null when no deduction)
-  createdAt      DateTime @default(now())
+  createdAt            DateTime @default(now())
 
   @@index([taskId])
   @@index([workspaceId])

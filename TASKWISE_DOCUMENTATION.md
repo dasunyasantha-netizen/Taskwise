@@ -96,16 +96,18 @@ There are two roles in TaskWise:
 
 ## 4. Workspace & Hierarchy Setup
 
-### Workspace
-A TaskWise instance belongs to a single **Workspace**. It has a name, company name, and optional logo. All data (tasks, people, projects) belongs to one workspace.
+### Companies and workspaces
+TaskWise is multi-tenant. Each **Company** owns exactly one **Workspace**, and all data (tasks, people, projects) belongs to that workspace — nothing crosses between companies.
+
+A company has a unique login **prefix**. New companies are onboarded through the Company Request flow, which creates the company, its workspace, its layers, and its first administrator. The one exception is **Youth Council**, the original tenant: it carries `allowUnprefixedLogin`, so its users sign in with a bare phone number (and some with legacy short internal codes) rather than a prefixed login ID.
 
 ### Layers
-The hierarchy has up to **3 layers**, numbered 1–3 from top to bottom:
+The hierarchy has **3 layers** by default, numbered 1–3 from top to bottom:
 - Layer 1 = most senior (e.g. "Senior Management")
 - Layer 2 = middle management (e.g. "Department Heads")
 - Layer 3 = operational staff (e.g. "Officers")
 
-Each layer has a name and contains one or more **Departments**.
+Each layer has a name and contains one or more **Departments**. Companies holding the `four_level_hierarchy` feature have a fourth tier and call these tiers **Levels** — see [Four-level hierarchy](#four-level-hierarchy-feature-gated) below.
 
 ### Departments
 Each department belongs to one layer. A department groups personnel together and can receive task assignments as a unit (before any individual accepts it).
@@ -118,6 +120,52 @@ Each person belongs to exactly one department. Personnel fields:
 
 **Setting up supervisors:**
 The director assigns supervisors via the Hierarchy Manager. If a personnel opens a subtask they have been assigned and they have no supervisor set, TaskWise prompts them to select one before they can proceed.
+
+---
+
+### Four-level hierarchy (feature-gated)
+
+Companies granted the **`four_level_hierarchy`** feature use four tiers instead of three, and the UI reads "Level" rather than "Layer". Companies without the feature are entirely unaffected: three layers, an optional supervisor, no office category.
+
+| Level | Office category | Departments are… | Reports to |
+|-------|-----------------|------------------|------------|
+| 1 | — | organisational units | the Director |
+| 2 | **required** — Head Office or Provincial | organisational units | a Level 1 user |
+| 3 | **required** — Head Office or Provincial | organisational units | a Level 2 user |
+| 4 | — | **job roles** (Doctors, Engineers, …) | a Level 3 user |
+
+**Office category.** The Head Office / Provincial tag lives on the **department** (`Department.officeCategory`), and a person inherits it from the department they sit in. Creating a Level 2 or 3 department requires choosing one; creating a Level 2 or 3 *user* asks for the category first and then filters the department list to match. Levels 1 and 4 never carry a category.
+
+Head Office and Provincial hold **identical permissions and data access**. The category is a classification used for grouping, filtering and reporting only.
+
+A director can retag a department between the two categories at any time from Team Hierarchy. Everyone in it moves with it, the UI names how many people are affected, and the change is written to the audit log as `DEPARTMENT_RETAGGED`.
+
+**Level 4 departments are job roles**, not organisational units — all doctors sit in "Doctors" regardless of which Level 3 manager they report to or which category that manager belongs to. Assigning a task to a Level 4 department therefore reaches everyone in that role across the whole company.
+
+**Reporting manager.** Creating a Level 2, 3 or 4 user requires naming a manager exactly one level above them. The picker defaults to managers in the same office category and offers a "show managers from every category" toggle — cross-category reporting lines are allowed and are never rejected by the server. Level 1 users report to the Director and cannot be given a manager.
+
+Because a manager always sits exactly one level up, reporting cycles are structurally impossible.
+
+**Moving between levels.** A move that changes someone's level re-opens their reporting line: the existing manager is re-validated, and the move is refused until a manager at the new level is supplied.
+
+**Existing users without a manager.** The rule applies going forward only. Users who predate it keep an empty manager and are flagged — a badge in Team Hierarchy, a count banner at the top of the page, and a note on the chairman's User Management screen. They are never blocked, and their approvals continue to escalate straight to the Director until a manager is set. Editing such a user for an unrelated reason does not force the field to be filled.
+
+**Where the category shows up:** department grouping in Team Hierarchy, a Head Office / Provincial step in the task filter bar on Levels 2 and 3, a category column plus a Head Office vs Provincial summary in the By Department report, and optional category targeting on Level 2 and 3 broadcasts.
+
+---
+
+### Company features
+
+Optional modules are granted per company through the `CompanyFeature` table. Features are **opt-in**: a company with no row for a key does not hold that feature.
+
+| Key | What it does |
+|-----|--------------|
+| `insurance_management` | Quotations, policies and renewals, with a monthly insurance report |
+| `four_level_hierarchy` | The four-level hierarchy described above |
+
+A **System Administrator** manages these from the **Company Features** screen (sidebar, admin only), which lists every company against every feature as a toggle. Turning one off asks for confirmation and takes effect on that company's next request; the enabled set reaches the client as `user.features` on login and on `/api/auth/me`, so an open session picks up a change on its next page load. Every grant and revocation is written to the audit log as `COMPANY_FEATURE_ENABLED` / `COMPANY_FEATURE_DISABLED`.
+
+Server-side, `requireFeature(key)` guards whole route groups and returns **403** when a company is not entitled.
 
 ---
 
@@ -734,6 +782,8 @@ All endpoints require `Authorization: Bearer <token>` unless marked **Public**.
 | Prefix | Purpose |
 |--------|---------|
 | `/api/workspace/` | Layers, departments, personnel CRUD; supervisor management |
+| `/api/workspace/managers?level=N` | Candidate reporting managers one level above N (Director) |
+| `/api/admin/features` | Company feature entitlements (System Administrator) |
 | `/api/projects/` | Project CRUD, archive/unarchive |
 | `/api/notices/` | Broadcasts CRUD, dismiss |
 | `/api/notifications/` | List notifications, mark as read |
@@ -763,10 +813,12 @@ All endpoints require `Authorization: Bearer <token>` unless marked **Public**.
 | `passwordHash`, `mustChangePassword` | Auth fields |
 | `syswiseToken` | SSO token from SysWise platform |
 
-#### Workspace / Layer / Department
-- **Workspace** — top-level container for all data
-- **Layer** — numbered 1–3; belongs to workspace
-- **Department** — belongs to one layer; groups personnel
+#### Company / Workspace / Layer / Department
+- **Company** — the tenant: unique `prefix`, `status`, `allowUnprefixedLogin`; owns one workspace
+- **CompanyFeature** — `(companyId, featureKey, enabled)`; opt-in, a missing row means the company does not hold the feature
+- **Workspace** — container for all of one company's data
+- **Layer** — numbered 1–3, plus 4 for companies with `four_level_hierarchy`; belongs to workspace
+- **Department** — belongs to one layer; groups personnel; `officeCategory` is `HEAD_OFFICE` / `PROVINCIAL` on levels 2 and 3 of a four-level company and null everywhere else
 
 #### Task
 | Field | Notes |

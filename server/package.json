@@ -9,9 +9,10 @@
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
     "db:studio": "prisma studio",
-    "test": "tsx src/tests/companyHelpers.test.ts && tsx src/tests/taskFilters.test.ts && tsx src/tests/deduction.test.ts && tsx src/tests/companyOnboarding.test.ts",
+    "test": "tsx src/tests/companyHelpers.test.ts && tsx src/tests/taskFilters.test.ts && tsx src/tests/deduction.test.ts && tsx src/tests/companyOnboarding.test.ts && tsx src/tests/fourLevelHierarchy.test.ts",
     "test:helpers": "tsx src/tests/companyHelpers.test.ts",
-    "test:integration": "tsx src/tests/companyOnboarding.test.ts"
+    "test:integration": "tsx src/tests/companyOnboarding.test.ts",
+    "test:hierarchy": "tsx src/tests/fourLevelHierarchy.test.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.8.0",
