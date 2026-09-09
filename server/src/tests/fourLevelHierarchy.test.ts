@@ -297,6 +297,20 @@ async function main() {
     await ws.movePersonnel(mockReq({ params: { id: l3Person }, body: { departmentId: l3Prov, supervisorId: l2HeadPerson }, user: ycUser }), mockRes())
   })
 
+  await test('A manager-less user can still be moved between Head Office and Provincial', async () => {
+    // Changing someone's office category means moving them to a department in
+    // the other category. That is a same-level move and must not be blocked by
+    // the missing manager on a legacy account — those are flagged, not forced.
+    const legacy = await prisma.personnel.create({
+      data: { name: 'Legacy Uncategorised', phone: '0714000009', normalizedPhone: '94714000009', loginId: '0714000009', password: await hash('Pw@12345'), departmentId: l2Head, workspaceId: ycWs.id, companyId: ycCo.id },
+    })
+    const res = mockRes()
+    await ws.movePersonnel(mockReq({ params: { id: legacy.id }, body: { departmentId: l2Prov }, user: ycUser }), res)
+    assert.equal(res.statusCode, 200)
+    assert.equal(res.body.departmentId, l2Prov)
+    assert.equal(res.body.supervisorId, null)
+  })
+
   await test('A move within the same level leaves the manager alone', async () => {
     const res = mockRes()
     await ws.movePersonnel(mockReq({ params: { id: l2ProvPerson }, body: { departmentId: l2Head }, user: ycUser }), res)

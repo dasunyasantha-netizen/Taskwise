@@ -555,7 +555,10 @@ export async function movePersonnel(req: Request, res: Response): Promise<void> 
     if (!dept) { res.status(404).json({ error: 'Target department not found' }); return }
 
     // Moving across levels re-opens the reporting line: the manager must still
-    // sit exactly one level above where this person lands.
+    // sit exactly one level above where this person lands. A move within the
+    // same level — which is how someone's office category is changed — leaves
+    // the reporting line untouched, so an existing user who has no manager yet
+    // stays flagged rather than being blocked from moving.
     const levelChanged = dept.layer.number !== (person.department?.layer?.number ?? 0)
     const fourLevel = await isFourLevelWorkspace(req.user!.workspaceId)
     const supervisor = await resolveSupervisor({
@@ -563,7 +566,7 @@ export async function movePersonnel(req: Request, res: Response): Promise<void> 
       workspaceId: req.user!.workspaceId,
       level: dept.layer.number,
       subjectId: person.id,
-      provided: supervisorId !== undefined ? supervisorId : person.supervisorId,
+      provided: levelChanged && supervisorId === undefined ? person.supervisorId : supervisorId,
       current: person.supervisorId,
       isCreate: levelChanged,
     })
