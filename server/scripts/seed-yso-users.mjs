@@ -23,13 +23,25 @@
  *     [--apply]
  */
 
+// Flags that are a bare switch; everything else must be given a value. Without
+// this an empty argument would silently become `true` and be sent as the value.
+const SWITCHES = new Set(['apply', 'force-password-change'])
+
 const args = new Map()
 for (let i = 2; i < process.argv.length; i++) {
   const a = process.argv[i]
   if (!a.startsWith('--')) continue
   const key = a.slice(2)
+  if (SWITCHES.has(key)) { args.set(key, true); continue }
   const next = process.argv[i + 1]
-  if (next && !next.startsWith('--')) { args.set(key, next); i++ } else { args.set(key, true) }
+  if (next === undefined || next.startsWith('--')) {
+    console.error(`\n✗ --${key} needs a value\n`); process.exit(1)
+  }
+  if (next === '') {
+    console.error(`\n✗ --${key} was given an empty value. If you used a shell variable, note that "VAR=x cmd \\$VAR" expands \\$VAR before the assignment applies.\n`)
+    process.exit(1)
+  }
+  args.set(key, next); i++
 }
 
 const API = args.get('api') || 'http://localhost:4300/api'
