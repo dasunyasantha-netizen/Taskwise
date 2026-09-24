@@ -18,6 +18,7 @@ interface Props {
 const COLUMNS = [
   { status: 'NOT_STARTED', label: 'Not Started', color: 'bg-gray-400', statuses: ['PENDING', 'ASSIGNED'] },
   { status: 'IN_PROGRESS', label: 'In Progress', color: 'bg-yellow-400', statuses: ['IN_PROGRESS'] },
+  { status: 'BLOCKED',     label: 'Blocked',     color: 'bg-teal-400',   statuses: ['BLOCKED'] },
   { status: 'SUBMITTED',   label: 'Submitted',   color: 'bg-purple-400', statuses: ['SUBMITTED'] },
   { status: 'APPROVED',    label: 'Approved',    color: 'bg-green-400',  statuses: ['APPROVED'] },
   { status: 'RETURNED',    label: 'Returned',    color: 'bg-red-400',    statuses: ['RETURNED'] },

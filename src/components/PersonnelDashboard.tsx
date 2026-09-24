@@ -26,6 +26,7 @@ const priorityBar:  Record<string, string> = {
 }
 const statusBadge: Record<string, string> = {
   IN_PROGRESS: 'badge-warning',
+  BLOCKED:     'badge-teal',
   SUBMITTED:   'badge-purple',
   RETURNED:    'badge-danger',
   REJECTED:    'badge-danger',
@@ -38,6 +39,7 @@ const subtaskStatusDot: Record<string, string> = {
   PENDING:     'bg-gray-400',
   ASSIGNED:    'bg-gray-400',
   IN_PROGRESS: 'bg-yellow-500',
+  BLOCKED:     'bg-teal-500',
   SUBMITTED:   'bg-purple-500',
   APPROVED:    'bg-green-500',
   RETURNED:    'bg-red-400',
