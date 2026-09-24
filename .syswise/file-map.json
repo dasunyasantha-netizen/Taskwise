@@ -1,0 +1,110 @@
+{
+  "generated": true,
+  "app": "taskwise",
+  "important_paths": [
+    {
+      "path": "src/main.tsx",
+      "role": "fe_entry"
+    },
+    {
+      "path": "src/App.tsx",
+      "role": "fe_shell_auth_routing"
+    },
+    {
+      "path": "src/types.ts",
+      "role": "fe_domain_types_TaskStatus"
+    },
+    {
+      "path": "src/services/apiService.ts",
+      "role": "fe_api_client"
+    },
+    {
+      "path": "src/components/DirectorDashboard.tsx",
+      "role": "fe_director_shell"
+    },
+    {
+      "path": "src/components/PersonnelDashboard.tsx",
+      "role": "fe_personnel_shell"
+    },
+    {
+      "path": "src/components/TasksPage.tsx",
+      "role": "fe_task_list"
+    },
+    {
+      "path": "src/components/TaskDetailPanel.tsx",
+      "role": "fe_task_detail"
+    },
+    {
+      "path": "src/components/PersonnelTaskModal.tsx",
+      "role": "fe_personnel_task_modal"
+    },
+    {
+      "path": "src/components/BoardView.tsx",
+      "role": "fe_kanban"
+    },
+    {
+      "path": "src/components/FilterBar.tsx",
+      "role": "fe_status_filters"
+    },
+    {
+      "path": "src/components/FlowchartView.tsx",
+      "role": "fe_flowchart_status_colors"
+    },
+    {
+      "path": "src/components/Auth.tsx",
+      "role": "fe_login_webauthn_sso"
+    },
+    {
+      "path": "server/src/index.ts",
+      "role": "be_entry"
+    },
+    {
+      "path": "server/src/routes/taskRoutes.ts",
+      "role": "be_task_routes"
+    },
+    {
+      "path": "server/src/controllers/taskController.ts",
+      "role": "be_task_lifecycle_incl_block"
+    },
+    {
+      "path": "server/src/routes/notificationRoutes.ts",
+      "role": "be_notifications"
+    },
+    {
+      "path": "server/src/routes/authRoutes.ts",
+      "role": "be_auth_sso"
+    },
+    {
+      "path": "server/prisma/schema.prisma",
+      "role": "db_schema"
+    },
+    {
+      "path": "server/src/tests/taskFilters.test.ts",
+      "role": "unit_pure"
+    },
+    {
+      "path": "server/src/tests/companyHelpers.test.ts",
+      "role": "unit_pure"
+    },
+    {
+      "path": "server/src/tests/deduction.test.ts",
+      "role": "unit_pure"
+    },
+    {
+      "path": "deploy.sh",
+      "role": "prod_deploy_dangerous"
+    },
+    {
+      "path": "TASKWISE_DOCUMENTATION.md",
+      "role": "docs"
+    },
+    {
+      "path": "PICKITI_INTEGRATION.md",
+      "role": "docs_portal_contract"
+    },
+    {
+      "path": ".syswise/",
+      "role": "app_brain"
+    }
+  ]
+}

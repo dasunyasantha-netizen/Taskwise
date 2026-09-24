@@ -1,0 +1,30 @@
+{
+  "generated": true,
+  "symbols": [
+    {
+      "name": "TaskStatus",
+      "file": "src/types.ts",
+      "kind": "type"
+    },
+    {
+      "name": "blockTask",
+      "file": "server/src/controllers/taskController.ts",
+      "kind": "function"
+    },
+    {
+      "name": "unblockTask",
+      "file": "server/src/controllers/taskController.ts",
+      "kind": "function"
+    },
+    {
+      "name": "Task",
+      "file": "server/prisma/schema.prisma",
+      "kind": "model"
+    },
+    {
+      "name": "Notification",
+      "file": "server/prisma/schema.prisma",
+      "kind": "model"
+    }
+  ]
+}

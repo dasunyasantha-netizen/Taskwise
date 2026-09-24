@@ -1,0 +1,27 @@
+{
+  "app": "taskwise",
+  "depends_on": [
+    {
+      "app": "syswise",
+      "kind": "identity_sso_entitlements",
+      "notes": "Portal hosts Taskwise route (syswise.lk/taskwise); SSO/identity/groups/entitlements live in Syswise portal (Django/Next). Taskwise exchanges Syswise JWT at /sso and must not invent parallel identity. See portal GROUPS_AND_IDENTITY_CONTRACT.md, docs/pickiti/auth-sso.md, docs/pickiti/entitlements-api.md; Taskwise PICKITI_INTEGRATION.md + TASKWISE_DOCUMENTATION.md \u00a7SSO."
+    }
+  ],
+  "shared_services": [
+    {
+      "name": "postgres",
+      "notes": "Shared Postgres on local 5432; Taskwise DB separate (taskwise_db / taskwise_local per docs; .env.example uses taskwise_db). Keep taskwise_test for tests."
+    }
+  ],
+  "provides": [
+    {
+      "name": "notifications",
+      "notes": "In-app Notification model + /api/notifications (not a separate app)."
+    },
+    {
+      "name": "task_api",
+      "notes": "/api/tasks REST (CRUD + assign/accept/start/submit/return/approve/reject/reopen/cancel; block/unblock controllers exist, routes/FE incomplete)."
+    }
+  ],
+  "inbound_from": []
+}
