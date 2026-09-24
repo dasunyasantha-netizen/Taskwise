@@ -33,7 +33,7 @@
 
 ## 1. System Overview
 
-TaskWise is a structured task management system designed for organisations with a hierarchical workforce. It sits inside the SysWise platform and is accessed via SSO from the SysWise dashboard.
+TaskWise is a structured task management system designed for organisations with a hierarchical workforce. It sits inside the SysWise platform and is launched as a **direct route** at `/taskwise/` (from the SysWise Apps catalog or Pickiti). There is **no live Syswise JWT SSO exchange** in this app; users sign in with TaskWise credentials (phone + password or WebAuthn). Return-navigation back to Pickiti or SysWise follows `pickiti-launcher-protocol` **1.0.0** (`src/services/launchSource.ts`).
 
 The core model is: a **Director** creates tasks and assigns them to people or departments. Those people work through the task, log progress, create subtasks if needed, and submit for approval. The director approves or returns the work. Every action is permanently logged.
 
@@ -194,9 +194,11 @@ Server-side, `requireFeature(key)` guards whole route groups and returns **403**
   2. **Biometric enrolment** — registers their fingerprint/Face ID
 - Both steps are optional and can be skipped
 
-### SSO from SysWise
-- Users arrive at `/sso?token=<syswiseJWT>` from the SysWise dashboard
-- TaskWise decodes the token, auto-creates or matches the user, and returns a TaskWise-specific JWT
+### Launch from SysWise / Pickiti (not JWT SSO)
+- Catalog launch path is the **direct route** `/taskwise/` — TaskWise has **no** portal `/sso/taskwise` page and **no** live `/sso?token=<syswiseJWT>` exchange in this repo.
+- Users authenticate with TaskWise local login (phone + password) or WebAuthn; JWT is stored as `taskwise_token`.
+- Return-navigation uses shared contract **`pickiti-launcher-protocol` 1.0.0**: query params `source` (`pickiti`|`syswise`) and allow-listed `launcher_origin`, persisted as `taskwise_launch_source` / `taskwise_launcher_origin`, returning to `/pickiti` or `/apps`. See `PICKITI_INTEGRATION.md` and `.syswise/api-contracts/pickiti-launcher-protocol.v1.json`.
+- Do not invent a parallel Syswise JWT SSO flow without a coordinated cross-app request; portal `docs/pickiti/auth-sso.md` remains the authority for any future SSO page.
 
 ### Session Persistence
 - The last active view is stored in `localStorage` (`taskwise_view`)
@@ -811,7 +813,7 @@ All endpoints require `Authorization: Bearer <token>` unless marked **Public**.
 | `name`, `phone`, `email`, `nic`, `avatarUrl` | Profile data |
 | `supervisorId` | Self-reference → Personnel (direct manager) |
 | `passwordHash`, `mustChangePassword` | Auth fields |
-| `syswiseToken` | SSO token from SysWise platform |
+| `syswiseToken` | Legacy/unused relative to current launch model (no live Syswise JWT SSO exchange; direct `/taskwise/` + local JWT) |
 
 #### Company / Workspace / Layer / Department
 - **Company** — the tenant: unique `prefix`, `status`, `allowUnprefixedLogin`; owns one workspace
