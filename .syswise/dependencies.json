@@ -4,13 +4,72 @@
     {
       "app": "syswise",
       "kind": "identity_sso_entitlements",
-      "notes": "Portal hosts Taskwise route (syswise.lk/taskwise); SSO/identity/groups/entitlements live in Syswise portal (Django/Next). Taskwise exchanges Syswise JWT at /sso and must not invent parallel identity. See portal GROUPS_AND_IDENTITY_CONTRACT.md, docs/pickiti/auth-sso.md, docs/pickiti/entitlements-api.md; Taskwise PICKITI_INTEGRATION.md + TASKWISE_DOCUMENTATION.md \u00a7SSO."
+      "notes": "Portal is identity/entitlements authority and hosts /taskwise marketing + reverse-proxy path. Taskwise must not invent parallel identity. See portal GROUPS_AND_IDENTITY_CONTRACT.md, docs/pickiti/auth-sso.md, docs/pickiti/entitlements-api.md.",
+      "interfaces": [
+        {
+          "name": "pickiti-launcher-protocol",
+          "version": "1.0.0",
+          "risk": "low",
+          "contract": ".syswise/api-contracts/pickiti-launcher-protocol.v1.json",
+          "portal_contract": "syswise:.syswise/api-contracts/pickiti-launcher-protocol.v1.json",
+          "files": [
+            "src/services/launchSource.ts",
+            "src/App.tsx",
+            "src/components/DirectorDashboard.tsx",
+            "src/components/PersonnelDashboard.tsx",
+            "PICKITI_INTEGRATION.md"
+          ],
+          "notes": "REAL current coupling: source + launcher_origin return-nav. Portal producers: lib/pickiti/launcher.ts, AppsContent TaskWise launchPath. Preferred M2 shared interface."
+        },
+        {
+          "name": "entitlements_taskwise_pro",
+          "version": "platform",
+          "risk": "medium",
+          "files": [],
+          "portal_files": [
+            "entitlements/catalog.py",
+            "lib/pickiti/catalog.ts"
+          ],
+          "notes": "Portal PAID_APPS=('taskwise',); product taskwise_pro. Taskwise company feature flags are separate (local admin/features) — do not confuse with Pickiti entitlements."
+        },
+        {
+          "name": "cors_and_origins",
+          "version": "platform",
+          "risk": "low",
+          "files": [
+            "server/src/index.ts"
+          ],
+          "portal_files": [
+            "auth_backend/settings.py"
+          ],
+          "notes": "Taskwise CORS allows localhost:3500, localhost:3100, https://syswise.lk. Portal CORS includes TaskWise :3500. Env key names only: JWT_SECRET, DATABASE_URL, PORT (Taskwise); SYSWISE_SERVICE_KEYS etc. on portal."
+        },
+        {
+          "name": "sso_handoff",
+          "version": "absent",
+          "risk": "medium",
+          "files": [],
+          "notes": "NO app/sso/taskwise on portal; NO Taskwise /api/auth/sso-login found. TASKWISE_DOCUMENTATION.md §SSO (/sso?token=) is STALE. launch_views.LAUNCHABLE_APPS includes taskwise for future launch-code exchange — not adopted. Treat as future coordinated work, not current code path."
+        },
+        {
+          "name": "local_syswise_admin_role",
+          "version": "local",
+          "risk": "medium",
+          "files": [
+            "server/prisma/schema.prisma",
+            "server/scripts/provision-syswise-admin.cjs",
+            "server/src/controllers/companyRequestController.ts",
+            "server/src/middleware/authMiddleware.ts"
+          ],
+          "notes": "Director.isSyswiseAdmin + company onboarding approval live inside Taskwise DB — not portal User.is_superuser. Operational coupling to 'Syswise' brand/process, not portal JWT."
+        }
+      ]
     }
   ],
   "shared_services": [
     {
       "name": "postgres",
-      "notes": "Shared Postgres on local 5432; Taskwise DB separate (taskwise_db / taskwise_local per docs; .env.example uses taskwise_db). Keep taskwise_test for tests."
+      "notes": "Shared Postgres host typically :5432; Taskwise DB separate (taskwise_db / taskwise_local; .env.example uses taskwise_db). Keep taskwise_test for tests."
     }
   ],
   "provides": [
@@ -21,6 +80,12 @@
     {
       "name": "task_api",
       "notes": "/api/tasks REST (CRUD + assign/accept/start/submit/return/approve/reject/reopen/cancel; block/unblock controllers exist, routes/FE incomplete)."
+    },
+    {
+      "name": "pickiti-launcher-protocol",
+      "version": "1.0.0",
+      "contract": ".syswise/api-contracts/pickiti-launcher-protocol.v1.json",
+      "notes": "Consumer implementation of shared launcher return-nav contract also owned/produced by portal."
     }
   ],
   "inbound_from": []
