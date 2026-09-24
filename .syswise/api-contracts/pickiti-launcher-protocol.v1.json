@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "syswise://api-contracts/pickiti-launcher-protocol.v1.json",
+  "title": "PickitiLauncherProtocol",
+  "description": "Cross-app contract: non-secret launcher return-navigation between Syswise portal/Pickiti and direct-route apps (TaskWise). Authoritative prose: portal docs/pickiti/new-app-integration.md. Contract name pickiti-launcher-protocol version 1.0.0 — both App Brains MUST reference the same name/version.",
+  "contract": {
+    "name": "pickiti-launcher-protocol",
+    "version": "1.0.0",
+    "kind": "launcher_return_navigation",
+    "breaking": false,
+    "owners": ["syswise", "taskwise"]
+  },
+  "query_params": {
+    "source": {
+      "type": "string",
+      "enum": ["pickiti", "syswise"],
+      "notes": "Chooses product label and return path. Explicit launch overwrites stored value."
+    },
+    "launcher_origin": {
+      "type": "string",
+      "format": "uri",
+      "allowlist": [
+        "https://syswise.lk",
+        "https://www.syswise.lk",
+        "http://localhost:3100",
+        "http://127.0.0.1:3100"
+      ],
+      "notes": "Allow-listed origin only; reject path/query and unlisted hosts/ports."
+    }
+  },
+  "return_paths": {
+    "pickiti": "/pickiti",
+    "syswise": "/apps",
+    "default_when_missing": "syswise"
+  },
+  "storage_keys": {
+    "taskwise": {
+      "source": "taskwise_launch_source",
+      "origin": "taskwise_launcher_origin"
+    }
+  },
+  "portal_producers": [
+    "lib/pickiti/launcher.ts#withPickitiSource",
+    "lib/pickiti/launcher.ts#launchUrlFor",
+    "components/AppsContent.tsx (TaskWise launchPath)",
+    "lib/ssoAuth.ts (SSO apps; TaskWise is direct-route)"
+  ],
+  "taskwise_consumers": [
+    "src/services/launchSource.ts",
+    "src/App.tsx#captureLaunchSource",
+    "src/components/DirectorDashboard.tsx",
+    "src/components/PersonnelDashboard.tsx",
+    "PICKITI_INTEGRATION.md"
+  ],
+  "rules": [
+    "Parse source and launcher_origin before cleaning the address bar.",
+    "Return controls navigate only; they must never clear syswise_token, syswise_refresh, taskwise_token, or profile caches.",
+    "Cold/direct visit with no stored context defaults to SysWise /apps.",
+    "TaskWise has no portal /sso/taskwise page; catalog launchPath is /taskwise/ (direct). Do not invent parallel SSO without a coordinated cross_app_request.",
+    "TASKWISE_DOCUMENTATION.md claim of /sso?token=<syswiseJWT> is stale relative to current code — treat portal auth-sso.md as authority until an SSO page exists."
+  ],
+  "env_key_names_related": {
+    "portal": ["NEXT_PUBLIC_SYSWISE_URL", "NEXT_PUBLIC_PICKITI_USE_PRODUCTION_SERVER", "SYSWISE_SERVICE_KEYS", "ALLOWED_HOSTS"],
+    "taskwise": ["JWT_SECRET", "DATABASE_URL", "PORT"],
+    "notes": "Key NAMES only — never commit values. Taskwise .env.example has no SYSWISE_SERVICE_KEY yet (launch-code consumer not adopted)."
+  }
+}
