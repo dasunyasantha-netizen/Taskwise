@@ -20,6 +20,7 @@ const priorityColors: Record<string, string> = {
 }
 const statusColors: Record<string, string> = {
   PENDING: 'badge-gray', ASSIGNED: 'badge-primary', IN_PROGRESS: 'badge-warning',
+  BLOCKED: 'badge-teal',
   SUBMITTED: 'badge-purple', APPROVED: 'badge-success', RETURNED: 'badge-danger',
   REJECTED: 'badge-danger', CANCELLED: 'badge-gray',
 }
@@ -35,6 +36,8 @@ const eventLabels: Record<string, string> = {
   TASK_REJECTED:   'Task rejected',
   TASK_RETURNED:   'Task returned',
   TASK_CANCELLED:  'Task cancelled',
+  TASK_BLOCKED:     'Task blocked',
+  TASK_UNBLOCKED:   'Task unblocked',
   TASK_DELETED:    'Task deleted',
   SUBTASK_CREATED: 'Subtask created',
   COMMENT_ADDED:   'Comment added',
@@ -656,7 +659,8 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
           {tab === 'chain' && (() => {
             const STATUS_COLORS: Record<string, string> = {
               PENDING: 'bg-gray-100 text-gray-600', ASSIGNED: 'bg-blue-100 text-blue-700',
-              IN_PROGRESS: 'bg-amber-100 text-amber-700', SUBMITTED: 'bg-purple-100 text-purple-700',
+              IN_PROGRESS: 'bg-amber-100 text-amber-700', BLOCKED: 'bg-teal-100 text-teal-700',
+              SUBMITTED: 'bg-purple-100 text-purple-700',
               APPROVED: 'bg-green-100 text-green-700', RETURNED: 'bg-orange-100 text-orange-700',
               REJECTED: 'bg-red-100 text-red-700', CANCELLED: 'bg-gray-100 text-gray-500',
             }

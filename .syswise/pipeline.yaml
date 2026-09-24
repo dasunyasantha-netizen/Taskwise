@@ -1,0 +1,32 @@
+# Exact commands for Taskwise. Prefer pure unit tests (no DB) for default unit stage.
+# Full `npm test` in server also runs companyOnboarding + fourLevelHierarchy (may need DB).
+stages:
+  - name: unit-pure
+    group: unit
+    command: "cd server && npm run test:helpers && npx tsx src/tests/taskFilters.test.ts && npx tsx src/tests/deduction.test.ts"
+    continue_on_error: false
+
+  - name: contract-task-status
+    group: contract
+    command: "node .syswise/scripts/check-task-status-contract.mjs"
+    continue_on_error: false
+
+  - name: typecheck-fe
+    group: lint
+    command: "npx tsc --noEmit"
+    continue_on_error: true
+
+  - name: typecheck-be
+    group: lint
+    command: "cd server && npx tsc --noEmit"
+    continue_on_error: true
+
+  - name: build-fe
+    group: build
+    command: "npm run build"
+    continue_on_error: true
+
+# Notes:
+# - Root package.json has no lint script; FE build runs `tsc && vite build`.
+# - server `npm test` = helpers + taskFilters + deduction + companyOnboarding + fourLevelHierarchy.
+# - No CI (.github) in repo as of onboarding.

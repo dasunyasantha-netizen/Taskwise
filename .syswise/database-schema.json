@@ -1,0 +1,408 @@
+{
+  "source": "server/prisma/schema.prisma",
+  "note": "Extracted by onboarding script; Task.status/priority are String fields with documented value sets (not Prisma enums).",
+  "enums": {
+    "Task.status": {
+      "storage": "String",
+      "default": "PENDING",
+      "values": [
+        "PENDING",
+        "ASSIGNED",
+        "IN_PROGRESS",
+        "BLOCKED",
+        "SUBMITTED",
+        "APPROVED",
+        "RETURNED",
+        "REJECTED",
+        "CANCELLED"
+      ],
+      "schema_comment": "PENDING | ASSIGNED | IN_PROGRESS | BLOCKED | SUBMITTED | APPROVED | RETURNED | REJECTED | CANCELLED",
+      "blocked_note": "BLOCKED: assignee waiting on information or another team; unblocks back to IN_PROGRESS"
+    },
+    "Task.priority": {
+      "storage": "String",
+      "default": "MEDIUM",
+      "values": [
+        "CRITICAL",
+        "HIGH",
+        "MEDIUM",
+        "LOW"
+      ]
+    }
+  },
+  "models": {
+    "Task": {
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "attributes": "@id @default(uuid())",
+          "comment": null
+        },
+        {
+          "name": "workspaceId",
+          "type": "String",
+          "attributes": "",
+          "comment": null
+        },
+        {
+          "name": "projectId",
+          "type": "String",
+          "attributes": "",
+          "comment": null
+        },
+        {
+          "name": "project",
+          "type": "Project",
+          "attributes": "@relation(fields: [projectId], references: [id], onDelete: Cascade)",
+          "comment": null
+        },
+        {
+          "name": "parentTaskId",
+          "type": "String?",
+          "attributes": "",
+          "comment": null
+        },
+        {
+          "name": "parent",
+          "type": "Task?",
+          "attributes": "@relation(\"TaskSubtasks\", fields: [parentTaskId], references: [id])",
+          "comment": null
+        },
+        {
+          "name": "subtasks",
+          "type": "Task[]",
+          "attributes": "@relation(\"TaskSubtasks\")",
+          "comment": null
+        },
+        {
+          "name": "groupTaskId",
+          "type": "String?",
+          "attributes": "",
+          "comment": null
+        },
+        {
+          "name": "groupTask",
+          "type": "Task?",
+          "attributes": "@relation(\"GroupTaskInstances\", fields: [groupTaskId], references: [id])",
+          "comment": null
+        },
+        {
+          "name": "groupTaskInstances",
+          "type": "Task[]",
+          "attributes": "@relation(\"GroupTaskInstances\")",
+          "comment": null
+        },
+        {
+          "name": "title",
+          "type": "String",
+          "attributes": "",
+          "comment": null
+        },
+        {
+          "name": "description",
+          "type": "String?",
+          "attributes": "",
+          "comment": null
+        },
+        {
+          "name": "priority",
+          "type": "String",
+          "attributes": "@default(\"MEDIUM\")",
+          "comment": "CRITICAL | HIGH | MEDIUM | LOW"
+        },
+        {
+          "name": "status",
+          "type": "String",
+          "attributes": "@default(\"PENDING\")",
+          "comment": null
+        },
+        {
+          "name": "deadline",
+          "type": "DateTime?",
+          "attributes": "",
+          "comment": null
+        },
+        {
+          "name": "originalDeadline",
+          "type": "DateTime?",
+          "attributes": "",
+          "comment": "snapshot of deadline at task creation \u2014 never changed after first set"
+        },
+        {
+          "name": "deadlineSetById",
+          "type": "String?",
+          "attributes": "",
+          "comment": "Director.id or Personnel.id"
+        },
+        {
+          "name": "deadlineSetByType",
+          "type": "String?",
+          "attributes": "",
+          "comment": "\"director\" | \"personnel\""
+        },
+        {
+          "name": "createdByDirectorId",
+          "type": "String?",
+          "attributes": "",
+          "comment": null
+        },
+        {
+          "name": "createdByDirector",
+          "type": "Director?",
+          "attributes": "@relation(\"TaskCreatedByDirector\", fields: [createdByDirectorId], references: [id])",
+          "comment": null
+        },
+        {
+          "name": "createdByPersonnelId",
+          "type": "String?",
+          "attributes": "",
+          "comment": null
+        },
+        {
+          "name": "createdByPersonnel",
+          "type": "Personnel?",
+          "attributes": "@relation(\"TaskCreatedByPersonnel\", fields: [createdByPersonnelId], references: [id])",
+          "comment": null
+        },
+        {
+          "name": "approvalById",
+          "type": "String?",
+          "attributes": "",
+          "comment": null
+        },
+        {
+          "name": "approvalByType",
+          "type": "String?",
+          "attributes": "",
+          "comment": "\"director\" | \"personnel\""
+        },
+        {
+          "name": "actedById",
+          "type": "String?",
+          "attributes": "",
+          "comment": null
+        },
+        {
+          "name": "actedByType",
+          "type": "String?",
+          "attributes": "",
+          "comment": "\"director\" | \"personnel\""
+        },
+        {
+          "name": "startedAt",
+          "type": "DateTime?",
+          "attributes": "",
+          "comment": "when status first moved to IN_PROGRESS"
+        },
+        {
+          "name": "returnReason",
+          "type": "String?",
+          "attributes": "",
+          "comment": null
+        },
+        {
+          "name": "returnedAt",
+          "type": "DateTime?",
+          "attributes": "",
+          "comment": null
+        },
+        {
+          "name": "cancelledAt",
+          "type": "DateTime?",
+          "attributes": "",
+          "comment": null
+        },
+        {
+          "name": "cancelReason",
+          "type": "String?",
+          "attributes": "",
+          "comment": null
+        },
+        {
+          "name": "deletedAt",
+          "type": "DateTime?",
+          "attributes": "",
+          "comment": null
+        },
+        {
+          "name": "createdAt",
+          "type": "DateTime",
+          "attributes": "@default(now())",
+          "comment": null
+        },
+        {
+          "name": "updatedAt",
+          "type": "DateTime",
+          "attributes": "@updatedAt",
+          "comment": null
+        },
+        {
+          "name": "assignments",
+          "type": "TaskAssignment[]",
+          "attributes": "",
+          "comment": null
+        },
+        {
+          "name": "comments",
+          "type": "TaskComment[]",
+          "attributes": "",
+          "comment": null
+        },
+        {
+          "name": "auditLogs",
+          "type": "AuditLog[]",
+          "attributes": "",
+          "comment": null
+        },
+        {
+          "name": "notifications",
+          "type": "Notification[]",
+          "attributes": "",
+          "comment": null
+        },
+        {
+          "name": "progressLogs",
+          "type": "TaskProgressLog[]",
+          "attributes": "",
+          "comment": null
+        },
+        {
+          "name": "deadlineExtensions",
+          "type": "DeadlineExtension[]",
+          "attributes": "",
+          "comment": null
+        },
+        {
+          "name": "cancellationReview",
+          "type": "TaskCancellationReview?",
+          "attributes": "",
+          "comment": null
+        },
+        {
+          "name": "chainAsParent",
+          "type": "TaskChain[]",
+          "attributes": "@relation(\"ChainParentTask\")",
+          "comment": null
+        },
+        {
+          "name": "chainAsChild",
+          "type": "TaskChain[]",
+          "attributes": "@relation(\"ChainChildTask\")",
+          "comment": null
+        }
+      ]
+    },
+    "Notification": {
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "attributes": "@id @default(uuid())",
+          "comment": null
+        },
+        {
+          "name": "workspaceId",
+          "type": "String",
+          "attributes": "",
+          "comment": null
+        },
+        {
+          "name": "recipientDirectorId",
+          "type": "String?",
+          "attributes": "",
+          "comment": null
+        },
+        {
+          "name": "recipientDirector",
+          "type": "Director?",
+          "attributes": "@relation(\"NotifRecipientDirector\", fields: [recipientDirectorId], references: [id], onDelete: Cascade)",
+          "comment": null
+        },
+        {
+          "name": "recipientPersonnelId",
+          "type": "String?",
+          "attributes": "",
+          "comment": null
+        },
+        {
+          "name": "recipientPersonnel",
+          "type": "Personnel?",
+          "attributes": "@relation(\"NotifRecipientPersonnel\", fields: [recipientPersonnelId], references: [id], onDelete: Cascade)",
+          "comment": null
+        },
+        {
+          "name": "recipientType",
+          "type": "String",
+          "attributes": "",
+          "comment": "\"director\" | \"personnel\""
+        },
+        {
+          "name": "type",
+          "type": "String",
+          "attributes": "",
+          "comment": null
+        },
+        {
+          "name": "title",
+          "type": "String",
+          "attributes": "",
+          "comment": null
+        },
+        {
+          "name": "message",
+          "type": "String",
+          "attributes": "",
+          "comment": null
+        },
+        {
+          "name": "taskId",
+          "type": "String?",
+          "attributes": "",
+          "comment": null
+        },
+        {
+          "name": "task",
+          "type": "Task?",
+          "attributes": "@relation(fields: [taskId], references: [id], onDelete: Cascade)",
+          "comment": null
+        },
+        {
+          "name": "payload",
+          "type": "Json?",
+          "attributes": "",
+          "comment": null
+        },
+        {
+          "name": "isRead",
+          "type": "Boolean",
+          "attributes": "@default(false)",
+          "comment": null
+        },
+        {
+          "name": "readAt",
+          "type": "DateTime?",
+          "attributes": "",
+          "comment": null
+        },
+        {
+          "name": "createdAt",
+          "type": "DateTime",
+          "attributes": "@default(now())",
+          "comment": null
+        }
+      ],
+      "type_values_from_comment": [
+        "task_assigned",
+        "task_returned",
+        "task_submitted_for_approval",
+        "task_approved",
+        "task_rejected",
+        "task_deadline_warning",
+        "subtask_created",
+        "comment_added",
+        "personnel_moved"
+      ]
+    }
+  }
+}

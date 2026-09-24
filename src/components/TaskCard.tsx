@@ -18,6 +18,7 @@ const statusBadge: Record<string, string> = {
   PENDING:     'badge-gray',
   ASSIGNED:    'badge-primary',
   IN_PROGRESS: 'badge-warning',
+  BLOCKED:     'badge-teal',
   SUBMITTED:   'badge-purple',
   APPROVED:    'badge-success',
   RETURNED:    'badge-danger',
