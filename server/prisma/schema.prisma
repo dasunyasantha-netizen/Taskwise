@@ -521,6 +521,7 @@ model Task {
   status      String  @default("PENDING")
   // PENDING | ASSIGNED | IN_PROGRESS | BLOCKED | SUBMITTED | APPROVED | RETURNED | REJECTED | CANCELLED
   // BLOCKED: assignee is waiting on information or another team; unblocks back to IN_PROGRESS
+  blockedReason String? // optional reason when status is BLOCKED; pairs with BLOCKED status
 
   deadline          DateTime?
   originalDeadline  DateTime? // snapshot of deadline at task creation — never changed after first set

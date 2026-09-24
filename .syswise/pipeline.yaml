@@ -1,5 +1,6 @@
 # Exact commands for Taskwise. Prefer pure unit tests (no DB) for default unit stage.
 # Full `npm test` in server also runs companyOnboarding + fourLevelHierarchy (may need DB).
+# M3: migrate_* stages target local taskwise_test only — never prod. Skippable when Postgres missing.
 stages:
   - name: unit-pure
     group: unit
@@ -16,6 +17,23 @@ stages:
     command: "node .syswise/scripts/check-launcher-protocol-contract.mjs"
     continue_on_error: false
 
+  - name: migrate_status
+    group: database
+    # READ-class: prisma migrate status against DATABASE_URL (expect test DB).
+    command: "bash -lc 'if ! command -v psql >/dev/null 2>&1; then echo \"SKIP migrate_status: psql not found — see .syswise/known-risks.md Postgres setup\"; exit 0; fi; if [ -z \"${DATABASE_URL:-}\" ]; then export DATABASE_URL=\"postgresql://taskwise:taskwise_local@127.0.0.1:5432/taskwise_test?schema=public\"; fi; case \"$DATABASE_URL\" in *taskwise_test*) ;; *) echo \"REFUSING migrate_status: DATABASE_URL must contain taskwise_test (got non-test URL)\"; exit 2;; esac; cd server && npx prisma migrate status'"
+    continue_on_error: true
+
+  - name: migrate_deploy_test
+    group: database
+    # WRITE against test DB only. Never prod.
+    command: "bash -lc 'if ! command -v psql >/dev/null 2>&1; then echo \"SKIP migrate_deploy_test: psql not found — see .syswise/known-risks.md Postgres setup\"; exit 0; fi; if [ -z \"${DATABASE_URL:-}\" ]; then export DATABASE_URL=\"postgresql://taskwise:taskwise_local@127.0.0.1:5432/taskwise_test?schema=public\"; fi; case \"$DATABASE_URL\" in *taskwise_test*) ;; *) echo \"REFUSING migrate_deploy_test: DATABASE_URL must contain taskwise_test\"; exit 2;; esac; cd server && npx prisma migrate deploy'"
+    continue_on_error: true
+
+  - name: migrate_rollback_check
+    group: database
+    # Prisma has no built-in migrate rollback. Document + verify rollback scripts exist.
+    command: "bash -lc 'echo \"migrate_rollback_check: Prisma does not auto-rollback.\"; echo \"1) Forward SQL: server/prisma/migrations/<ts>_<name>/migration.sql\"; echo \"2) Inverse SQL: .syswise/scripts/rollback-<name>.sql\"; echo \"3) Dry-run on taskwise_test only: psql \\\$DATABASE_URL -v ON_ERROR_STOP=1 -f <rollback.sql>\"; echo \"4) Record dry_run_log_path + tested_on in worker result migration_artifacts.\"; if ls .syswise/scripts/rollback-*.sql >/dev/null 2>&1; then echo \"Found rollback scripts:\"; ls -1 .syswise/scripts/rollback-*.sql; else echo \"No .syswise/scripts/rollback-*.sql yet (OK until a migration package lands)\"; fi'"
+    continue_on_error: true
 
   - name: typecheck-fe
     group: lint
@@ -35,4 +53,6 @@ stages:
 # Notes:
 # - Root package.json has no lint script; FE build runs `tsc && vite build`.
 # - server `npm test` = helpers + taskFilters + deduction + companyOnboarding + fourLevelHierarchy.
+# - companyOnboarding / fourLevelHierarchy create/use DB `taskwise_test` via DATABASE_URL rewrite.
 # - No CI (.github) in repo as of onboarding.
+# - deploy.sh on prod host runs `npx prisma migrate deploy` — Syswise must never invoke deploy.sh.

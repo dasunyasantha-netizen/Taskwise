@@ -118,6 +118,12 @@
           "comment": null
         },
         {
+          "name": "blockedReason",
+          "type": "String?",
+          "attributes": "",
+          "comment": "optional reason when status is BLOCKED; pairs with BLOCKED status"
+        },
+        {
           "name": "deadline",
           "type": "DateTime?",
           "attributes": "",
