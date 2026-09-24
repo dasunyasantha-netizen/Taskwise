@@ -1,0 +1,74 @@
+# READ/WRITE globs per worker role for Taskwise layout.
+# Protected paths are never writable by workers.
+
+protected_paths:
+  - ".env"
+  - ".env.*"
+  - "server/.env"
+  - "server/.env.*"
+  - ".env.production"
+  - "deploy.sh"
+  - "**/*.pem"
+  - "**/credentials*"
+
+roles:
+  explorer:
+    read_paths:
+      - "**/*"
+    write_paths: []
+
+  frontend:
+    read_paths:
+      - "src/**"
+      - "index.html"
+      - "vite.config.ts"
+      - "tailwind.config.js"
+      - "postcss.config.js"
+      - "tsconfig.json"
+      - "tsconfig.node.json"
+      - "public/**"
+      - "package.json"
+      - ".syswise/**"
+      - "contracts/**"
+    write_paths:
+      - "src/**"
+      - "public/**"
+      - ".syswise/api-contracts/**"
+
+  backend:
+    read_paths:
+      - "server/src/**"
+      - "server/package.json"
+      - "server/tsconfig.json"
+      - "server/prisma/schema.prisma"
+      - ".syswise/**"
+      - "contracts/**"
+    write_paths:
+      - "server/src/**"
+      - ".syswise/api-contracts/**"
+
+  database:
+    read_paths:
+      - "server/prisma/**"
+      - "server/src/**"
+      - ".syswise/database-schema.json"
+      - ".syswise/api-contracts/**"
+    write_paths:
+      - "server/prisma/schema.prisma"
+      - "server/prisma/migrations/**"
+      - ".syswise/database-schema.json"
+
+  qa:
+    read_paths:
+      - "**/*"
+    write_paths:
+      - "server/src/tests/**"
+      - "**/*.test.*"
+      - "**/*.spec.*"
+      - ".syswise/scripts/**"
+      - ".syswise/api-contracts/**"
+
+  review:
+    read_paths:
+      - "**/*"
+    write_paths: []

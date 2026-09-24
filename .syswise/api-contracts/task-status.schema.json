@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "taskwise://api-contracts/task-status.schema.json",
+  "title": "TaskStatus",
+  "description": "Task.status values matching server/prisma/schema.prisma comment (String field, not Prisma enum). Must stay in sync with FE src/types.ts TaskStatus.",
+  "type": "string",
+  "enum": [
+    "PENDING",
+    "ASSIGNED",
+    "IN_PROGRESS",
+    "BLOCKED",
+    "SUBMITTED",
+    "APPROVED",
+    "RETURNED",
+    "REJECTED",
+    "CANCELLED"
+  ]
+}
