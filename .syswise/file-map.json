@@ -3,6 +3,14 @@
   "app": "taskwise",
   "important_paths": [
     {
+      "path": ".syswise/api-contracts/pickiti-launcher-protocol.v1.json",
+      "role": "shared_m2_contract"
+    },
+    {
+      "path": "src/services/launchSource.ts",
+      "role": "launcher_protocol_consumer"
+    },
+    {
       "path": "src/main.tsx",
       "role": "fe_entry"
     },

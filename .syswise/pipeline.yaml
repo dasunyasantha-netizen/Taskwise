@@ -11,6 +11,12 @@ stages:
     command: "node .syswise/scripts/check-task-status-contract.mjs"
     continue_on_error: false
 
+  - name: contract-launcher-protocol
+    group: contract
+    command: "node .syswise/scripts/check-launcher-protocol-contract.mjs"
+    continue_on_error: false
+
+
   - name: typecheck-fe
     group: lint
     command: "npx tsc --noEmit"

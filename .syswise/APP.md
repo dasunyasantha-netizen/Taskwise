@@ -26,7 +26,7 @@ the Syswise portal — Taskwise must not invent a parallel identity system.
 - Frontend: Vite + React 18 + TypeScript + Tailwind (PWA)
 - Backend: Node.js + Express + TypeScript
 - ORM/DB: Prisma → PostgreSQL (`taskwise_db` / local `taskwise` / `taskwise_test`)
-- Auth: JWT (`taskwise_token` in localStorage) + WebAuthn/FIDO2; SSO entry via Syswise JWT at `/sso?token=`
+- Auth: JWT (`taskwise_token` in localStorage) + WebAuthn/FIDO2; **no live Syswise JWT SSO exchange** (direct `/taskwise/` launch). Return-nav via `pickiti-launcher-protocol` **1.0.0**.
 
 ## How to run (local)
 
@@ -56,5 +56,7 @@ cd .. && npm install && npm run dev  # Vite on :3500, proxies /api → :4300
 ## Notes for Syswise workers
 
 Workers receive only a scoped task packet. Prefer this brain + `file-map.json` / `symbols.json`
-over broad repo crawls. Cross-app identity contracts live in the Syswise portal clone
-(`GROUPS_AND_IDENTITY_CONTRACT.md`, `docs/pickiti/auth-sso.md`) — read-only for M1.
+over broad repo crawls. Cross-app contracts:
+- Launcher return-nav: `.syswise/api-contracts/pickiti-launcher-protocol.v1.json` (same file in portal brain).
+- Identity/groups: portal `GROUPS_AND_IDENTITY_CONTRACT.md`, `docs/pickiti/auth-sso.md` (read; do not invent SSO).
+M2 cross-app work must be routed Taskwise Manager → Orchestrator → Syswise Portal Manager.
