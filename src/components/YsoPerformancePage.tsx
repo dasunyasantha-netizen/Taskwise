@@ -9,6 +9,8 @@ import {
   YsoMeeting,
 } from '../services/ysoService'
 import type { AuthUser } from '../types'
+import DatePicker from './DatePicker'
+import Select from './Select'
 
 const panel = 'bg-white rounded-2xl border border-slate-200 p-5 shadow-sm'
 const input =
@@ -82,6 +84,7 @@ function Modal({
     const previous = document.activeElement as HTMLElement | null
     ref.current?.focus()
     const onKey = (e: KeyboardEvent) => {
+      if (document.querySelector('[data-system-picker]')) return
       if (e.key === 'Escape') onClose()
       if (e.key !== 'Tab') return
       const nodes = Array.from(
@@ -188,6 +191,19 @@ function EntryForm({
     setBusy(true)
     setError('')
     try {
+      for (const field of task.fields.filter(
+        (f) =>
+          task.id !== 10 ||
+          (values.phase === 'SETTLEMENT'
+            ? !['reference', 'date', 'dueDate'].includes(f.key)
+            : !['advanceId', 'settlementDate'].includes(f.key))
+      )) {
+        if (
+          ['date', 'month', 'select'].includes(field.type) &&
+          !values[field.key]
+        )
+          throw new Error(`Choose ${field.label.toLowerCase()}.`)
+      }
       let attachment
       if (task.id >= 12) {
         if (!file || file.size > 1048576)
@@ -271,19 +287,31 @@ function EntryForm({
                     {f.label}
                   </span>
                 ) : f.type === 'select' ? (
-                  <select
-                    className={input}
-                    required
+                  <Select
+                    ariaLabel={f.label}
+                    className="[&>button]:min-h-11"
                     value={values[f.key] ?? ''}
-                    onChange={(e) => set(f.key, e.target.value)}
-                  >
-                    <option value="">Choose…</option>
-                    {options.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(value) => set(f.key, value)}
+                    options={options}
+                    placeholder="Choose…"
+                  />
+                ) : f.type === 'date' || f.type === 'month' ? (
+                  <DatePicker
+                    ariaLabel={f.label}
+                    className="[&>button]:min-h-11"
+                    compact
+                    mode={f.type}
+                    value={values[f.key] ?? ''}
+                    onChange={(value) => set(f.key, value)}
+                    minDate={f.type === 'month' ? '2000-01-01' : undefined}
+                    maxDate={
+                      f.type === 'month'
+                        ? '2099-12-31'
+                        : f.key !== 'dueDate'
+                          ? dashboard.today
+                          : undefined
+                    }
+                  />
                 ) : f.type === 'textarea' ? (
                   <textarea
                     className={input}
@@ -299,11 +327,7 @@ function EntryForm({
                     type={f.type}
                     required
                     min={f.min}
-                    max={
-                      f.type === 'date' && f.key !== 'dueDate'
-                        ? dashboard.today
-                        : f.max
-                    }
+                    max={f.max}
                     maxLength={300}
                     step={f.type === 'number' ? 1 : undefined}
                     value={values[f.key] ?? ''}
@@ -537,6 +561,7 @@ function MeetingForm({
           e.preventDefault()
           setBusy(true)
           try {
+            if (!values.date) throw new Error('Choose a meeting date.')
             await ysoApi.meeting(values)
             await onSave()
             onClose()
@@ -550,15 +575,27 @@ function MeetingForm({
         {(['title', 'date', 'location'] as const).map((key) => (
           <label className="block text-sm capitalize" key={key}>
             {key}
-            <input
-              className={input + ' mt-1'}
-              required
-              type={key === 'date' ? 'date' : 'text'}
-              min={key === 'date' ? dashboard.today : undefined}
-              maxLength={key === 'title' ? 200 : 300}
-              value={values[key]}
-              onChange={(e) => setValues({ ...values, [key]: e.target.value })}
-            />
+            {key === 'date' ? (
+              <DatePicker
+                compact
+                ariaLabel="Meeting date"
+                className="mt-1 [&>button]:min-h-11"
+                value={values.date}
+                minDate={dashboard.today}
+                onChange={(date) => setValues({ ...values, date })}
+              />
+            ) : (
+              <input
+                className={input + ' mt-1'}
+                required
+                type="text"
+                maxLength={key === 'title' ? 200 : 300}
+                value={values[key]}
+                onChange={(e) =>
+                  setValues({ ...values, [key]: e.target.value })
+                }
+              />
+            )}
           </label>
         ))}
         <fieldset className="space-y-2">
@@ -1219,14 +1256,17 @@ export default function YsoPerformancePage({ user }: { user: AuthUser }) {
         <div className="flex gap-2 items-end">
           <label className="text-xs text-slate-500">
             Reporting month
-            <input
-              aria-label="Reporting month"
-              type="month"
-              min="2000-01"
-              max="2099-12"
-              className={input + ' mt-1'}
+            <DatePicker
+              ariaLabel="Reporting month"
+              mode="month"
+              compact
+              minDate="2000-01-01"
+              maxDate="2099-12-31"
+              className="mt-1 min-w-40 [&>button]:min-h-11"
               value={period}
-              onChange={(e) => /^20\d{2}-(0[1-9]|1[0-2])$/.test(e.target.value) && setPeriod(e.target.value)}
+              onChange={(value) =>
+                /^20\d{2}-(0[1-9]|1[0-2])$/.test(value) && setPeriod(value)
+              }
             />
           </label>
           <button
@@ -1261,39 +1301,35 @@ export default function YsoPerformancePage({ user }: { user: AuthUser }) {
           {d.role === 'DIRECTOR' && (
             <label className="text-xs">
               Provincial AD
-              <select
-                className={input + ' mt-1'}
+              <Select
+                ariaLabel="Provincial AD"
+                className="mt-1 min-w-44 [&>button]:min-h-11"
                 value={selectedAd}
-                onChange={(e) => {
-                  setSelectedAd(e.target.value)
+                onChange={(value) => {
+                  setSelectedAd(value)
                   setSelectedPerson('')
                 }}
-              >
-                <option value="">All ADs</option>
-                {d.ads.map((ad) => (
-                  <option key={ad.id} value={ad.id}>
-                    {ad.name}
-                  </option>
-                ))}
-              </select>
+                options={[
+                  { value: '', label: 'All ADs' },
+                  ...d.ads.map((ad) => ({ value: ad.id, label: ad.name })),
+                ]}
+              />
             </label>
           )}
           <label className="text-xs">
             YSO
-            <select
-              className={input + ' mt-1'}
+            <Select
+              ariaLabel="YSO"
+              className="mt-1 min-w-44 [&>button]:min-h-11"
               value={selectedPerson}
-              onChange={(e) => setSelectedPerson(e.target.value)}
-            >
-              <option value="">All YSOs</option>
-              {d.people
-                .filter((p) => !selectedAd || p.adId === selectedAd)
-                .map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-            </select>
+              onChange={setSelectedPerson}
+              options={[
+                { value: '', label: 'All YSOs' },
+                ...d.people
+                  .filter((p) => !selectedAd || p.adId === selectedAd)
+                  .map((p) => ({ value: p.id, label: p.name })),
+              ]}
+            />
           </label>
         </div>
       )}
@@ -1482,14 +1518,21 @@ export default function YsoPerformancePage({ user }: { user: AuthUser }) {
             ].map((t) => (
               <button
                 className={`min-w-0 min-h-12 flex items-center justify-center gap-1 rounded-xl px-1 py-3 text-xs sm:text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2 ${tab === t.key ? 'bg-teal-700 text-white shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}`}
-                aria-label={t.key === 'approvals' ? `Approvals (${queue.length} pending)` : t.label}
+                aria-label={
+                  t.key === 'approvals'
+                    ? `Approvals (${queue.length} pending)`
+                    : t.label
+                }
                 aria-pressed={tab === t.key}
                 key={t.key}
                 onClick={() => setTab(t.key)}
               >
                 {t.label}
                 {t.key === 'approvals' && queue.length > 0 && (
-                  <span aria-hidden="true" className={`inline-flex min-w-4 h-4 items-center justify-center rounded-full px-1 text-[10px] tabular-nums ${tab === t.key ? 'bg-white/20 text-white' : 'bg-teal-100 text-teal-800'}`}>
+                  <span
+                    aria-hidden="true"
+                    className={`inline-flex min-w-4 h-4 items-center justify-center rounded-full px-1 text-[10px] tabular-nums ${tab === t.key ? 'bg-white/20 text-white' : 'bg-teal-100 text-teal-800'}`}
+                  >
                     {queue.length > 99 ? '99+' : queue.length}
                   </span>
                 )}
@@ -1853,6 +1896,8 @@ export default function YsoPerformancePage({ user }: { user: AuthUser }) {
               e.preventDefault()
               setBusy(true)
               try {
+                if (!activationDate)
+                  throw new Error('Choose a reporting start date.')
                 await mutate(() =>
                   ysoApi.activate(activation.id, activationDate)
                 )
@@ -1870,19 +1915,23 @@ export default function YsoPerformancePage({ user }: { user: AuthUser }) {
             </p>
             <label className="block text-sm">
               Reporting start date
-              <input
-                type="date"
-                className={input + ' mt-1'}
-                required
-                max={d.today}
+              <DatePicker
+                compact
+                ariaLabel="Reporting start date"
+                className="mt-1 [&>button]:min-h-11"
+                maxDate={d.today}
                 value={activationDate}
-                onChange={(e) => setActivationDate(e.target.value)}
+                onChange={setActivationDate}
               />
             </label>
             <button className={primary} disabled={busy}>
               Activate reporting
             </button>
-            {error && <p role="alert" className="text-sm text-rose-700">{error}</p>}
+            {error && (
+              <p role="alert" className="text-sm text-rose-700">
+                {error}
+              </p>
+            )}
           </form>
         </Modal>
       )}

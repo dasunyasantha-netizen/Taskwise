@@ -20,12 +20,13 @@ interface Props {
   placeholder?: string
   className?: string
   disabled?: boolean
+  ariaLabel?: string
 }
 
 /** Below this many options a search box is more clutter than help. */
 const SEARCH_THRESHOLD = 8
 
-export default function Select({ value, onChange, options, placeholder = 'Select...', className = '', disabled = false }: Props) {
+export default function Select({ value, onChange, options, placeholder = 'Select...', className = '', disabled = false, ariaLabel }: Props) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [dropPos, setDropPos] = useState({ top: 0, left: 0, width: 0, openUpward: false })
@@ -33,7 +34,7 @@ export default function Select({ value, onChange, options, placeholder = 'Select
   const dropRef = useRef<HTMLDivElement>(null)
   const searchRef = useRef<HTMLInputElement>(null)
 
-  const close = useCallback(() => { setOpen(false); setQuery('') }, [])
+  const close = useCallback(() => { setOpen(false); setQuery(''); ref.current?.querySelector('button')?.focus() }, [])
 
   useEffect(() => {
     if (!open) return
@@ -108,6 +109,8 @@ export default function Select({ value, onChange, options, placeholder = 'Select
         zIndex: 9999,
       }}
       ref={dropRef}
+      data-system-picker="true"
+      onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); close() } }}
       className="bg-white border border-tw-border rounded-xl shadow-panel overflow-hidden"
     >
       {showSearch && (
@@ -129,7 +132,7 @@ export default function Select({ value, onChange, options, placeholder = 'Select
         )}
         {ungrouped.map(opt => (
           <button key={opt.value} type="button"
-            onMouseDown={e => { e.preventDefault(); pick(opt.value) }}
+            onClick={() => pick(opt.value)}
             className={`w-full text-left px-3 py-2 text-sm transition-colors flex items-center justify-between gap-2
               ${opt.value === value ? 'bg-tw-primary-light text-tw-primary font-medium' : 'text-tw-text hover:bg-tw-hover'}`}>
             <span className="flex items-center gap-2 min-w-0">
@@ -151,7 +154,7 @@ export default function Select({ value, onChange, options, placeholder = 'Select
             </div>
             {opts.map(opt => (
               <button key={opt.value} type="button"
-                onMouseDown={e => { e.preventDefault(); pick(opt.value) }}
+                onClick={() => pick(opt.value)}
                 className={`w-full text-left px-4 py-2 text-sm transition-colors flex items-center justify-between gap-2
                   ${opt.value === value ? 'bg-tw-primary-light text-tw-primary font-medium' : 'text-tw-text hover:bg-tw-hover'}`}>
                 <span className="flex items-center gap-2 min-w-0">
@@ -178,6 +181,9 @@ export default function Select({ value, onChange, options, placeholder = 'Select
         type="button"
         disabled={disabled}
         onClick={handleOpen}
+        onKeyDown={e => { if (e.key === 'Escape' && open) { e.stopPropagation(); close() } }}
+        aria-label={ariaLabel}
+        aria-expanded={open}
         className={`w-full flex items-center justify-between border rounded-lg px-3 py-2 text-sm bg-white transition-colors text-left
           ${disabled ? 'opacity-50 cursor-not-allowed border-tw-border' : 'hover:border-tw-primary cursor-pointer border-tw-border focus:outline-none focus:ring-2 focus:ring-tw-primary'}
           ${open ? 'border-tw-primary ring-2 ring-tw-primary ring-opacity-20' : ''}`}

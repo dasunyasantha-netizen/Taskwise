@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 
 interface Props {
-  value: string        // "YYYY-MM-DD" or ""
+  value: string        // "YYYY-MM-DD", or "YYYY-MM" in month mode
   onChange: (val: string) => void
   placeholder?: string
   minDate?: string
@@ -10,14 +10,16 @@ interface Props {
   className?: string
   triggerClassName?: string
   compact?: boolean
+  mode?: 'date' | 'month'
+  ariaLabel?: string
 }
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 const DAYS   = ['Su','Mo','Tu','We','Th','Fr','Sa']
 
-export default function DatePicker({ value, onChange, placeholder = 'Select date', minDate, maxDate, className = '', triggerClassName, compact = false }: Props) {
+export default function DatePicker({ value, onChange, placeholder = 'Select date', minDate, maxDate, className = '', triggerClassName, compact = false, mode = 'date', ariaLabel }: Props) {
   const today = new Date()
-  const parsed = value ? new Date(value + 'T00:00:00') : null
+  const parsed = value ? new Date(value + (mode === 'month' ? '-01' : '') + 'T00:00:00') : null
 
   const [open, setOpen]             = useState(false)
   const [viewYear, setViewYear]     = useState(parsed?.getFullYear() ?? today.getFullYear())
@@ -27,7 +29,7 @@ export default function DatePicker({ value, onChange, placeholder = 'Select date
 
   const ref = useRef<HTMLDivElement>(null)
   const dropRef = useRef<HTMLDivElement>(null)
-  const close = useCallback(() => setOpen(false), [])
+  const close = useCallback(() => { setOpen(false); ref.current?.querySelector('button')?.focus() }, [])
 
   useEffect(() => {
     if (!open) return
@@ -44,7 +46,7 @@ export default function DatePicker({ value, onChange, placeholder = 'Select date
     if (!open && ref.current) {
       const rect = ref.current.getBoundingClientRect()
       const spaceBelow = window.innerHeight - rect.bottom
-      const estimatedHeight = compact ? 312 : 360
+      const estimatedHeight = mode === 'month' ? 260 : compact ? 312 : 360
       const openUpward = spaceBelow < estimatedHeight && rect.top > spaceBelow
       const width = Math.min(compact ? 272 : Math.max(rect.width, 288), window.innerWidth - 16)
       setDropPos({
@@ -96,8 +98,18 @@ export default function DatePicker({ value, onChange, placeholder = 'Select date
   const daysInMonth = getDaysInMonth(viewYear, viewMonth)
   const firstDay    = getFirstDay(viewYear, viewMonth)
 
+  const selectMonth = (month: number) => {
+    onChange(`${viewYear}-${String(month + 1).padStart(2, '0')}`)
+    close()
+  }
+  const monthDisabled = (month: number) => {
+    const start = new Date(viewYear, month, 1)
+    const end = new Date(viewYear, month + 1, 0)
+    return !!((minD && end < minD) || (maxD && start > maxD))
+  }
+
   const displayValue = parsed
-    ? parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    ? parsed.toLocaleDateString('en-US', { month: 'short', ...(mode === 'date' ? { day: 'numeric' as const } : {}), year: 'numeric' })
     : ''
 
   const yearRange = Array.from({ length: 12 }, (_, i) => viewYear - 5 + i)
@@ -105,6 +117,8 @@ export default function DatePicker({ value, onChange, placeholder = 'Select date
   const dropdown = open ? createPortal(
     <div
       ref={dropRef}
+      data-system-picker="true"
+      onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); close() } }}
       style={{
         position: 'fixed',
         top: dropPos.openUpward ? undefined : dropPos.top,
@@ -117,17 +131,18 @@ export default function DatePicker({ value, onChange, placeholder = 'Select date
     >
       {/* Month / Year nav */}
       <div className={`flex items-center justify-between border-b border-tw-border ${compact ? 'px-3 py-2' : 'px-4 py-3'}`}>
-        <button onMouseDown={e => { e.preventDefault(); prevMonth() }} className="p-1.5 rounded-lg hover:bg-tw-hover transition-colors text-tw-text-secondary hover:text-tw-text">
+        <button type="button" aria-label={mode === 'month' ? 'Previous year' : 'Previous month'} onClick={e => { e.preventDefault(); mode === 'month' ? setViewYear(y => y - 1) : prevMonth() }} className="p-1.5 rounded-lg hover:bg-tw-hover transition-colors text-tw-text-secondary hover:text-tw-text">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/></svg>
         </button>
         <button
-          onMouseDown={e => { e.preventDefault(); setShowYearPicker(y => !y) }}
+          type="button"
+          onClick={e => { e.preventDefault(); setShowYearPicker(y => !y) }}
           className="flex items-center gap-1 font-semibold text-sm text-tw-text hover:text-tw-primary transition-colors px-2 py-1 rounded-lg hover:bg-tw-hover"
         >
-          {MONTHS[viewMonth]} {viewYear}
+          {mode === 'date' ? MONTHS[viewMonth] + ' ' : ''}{viewYear}
           <svg className={`w-3.5 h-3.5 transition-transform ${showYearPicker ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/></svg>
         </button>
-        <button onMouseDown={e => { e.preventDefault(); nextMonth() }} disabled={!!maxD && (viewYear > maxD.getFullYear() || (viewYear === maxD.getFullYear() && viewMonth >= maxD.getMonth()))} className="p-1.5 rounded-lg hover:bg-tw-hover transition-colors text-tw-text-secondary hover:text-tw-text disabled:opacity-30 disabled:cursor-not-allowed">
+        <button type="button" aria-label={mode === 'month' ? 'Next year' : 'Next month'} onClick={e => { e.preventDefault(); mode === 'month' ? setViewYear(y => y + 1) : nextMonth() }} disabled={!!maxD && (viewYear > maxD.getFullYear() || (viewYear === maxD.getFullYear() && (mode === 'month' || viewMonth >= maxD.getMonth())))} className="p-1.5 rounded-lg hover:bg-tw-hover transition-colors text-tw-text-secondary hover:text-tw-text disabled:opacity-30 disabled:cursor-not-allowed">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/></svg>
         </button>
       </div>
@@ -135,7 +150,7 @@ export default function DatePicker({ value, onChange, placeholder = 'Select date
       {showYearPicker && (
         <div className={`grid grid-cols-4 gap-1 border-b border-tw-border bg-white ${compact ? 'p-2' : 'p-3'}`}>
           {yearRange.map(y => (
-            <button key={y} onMouseDown={e => { e.preventDefault(); setViewYear(y); setShowYearPicker(false) }}
+            <button type="button" key={y} onClick={e => { e.preventDefault(); setViewYear(y); setShowYearPicker(false) }}
               className={`py-1.5 rounded-lg text-sm font-medium transition-colors ${y === viewYear ? 'bg-tw-primary text-white' : 'hover:bg-tw-hover text-tw-text'}`}>
               {y}
             </button>
@@ -143,7 +158,17 @@ export default function DatePicker({ value, onChange, placeholder = 'Select date
         </div>
       )}
 
-      {!showYearPicker && (
+      {!showYearPicker && mode === 'month' && (
+        <div className="grid grid-cols-3 gap-1 p-3">
+          {MONTHS.map((month, index) => (
+            <button type="button" key={month} disabled={monthDisabled(index)} onClick={() => selectMonth(index)}
+              className={`min-h-11 rounded-lg text-sm font-medium transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${parsed?.getFullYear() === viewYear && parsed?.getMonth() === index ? 'bg-tw-primary text-white' : 'text-tw-text hover:bg-tw-hover'}`}>
+              {month.slice(0, 3)}
+            </button>
+          ))}
+        </div>
+      )}
+      {!showYearPicker && mode === 'date' && (
         <>
           <div className={`grid grid-cols-7 ${compact ? 'px-2 pt-2 pb-0.5' : 'px-3 pt-3 pb-1'}`}>
             {DAYS.map(d => (
@@ -158,9 +183,10 @@ export default function DatePicker({ value, onChange, placeholder = 'Select date
               const dis = isDisabled(day)
               return (
                 <button
+                  type="button"
                   key={day}
                   disabled={dis}
-                  onMouseDown={e => { e.preventDefault(); if (!dis) selectDay(day) }}
+                  onClick={e => { e.preventDefault(); if (!dis) selectDay(day) }}
                   className={`
                     w-full ${compact ? 'h-8' : 'aspect-square'} flex items-center justify-center text-sm rounded-lg font-medium transition-colors
                     ${sel  ? 'bg-tw-primary text-white shadow-sm'              : ''}
@@ -175,9 +201,9 @@ export default function DatePicker({ value, onChange, placeholder = 'Select date
             })}
           </div>
           <div className={`flex items-center justify-between border-t border-tw-border bg-tw-hover ${compact ? 'px-3 py-2' : 'px-4 py-2.5'}`}>
-            <button onMouseDown={e => { e.preventDefault(); onChange(''); close() }} className="text-xs text-tw-text-secondary hover:text-tw-danger transition-colors font-medium">Clear</button>
-            <button onMouseDown={e => { e.preventDefault(); selectDay(today.getDate()); setViewYear(today.getFullYear()); setViewMonth(today.getMonth()) }}
-              className="text-xs text-tw-primary hover:underline font-medium">Today</button>
+            <button type="button" onClick={e => { e.preventDefault(); onChange(''); close() }} className="text-xs text-tw-text-secondary hover:text-tw-danger transition-colors font-medium">Clear</button>
+            <button type="button" onClick={e => { e.preventDefault(); onChange(`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`); close() }}
+              disabled={!!((minD && today < minD) || (maxD && new Date(today.getFullYear(), today.getMonth(), today.getDate()) > maxD))} className="text-xs text-tw-primary hover:underline font-medium disabled:opacity-30">Today</button>
           </div>
         </>
       )}
@@ -190,6 +216,9 @@ export default function DatePicker({ value, onChange, placeholder = 'Select date
       <button
         type="button"
         onClick={handleOpen}
+        onKeyDown={e => { if (e.key === 'Escape' && open) { e.stopPropagation(); close() } }}
+        aria-label={ariaLabel}
+        aria-expanded={open}
         className={triggerClassName ?? 'w-full flex items-center justify-between border border-tw-border rounded-lg px-3 py-2 text-sm bg-white hover:border-tw-primary focus:outline-none focus:ring-2 focus:ring-tw-primary transition-colors'}
       >
         <div className="flex items-center gap-2 min-w-0">
