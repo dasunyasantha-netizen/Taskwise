@@ -56,6 +56,7 @@ const STATUS_STYLES: Record<string, string> = {
   PENDING:     'bg-gray-100 text-gray-600',
   ASSIGNED:    'bg-blue-50 text-blue-700',
   IN_PROGRESS: 'bg-yellow-50 text-yellow-700',
+  BLOCKED:     'bg-teal-50 text-teal-700',
   SUBMITTED:   'bg-purple-50 text-purple-700',
   APPROVED:    'bg-green-50 text-green-700',
   RETURNED:    'bg-orange-50 text-orange-700',
@@ -64,6 +65,7 @@ const STATUS_STYLES: Record<string, string> = {
 
 const STATUS_LABELS: Record<string, string> = {
   PENDING: 'Pending', ASSIGNED: 'Assigned', IN_PROGRESS: 'In Progress',
+  BLOCKED: 'Blocked',
   SUBMITTED: 'Submitted', APPROVED: 'Approved', RETURNED: 'Returned', CANCELLED: 'Cancelled',
 }
 

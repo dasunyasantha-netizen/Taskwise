@@ -1,0 +1,150 @@
+=== SYS-0003-D dry-run log ===
+started_at: 2026-09-24 11:41:48 +0530
+tested_on: taskwise_test@localhost (peer auth as box, unix socket)
+DATABASE_URL: postgresql://box@localhost/taskwise_test?host=/var/run/postgresql&schema=public
+
+=== Step a: prisma migrate deploy ===
+cmd: cd server && DATABASE_URL=... npx prisma migrate deploy
+Prisma schema loaded from prisma/schema.prisma
+Datasource "db": PostgreSQL database "taskwise_test", schema "public" at "localhost"
+
+30 migrations found in prisma/migrations
+
+Applying migration `20260428151238_add_progress_logs`
+Applying migration `20260428180309_add_supervisor_to_personnel`
+Applying migration `20260429061225_add_started_at`
+Applying migration `20260506202151_add_push_subscriptions`
+Applying migration `20260527035543_add_notices`
+Applying migration `20260531181657_add_task_groups`
+Applying migration `20260602185701_add_chairman_impersonation`
+Applying migration `20260603033543_add_webauthn_credentials`
+Applying migration `20260603041847_add_deadline_extensions`
+Applying migration `20260606032148_add_task_chain`
+Applying migration `20260606115225_add_project_categories`
+Applying migration `20260606123747_add_category_director`
+Applying migration `20260717061008_add_login_log`
+Applying migration `20260727090000_add_company_onboarding`
+Applying migration `20260801190000_add_secure_admin_impersonation`
+Applying migration `20260801193000_remove_legacy_impersonation_password`
+Applying migration `20260804120000_add_progress_log_edits`
+Applying migration `20260805100000_add_insurance_management`
+Applying migration `20260806100000_start_assigned_tasks_with_activity`
+Applying migration `20260806153000_add_versioned_scoring_and_cancellation_reviews`
+Applying migration `20260811110000_add_insurance_introducer_partner`
+Applying migration `20260811140000_fairfirst_policy_lifecycle`
+Applying migration `20260813100000_add_company_policy_number`
+Applying migration `20260813140000_backfill_sample_company_policy_number`
+Applying migration `20260813170000_add_policy_cancelled_at`
+Applying migration `20260813190000_add_policy_renewals`
+Applying migration `20260821120000_add_deadline_extension_points_deduction`
+Applying migration `20260909100000_add_youth_council_four_level_hierarchy`
+Applying migration `20260909110000_name_level_4_officers`
+Applying migration `20260924114109_add_task_blocked_reason`
+
+The following migration(s) have been applied:
+
+migrations/
+  └─ 20260428151238_add_progress_logs/
+    └─ migration.sql
+  └─ 20260428180309_add_supervisor_to_personnel/
+    └─ migration.sql
+  └─ 20260429061225_add_started_at/
+    └─ migration.sql
+  └─ 20260506202151_add_push_subscriptions/
+    └─ migration.sql
+  └─ 20260527035543_add_notices/
+    └─ migration.sql
+  └─ 20260531181657_add_task_groups/
+    └─ migration.sql
+  └─ 20260602185701_add_chairman_impersonation/
+    └─ migration.sql
+  └─ 20260603033543_add_webauthn_credentials/
+    └─ migration.sql
+  └─ 20260603041847_add_deadline_extensions/
+    └─ migration.sql
+  └─ 20260606032148_add_task_chain/
+    └─ migration.sql
+  └─ 20260606115225_add_project_categories/
+    └─ migration.sql
+  └─ 20260606123747_add_category_director/
+    └─ migration.sql
+  └─ 20260717061008_add_login_log/
+    └─ migration.sql
+  └─ 20260727090000_add_company_onboarding/
+    └─ migration.sql
+  └─ 20260801190000_add_secure_admin_impersonation/
+    └─ migration.sql
+  └─ 20260801193000_remove_legacy_impersonation_password/
+    └─ migration.sql
+  └─ 20260804120000_add_progress_log_edits/
+    └─ migration.sql
+  └─ 20260805100000_add_insurance_management/
+    └─ migration.sql
+  └─ 20260806100000_start_assigned_tasks_with_activity/
+    └─ migration.sql
+  └─ 20260806153000_add_versioned_scoring_and_cancellation_reviews/
+    └─ migration.sql
+  └─ 20260811110000_add_insurance_introducer_partner/
+    └─ migration.sql
+  └─ 20260811140000_fairfirst_policy_lifecycle/
+    └─ migration.sql
+  └─ 20260813100000_add_company_policy_number/
+    └─ migration.sql
+  └─ 20260813140000_backfill_sample_company_policy_number/
+    └─ migration.sql
+  └─ 20260813170000_add_policy_cancelled_at/
+    └─ migration.sql
+  └─ 20260813190000_add_policy_renewals/
+    └─ migration.sql
+  └─ 20260821120000_add_deadline_extension_points_deduction/
+    └─ migration.sql
+  └─ 20260909100000_add_youth_council_four_level_hierarchy/
+    └─ migration.sql
+  └─ 20260909110000_name_level_4_officers/
+    └─ migration.sql
+  └─ 20260924114109_add_task_blocked_reason/
+    └─ migration.sql
+      
+All migrations have been successfully applied.
+migrate_deploy_exit: 0
+
+=== Step b: verify column exists ===
+cmd: psql -d taskwise_test -c "\d \"Task\"" (column check)
+  column_name  | data_type | is_nullable 
+---------------+-----------+-------------
+ blockedReason | text      | YES
+(1 row)
+
+1:                                       Table "public.Task"
+2:        Column        |              Type              | Collation | Nullable |      Default      
+31: blockedReason        | text                           |           |          | 
+
+=== Step c: apply rollback SQL ===
+cmd: psql -d taskwise_test -f server/prisma/migrations/20260924114109_add_task_blocked_reason/rollback.sql
+ALTER TABLE
+rollback_exit: 0
+verify column gone:
+ column_name 
+-------------
+(0 rows)
+
+
+=== Step d: re-apply forward migration SQL ===
+cmd: psql -d taskwise_test -f server/prisma/migrations/20260924114109_add_task_blocked_reason/migration.sql
+ALTER TABLE
+reapply_exit: 0
+verify column present again:
+  column_name  | data_type | is_nullable 
+---------------+-----------+-------------
+ blockedReason | text      | YES
+(1 row)
+
+prisma migrations table entry:
+             migration_name             | finished 
+----------------------------------------+----------
+ 20260924114109_add_task_blocked_reason | t
+(1 row)
+
+
+finished_at: 2026-09-24 11:41:50 +0530
+=== dry-run complete (test DB only; never prod) ===
