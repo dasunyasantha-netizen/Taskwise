@@ -120,3 +120,17 @@ Deploy the migration before restarting the backend and releasing the frontend.
 In the AD's **YSO Performance → YSO monitoring** tab, activate reporting for each
 YSO. The first complete month should be checked against a manual calculation,
 especially the weekly calendar and overdue advance adjustments.
+
+## Pickiti and phone verification
+
+Pickiti's existing TaskWise tile opens this module through TaskWise's own login.
+YSOs land on the Task Hub; ADs and Directors open YSO Performance from navigation.
+The login page and authenticated headers retain the Pickiti return destination.
+Mobile forms use 44px minimum controls, 16px input text and a viewport-bounded
+scrolling dialog. Bottom navigation reserves the device's safe-area inset.
+
+Verified at a 390 × 844 browser viewport using isolated synthetic accounts:
+Pickiti login and active test entitlement → TaskWise launch → YSO login →
+submission pending with official score unchanged → return to Pickiti with its
+session retained. Director monitoring and analytics were also inspected at phone
+size. This is browser viewport coverage, not a physical Android/TWA device test.

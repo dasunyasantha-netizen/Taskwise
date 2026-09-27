@@ -5,6 +5,7 @@ import {
   startAuthentication,
 } from '@simplewebauthn/browser'
 import CompanyRequestModal from './CompanyRequestModal'
+import { launcherHomeUrl, launcherName } from '../services/launchSource'
 
 interface Props {
   onLogin: (token: string, user: AuthUser) => void
@@ -240,7 +241,10 @@ export default function Auth({ onLogin }: Props) {
         </div>
       </div>
 
-      <p className="mt-5 text-white/40 text-xs relative z-10">Created by SysWise</p>
+      <a href={launcherHomeUrl()} className="mt-5 min-h-11 inline-flex items-center px-4 text-white text-sm relative z-10">
+        ← Back to {launcherName()}
+      </a>
+      <p className="mt-2 mb-5 text-white/40 text-xs relative z-10">Created by SysWise</p>
       {showCompanyRequest && <CompanyRequestModal onClose={() => setShowCompanyRequest(false)} />}
     </div>
   )

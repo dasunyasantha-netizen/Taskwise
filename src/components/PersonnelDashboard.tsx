@@ -1075,7 +1075,7 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
           </div>
         </header>
 
-        <main ref={mainRef} className="flex-1 overflow-auto pb-20 md:pb-0">
+        <main ref={mainRef} className="flex-1 overflow-auto pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-0">
           {/* ── MY QUEUE ──────────────────────────────────────────────── */}
           {currentView === 'personnel_queue' && (
             <div className="p-4 md:p-6">
@@ -1346,7 +1346,7 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
       </div>
 
       {/* ── Mobile bottom tab bar ──────────────────────────────────────── */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-20 bg-white border-t border-gray-200 shadow-[0_-2px_16px_rgba(0,0,0,0.08)]">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-20 pb-[env(safe-area-inset-bottom)] bg-white border-t border-gray-200 shadow-[0_-2px_16px_rgba(0,0,0,0.08)]">
         <div className="flex items-stretch">
           {navItems.map(item => (
             <button key={item.view}
@@ -1358,7 +1358,7 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
                 <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-tw-primary rounded-full" />
               )}
               <span className="text-lg leading-none">{item.icon}</span>
-              <span className="text-[10px] font-semibold leading-none">{item.label.split(' ')[0]}</span>
+              <span className="text-[10px] font-semibold leading-none">{({ yso_performance: 'YSO Hub', personnel_queue: 'Tasks', personnel_approval_queue: 'Approvals', project_board: 'Projects', profile: 'Profile' } as Partial<Record<ViewMode, string>>)[item.view] || item.label}</span>
               {/* Badge */}
               {((item.view === 'personnel_queue' && queue.length > 0) ||
                 (item.badge !== undefined && item.badge > 0)) && (

@@ -1174,7 +1174,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
           </div>
         </header>
 
-        <main ref={mainRef} className="flex-1 overflow-auto pb-20 md:pb-0">
+        <main ref={mainRef} className="flex-1 overflow-auto pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-0">
 
           {/* DASHBOARD */}
           {currentView === 'director_dashboard' && (
@@ -1459,7 +1459,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
         </div>
       )}
 
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-20 bg-white border-t border-gray-200 shadow-[0_-2px_16px_rgba(0,0,0,0.08)]">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-20 pb-[env(safe-area-inset-bottom)] bg-white border-t border-gray-200 shadow-[0_-2px_16px_rgba(0,0,0,0.08)]">
         <div className="flex items-stretch">
           {mobileNavItems.map(item => (
             <button key={item.view ?? 'more'}

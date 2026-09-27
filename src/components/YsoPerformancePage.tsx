@@ -12,11 +12,11 @@ import type { AuthUser } from '../types'
 
 const panel = 'bg-white rounded-2xl border border-slate-200 p-5 shadow-sm'
 const input =
-  'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-teal-500'
+  'w-full min-h-11 rounded-lg border border-slate-300 px-3 py-2 text-base sm:text-sm bg-white focus:ring-2 focus:ring-teal-500'
 const primary =
-  'rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:opacity-50'
+  'min-h-11 rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:opacity-50'
 const secondary =
-  'rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-50 disabled:opacity-50'
+  'min-h-11 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-50 disabled:opacity-50'
 const signed = (n: number) => (n > 0 ? `+${n}` : String(n))
 const pretty = (value: string) => value.replace(/_/g, ' ').toLowerCase()
 const when = (value: string) =>
@@ -123,7 +123,7 @@ function Modal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={headingId}
-        className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6"
+        className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90dvh] overflow-y-auto overscroll-contain p-4 sm:p-6"
       >
         <div className="flex justify-between items-start gap-3 mb-5">
           <h2 id={headingId} className="text-xl font-bold text-slate-900">
