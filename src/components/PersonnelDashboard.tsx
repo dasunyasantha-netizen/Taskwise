@@ -10,6 +10,7 @@ import { usePWA } from '../hooks/usePWA'
 import ProgressUpdateSheet from './ProgressUpdateSheet'
 import InsuranceManagementPage from './InsuranceManagementPage'
 import YsoPerformancePage from './YsoPerformancePage'
+import LetterManagement from './LetterManagement'
 import { launcherHomeUrl, launcherName, type LaunchSource } from '../services/launchSource'
 
 interface Props {
@@ -874,6 +875,7 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
   const [approvalTasks, setApprovalTasks] = useState<Task[]>([])
 
   const navItems = [
+    { label: 'Letters', view: 'letters' as ViewMode, icon: '✉' },
     ...(ysoEnabled ? [{ label: user.ysoRole === 'YSO' ? 'YSO Task Hub' : 'YSO Performance', view: 'yso_performance' as ViewMode, icon: '🌱' }] : []),
     ...(insuranceEnabled ? [{ label: 'Insurance', view: 'insurance_management' as ViewMode, icon: '🛡️' }] : []),
     { label: 'My Queue',       view: 'personnel_queue'          as ViewMode, icon: '📋' },
@@ -992,6 +994,7 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
                   : currentView === 'personnel_approval_queue' ? 'Approvals'
                   : currentView === 'project_board' ? (selectedProject ? selectedProject.name : 'Projects')
                   : currentView === 'insurance_management' ? 'Insurance Management'
+                  : currentView === 'letters' ? 'Letters'
                   : currentView === 'yso_performance' ? 'YSO Performance'
                   : 'My Profile'}
               </span>
@@ -1062,6 +1065,7 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
             </a>
             <NotificationsMenu
               onOpenYso={() => navigate('yso_performance')}
+              onOpenLetter={(id) => { sessionStorage.setItem('taskwise_letter_open', id); navigate('letters'); window.dispatchEvent(new CustomEvent('taskwise:open-letter', { detail: id })) }}
               onOpenTask={async taskId => {
                 try {
                   setTaskStack([])
@@ -1305,6 +1309,7 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
           {currentView === 'insurance_management' && insuranceEnabled && (
             <InsuranceManagementPage />
           )}
+          {currentView === 'letters' && <LetterManagement />}
           {currentView === 'yso_performance' && ysoEnabled && <YsoPerformancePage user={user} />}
 
           {currentView === 'project_board' && !selectedProject && (

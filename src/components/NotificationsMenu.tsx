@@ -6,9 +6,10 @@ type Props = {
   onOpenTask?: (taskId: string) => void | Promise<void>
   onOpenCompanyRequests?: () => void
   onOpenYso?: () => void
+  onOpenLetter?: (id: string) => void
 }
 
-export default function NotificationsMenu({ onOpenTask, onOpenCompanyRequests, onOpenYso }: Props) {
+export default function NotificationsMenu({ onOpenTask, onOpenCompanyRequests, onOpenYso, onOpenLetter }: Props) {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -52,6 +53,8 @@ export default function NotificationsMenu({ onOpenTask, onOpenCompanyRequests, o
     if (!notification.isRead) await markRead(notification.id)
     setOpen(false)
 
+    if (notification.type === 'letter_update' && typeof notification.payload?.threadId === 'string') { onOpenLetter?.(notification.payload.threadId); return }
+
     if (notification.type === 'yso_update') { onOpenYso?.(); return }
 
     if (notification.type === 'company_request_submitted') {
@@ -65,6 +68,7 @@ export default function NotificationsMenu({ onOpenTask, onOpenCompanyRequests, o
   }
 
   const typeIcon: Record<string, string> = {
+    letter_update: '✉',
     yso_update: '🌱',
     task_assigned: '📋',
     task_returned: '↩️',

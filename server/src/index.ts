@@ -16,6 +16,8 @@ import projectCategoryRoutes  from './routes/projectCategoryRoutes'
 import companyRequestRoutes   from './routes/companyRequestRoutes'
 import insuranceRoutes        from './routes/insuranceRoutes'
 import adminRoutes            from './routes/adminRoutes'
+import letterRoutes from './routes/letterRoutes'
+import { startLetterWorker } from './helpers/letterWorker'
 import ysoRoutes              from './routes/ysoRoutes'
 
 const app  = express()
@@ -29,6 +31,8 @@ app.use(cors({
   ],
   credentials: true,
 }))
+
+app.use('/api/letters', letterRoutes)
 
 app.use(express.json({ limit: '2mb' }))  // allow avatar/logo base64 payloads up to ~1.5MB
 
@@ -55,6 +59,7 @@ app.get('/api/health', (_req, res) => {
 
 app.listen(PORT, () => {
   console.log(`TaskWise backend running on port ${PORT}`)
+  startLetterWorker()
 })
 
 export default app

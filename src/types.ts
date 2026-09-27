@@ -351,6 +351,7 @@ export interface TaskProgressLog {
 // ─── Notifications ───────────────────────────────────────────────────────────
 
 export type NotificationType =
+  | 'letter_update'
   | 'yso_update'
   | 'task_assigned'
   | 'task_returned'
@@ -414,6 +415,7 @@ export type ViewMode =
   | 'company_requests'
   | 'company_features'
   | 'insurance_management'
+  | 'letters'
   | 'yso_performance'
   | 'settings'
   | 'profile'

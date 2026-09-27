@@ -72,6 +72,7 @@ model ImpersonationSession {
 }
 
 model Workspace {
+  letterThreads LetterThread[]
   id          String   @id @default(uuid())
   name        String
   companyName String? // branding: displayed in sidebar/login
@@ -228,6 +229,7 @@ model Department {
 }
 
 model Personnel {
+  isLetterLogger Boolean @default(false)
   id                 String      @id @default(uuid())
   workspaceId        String
   companyId          String?
@@ -985,4 +987,133 @@ model WebAuthnCredential {
   lastUsedAt   DateTime?
 
   @@index([actorId, actorType])
+}
+
+
+// Correspondence identity fields are typed actor keys (director:<id> / personnel:<id>).
+// Names are immutable audit snapshots; every mutation revalidates live membership.
+model LetterThread {
+  id String @id @default(uuid())
+  workspaceId String
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+  reference String
+  subject String
+  sender String
+  senderContact String?
+  externalReference String?
+  channel String
+  createdBy String
+  createdByName String
+  assignedTo String
+  assignedToName String
+  assignedAt DateTime @default(now())
+  firstReceivedDate String
+  latestReceivedDate String
+  status String @default("OPEN")
+  closedAt DateTime?
+  version Int @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  events LetterEvent[]
+  access LetterAccess[]
+  @@unique([workspaceId, reference])
+  @@index([workspaceId, status, assignedAt])
+  @@index([workspaceId, assignedTo])
+}
+
+model LetterEvent {
+  id String @id @default(uuid())
+  threadId String
+  thread LetterThread @relation(fields: [threadId], references: [id])
+  workspaceId String
+  requestId String
+  requestHash String
+  sequence Int
+  kind String
+  actorKey String
+  actorName String
+  notes String
+  correspondent String?
+  correspondenceDate String?
+  receivedDate String?
+  fromAssignee String?
+  fromAssigneeName String?
+  toAssignee String?
+  toAssigneeName String?
+  previousAssignedAt DateTime?
+  createdAt DateTime @default(now())
+  attachments LetterAttachment[]
+  @@unique([workspaceId, requestId])
+  @@unique([threadId, sequence])
+  @@index([threadId, createdAt])
+}
+
+model LetterAccess {
+  threadId String
+  thread LetterThread @relation(fields: [threadId], references: [id])
+  actorKey String
+  @@id([threadId, actorKey])
+}
+
+model LetterCounter {
+  workspaceId String
+  year Int
+  value Int @default(0)
+  @@id([workspaceId, year])
+}
+
+model LetterSettings {
+  workspaceId String @id
+  folderId String?
+  clientId String?
+  encryptedSecret String?
+  encryptedRefreshToken String?
+  connected Boolean @default(false)
+  entryDelayDays Int @default(2)
+  assigneeDays Int @default(7)
+  updatedAt DateTime @updatedAt
+}
+
+model LetterOAuthState {
+  stateHash String @id
+  workspaceId String
+  directorId String
+  configVersion DateTime
+  expiresAt DateTime
+}
+
+model LetterAttachment {
+  id String @id @default(uuid())
+  eventId String
+  event LetterEvent @relation(fields: [eventId], references: [id])
+  name String
+  mime String
+  size Int
+  sha256 String
+  original Bytes
+  driveFileId String?
+  driveFolderId String?
+  uploadState String @default("PENDING")
+  uploadError String?
+  uploadAttempts Int @default(0)
+  uploadNextAt DateTime @default(now())
+  uploadLeaseUntil DateTime?
+  previewState String @default("PENDING")
+  previewError String?
+  previewAttempts Int @default(0)
+  previewNextAt DateTime @default(now())
+  previewLeaseUntil DateTime?
+  pageCount Int?
+  createdAt DateTime @default(now())
+  previews LetterPreview[]
+  @@index([uploadState, uploadNextAt])
+  @@index([previewState, previewNextAt])
+}
+
+model LetterPreview {
+  attachmentId String
+  attachment LetterAttachment @relation(fields: [attachmentId], references: [id])
+  page Int
+  bytes Bytes
+  @@id([attachmentId, page])
 }

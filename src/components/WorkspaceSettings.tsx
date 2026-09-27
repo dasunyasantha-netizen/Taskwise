@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react'
 import type { AuthUser } from '../types'
+import { LetterSettingsPanel } from './LetterManagement'
 import { workspaceApi } from '../services/apiService'
 
 interface Props {
@@ -176,6 +177,8 @@ export default function WorkspaceSettings({ user, onUpdate }: Props) {
           </div>
         </form>
       </div>
+
+      <LetterSettingsPanel />
 
       {/* Workspace info */}
       <div className="card p-4">
