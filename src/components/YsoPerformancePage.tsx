@@ -1465,30 +1465,34 @@ export default function YsoPerformancePage({ user }: { user: AuthUser }) {
       ) : (
         <>
           <nav
-            className="flex gap-2 border-b border-slate-200 overflow-x-auto pb-3"
+            className={`grid ${isAd ? 'grid-cols-3' : 'grid-cols-2'} gap-1 rounded-2xl border border-slate-200 bg-slate-100 p-1`}
             aria-label="YSO workspace tabs"
           >
             {[
-              { key: 'monitor', label: 'YSO monitoring' },
+              { key: 'monitor', label: 'Overview' },
               ...(isAd
                 ? [
                     {
                       key: 'approvals',
-                      label: `Approvals & task management (${queue.length})`,
+                      label: 'Approvals',
                     },
                   ]
                 : []),
-              { key: 'analytics', label: 'Analytics & performance' },
+              { key: 'analytics', label: 'Analytics' },
             ].map((t) => (
               <button
-                className={
-                  tab === t.key ? primary : secondary + ' whitespace-nowrap'
-                }
+                className={`min-w-0 min-h-12 flex items-center justify-center gap-1 rounded-xl px-1 py-3 text-xs sm:text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2 ${tab === t.key ? 'bg-teal-700 text-white shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}`}
+                aria-label={t.key === 'approvals' ? `Approvals (${queue.length} pending)` : t.label}
                 aria-pressed={tab === t.key}
                 key={t.key}
                 onClick={() => setTab(t.key)}
               >
                 {t.label}
+                {t.key === 'approvals' && queue.length > 0 && (
+                  <span aria-hidden="true" className={`inline-flex min-w-4 h-4 items-center justify-center rounded-full px-1 text-[10px] tabular-nums ${tab === t.key ? 'bg-white/20 text-white' : 'bg-teal-100 text-teal-800'}`}>
+                    {queue.length > 99 ? '99+' : queue.length}
+                  </span>
+                )}
               </button>
             ))}
           </nav>
