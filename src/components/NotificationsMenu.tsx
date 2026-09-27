@@ -5,9 +5,10 @@ import { notificationApi } from '../services/apiService'
 type Props = {
   onOpenTask?: (taskId: string) => void | Promise<void>
   onOpenCompanyRequests?: () => void
+  onOpenYso?: () => void
 }
 
-export default function NotificationsMenu({ onOpenTask, onOpenCompanyRequests }: Props) {
+export default function NotificationsMenu({ onOpenTask, onOpenCompanyRequests, onOpenYso }: Props) {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -51,6 +52,8 @@ export default function NotificationsMenu({ onOpenTask, onOpenCompanyRequests }:
     if (!notification.isRead) await markRead(notification.id)
     setOpen(false)
 
+    if (notification.type === 'yso_update') { onOpenYso?.(); return }
+
     if (notification.type === 'company_request_submitted') {
       onOpenCompanyRequests?.()
       return
@@ -62,6 +65,7 @@ export default function NotificationsMenu({ onOpenTask, onOpenCompanyRequests }:
   }
 
   const typeIcon: Record<string, string> = {
+    yso_update: '🌱',
     task_assigned: '📋',
     task_returned: '↩️',
     task_submitted_for_approval: '✅',

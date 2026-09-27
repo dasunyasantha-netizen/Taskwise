@@ -53,6 +53,7 @@ function NoticeBanner({ loggedIn }: { loggedIn: boolean }) {
 const TOKEN_KEY      = 'taskwise_token'
 const USER_KEY       = 'taskwise_user'
 const VIEW_KEY       = 'taskwise_view'
+const defaultViewFor = (u: AuthUser): ViewMode => u.ysoRole === 'YSO' && u.features?.includes('four_level_hierarchy') ? 'yso_performance' : u.actorType === 'director' ? 'director_dashboard' : 'personnel_queue'
 // System Admin stores the real session here during short-lived support access.
 const REAL_TOKEN_KEY = 'taskwise_real_token'
 const REAL_USER_KEY  = 'taskwise_real_user'
@@ -89,7 +90,7 @@ export default function App() {
         setUser(parsed)
         if (!parsed.mustChangePassword) {
           const savedView = localStorage.getItem(VIEW_KEY) as ViewMode | null
-          const defaultView = parsed.actorType === 'director' ? 'director_dashboard' : 'personnel_queue'
+          const defaultView = defaultViewFor(parsed)
           setView(savedView && savedView !== 'login' ? savedView : defaultView)
           maybeShowSetup(parsed.actorId)
         }
@@ -144,7 +145,7 @@ export default function App() {
     localStorage.setItem(USER_KEY, JSON.stringify(userData))
     setUser(userData)
     if (!userData.mustChangePassword) {
-      persistView(userData.actorType === 'director' ? 'director_dashboard' : 'personnel_queue')
+      persistView(defaultViewFor(userData))
       maybeShowSetup(userData.actorId)
     }
   }
@@ -156,7 +157,7 @@ export default function App() {
       localStorage.setItem(USER_KEY, JSON.stringify(next))
       return next
     })
-    persistView('personnel_queue')
+    persistView(user ? defaultViewFor(user) : 'personnel_queue')
   }
 
   const handleLogout = async () => {

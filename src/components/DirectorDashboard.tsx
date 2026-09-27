@@ -28,6 +28,7 @@ import LeaderboardPage from './LeaderboardPage'
 import CompanyRequestsPage from './CompanyRequestsPage'
 import CompanyFeaturesPage from './CompanyFeaturesPage'
 import InsuranceManagementPage from './InsuranceManagementPage'
+import YsoPerformancePage from './YsoPerformancePage'
 import { launcherHomeUrl, launcherName, type LaunchSource } from '../services/launchSource'
 
 interface Props {
@@ -791,6 +792,7 @@ function MobileUserMenu({ user, onProfile, onSettings, onLogout }: { user: AuthU
 // ─── Director Dashboard ───────────────────────────────────────────────────────
 export default function DirectorDashboard({ user, currentView, setView, onLogout, onUserUpdate, onImpersonationStart, launchSource }: Props) {
   const insuranceEnabled = user.features?.includes('insurance_management') === true
+  const ysoEnabled = user.features?.includes('four_level_hierarchy') === true
   // ── Navigation history (view + scroll position) ───────────────────────────
   const [viewHistory, setViewHistory] = useState<Array<{ view: ViewMode; scrollTop: number }>>([])
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
@@ -914,6 +916,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
   }
 
   const navItems = [
+    ...(ysoEnabled ? [{ label: 'YSO Performance', view: 'yso_performance' as ViewMode, icon: '🌱' }] : []),
     ...(insuranceEnabled ? [{ label: 'Insurance', view: 'insurance_management' as ViewMode, icon: '🛡️' }] : []),
     { label: 'Dashboard',      view: 'director_dashboard' as ViewMode, icon: '⊞' },
     { label: 'Projects',       view: 'project_board'      as ViewMode, icon: '📋' },
@@ -952,6 +955,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
   ]
   const [showMobileMore, setShowMobileMore] = useState(false)
   const mobileMoreItems = [
+    ...(ysoEnabled ? [{ label: 'YSO Performance', view: 'yso_performance' as ViewMode, icon: '🌱' }] : []),
     ...(insuranceEnabled ? [{ label: 'Insurance', view: 'insurance_management' as ViewMode, icon: '🛡️' }] : []),
     { label: 'Tasks',           view: 'tasks'             as ViewMode, icon: '🗂️' },
     { label: 'Team Hierarchy',  view: 'hierarchy_manager' as ViewMode, icon: '👥' },
@@ -1076,6 +1080,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
                   : currentView === 'user_management' ? 'User Management'
                   : currentView === 'leaderboard' ? 'Leaderboard'
                   : currentView === 'insurance_management' ? 'Insurance Management'
+                  : currentView === 'yso_performance' ? 'YSO Performance'
                   : currentView === 'company_requests' ? 'Company Requests'
                   : currentView === 'company_features' ? 'Company Features'
                   : 'My Profile'}
@@ -1152,6 +1157,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
               </svg>
             </a>
             <NotificationsMenu
+              onOpenYso={() => navigate('yso_performance')}
               onOpenTask={async taskId => {
                 try {
                   setSelectedTask(await taskApi.get(taskId) as Task)
@@ -1240,6 +1246,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
           {currentView === 'insurance_management' && insuranceEnabled && (
             <InsuranceManagementPage />
           )}
+          {currentView === 'yso_performance' && ysoEnabled && <YsoPerformancePage user={user} />}
 
           {/* PROJECTS */}
           {currentView === 'project_board' && !selectedProject && (

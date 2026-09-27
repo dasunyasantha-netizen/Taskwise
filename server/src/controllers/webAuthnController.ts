@@ -13,6 +13,7 @@ import jwt from 'jsonwebtoken'
 import prisma from '../prisma'
 import { resolveLoginLookup } from '../helpers/phone'
 import { getEnabledFeatures } from '../helpers/features'
+import { ysoRole } from '../helpers/ysoAccess'
 
 const RP_NAME = 'TaskWise'
 // On production this must be the actual domain; locally it's localhost
@@ -288,7 +289,7 @@ export async function authenticationVerify(req: Request, res: Response): Promise
         },
       })
     } else {
-      const per = actor as { id: string; workspaceId: string; name: string; phone: string; email?: string | null; avatarUrl?: string | null; mustChangePassword: boolean; departmentId: string; department: { layer: { number: number } } }
+      const per = actor as { id: string; workspaceId: string; name: string; phone: string; email?: string | null; avatarUrl?: string | null; mustChangePassword: boolean; departmentId: string; department: { name: string; officeCategory: string | null; layer: { number: number } } }
       const layerNumber = per.department.layer.number
       const workspace = await prisma.workspace.findUnique({ where: { id: per.workspaceId }, select: { companyName: true, companyLogo: true } })
       const features = await getEnabledFeatures(per.workspaceId)
@@ -299,7 +300,7 @@ export async function authenticationVerify(req: Request, res: Response): Promise
         user: {
           actorId: per.id, actorType: 'personnel', workspaceId: per.workspaceId,
           name: per.name, phone: per.phone, email: per.email, avatarUrl: per.avatarUrl,
-          layerNumber, departmentId: per.departmentId,
+          layerNumber, departmentId: per.departmentId, ysoRole: ysoRole(per.department),
           companyName: workspace?.companyName, companyLogo: workspace?.companyLogo,
           mustChangePassword: per.mustChangePassword,
           features,

@@ -237,6 +237,7 @@ export async function createPersonnel(req: Request, res: Response): Promise<void
       fourLevel,
       workspaceId: req.user!.workspaceId,
       level: dept.layer.number,
+      departmentName: dept.name,
       provided: supervisorId,
       isCreate: true,
     })
@@ -407,6 +408,7 @@ export async function updatePersonnel(req: Request, res: Response): Promise<void
     // Directors can set any supervisorId; personnel can set their own supervisorId (for approval chain setup)
     const movingDepartment = actorType === 'director' && !!departmentId && departmentId !== person.departmentId
     let targetLevel = person.department?.layer?.number ?? 0
+    let targetDepartmentName = person.department?.name
     if (movingDepartment) {
       const target = await prisma.department.findFirst({
         where: { id: departmentId, workspaceId, deletedAt: null },
@@ -414,20 +416,26 @@ export async function updatePersonnel(req: Request, res: Response): Promise<void
       })
       if (!target) { res.status(404).json({ error: 'Target department not found' }); return }
       targetLevel = target.layer.number
+      targetDepartmentName = target.name
     }
     const levelChanged = movingDepartment && targetLevel !== (person.department?.layer?.number ?? 0)
+    const enteringYso = movingDepartment && targetDepartmentName?.toUpperCase() === 'YSO' && person.department.name.toUpperCase() !== 'YSO'
 
     const fourLevel = await isFourLevelWorkspace(workspaceId)
+    if (fourLevel && person.department.name.toUpperCase() === 'YSO' && actorType !== 'director' && supervisorId !== undefined && supervisorId !== person.supervisorId) {
+      res.status(403).json({ error: 'Only the Director can change a YSO reporting AD' }); return
+    }
     // A move that changes level can strand an existing manager who is no longer
     // one level up, so the manager is re-validated rather than carried over.
     const supervisor = await resolveSupervisor({
       fourLevel,
       workspaceId,
       level: targetLevel,
+      departmentName: targetDepartmentName,
       subjectId: person.id,
-      provided: levelChanged && supervisorId === undefined ? person.supervisorId : supervisorId,
+      provided: (levelChanged || enteringYso) && supervisorId === undefined ? person.supervisorId : supervisorId,
       current: person.supervisorId,
-      isCreate: levelChanged,
+      isCreate: levelChanged || enteringYso,
     })
     if ('error' in supervisor) { res.status(400).json({ error: supervisor.error }); return }
 
@@ -560,15 +568,17 @@ export async function movePersonnel(req: Request, res: Response): Promise<void> 
     // the reporting line untouched, so an existing user who has no manager yet
     // stays flagged rather than being blocked from moving.
     const levelChanged = dept.layer.number !== (person.department?.layer?.number ?? 0)
+    const enteringYso = dept.name.toUpperCase() === 'YSO' && person.department.name.toUpperCase() !== 'YSO'
     const fourLevel = await isFourLevelWorkspace(req.user!.workspaceId)
     const supervisor = await resolveSupervisor({
       fourLevel,
       workspaceId: req.user!.workspaceId,
       level: dept.layer.number,
       subjectId: person.id,
-      provided: levelChanged && supervisorId === undefined ? person.supervisorId : supervisorId,
+      departmentName: dept.name,
+      provided: (levelChanged || enteringYso) && supervisorId === undefined ? person.supervisorId : supervisorId,
       current: person.supervisorId,
-      isCreate: levelChanged,
+      isCreate: levelChanged || enteringYso,
     })
     if ('error' in supervisor) { res.status(400).json({ error: supervisor.error }); return }
 

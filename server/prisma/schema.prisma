@@ -260,6 +260,7 @@ model Personnel {
   comments              TaskComment[]                      @relation("CommentAuthorPersonnel")
   progressLogs          TaskProgressLog[]                  @relation("ProgressLogAuthor")
   cancellationPenalties TaskCancellationPenaltyRecipient[]
+  ysoProfile            YsoProfile?
 
   @@unique([companyId, normalizedPhone])
   @@index([workspaceId])
@@ -267,6 +268,116 @@ model Personnel {
   @@index([normalizedPhone])
   @@index([departmentId])
   @@index([supervisorId])
+}
+
+// YSO performance is independent of ordinary project/task scoring.
+model YsoProfile {
+  id          String @id @default(uuid())
+  workspaceId String
+  personnelId String @unique
+  personnel   Personnel @relation(fields: [personnelId], references: [id], onDelete: Restrict)
+  startDate   String
+  createdAt   DateTime @default(now())
+  @@index([workspaceId])
+}
+
+model YsoMeeting {
+  id          String @id @default(uuid())
+  workspaceId String
+  adId        String
+  title       String
+  date        String
+  location    String
+  invitees    Json
+  cancelled   Boolean @default(false)
+  createdAt   DateTime @default(now())
+  @@index([workspaceId, date])
+}
+
+model YsoSubmission {
+  id           String @id @default(uuid())
+  workspaceId  String
+  personnelId  String
+  assignedAdId String
+  task         Int
+  period       String
+  businessKey  String
+  data         Json
+  status       String @default("SUBMITTED")
+  submittedAt  DateTime @default(now())
+  queuedAt     DateTime?
+  reviewedAt   DateTime?
+  reviewedById String?
+  feedback     String?
+  previousId   String?
+  supersededAt DateTime?
+  attachment   YsoAttachment?
+  @@index([workspaceId, personnelId, period])
+  @@index([workspaceId, status])
+  @@index([personnelId, businessKey])
+}
+
+model YsoAttachment {
+  id           String @id @default(uuid())
+  submissionId String @unique
+  submission   YsoSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  name         String
+  mime         String
+  bytes        Bytes
+}
+
+model YsoAssessment {
+  id          String @id @default(uuid())
+  workspaceId String
+  personnelId String
+  adId        String
+  period      String
+  scores      Json
+  rationale   String
+  updatedAt   DateTime @updatedAt
+  @@unique([personnelId, period])
+  @@index([workspaceId, period])
+}
+
+model YsoPenaltyDecision {
+  id          String @id @default(uuid())
+  workspaceId String
+  personnelId String
+  key         String
+  task        Int
+  period      String
+  outcome     String
+  reason      String
+  adId        String
+  updatedAt   DateTime @updatedAt
+  @@unique([personnelId, key])
+  @@index([workspaceId, period])
+}
+
+// Append-only adjustments; the balance is SUM(points), never an editable total.
+model YsoScoreEntry {
+  id          String @id @default(uuid())
+  workspaceId String
+  personnelId String
+  adId        String
+  period      String
+  task        Int
+  points      Int
+  reason      String
+  ruleVersion String @default("2026-09-v1")
+  createdAt   DateTime @default(now())
+  @@index([workspaceId, personnelId, period])
+}
+
+model YsoAuditEvent {
+  id          String @id @default(uuid())
+  workspaceId String
+  personnelId String?
+  actorId     String
+  event       String
+  data        Json
+  createdAt   DateTime @default(now())
+  @@index([workspaceId, personnelId, createdAt])
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

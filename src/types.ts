@@ -32,6 +32,7 @@ export interface AuthUser {
   companyId?: string
   companyPrefix?: string
   features?: string[]
+  ysoRole?: 'YSO' | 'AD' | null
   impersonation?: ImpersonationInfo
 }
 
@@ -349,6 +350,7 @@ export interface TaskProgressLog {
 // ─── Notifications ───────────────────────────────────────────────────────────
 
 export type NotificationType =
+  | 'yso_update'
   | 'task_assigned'
   | 'task_returned'
   | 'task_submitted_for_approval'
@@ -411,6 +413,7 @@ export type ViewMode =
   | 'company_requests'
   | 'company_features'
   | 'insurance_management'
+  | 'yso_performance'
   | 'settings'
   | 'profile'
 

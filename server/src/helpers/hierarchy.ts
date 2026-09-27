@@ -104,6 +104,7 @@ export async function resolveSupervisor(opts: {
   workspaceId: string
   level: number
   subjectId?: string
+  departmentName?: string
   provided: unknown
   current?: string | null
   isCreate: boolean
@@ -128,11 +129,14 @@ export async function resolveSupervisor(opts: {
 
   const manager = await prisma.personnel.findFirst({
     where: { id: supplied, workspaceId, deletedAt: null },
-    select: { id: true, department: { select: { layer: { select: { number: true } } } } },
+    select: { id: true, isActive: true, department: { select: { officeCategory: true, layer: { select: { number: true } } } } },
   })
   if (!manager) return { error: 'Reporting manager not found' }
   if (manager.department?.layer?.number !== level - 1) {
     return { error: `A level ${level} user must report to a level ${level - 1} manager` }
+  }
+  if (level === 4 && opts.departmentName?.toUpperCase() === 'YSO' && (!manager.isActive || manager.department.officeCategory !== 'PROVINCIAL')) {
+    return { error: 'YSOs must report to an active Level 3 Provincial AD' }
   }
   return { value: supplied }
 }

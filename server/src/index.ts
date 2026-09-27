@@ -16,6 +16,7 @@ import projectCategoryRoutes  from './routes/projectCategoryRoutes'
 import companyRequestRoutes   from './routes/companyRequestRoutes'
 import insuranceRoutes        from './routes/insuranceRoutes'
 import adminRoutes            from './routes/adminRoutes'
+import ysoRoutes              from './routes/ysoRoutes'
 
 const app  = express()
 const PORT = process.env.PORT || 4300
@@ -45,6 +46,7 @@ app.use('/api/project-categories', projectCategoryRoutes)
 app.use('/api/company',            companyRequestRoutes)
 app.use('/api/insurance',          insuranceRoutes)
 app.use('/api/admin',              adminRoutes)
+app.use('/api/yso',                ysoRoutes)
 
 // Health check
 app.get('/api/health', (_req, res) => {

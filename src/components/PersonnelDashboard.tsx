@@ -9,6 +9,7 @@ import ElapsedDays from './ElapsedDays'
 import { usePWA } from '../hooks/usePWA'
 import ProgressUpdateSheet from './ProgressUpdateSheet'
 import InsuranceManagementPage from './InsuranceManagementPage'
+import YsoPerformancePage from './YsoPerformancePage'
 import { launcherHomeUrl, launcherName, type LaunchSource } from '../services/launchSource'
 
 interface Props {
@@ -787,6 +788,7 @@ function MobileUserMenu({ user, onProfile, onLogout }: { user: AuthUser; onProfi
 // ── Main dashboard ────────────────────────────────────────────────────────────
 export default function PersonnelDashboard({ user, currentView, setView, onLogout, onUserUpdate, launchSource }: Props) {
   const insuranceEnabled = user.features?.includes('insurance_management') === true
+  const ysoEnabled = user.features?.includes('four_level_hierarchy') === true && !!user.ysoRole
   const { canInstall, isIOS, installApp, pushEnabled, enablePush } = usePWA()
   const [showIOSGuide, setShowIOSGuide] = useState(false)
   const [queue, setQueue]               = useState<Task[]>([])
@@ -870,6 +872,7 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
   const [approvalTasks, setApprovalTasks] = useState<Task[]>([])
 
   const navItems = [
+    ...(ysoEnabled ? [{ label: user.ysoRole === 'YSO' ? 'YSO Task Hub' : 'YSO Performance', view: 'yso_performance' as ViewMode, icon: '🌱' }] : []),
     ...(insuranceEnabled ? [{ label: 'Insurance', view: 'insurance_management' as ViewMode, icon: '🛡️' }] : []),
     { label: 'My Queue',       view: 'personnel_queue'          as ViewMode, icon: '📋' },
     { label: 'Approval Queue', view: 'personnel_approval_queue' as ViewMode, icon: '✅', badge: approvalTasks.length },
@@ -987,6 +990,7 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
                   : currentView === 'personnel_approval_queue' ? 'Approvals'
                   : currentView === 'project_board' ? (selectedProject ? selectedProject.name : 'Projects')
                   : currentView === 'insurance_management' ? 'Insurance Management'
+                  : currentView === 'yso_performance' ? 'YSO Performance'
                   : 'My Profile'}
               </span>
               <div className="text-xs text-white/50 md:hidden">{user.name}</div>
@@ -1055,6 +1059,7 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
               </svg>
             </a>
             <NotificationsMenu
+              onOpenYso={() => navigate('yso_performance')}
               onOpenTask={async taskId => {
                 try {
                   setTaskStack([])
@@ -1298,6 +1303,7 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
           {currentView === 'insurance_management' && insuranceEnabled && (
             <InsuranceManagementPage />
           )}
+          {currentView === 'yso_performance' && ysoEnabled && <YsoPerformancePage user={user} />}
 
           {currentView === 'project_board' && !selectedProject && (
             <div className="p-4 md:p-6">

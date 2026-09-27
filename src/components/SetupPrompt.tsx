@@ -106,6 +106,7 @@ export default function SetupPrompt({ actorId, onDone }: Props) {
             </svg>
           </div>
           <p className="text-sm text-tw-text-secondary">Setting up notifications…</p>
+          <button onClick={finish} className="mt-4 text-sm text-tw-text-secondary hover:underline">Skip for now</button>
         </div>
       </div>
     )

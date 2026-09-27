@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken'
 import prisma from '../prisma'
 import { companyLoginPrefix, normalizeSriLankanPhone, resolveLoginLookup } from '../helpers/phone'
 import { getEnabledFeatures } from '../helpers/features'
+import { ysoRole } from '../helpers/ysoAccess'
 
 function signToken(
   actorId: string,
@@ -175,6 +176,7 @@ export async function unifiedLogin(req: Request, res: Response): Promise<void> {
           companyName: workspace?.companyName,
           companyLogo: workspace?.companyLogo,
           mustChangePassword: personnel.mustChangePassword,
+          ysoRole: ysoRole(personnel.department),
           features,
         }
       })
@@ -336,7 +338,7 @@ export async function getMe(req: Request, res: Response): Promise<void> {
     } else {
       const personnel = await prisma.personnel.findUnique({
         where: { id: actorId },
-        select: { id: true, phone: true, email: true, nic: true, name: true, avatarUrl: true, departmentId: true, workspaceId: true, loginId: true, companyId: true, company: { select: { prefix: true } } }
+        select: { id: true, phone: true, email: true, nic: true, name: true, avatarUrl: true, departmentId: true, department: { include: { layer: true } }, workspaceId: true, loginId: true, companyId: true, company: { select: { prefix: true } } }
       })
       const workspace = workspaceId
         ? await prisma.workspace.findUnique({
@@ -344,7 +346,7 @@ export async function getMe(req: Request, res: Response): Promise<void> {
             select: { companyName: true, companyLogo: true }
           })
         : null
-      res.json({ actorId, actorType, workspaceId, ...personnel, companyPrefix: personnel?.company?.prefix, companyName: workspace?.companyName, companyLogo: workspace?.companyLogo, features })
+      res.json({ actorId, actorType, workspaceId, ...personnel, layerNumber: personnel?.department.layer.number, ysoRole: ysoRole(personnel?.department), companyPrefix: personnel?.company?.prefix, companyName: workspace?.companyName, companyLogo: workspace?.companyLogo, features })
     }
   } catch (err) {
     console.error(err)
@@ -531,7 +533,7 @@ export async function startImpersonation(req: Request, res: Response): Promise<v
 
     const isPersonnel = validatedTargetActorType === 'personnel'
     const personnelTarget = isPersonnel
-      ? target as typeof target & { departmentId: string; department: { layer: { number: number } } }
+      ? target as typeof target & { departmentId: string; department: { name: string; officeCategory: string | null; layer: { number: number } } }
       : null
     const layerNumber = personnelTarget?.department.layer.number
     const token = signToken(target.id, validatedTargetActorType, target.workspaceId, {
@@ -560,7 +562,7 @@ export async function startImpersonation(req: Request, res: Response): Promise<v
         avatarUrl: target.avatarUrl,
         loginId: target.loginId || target.phone,
         ...(isPersonnel
-          ? { layerNumber, departmentId: personnelTarget!.departmentId, mustChangePassword: false }
+          ? { layerNumber, departmentId: personnelTarget!.departmentId, mustChangePassword: false, ysoRole: ysoRole(personnelTarget!.department) }
           : {
               isChairman: (target as { isChairman?: boolean }).isChairman,
               isCompanyAdmin: (target as { isCompanyAdmin?: boolean }).isCompanyAdmin,
