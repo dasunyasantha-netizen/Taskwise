@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
+import { useLanguage } from '../i18n/Language'
 
 export interface SelectOption {
   value: string
@@ -27,6 +28,7 @@ interface Props {
 const SEARCH_THRESHOLD = 8
 
 export default function Select({ value, onChange, options, placeholder = 'Select...', className = '', disabled = false, ariaLabel }: Props) {
+  const { t, language } = useLanguage()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [dropPos, setDropPos] = useState({ top: 0, left: 0, width: 0, openUpward: false })
@@ -121,14 +123,14 @@ export default function Select({ value, onChange, options, placeholder = 'Select
             value={query}
             onChange={e => setQuery(e.target.value)}
             onKeyDown={onSearchKeyDown}
-            placeholder={`Search ${options.length} options…`}
+            placeholder={language === 'si' ? `විකල්ප ${options.length}ක් සොයන්න…` : `Search ${options.length} options…`}
             className="w-full border border-tw-border rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:border-tw-primary"
           />
         </div>
       )}
       <div className="max-h-56 overflow-y-auto py-1">
         {visible.length === 0 && (
-          <div className="px-3 py-4 text-sm text-tw-text-secondary text-center">No matches for “{query.trim()}”</div>
+          <div className="px-3 py-4 text-sm text-tw-text-secondary text-center">{language === 'si' ? 'ගැළපෙන ප්‍රතිඵල නැත: ' : 'No matches for “'}{query.trim()}{language === 'si' ? '' : '”'}</div>
         )}
         {ungrouped.map(opt => (
           <button key={opt.value} type="button"
@@ -190,7 +192,7 @@ export default function Select({ value, onChange, options, placeholder = 'Select
       >
         <span className={`flex items-center gap-2 min-w-0 ${selected ? 'text-tw-text' : 'text-tw-text-secondary'}`}>
           {selected?.color && <Dot color={selected.color} />}
-          <span className="truncate">{selected ? selected.label : placeholder}</span>
+          <span className="truncate">{selected ? selected.label : t(placeholder)}</span>
         </span>
         <svg className={`w-4 h-4 text-tw-text-secondary flex-shrink-0 transition-transform ml-2 ${open ? 'rotate-180' : ''}`}
           fill="none" stroke="currentColor" viewBox="0 0 24 24">

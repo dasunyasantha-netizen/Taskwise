@@ -9,19 +9,15 @@ import {
 } from '../services/letterService'
 import DatePicker from './DatePicker'
 import Select from './Select'
+import type { AuthUser } from '../types'
+import { LanguageToggle, useLanguage, displayDate } from '../i18n/Language'
 const box = 'rounded-2xl border border-tw-border bg-white shadow-sm p-4 sm:p-5'
 const button = 'btn-primary min-h-11'
 const secondary = 'btn-secondary min-h-11'
-const timestamp = (value: string) =>
-  new Date(value).toLocaleString('en-GB', {
-    timeZone: 'Asia/Colombo',
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  })
-const shortDate = (value: string) =>
-  new Date(value + 'T00:00:00').toLocaleDateString('en-GB', {
-    dateStyle: 'medium',
-  })
+const timestamp = (value: string, locale = 'en-GB') =>
+  displayDate(value, locale === 'si-LK' ? 'si' : 'en', true)
+const shortDate = (value: string, locale = 'en-GB') =>
+  displayDate(value, locale === 'si-LK' ? 'si' : 'en')
 function Field({
   label,
   children,
@@ -29,19 +25,21 @@ function Field({
   label: string
   children: React.ReactNode
 }) {
+  const { t: tr, locale } = useLanguage()
   return (
     <label className="block text-sm font-medium text-tw-text space-y-1.5">
-      <span>{label}</span>
+      <span>{tr(label)}</span>
       {children}
     </label>
   )
 }
 function Status({ closed }: { closed: boolean }) {
+  const { t: tr, locale } = useLanguage()
   return (
     <span
       className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${closed ? 'bg-slate-100 text-slate-600' : 'bg-blue-50 text-tw-primary'}`}
     >
-      {closed ? 'Closed' : 'Open'}
+      {closed ? tr("Closed") : tr("Open")}
     </span>
   )
 }
@@ -54,6 +52,7 @@ function Dialog({
   onClose: () => void
   children: React.ReactNode
 }) {
+  const { t: tr, locale } = useLanguage()
   const ref = useRef<HTMLDivElement>(null),
     closeRef = useRef(onClose),
     id = React.useId()
@@ -107,13 +106,13 @@ function Dialog({
       >
         <div className="flex items-start justify-between gap-3 mb-5">
           <h2 id={id} className="text-xl font-bold">
-            {title}
+            {tr(title)}
           </h2>
           <button
             type="button"
             className={secondary}
             onClick={onClose}
-            aria-label="Close dialog"
+            aria-label={tr("Close dialog")}
           >
             ✕
           </button>
@@ -160,6 +159,7 @@ function LetterForm({
   onClose: () => void
   onSaved: (id: string) => Promise<void>
 }) {
+  const { t: tr, locale } = useLanguage()
   const [form, setForm] = useState({
     subject: '',
     sender: '',
@@ -221,16 +221,16 @@ function LetterForm({
           setError('')
           try {
             if (['NEW', 'INCOMING'].includes(kind) && !form.receivedDate)
-              throw new Error('Choose the received date.')
+              throw new Error(tr("Choose the received date."))
             if (
               kind === 'OUTGOING' &&
               (!form.correspondenceDate || !selectedFiles.length)
             )
               throw new Error(
-                'Choose the reply date and attach the outgoing letter.'
+                tr("Choose the reply date and attach the outgoing letter.")
               )
             if (['TRANSFER', 'SHARE'].includes(kind) && !form.personKey)
-              throw new Error('Choose a staff member.')
+              throw new Error(tr("Choose a staff member."))
             const data = {
                 ...form,
                 kind,
@@ -257,9 +257,7 @@ function LetterForm({
         {kind === 'NEW' && (
           <>
             <div className="rounded-xl bg-blue-50 p-3 text-sm text-blue-900">
-              A reference number is generated on save. You become the initial
-              assignee and remain the recorded letter enterer.
-            </div>
+              {tr("A reference number is generated on save. You become the initial assignee and remain the recorded letter enterer.")}</div>
             <Field label="Sender">
               <input
                 required
@@ -299,12 +297,9 @@ function LetterForm({
             {matches.length > 0 && (
               <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm">
                 <p className="font-semibold mb-2">
-                  Possibly related correspondence
-                </p>
+                  {tr("Possibly related correspondence")}</p>
                 <p className="mb-2">
-                  If this is a reply, open the existing thread instead of
-                  creating another reference.
-                </p>
+                  {tr("If this is a reply, open the existing thread instead of creating another reference.")}</p>
                 {matches.map((t) => (
                   <button
                     type="button"
@@ -322,12 +317,12 @@ function LetterForm({
             )}
             <Field label="Letter format">
               <Select
-                ariaLabel="Letter format"
+                ariaLabel={tr("Letter format")}
                 value={form.channel}
                 onChange={(v) => set('channel', v)}
                 options={[
-                  { value: 'PHYSICAL', label: 'Physical letter' },
-                  { value: 'DIGITAL', label: 'Digital correspondence' },
+                  { value: 'PHYSICAL', label: tr("Physical letter") },
+                  { value: 'DIGITAL', label: tr("Digital correspondence") },
                 ]}
                 className="[&>button]:min-h-11"
               />
@@ -338,7 +333,7 @@ function LetterForm({
           <Field label="Received date">
             <DatePicker
               compact
-              ariaLabel="Received date"
+              ariaLabel={tr("Received date")}
               value={form.receivedDate}
               onChange={(v) => set('receivedDate', v)}
               minDate={
@@ -361,21 +356,17 @@ function LetterForm({
               />
             </Field>
             <p className="text-sm text-tw-text-secondary">
-              This stays under {thread?.reference}. A closed thread reopens with
-              its existing assignee.
-            </p>
+              {tr("This stays under")}{thread?.reference}{tr(". A closed thread reopens with its existing assignee.")}</p>
           </>
         )}
         {kind === 'OUTGOING' && (
           <>
             <div className="rounded-xl bg-blue-50 p-3 text-sm">
-              Record a reply that has already been sent. Saving closes the
-              inquiry; Taskwise does not send email or post letters.
-            </div>
+              {tr("Record a reply that has already been sent. Saving closes the inquiry; Taskwise does not send email or post letters.")}</div>
             <Field label="Reply date">
               <DatePicker
                 compact
-                ariaLabel="Reply date"
+                ariaLabel={tr("Reply date")}
                 value={form.correspondenceDate}
                 minDate={thread?.latestReceivedDate}
                 maxDate={context.today}
@@ -395,9 +386,9 @@ function LetterForm({
           </>
         )}
         {['TRANSFER', 'SHARE'].includes(kind) && (
-          <Field label={kind === 'TRANSFER' ? 'New assignee' : 'Staff member'}>
+          <Field label={kind === 'TRANSFER' ? tr("New assignee") : tr("Staff member")}>
             <Select
-              ariaLabel={kind === 'TRANSFER' ? 'New assignee' : 'Staff member'}
+              ariaLabel={kind === 'TRANSFER' ? tr("New assignee") : tr("Staff member")}
               value={form.personKey}
               onChange={(v) => set('personKey', v)}
               options={context.people
@@ -412,10 +403,10 @@ function LetterForm({
         <Field
           label={
             kind === 'NEW'
-              ? 'Important details'
+              ? tr("Important details")
               : kind === 'TRANSFER'
-                ? 'Handover note'
-                : 'Notes'
+                ? tr("Handover note")
+                : tr("Notes")
           }
         >
           <textarea
@@ -431,8 +422,8 @@ function LetterForm({
           <Field
             label={
               kind === 'OUTGOING'
-                ? 'Copy of outgoing letter (required)'
-                : 'Original documents'
+                ? tr("Copy of outgoing letter (required)")
+                : tr("Original documents")
             }
           >
             <input
@@ -440,20 +431,21 @@ function LetterForm({
               accept="application/pdf,image/png,image/jpeg"
               multiple
               required={kind === 'OUTGOING'}
-              className="block w-full text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-blue-50 file:px-3 file:py-3 file:text-tw-primary"
+              className="sr-only peer"
               onChange={(e) => setFiles(Array.from(e.target.files || []))}
             />
-            <span className="block text-xs text-tw-text-secondary">
-              PDF, PNG or JPG · up to 4 files · 4 MB each / 8 MB total.
-              Originals are preserved; preview and Drive upload run in the
-              background.
+            <span className="inline-flex min-h-11 items-center rounded-lg border border-tw-border bg-blue-50 px-3 py-2 text-sm font-semibold text-tw-primary cursor-pointer peer-focus-visible:ring-2 peer-focus-visible:ring-teal-700">
+              {tr('Choose files')}
             </span>
+            <span className="block text-xs text-tw-text-secondary" aria-live="polite">
+              {selectedFiles.length ? selectedFiles.map(file => file.name).join(', ') : tr('No files selected')}
+            </span>
+            <span className="block text-xs text-tw-text-secondary">
+              {tr("PDF, PNG or JPG · up to 4 files · 4 MB each / 8 MB total. Originals are preserved; preview and Drive upload run in the background.")}</span>
           </Field>
         )}
         <p className="text-xs text-tw-text-secondary">
-          The system logs the current time automatically. Dates and delay
-          metrics use Sri Lanka time.
-        </p>
+          {tr("The system logs the current time automatically. Dates and delay metrics use Sri Lanka time.")}</p>
         {error && (
           <p role="alert" className="text-sm text-red-700">
             {error}
@@ -462,14 +454,14 @@ function LetterForm({
         <div className="flex flex-wrap gap-2">
           <button className={button} disabled={busy}>
             {busy
-              ? 'Saving…'
+              ? tr("Saving…")
               : kind === 'OUTGOING'
-                ? 'Save reply & close'
+                ? tr("Save reply & close")
                 : kind === 'INCOMING' && thread?.status === 'CLOSED'
-                  ? 'Save & reopen'
+                  ? tr("Save & reopen")
                   : kind === 'NEW'
-                    ? 'Save incoming letter'
-                    : 'Save action'}
+                    ? tr("Save incoming letter")
+                    : tr("Save action")}
           </button>
           <button
             type="button"
@@ -477,14 +469,14 @@ function LetterForm({
             onClick={onClose}
             disabled={busy}
           >
-            Cancel
-          </button>
+            {tr("Cancel")}</button>
         </div>
       </form>
     </Dialog>
   )
 }
 function Preview({ file, onClose }: { file: LetterFile; onClose: () => void }) {
+  const { t: tr, locale } = useLanguage()
   const [page, setPage] = useState(file.previews[0]?.page || 1),
     [url, setUrl] = useState(''),
     [error, setError] = useState('')
@@ -516,24 +508,20 @@ function Preview({ file, onClose }: { file: LetterFile; onClose: () => void }) {
           disabled={page <= 1}
           onClick={() => setPage((p) => p - 1)}
         >
-          Previous
-        </button>
+          {tr("Previous")}</button>
         <span className="text-sm">
-          Page {page} / {file.pageCount || file.previews.length}
+          {tr("Page")}{page} / {file.pageCount || file.previews.length}
         </span>
         <button
           className={secondary}
           disabled={page >= file.previews.length}
           onClick={() => setPage((p) => p + 1)}
         >
-          Next
-        </button>
+          {tr("Next")}</button>
       </div>
       {(file.pageCount || 0) > file.previews.length && (
         <p className="text-sm mb-3">
-          Quick preview includes the first {file.previews.length} pages.
-          Download the original for the complete document.
-        </p>
+          {tr("Quick preview includes the first")}{file.previews.length} {tr("pages. Download the original for the complete document.")}</p>
       )}
       {error ? (
         <p role="alert">{error}</p>
@@ -544,13 +532,14 @@ function Preview({ file, onClose }: { file: LetterFile; onClose: () => void }) {
           className="w-full rounded-lg border border-tw-border"
         />
       ) : (
-        <p role="status">Loading preview…</p>
+        <p role="status">{tr("Loading preview…")}</p>
       )}
     </Dialog>
   )
 }
 
-export default function LetterManagement() {
+export default function LetterManagement({ user, onUserUpdate }: { user: AuthUser; onUserUpdate: (value: Partial<AuthUser>) => void }) {
+  const { t: tr, locale } = useLanguage()
   const [context, setContext] = useState<LetterContext | null>(null),
     [list, setList] = useState<LetterList | null>(null),
     [thread, setThread] = useState<Letter | null>(null)
@@ -655,36 +644,33 @@ export default function LetterManagement() {
       <div className="flex flex-wrap justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-widest text-tw-primary mb-2">
-            Correspondence
-          </p>
+            {tr("Correspondence")}</p>
           <h1 className="text-2xl font-bold">
-            {selected ? 'Letter thread' : 'Letter register'}
+            {selected ? tr("Letter thread") : tr("Letter register")}
           </h1>
           <p className="text-sm text-tw-text-secondary mt-1">
             {context?.me.director
-              ? 'Your workspace’s correspondence, responsibility and response history.'
+              ? tr("Your workspace’s correspondence, responsibility and response history.")
               : context?.me.logger
-                ? 'Log incoming correspondence and follow each inquiry.'
-                : 'Letters assigned to you, entered by you or shared with you.'}
+                ? tr("Log incoming correspondence and follow each inquiry.")
+                : tr("Letters assigned to you, entered by you or shared with you.")}
           </p>
         </div>
-        <div className="flex gap-2 items-start">
+        <div className="flex flex-wrap gap-2 items-start">
+          <LanguageToggle user={user} onUserUpdate={onUserUpdate} />
           {selected && (
             <button className={secondary} onClick={() => open('')}>
-              ← Register
-            </button>
+              {tr("← Register")}</button>
           )}
           <button
             className={secondary}
             disabled={busy}
             onClick={() => void refresh()}
           >
-            Refresh
-          </button>
+            {tr("Refresh")}</button>
           {context?.me.logger && !selected && (
             <button className={button} onClick={() => setKind('NEW')}>
-              + Log letter
-            </button>
+              {tr("+ Log letter")}</button>
           )}
         </div>
       </div>
@@ -693,24 +679,22 @@ export default function LetterManagement() {
           {error}
         </p>
       )}
-      {!context && busy && <p role="status">Loading correspondence…</p>}
+      {!context && busy && <p role="status">{tr("Loading correspondence…")}</p>}
       {context && !context.driveConnected && (
         <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm text-amber-900">
-          Google Drive is not connected. Documents are saved securely in
-          Taskwise and queued until the Director connects Drive in Settings.
-        </div>
+          {tr("Google Drive is not connected. Documents are saved securely in Taskwise and queued until the Director connects Drive in Settings.")}</div>
       )}
       {!selected && list && (
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {[
-              ['Open inquiries', list.metrics.open],
-              ['Closed inquiries', list.metrics.closed],
-              ['Assignee bottlenecks', list.metrics.overdue],
-              ['Average entry delay', `${list.metrics.averageEntryDays} days`],
+              [tr("Open inquiries"), list.metrics.open],
+              [tr("Closed inquiries"), list.metrics.closed],
+              [tr("Assignee bottlenecks"), list.metrics.overdue],
+              [tr("Average entry delay"), `${list.metrics.averageEntryDays} ${tr('days')}`],
             ].map(([label, value]) => (
               <div className={box} key={label}>
-                <p className="text-xs text-tw-text-secondary">{label}</p>
+                <p className="text-xs text-tw-text-secondary">{tr(String(label))}</p>
                 <p className="text-2xl font-bold mt-2">{value}</p>
               </div>
             ))}
@@ -718,9 +702,9 @@ export default function LetterManagement() {
           <div className={box + ' space-y-4'}>
             <div className="flex flex-col sm:flex-row gap-3">
               <input
-                aria-label="Search letters"
+                aria-label={tr("Search letters")}
                 type="search"
-                placeholder="Search reference, sender or subject…"
+                placeholder={tr("Search reference, sender or subject…")}
                 className="input flex-1 min-w-0"
                 value={q}
                 onChange={(e) => {
@@ -729,16 +713,16 @@ export default function LetterManagement() {
                 }}
               />
               <Select
-                ariaLabel="Letter status"
+                ariaLabel={tr("Letter status")}
                 value={status}
                 onChange={(v) => {
                   setStatus(v)
                   setPage(0)
                 }}
                 options={[
-                  { value: '', label: 'All statuses' },
-                  { value: 'OPEN', label: 'Open' },
-                  { value: 'CLOSED', label: 'Closed' },
+                  { value: '', label: tr("All statuses") },
+                  { value: 'OPEN', label: tr("Open") },
+                  { value: 'CLOSED', label: tr("Closed") },
                 ]}
                 className="sm:w-40 [&>button]:min-h-11"
               />
@@ -750,15 +734,14 @@ export default function LetterManagement() {
                   setPage(0)
                 }}
               >
-                {mine ? '✓ Assigned to me' : 'Assigned to me'}
+                {mine ? tr("✓ Assigned to me") : tr("Assigned to me")}
               </button>
             </div>
             <div className="flex justify-between text-xs text-tw-text-secondary">
-              <span>{list.total} inquiries</span>
+              <span>{list.total}  {tr("inquiries")}</span>
               <span>
-                {list.metrics.lateEntries} receipts logged after{' '}
-                {list.thresholds.entryDelayDays}+ days
-              </span>
+                {list.metrics.lateEntries}  {tr("receipts logged after")}{' '}
+                {list.thresholds.entryDelayDays}{tr("+ days")}</span>
             </div>
             <div className="space-y-2">
               {list.items.map((t) => (
@@ -780,8 +763,8 @@ export default function LetterManagement() {
                     {t.sender}
                   </p>
                   <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs mt-3">
-                    <span>With {t.assignedToName}</span>
-                    <span>Received {shortDate(t.firstReceivedDate)}</span>
+                    <span>{tr("With")} {t.assignedToName}</span>
+                    <span>{tr("Received")} {shortDate(t.firstReceivedDate, locale)}</span>
                     <span
                       className={
                         t.entryDelayDays >= list.thresholds.entryDelayDays
@@ -789,8 +772,7 @@ export default function LetterManagement() {
                           : ''
                       }
                     >
-                      Entry delay: {t.entryDelayDays} days
-                    </span>
+                      {tr("Entry delay:")}{t.entryDelayDays} {tr("days")}</span>
                     {t.status === 'OPEN' && (
                       <span
                         className={
@@ -799,8 +781,7 @@ export default function LetterManagement() {
                             : ''
                         }
                       >
-                        With assignee: {t.assigneeAgeDays} days
-                      </span>
+                        {tr("With assignee:")}{t.assigneeAgeDays} {tr("days")}</span>
                     )}
                   </div>
                 </button>
@@ -808,11 +789,11 @@ export default function LetterManagement() {
               {!list.items.length && (
                 <div className="text-center py-12">
                   <p className="text-3xl mb-3">✉</p>
-                  <p className="font-semibold">No letters in this view</p>
+                  <p className="font-semibold">{tr("No letters in this view")}</p>
                   <p className="text-sm text-tw-text-secondary mt-1">
                     {context?.me.logger
-                      ? 'Log an incoming letter or change your filters.'
-                      : 'Assigned or shared letters will appear here.'}
+                      ? tr("Log an incoming letter or change your filters.")
+                      : tr("Assigned or shared letters will appear here.")}
                   </p>
                 </div>
               )}
@@ -823,29 +804,24 @@ export default function LetterManagement() {
                 disabled={page === 0}
                 onClick={() => setPage((p) => p - 1)}
               >
-                Previous
-              </button>
+                {tr("Previous")}</button>
               <span className="text-sm">
-                Page {page + 1} of {Math.max(1, Math.ceil(list.total / 30))}
+                {tr("Page")}{page + 1}  {tr("of")} {Math.max(1, Math.ceil(list.total / 30))}
               </span>
               <button
                 className={secondary}
                 disabled={(page + 1) * 30 >= list.total}
                 onClick={() => setPage((p) => p + 1)}
               >
-                Next
-              </button>
+                {tr("Next")}</button>
             </div>
           </div>
           {context?.me.director && (
             <details className={box}>
               <summary className="font-semibold cursor-pointer">
-                Assignee workload & bottlenecks
-              </summary>
+                {tr("Assignee workload & bottlenecks")}</summary>
               <p className="text-sm text-tw-text-secondary mt-2">
-                Flagged after {list.thresholds.assigneeDays} calendar days with
-                the current assignee. Closed inquiries stop aging.
-              </p>
+                {tr("Flagged after")}{list.thresholds.assigneeDays} {tr("calendar days with the current assignee. Closed inquiries stop aging.")}</p>
               <div className="mt-4 space-y-3">
                 {list.metrics.holders.map((h, i) => (
                   <div
@@ -854,18 +830,17 @@ export default function LetterManagement() {
                   >
                     <strong>{h.name}</strong>
                     <span>
-                      {h.open} open · {h.overdue} flagged · oldest {h.maxDays}{' '}
-                      days
-                    </span>
+                      {h.open}  {tr("open ·")} {h.overdue}  {tr("flagged · oldest")} {h.maxDays}{' '}
+                      {tr("days")}</span>
                   </div>
                 ))}
-                {!list.metrics.holders.length && <p>No open assignments.</p>}
+                {!list.metrics.holders.length && <p>{tr("No open assignments.")}</p>}
               </div>
             </details>
           )}
         </>
       )}
-      {selected && !thread && !error && <p role="status">Loading letter…</p>}
+      {selected && !thread && !error && <p role="status">{tr("Loading letter…")}</p>}
       {thread && context && (
         <>
           <section className={box}>
@@ -879,42 +854,41 @@ export default function LetterManagement() {
               {thread.subject}
             </h2>
             <p className="text-sm mt-2 break-words">
-              From {thread.sender}
+              {tr("From")}{thread.sender}
               {thread.senderContact ? ' · ' + thread.senderContact : ''}
             </p>
             {thread.externalReference && (
               <p className="text-xs mt-1">
-                Sender’s reference: {thread.externalReference}
+                {tr("Sender’s reference:")}{thread.externalReference}
               </p>
             )}
             <dl className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-5 text-sm">
               {[
-                ['Received', shortDate(thread.firstReceivedDate)],
-                ['System logged', timestamp(thread.createdAt)],
-                ['Entered by', thread.createdByName],
-                ['Current assignee', thread.assignedToName],
+                [tr("Received"), shortDate(thread.firstReceivedDate, locale)],
+                [tr("System logged"), timestamp(thread.createdAt, locale)],
+                [tr("Entered by"), thread.createdByName],
+                [tr("Current assignee"), thread.assignedToName],
               ].map(([label, value]) => (
                 <div key={label}>
                   <dt className="text-xs text-tw-text-secondary mb-1">
-                    {label}
+                    {tr(label)}
                   </dt>
                   <dd className="font-medium">{value}</dd>
                 </div>
               ))}
             </dl>
             <div className="mt-4 flex flex-wrap gap-3 text-xs">
-              <span>Entry delay: {thread.entryDelayDays} calendar days</span>
+              <span>{tr("Entry delay:")} {thread.entryDelayDays}  {tr("calendar days")}</span>
               <span>
                 {thread.status === 'OPEN'
-                  ? `With current assignee: ${thread.assigneeAgeDays} calendar days`
-                  : `Closed ${timestamp(thread.closedAt!)}`}
+                  ? `${tr('With current assignee:')} ${thread.assigneeAgeDays} ${tr('calendar days')}`
+                  : `${tr('Closed')} ${timestamp(thread.closedAt!, locale)}`}
               </span>
             </div>
             <div className="flex flex-wrap gap-2 mt-5">
               {thread.permissions?.canReply && (
                 <button className={button} onClick={() => setKind('OUTGOING')}>
-                  Record reply & close
-                </button>
+                  {tr("Record reply & close")}</button>
               )}
               {thread.permissions?.canReceive && (
                 <button
@@ -922,8 +896,8 @@ export default function LetterManagement() {
                   onClick={() => setKind('INCOMING')}
                 >
                   {thread.status === 'CLOSED'
-                    ? 'Incoming reply & reopen'
-                    : 'Add incoming reply'}
+                    ? tr("Incoming reply & reopen")
+                    : tr("Add incoming reply")}
                 </button>
               )}
               {thread.permissions?.canManage && (
@@ -933,24 +907,21 @@ export default function LetterManagement() {
                       className={secondary}
                       onClick={() => setKind('TRANSFER')}
                     >
-                      Reassign
-                    </button>
+                      {tr("Reassign")}</button>
                   )}
                   <button className={secondary} onClick={() => setKind('NOTE')}>
-                    Add note
-                  </button>
+                    {tr("Add note")}</button>
                   <button
                     className={secondary}
                     onClick={() => setKind('SHARE')}
                   >
-                    Share view
-                  </button>
+                    {tr("Share view")}</button>
                 </>
               )}
             </div>
           </section>
           <section>
-            <h2 className="font-bold mb-4">Correspondence timeline</h2>
+            <h2 className="font-bold mb-4">{tr("Correspondence timeline")}</h2>
             <div className="space-y-4">
               {thread.events?.map((event) => (
                 <article className={box} key={event.id}>
@@ -959,11 +930,11 @@ export default function LetterManagement() {
                       {
                         (
                           {
-                            INCOMING: '↓ Incoming letter',
-                            OUTGOING: '↑ Outgoing reply · closed',
-                            TRANSFER: '⇄ Responsibility transferred',
-                            NOTE: 'Internal note',
-                            SHARE: 'Viewing access shared',
+                            INCOMING: tr("↓ Incoming letter"),
+                            OUTGOING: tr("↑ Outgoing reply · closed"),
+                            TRANSFER: tr("⇄ Responsibility transferred"),
+                            NOTE: tr("Internal note"),
+                            SHARE: tr("Viewing access shared"),
                           } as Record<string, string>
                         )[event.kind]
                       }{' '}
@@ -972,34 +943,32 @@ export default function LetterManagement() {
                       </span>
                     </h3>
                     <p className="text-xs text-tw-text-secondary">
-                      {timestamp(event.createdAt)}
+                      {timestamp(event.createdAt, locale)}
                     </p>
                   </div>
                   <p className="text-xs text-tw-text-secondary mt-1">
-                    Logged by {event.actorName}
+                    {tr("Logged by")}{event.actorName}
                   </p>
                   {event.receivedDate && (
                     <p className="text-sm mt-3">
-                      Received {shortDate(event.receivedDate)} · from{' '}
-                      {event.correspondent} · entry delay {event.entryDelayDays}{' '}
-                      days
-                    </p>
+                      {tr("Received")}{shortDate(event.receivedDate, locale)}  {tr("· from")}{' '}
+                      {event.correspondent}  {tr("· entry delay")} {event.entryDelayDays}{' '}
+                      {tr("days")}</p>
                   )}
                   {event.correspondenceDate && (
                     <p className="text-sm mt-3">
-                      Sent {shortDate(event.correspondenceDate)} · to{' '}
+                      {tr("Sent")}{shortDate(event.correspondenceDate, locale)}  {tr("· to")}{' '}
                       {event.correspondent}
                     </p>
                   )}
                   {event.kind === 'TRANSFER' && (
                     <p className="text-sm mt-3">
-                      {event.fromAssigneeName} → {event.toAssigneeName} · held{' '}
-                      {event.holdingDays} calendar days
-                    </p>
+                      {event.fromAssigneeName} → {event.toAssigneeName}  {tr("· held")}{' '}
+                      {event.holdingDays} {tr("calendar days")}</p>
                   )}
                   {event.kind === 'SHARE' && (
                     <p className="text-sm mt-3">
-                      Shared with {event.toAssigneeName}
+                      {tr("Shared with")}{event.toAssigneeName}
                     </p>
                   )}
                   {event.notes && (
@@ -1015,23 +984,22 @@ export default function LetterManagement() {
                       <p className="text-sm font-medium break-words">
                         {f.name}{' '}
                         <span className="text-xs text-tw-text-secondary">
-                          ({Math.round(f.size / 1024)} KB)
-                        </span>
+                          ({Math.round(f.size / 1024)} {tr("KB)")}</span>
                       </p>
                       <p className="text-xs mt-1 text-tw-text-secondary">
-                        Drive:{' '}
+                        {tr("Drive:")}{' '}
                         {
                           (
                             {
-                              READY: 'saved',
-                              BLOCKED: 'awaiting setup',
-                              PENDING: 'queued',
-                              PROCESSING: 'uploading',
-                              FAILED: 'needs attention',
+                              READY: tr("saved"),
+                              BLOCKED: tr("awaiting setup"),
+                              PENDING: tr("queued"),
+                              PROCESSING: tr("uploading"),
+                              FAILED: tr("needs attention"),
                             } as Record<string, string>
                           )[f.uploadState]
                         }{' '}
-                        · Preview: {f.previewState.toLowerCase()}
+                        {tr("· Preview:")}{tr(f.previewState.toLowerCase())}
                       </p>
                       {f.uploadError && (
                         <p className="text-xs text-amber-800 mt-1">
@@ -1049,15 +1017,13 @@ export default function LetterManagement() {
                             className={secondary}
                             onClick={() => setPreview(f)}
                           >
-                            Quick preview
-                          </button>
+                            {tr("Quick preview")}</button>
                         )}
                         <button
                           className={secondary}
                           onClick={() => void download(f)}
                         >
-                          Download original
-                        </button>
+                          {tr("Download original")}</button>
                         {thread.permissions?.canManage &&
                           (['FAILED', 'BLOCKED'].includes(f.uploadState) ||
                             f.previewState === 'FAILED') && (
@@ -1072,8 +1038,7 @@ export default function LetterManagement() {
                                 }
                               }}
                             >
-                              Retry processing
-                            </button>
+                              {tr("Retry processing")}</button>
                           )}
                       </div>
                     </div>
@@ -1099,6 +1064,7 @@ export default function LetterManagement() {
 }
 
 export function LetterSettingsPanel() {
+  const { t: tr, locale } = useLanguage()
   const [settings, setSettings] = useState<DriveSettings | null>(null),
     [context, setContext] = useState<LetterContext | null>(null),
     [secret, setSecret] = useState(''),
@@ -1132,11 +1098,9 @@ export function LetterSettingsPanel() {
   return (
     <section className={box + ' space-y-5'}>
       <div>
-        <h2 className="text-lg font-bold">Letter management</h2>
+        <h2 className="text-lg font-bold">{tr("Letter management")}</h2>
         <p className="text-sm text-tw-text-secondary mt-1">
-          Director controls for Letter Loggers, delay thresholds and private
-          Google Drive storage.
-        </p>
+          {tr("Director controls for Letter Loggers, delay thresholds and private Google Drive storage.")}</p>
       </div>
       {error && (
         <p role="alert" className="text-red-700 text-sm">
@@ -1150,12 +1114,9 @@ export function LetterSettingsPanel() {
       )}
       {context && (
         <div>
-          <h3 className="font-semibold mb-2">Letter Loggers</h3>
+          <h3 className="font-semibold mb-2">{tr("Letter Loggers")}</h3>
           <p className="text-sm text-tw-text-secondary mb-3">
-            Only these staff and Directors can register new letters. The
-            original enterer retains responsibility for adding incoming replies,
-            even if their Logger permission is later removed.
-          </p>
+            {tr("Only these staff and Directors can register new letters. The original enterer retains responsibility for adding incoming replies, even if their Logger permission is later removed.")}</p>
           <div className="max-h-72 overflow-y-auto space-y-1">
             {context.people
               .filter((p) => p.key.startsWith('personnel:'))
@@ -1177,7 +1138,7 @@ export function LetterSettingsPanel() {
                           e.target.checked
                         )
                         await load()
-                        setMessage('Logger permissions updated.')
+                        setMessage(tr("Logger permissions updated."))
                       })
                     }
                   />
@@ -1201,7 +1162,7 @@ export function LetterSettingsPanel() {
                 )
                 setSecret('')
                 setMessage(
-                  'Settings saved. Connect Google Drive if its configuration changed.'
+                  tr("Settings saved. Connect Google Drive if its configuration changed.")
                 )
               })
             }}
@@ -1240,25 +1201,19 @@ export function LetterSettingsPanel() {
                 />
               </Field>
             </div>
-            <h3 className="font-semibold pt-2">Google Drive connection</h3>
+            <h3 className="font-semibold pt-2">{tr("Google Drive connection")}</h3>
             <p className="text-sm text-tw-text-secondary">
-              Use an organization-controlled Google account with access to the
-              destination folder. Taskwise saves original documents there
-              without making them public. Credentials are encrypted and never
-              returned to the browser.
-            </p>
+              {tr("Use an organization-controlled Google account with access to the destination folder. Taskwise saves original documents there without making them public. Credentials are encrypted and never returned to the browser.")}</p>
             {!settings.encryptionReady && (
               <p className="text-sm text-amber-800">
-                A server encryption key must be configured before saving Google
-                credentials.
-              </p>
+                {tr("A server encryption key must be configured before saving Google credentials.")}</p>
             )}
             <Field label="Destination folder ID">
               <input
                 className="input"
                 value={settings.folderId}
                 maxLength={200}
-                placeholder="The ID after /folders/ in the Drive folder URL"
+                placeholder={tr("The ID after /folders/ in the Drive folder URL")}
                 onChange={(e) =>
                   setSettings({ ...settings, folderId: e.target.value })
                 }
@@ -1289,44 +1244,32 @@ export function LetterSettingsPanel() {
             </Field>
             <details className="text-sm rounded-xl bg-slate-50 p-3">
               <summary className="font-medium cursor-pointer">
-                Google Cloud setup instructions
-              </summary>
+                {tr("Google Cloud setup instructions")}</summary>
               <ol className="list-decimal pl-5 space-y-2 mt-3">
                 <li>
-                  Enable the Google Drive API in your Google Cloud project.
-                </li>
+                  {tr("Enable the Google Drive API in your Google Cloud project.")}</li>
                 <li>
-                  Configure the OAuth consent screen for your organization, then
-                  create a Web application OAuth client.
-                </li>
+                  {tr("Configure the OAuth consent screen for your organization, then create a Web application OAuth client.")}</li>
                 <li>
-                  Add this authorized redirect URI:{' '}
+                  {tr("Add this authorized redirect URI:")}{' '}
                   <code className="block break-all bg-white p-2 mt-1">
                     {settings.callbackUrl}
                   </code>
                 </li>
                 <li>
-                  Enter its client ID and secret above, save, then connect with
-                  the account that can write to your folder.
-                </li>
+                  {tr("Enter its client ID and secret above, save, then connect with the account that can write to your folder.")}</li>
               </ol>
               <p className="mt-3">
-                Access to a manually entered existing folder requires the Google
-                Drive scope. Google's consent screen describes this access.
-                Taskwise's upload worker uses only the configured folder; do not
-                share that folder with people who should not see all its
-                letters.
-              </p>
+                {tr("Access to a manually entered existing folder requires the Google Drive scope. Google's consent screen describes this access. Taskwise's upload worker uses only the configured folder; do not share that folder with people who should not see all its letters.")}</p>
             </details>
             <button className={button} disabled={busy}>
-              Save letter settings
-            </button>
+              {tr("Save letter settings")}</button>
           </form>
           <div className="flex flex-wrap items-center gap-2 border-t border-tw-border pt-4">
             <span className="text-sm mr-2">
               {settings.connected
-                ? '● Drive connected'
-                : '○ Drive not connected'}
+                ? tr("● Drive connected")
+                : tr("○ Drive not connected")}
             </span>
             <button
               className={secondary}
@@ -1338,7 +1281,7 @@ export function LetterSettingsPanel() {
                 })
               }
             >
-              {settings.connected ? 'Reconnect Google' : 'Connect Google Drive'}
+              {settings.connected ? tr("Reconnect Google") : tr("Connect Google Drive")}
             </button>
             {settings.connected && (
               <>
@@ -1352,8 +1295,7 @@ export function LetterSettingsPanel() {
                     })
                   }
                 >
-                  Test folder access
-                </button>
+                  {tr("Test folder access")}</button>
                 <button
                   className={secondary}
                   disabled={busy}
@@ -1362,13 +1304,12 @@ export function LetterSettingsPanel() {
                       await letters.disconnect()
                       await load()
                       setMessage(
-                        'Drive disconnected. Existing documents are preserved.'
+                        tr("Drive disconnected. Existing documents are preserved.")
                       )
                     })
                   }
                 >
-                  Disconnect
-                </button>
+                  {tr("Disconnect")}</button>
               </>
             )}
           </div>

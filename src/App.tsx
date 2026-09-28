@@ -10,6 +10,7 @@ import SetupPrompt from './components/SetupPrompt'
 import InsurancePolicyCompletionPrompt from './components/InsurancePolicyCompletionPrompt'
 import { authApi, noticeApi, type Notice } from './services/apiService'
 import { captureLaunchSource, type LaunchSource } from './services/launchSource'
+import { LanguageProvider } from './i18n/Language'
 
 function NoticeBanner({ loggedIn }: { loggedIn: boolean }) {
   const [notices, setNotices] = useState<Notice[]>([])
@@ -243,7 +244,7 @@ export default function App() {
   if (user.actorType === 'director') {
     const requiresInsurancePolicyCompletion = user.features?.includes('insurance_management') === true && !user.impersonation
     return (
-      <>
+      <LanguageProvider language={user.preferredLanguage === 'si' ? 'si' : 'en'}>
         {requiresInsurancePolicyCompletion && <InsurancePolicyCompletionPrompt />}
         {showSetup && !user.impersonation && (
           <SetupPrompt actorId={user.actorId} onDone={() => setShowSetup(false)} />
@@ -267,12 +268,12 @@ export default function App() {
             launchSource={launchSource}
           />
         </div>
-      </>
+      </LanguageProvider>
     )
   }
 
   return (
-    <>
+    <LanguageProvider language={user.preferredLanguage === 'si' ? 'si' : 'en'}>
       {showSetup && !user.impersonation && (
         <SetupPrompt actorId={user.actorId} onDone={() => setShowSetup(false)} />
       )}
@@ -295,6 +296,6 @@ export default function App() {
         />
       </div>
       <VersionBanner />
-    </>
+    </LanguageProvider>
   )
 }

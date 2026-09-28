@@ -268,7 +268,7 @@ export async function authenticationVerify(req: Request, res: Response): Promise
 
     // Issue a full session token — same shape as password login
     if (actorType === 'director') {
-      const dir = actor as { id: string; workspaceId?: string; name: string; phone: string; email?: string | null; avatarUrl?: string | null; loginId?: string | null; companyId?: string | null; isChairman: boolean; isSyswiseAdmin: boolean; isCompanyAdmin: boolean }
+      const dir = actor as { id: string; workspaceId?: string; name: string; phone: string; email?: string | null; avatarUrl?: string | null; preferredLanguage: string; loginId?: string | null; companyId?: string | null; isChairman: boolean; isSyswiseAdmin: boolean; isCompanyAdmin: boolean }
       const workspace = dir.workspaceId
         ? await prisma.workspace.findUnique({ where: { id: dir.workspaceId }, select: { companyName: true, companyLogo: true } })
         : null
@@ -278,7 +278,7 @@ export async function authenticationVerify(req: Request, res: Response): Promise
         token,
         user: {
           actorId: dir.id, actorType: 'director', workspaceId: dir.workspaceId,
-          name: dir.name, phone: dir.phone, email: dir.email, avatarUrl: dir.avatarUrl,
+          name: dir.name, phone: dir.phone, email: dir.email, avatarUrl: dir.avatarUrl, preferredLanguage: dir.preferredLanguage,
           isChairman: dir.isChairman,
           isSyswiseAdmin: dir.isSyswiseAdmin,
           isCompanyAdmin: dir.isCompanyAdmin,
@@ -289,7 +289,7 @@ export async function authenticationVerify(req: Request, res: Response): Promise
         },
       })
     } else {
-      const per = actor as { id: string; workspaceId: string; name: string; phone: string; email?: string | null; avatarUrl?: string | null; mustChangePassword: boolean; departmentId: string; department: { name: string; officeCategory: string | null; layer: { number: number } } }
+      const per = actor as { id: string; workspaceId: string; name: string; phone: string; email?: string | null; avatarUrl?: string | null; preferredLanguage: string; mustChangePassword: boolean; departmentId: string; department: { name: string; officeCategory: string | null; layer: { number: number } } }
       const layerNumber = per.department.layer.number
       const workspace = await prisma.workspace.findUnique({ where: { id: per.workspaceId }, select: { companyName: true, companyLogo: true } })
       const features = await getEnabledFeatures(per.workspaceId)
@@ -299,7 +299,7 @@ export async function authenticationVerify(req: Request, res: Response): Promise
         mustChangePassword: per.mustChangePassword,
         user: {
           actorId: per.id, actorType: 'personnel', workspaceId: per.workspaceId,
-          name: per.name, phone: per.phone, email: per.email, avatarUrl: per.avatarUrl,
+          name: per.name, phone: per.phone, email: per.email, avatarUrl: per.avatarUrl, preferredLanguage: per.preferredLanguage,
           layerNumber, departmentId: per.departmentId, ysoRole: ysoRole(per.department),
           companyName: workspace?.companyName, companyLogo: workspace?.companyLogo,
           mustChangePassword: per.mustChangePassword,

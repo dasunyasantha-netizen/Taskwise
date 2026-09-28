@@ -106,6 +106,7 @@ export async function unifiedLogin(req: Request, res: Response): Promise<void> {
           phone: director.phone,
           email: director.email,
           avatarUrl: director.avatarUrl,
+          preferredLanguage: director.preferredLanguage,
           isChairman: director.isChairman,
           isSyswiseAdmin: director.isSyswiseAdmin,
           isCompanyAdmin: director.isCompanyAdmin,
@@ -168,6 +169,7 @@ export async function unifiedLogin(req: Request, res: Response): Promise<void> {
           phone: personnel.phone,
           email: personnel.email,
           avatarUrl: personnel.avatarUrl,
+          preferredLanguage: personnel.preferredLanguage,
           loginId: personnel.loginId || personnel.phone,
           companyId: personnel.companyId,
           companyPrefix: personnel.company?.prefix,
@@ -326,7 +328,7 @@ export async function getMe(req: Request, res: Response): Promise<void> {
     if (actorType === 'director') {
       const director = await prisma.director.findUnique({
         where: { id: actorId },
-        select: { id: true, phone: true, email: true, nic: true, name: true, avatarUrl: true, workspaceId: true, isChairman: true, isSyswiseAdmin: true, isCompanyAdmin: true, loginId: true, companyId: true, company: { select: { prefix: true } } }
+        select: { id: true, phone: true, email: true, nic: true, name: true, avatarUrl: true, preferredLanguage: true, workspaceId: true, isChairman: true, isSyswiseAdmin: true, isCompanyAdmin: true, loginId: true, companyId: true, company: { select: { prefix: true } } }
       })
       const workspace = workspaceId
         ? await prisma.workspace.findUnique({
@@ -338,7 +340,7 @@ export async function getMe(req: Request, res: Response): Promise<void> {
     } else {
       const personnel = await prisma.personnel.findUnique({
         where: { id: actorId },
-        select: { id: true, phone: true, email: true, nic: true, name: true, avatarUrl: true, departmentId: true, department: { include: { layer: true } }, workspaceId: true, loginId: true, companyId: true, company: { select: { prefix: true } } }
+        select: { id: true, phone: true, email: true, nic: true, name: true, avatarUrl: true, preferredLanguage: true, departmentId: true, department: { include: { layer: true } }, workspaceId: true, loginId: true, companyId: true, company: { select: { prefix: true } } }
       })
       const workspace = workspaceId
         ? await prisma.workspace.findUnique({
@@ -559,7 +561,8 @@ export async function startImpersonation(req: Request, res: Response): Promise<v
         name: target.name,
         phone: target.phone,
         email: target.email,
-        avatarUrl: target.avatarUrl,
+          avatarUrl: target.avatarUrl,
+          preferredLanguage: target.preferredLanguage,
         loginId: target.loginId || target.phone,
         ...(isPersonnel
           ? { layerNumber, departmentId: personnelTarget!.departmentId, mustChangePassword: false, ysoRole: ysoRole(personnelTarget!.department) }

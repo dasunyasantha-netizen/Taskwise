@@ -6,6 +6,7 @@ import DatePicker from './DatePicker'
 import Select from './Select'
 import NotificationsMenu from './NotificationsMenu'
 import { usePWA } from '../hooks/usePWA'
+import { useLanguage } from '../i18n/Language'
 import HierarchyPanel from './HierarchyPanel'
 import ProjectManager from './ProjectManager'
 import TasksPage, { DEFAULT_TASK_SORT } from './TasksPage'
@@ -794,6 +795,7 @@ function MobileUserMenu({ user, onProfile, onSettings, onLogout }: { user: AuthU
 
 // ─── Director Dashboard ───────────────────────────────────────────────────────
 export default function DirectorDashboard({ user, currentView, setView, onLogout, onUserUpdate, onImpersonationStart, launchSource }: Props) {
+  const { t } = useLanguage()
   const insuranceEnabled = user.features?.includes('insurance_management') === true
   const ysoEnabled = user.features?.includes('four_level_hierarchy') === true
   // ── Navigation history (view + scroll position) ───────────────────────────
@@ -1010,7 +1012,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
               className={`w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2.5
                 ${activeView === item.view ? 'bg-tw-primary text-white shadow-sm' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}>
               <span className="text-base flex-shrink-0">{item.icon}</span>
-              <span className="flex-1">{item.label}</span>
+              <span className="flex-1">{t(item.label)}</span>
               {item.badge ? <span className="bg-tw-danger text-white text-xs rounded-full px-1.5 py-0.5 font-bold leading-none">{item.badge}</span> : null}
             </button>
           ))}
@@ -1029,7 +1031,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
               <div className="text-xs text-white/50">Director</div>
             </div>
           </button>
-          <button onClick={onLogout} className="w-full text-left px-2 py-1 text-xs text-white/40 hover:text-tw-danger transition-colors rounded">Sign out</button>
+          <button onClick={onLogout} className="w-full text-left px-2 py-1 text-xs text-white/40 hover:text-tw-danger transition-colors rounded">{t('Sign out')}</button>
           <p className="text-center text-xs text-white/25 mt-2">Created by SysWise</p>
         </div>
       </aside>
@@ -1085,8 +1087,8 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
                   : currentView === 'user_management' ? 'User Management'
                   : currentView === 'leaderboard' ? 'Leaderboard'
                   : currentView === 'insurance_management' ? 'Insurance Management'
-                  : currentView === 'letters' ? 'Letters'
-                  : currentView === 'yso_performance' ? 'YSO Performance'
+                  : currentView === 'letters' ? t('Letters')
+                  : currentView === 'yso_performance' ? t('YSO Performance')
                   : currentView === 'company_requests' ? 'Company Requests'
                   : currentView === 'company_features' ? 'Company Features'
                   : 'My Profile'}
@@ -1154,8 +1156,8 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
             )}
             <a
               href={launcherHomeUrl(launchSource)}
-              title={`Back to ${launcherName(launchSource)}`}
-              aria-label={`Back to ${launcherName(launchSource)}`}
+              title={t(`Back to ${launcherName(launchSource)}`)}
+              aria-label={t(`Back to ${launcherName(launchSource)}`)}
               className="flex items-center justify-center text-white/70 md:text-tw-text-secondary hover:text-white md:hover:text-tw-primary transition-colors p-1.5 rounded-lg"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -1253,8 +1255,8 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
           {currentView === 'insurance_management' && insuranceEnabled && (
             <InsuranceManagementPage />
           )}
-          {currentView === 'letters' && <LetterManagement />}
-          {currentView === 'yso_performance' && ysoEnabled && <YsoPerformancePage user={user} />}
+          {currentView === 'letters' && <LetterManagement user={user} onUserUpdate={onUserUpdate} />}
+          {currentView === 'yso_performance' && ysoEnabled && <YsoPerformancePage user={user} onUserUpdate={onUserUpdate} />}
 
           {/* PROJECTS */}
           {currentView === 'project_board' && !selectedProject && (
@@ -1452,7 +1454,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
                     ${activeView === item.view ? 'bg-blue-50 text-tw-primary' : 'text-gray-500 hover:bg-gray-50'}`}
                 >
                   <span className="text-2xl leading-none">{item.icon}</span>
-                  <span className="text-[10px] font-semibold leading-none text-center">{item.label}</span>
+                  <span className="text-[10px] font-semibold leading-none text-center">{t(item.label)}</span>
                   {item.badge ? (
                     <span className="absolute top-1 right-1 bg-red-500 text-white text-[9px] rounded-full w-4 h-4 flex items-center justify-center font-bold">
                       {item.badge}
@@ -1481,7 +1483,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
                 <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-tw-primary rounded-full" />
               )}
               <span className="text-lg leading-none">{item.icon}</span>
-              <span className="text-[10px] font-semibold leading-none">{item.label}</span>
+              <span className="text-[10px] font-semibold leading-none">{t(item.label)}</span>
               {item.badge ? (
                 <span className="absolute top-1.5 right-[20%] bg-red-500 text-white text-[9px] rounded-full w-4 h-4 flex items-center justify-center font-bold">
                   {item.badge}

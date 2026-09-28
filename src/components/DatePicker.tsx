@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
+import { useLanguage } from '../i18n/Language'
 
 interface Props {
   value: string        // "YYYY-MM-DD", or "YYYY-MM" in month mode
@@ -18,6 +19,7 @@ const MONTHS = ['January','February','March','April','May','June','July','August
 const DAYS   = ['Su','Mo','Tu','We','Th','Fr','Sa']
 
 export default function DatePicker({ value, onChange, placeholder = 'Select date', minDate, maxDate, className = '', triggerClassName, compact = false, mode = 'date', ariaLabel }: Props) {
+  const { t, locale, language } = useLanguage()
   const today = new Date()
   const parsed = value ? new Date(value + (mode === 'month' ? '-01' : '') + 'T00:00:00') : null
 
@@ -109,7 +111,7 @@ export default function DatePicker({ value, onChange, placeholder = 'Select date
   }
 
   const displayValue = parsed
-    ? parsed.toLocaleDateString('en-US', { month: 'short', ...(mode === 'date' ? { day: 'numeric' as const } : {}), year: 'numeric' })
+    ? language === 'si' ? `${parsed.getFullYear()} ${t(MONTHS[parsed.getMonth()])}${mode === 'date' ? ` ${parsed.getDate()}` : ''}` : parsed.toLocaleDateString(locale, { month: 'short', ...(mode === 'date' ? { day: 'numeric' as const } : {}), year: 'numeric' })
     : ''
 
   const yearRange = Array.from({ length: 12 }, (_, i) => viewYear - 5 + i)
@@ -131,7 +133,7 @@ export default function DatePicker({ value, onChange, placeholder = 'Select date
     >
       {/* Month / Year nav */}
       <div className={`flex items-center justify-between border-b border-tw-border ${compact ? 'px-3 py-2' : 'px-4 py-3'}`}>
-        <button type="button" aria-label={mode === 'month' ? 'Previous year' : 'Previous month'} onClick={e => { e.preventDefault(); mode === 'month' ? setViewYear(y => y - 1) : prevMonth() }} className="p-1.5 rounded-lg hover:bg-tw-hover transition-colors text-tw-text-secondary hover:text-tw-text">
+        <button type="button" aria-label={t(mode === 'month' ? 'Previous year' : 'Previous month')} onClick={e => { e.preventDefault(); mode === 'month' ? setViewYear(y => y - 1) : prevMonth() }} className="p-1.5 rounded-lg hover:bg-tw-hover transition-colors text-tw-text-secondary hover:text-tw-text">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/></svg>
         </button>
         <button
@@ -139,10 +141,10 @@ export default function DatePicker({ value, onChange, placeholder = 'Select date
           onClick={e => { e.preventDefault(); setShowYearPicker(y => !y) }}
           className="flex items-center gap-1 font-semibold text-sm text-tw-text hover:text-tw-primary transition-colors px-2 py-1 rounded-lg hover:bg-tw-hover"
         >
-          {mode === 'date' ? MONTHS[viewMonth] + ' ' : ''}{viewYear}
+          {mode === 'date' ? t(MONTHS[viewMonth]) + ' ' : ''}{viewYear}
           <svg className={`w-3.5 h-3.5 transition-transform ${showYearPicker ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/></svg>
         </button>
-        <button type="button" aria-label={mode === 'month' ? 'Next year' : 'Next month'} onClick={e => { e.preventDefault(); mode === 'month' ? setViewYear(y => y + 1) : nextMonth() }} disabled={!!maxD && (viewYear > maxD.getFullYear() || (viewYear === maxD.getFullYear() && (mode === 'month' || viewMonth >= maxD.getMonth())))} className="p-1.5 rounded-lg hover:bg-tw-hover transition-colors text-tw-text-secondary hover:text-tw-text disabled:opacity-30 disabled:cursor-not-allowed">
+        <button type="button" aria-label={t(mode === 'month' ? 'Next year' : 'Next month')} onClick={e => { e.preventDefault(); mode === 'month' ? setViewYear(y => y + 1) : nextMonth() }} disabled={!!maxD && (viewYear > maxD.getFullYear() || (viewYear === maxD.getFullYear() && (mode === 'month' || viewMonth >= maxD.getMonth())))} className="p-1.5 rounded-lg hover:bg-tw-hover transition-colors text-tw-text-secondary hover:text-tw-text disabled:opacity-30 disabled:cursor-not-allowed">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/></svg>
         </button>
       </div>
@@ -163,7 +165,7 @@ export default function DatePicker({ value, onChange, placeholder = 'Select date
           {MONTHS.map((month, index) => (
             <button type="button" key={month} disabled={monthDisabled(index)} onClick={() => selectMonth(index)}
               className={`min-h-11 rounded-lg text-sm font-medium transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${parsed?.getFullYear() === viewYear && parsed?.getMonth() === index ? 'bg-tw-primary text-white' : 'text-tw-text hover:bg-tw-hover'}`}>
-              {month.slice(0, 3)}
+              {language === 'si' ? t(month) : month.slice(0, 3)}
             </button>
           ))}
         </div>
@@ -171,7 +173,7 @@ export default function DatePicker({ value, onChange, placeholder = 'Select date
       {!showYearPicker && mode === 'date' && (
         <>
           <div className={`grid grid-cols-7 ${compact ? 'px-2 pt-2 pb-0.5' : 'px-3 pt-3 pb-1'}`}>
-            {DAYS.map(d => (
+            {(language === 'si' ? ['ඉ', 'ස', 'අ', 'බ', 'බ්‍ර', 'සි', 'සෙ'] : DAYS).map(d => (
               <div key={d} className="text-center text-xs font-semibold text-tw-text-secondary py-1">{d}</div>
             ))}
           </div>
@@ -201,9 +203,9 @@ export default function DatePicker({ value, onChange, placeholder = 'Select date
             })}
           </div>
           <div className={`flex items-center justify-between border-t border-tw-border bg-tw-hover ${compact ? 'px-3 py-2' : 'px-4 py-2.5'}`}>
-            <button type="button" onClick={e => { e.preventDefault(); onChange(''); close() }} className="text-xs text-tw-text-secondary hover:text-tw-danger transition-colors font-medium">Clear</button>
+            <button type="button" onClick={e => { e.preventDefault(); onChange(''); close() }} className="text-xs text-tw-text-secondary hover:text-tw-danger transition-colors font-medium">{t('Clear')}</button>
             <button type="button" onClick={e => { e.preventDefault(); onChange(`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`); close() }}
-              disabled={!!((minD && today < minD) || (maxD && new Date(today.getFullYear(), today.getMonth(), today.getDate()) > maxD))} className="text-xs text-tw-primary hover:underline font-medium disabled:opacity-30">Today</button>
+              disabled={!!((minD && today < minD) || (maxD && new Date(today.getFullYear(), today.getMonth(), today.getDate()) > maxD))} className="text-xs text-tw-primary hover:underline font-medium disabled:opacity-30">{t('Today')}</button>
           </div>
         </>
       )}
@@ -225,11 +227,11 @@ export default function DatePicker({ value, onChange, placeholder = 'Select date
           <svg className="w-4 h-4 text-tw-text-secondary flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
           </svg>
-          <span className={displayValue ? 'text-tw-text' : 'text-tw-text-secondary'}>{displayValue || placeholder}</span>
+          <span className={displayValue ? 'text-tw-text' : 'text-tw-text-secondary'}>{displayValue || t(placeholder)}</span>
         </div>
         <div className="flex items-center gap-1">
           {value && (
-            <span onClick={clear} className="text-tw-text-secondary hover:text-tw-danger transition-colors p-0.5 rounded" title="Clear">
+            <span onClick={clear} className="text-tw-text-secondary hover:text-tw-danger transition-colors p-0.5 rounded" title={t('Clear')}>
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
               </svg>

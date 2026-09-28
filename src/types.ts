@@ -20,6 +20,7 @@ export interface AuthUser {
   email?: string
   nic?: string
   avatarUrl?: string
+  preferredLanguage?: 'en' | 'si'
   layerNumber?: number
   departmentId?: string
   companyName?: string

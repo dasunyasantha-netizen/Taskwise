@@ -11,6 +11,7 @@ import {
 import type { AuthUser } from '../types'
 import DatePicker from './DatePicker'
 import Select from './Select'
+import { LanguageToggle, useLanguage, displayDate } from '../i18n/Language'
 
 const panel = 'bg-white rounded-2xl border border-slate-200 p-5 shadow-sm'
 const input =
@@ -21,12 +22,8 @@ const secondary =
   'min-h-11 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-50 disabled:opacity-50'
 const signed = (n: number) => (n > 0 ? `+${n}` : String(n))
 const pretty = (value: string) => value.replace(/_/g, ' ').toLowerCase()
-const when = (value: string) =>
-  new Date(value).toLocaleString('en-GB', {
-    timeZone: 'Asia/Colombo',
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  })
+const when = (value: string, locale = 'en-GB') =>
+  displayDate(value, locale === 'si-LK' ? 'si' : 'en', true)
 const pending = (entry: YsoEntry) =>
   !entry.supersededAt && ['SUBMITTED', 'PENDING'].includes(entry.status)
 const addDays = (date: string, days: number) =>
@@ -61,11 +58,12 @@ function weeklyProgress(dashboard: YsoDashboard, period: string) {
   }
 }
 function Status({ value }: { value: string }) {
+  const { t: tr, locale } = useLanguage()
   return (
     <span
       className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${value === 'APPROVED' ? 'bg-emerald-50 text-emerald-800' : value === 'REJECTED' ? 'bg-rose-50 text-rose-800' : 'bg-amber-50 text-amber-900'}`}
     >
-      {pretty(value)}
+      {tr(value === 'APPROVED_LEAVE' ? 'APPROVED LEAVE' : pretty(value))}
     </span>
   )
 }
@@ -78,6 +76,7 @@ function Modal({
   children: React.ReactNode
   onClose: () => void
 }) {
+  const { t: tr, locale } = useLanguage()
   const headingId = React.useId()
   const ref = React.useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -130,12 +129,12 @@ function Modal({
       >
         <div className="flex justify-between items-start gap-3 mb-5">
           <h2 id={headingId} className="text-xl font-bold text-slate-900">
-            {title}
+            {tr(title)}
           </h2>
           <button
             onClick={onClose}
             className={secondary}
-            aria-label="Close dialog"
+            aria-label={tr("Close dialog")}
           >
             ✕
           </button>
@@ -158,6 +157,7 @@ function EntryForm({
   onClose: () => void
   onSave: () => Promise<void>
 }) {
+  const { t: tr, locale } = useLanguage()
   const [values, setValues] = useState<Record<string, any>>(() =>
     previous
       ? { ...previous.data }
@@ -232,18 +232,15 @@ function EntryForm({
   }
   return (
     <Modal
-      title={`Task ${String(task.id).padStart(2, '0')} · ${task.title}`}
+      title={`${tr('Task')} ${String(task.id).padStart(2, '0')} · ${tr(task.title)}`}
       onClose={onClose}
     >
       <p className="rounded-lg bg-teal-50 text-teal-900 p-3 text-sm mb-5">
-        {task.rule}
+        {tr(task.rule)}
       </p>
       {previous && (
         <p className="text-sm text-amber-800 mb-4">
-          This creates a new submission version and timestamp. Existing approved
-          points stay in place until the AD approves the correction. Keep the
-          activity reference unchanged.
-        </p>
+          {tr("This creates a new submission version and timestamp. Existing approved points stay in place until the AD approves the correction. Keep the activity reference unchanged.")}</p>
       )}
       <form onSubmit={save} className="space-y-4">
         {task.fields
@@ -257,7 +254,7 @@ function EntryForm({
           .map((f) => {
             let options = (f.options ?? []).map((value) => ({
               value,
-              label: pretty(value),
+              label: tr(value === 'APPROVED_LEAVE' ? 'APPROVED LEAVE' : value === 'ATTENDED' || value === 'ABSENT' || value === 'ADVANCE' || value === 'SETTLEMENT' ? value : pretty(value)),
             }))
             if (f.key === 'meetingId')
               options = dashboard.meetings
@@ -274,7 +271,7 @@ function EntryForm({
                 className="block text-sm font-medium text-slate-700"
               >
                 {f.type !== 'checkbox' && (
-                  <span className="block mb-1">{f.label}</span>
+                  <span className="block mb-1">{tr(f.label)}</span>
                 )}
                 {f.type === 'checkbox' ? (
                   <span className="flex items-center gap-2">
@@ -284,20 +281,20 @@ function EntryForm({
                       onChange={(e) => set(f.key, e.target.checked)}
                       className="h-4 w-4"
                     />
-                    {f.label}
+                    {tr(f.label)}
                   </span>
                 ) : f.type === 'select' ? (
                   <Select
-                    ariaLabel={f.label}
+                    ariaLabel={tr(f.label)}
                     className="[&>button]:min-h-11"
                     value={values[f.key] ?? ''}
                     onChange={(value) => set(f.key, value)}
                     options={options}
-                    placeholder="Choose…"
+                    placeholder={tr("Choose…")}
                   />
                 ) : f.type === 'date' || f.type === 'month' ? (
                   <DatePicker
-                    ariaLabel={f.label}
+                    ariaLabel={tr(f.label)}
                     className="[&>button]:min-h-11"
                     compact
                     mode={f.type}
@@ -348,20 +345,19 @@ function EntryForm({
           })}
         {task.id >= 12 && (
           <label className="block text-sm font-medium">
-            Certificate (PDF, PNG or JPEG; maximum 1 MB)
-            <input
-              className="block mt-2 text-sm"
+            {tr("Certificate (PDF, PNG or JPEG; maximum 1 MB)")}<input
+              className="sr-only peer"
               type="file"
               required
               accept=".pdf,.png,.jpg,.jpeg"
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
             />
+            <span className="mt-2 inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium cursor-pointer peer-focus-visible:ring-2 peer-focus-visible:ring-teal-700">{tr('Choose file')}</span>
+            <span className="block text-xs text-slate-500" aria-live="polite">{file?.name ?? tr('No file selected')}</span>
           </label>
         )}
         <p className="text-xs text-slate-500">
-          Submission time is recorded by the server. Points remain zero until AD
-          approval. Dates use Sri Lanka time.
-        </p>
+          {tr("Submission time is recorded by the server. Points remain zero until AD approval. Dates use Sri Lanka time.")}</p>
         {error && (
           <p role="alert" className="text-rose-700 text-sm">
             {error}
@@ -369,10 +365,10 @@ function EntryForm({
         )}
         <button className={primary} disabled={busy}>
           {busy
-            ? 'Submitting…'
+            ? tr("Submitting…")
             : previous
-              ? 'Submit revised entry'
-              : 'Submit for AD approval'}
+              ? tr("Submit revised entry")
+              : tr("Submit for AD approval")}
         </button>
       </form>
     </Modal>
@@ -393,6 +389,7 @@ function DecisionDialog({
   onSave: (reason: string) => Promise<void>
   onClose: () => void
 }) {
+  const { t: tr, locale } = useLanguage()
   const [reason, setReason] = useState(''),
     [busy, setBusy] = useState(false),
     [error, setError] = useState('')
@@ -415,7 +412,7 @@ function DecisionDialog({
         }}
       >
         <label className="block text-sm">
-          Reason / feedback {required ? '(required)' : '(optional)'}
+          {tr("Reason / feedback")}{required ? tr("(required)") : tr("(optional)")}
           <textarea
             className={input + ' mt-1'}
             value={reason}
@@ -431,7 +428,7 @@ function DecisionDialog({
           </p>
         )}
         <button className={primary} disabled={busy}>
-          {busy ? 'Saving…' : actionLabel}
+          {busy ? tr("Saving…") : actionLabel}
         </button>
       </form>
     </Modal>
@@ -450,6 +447,7 @@ function AssessmentForm({
   onClose: () => void
   onSave: () => Promise<void>
 }) {
+  const { t: tr, locale } = useLanguage()
   const existing = dashboard.assessments.find(
     (a) => a.personnelId === person.id && a.period === period
   )
@@ -464,7 +462,7 @@ function AssessmentForm({
     <Modal title={`Monthly evaluation · ${person.name}`} onClose={onClose}>
       <p className="text-sm text-slate-500 mb-4">
         {period} ·{' '}
-        {existing ? 'Revision of existing evaluation' : 'New evaluation'}
+        {existing ? tr("Revision of existing evaluation") : tr("New evaluation")}
       </p>
       <form
         className="space-y-4"
@@ -487,7 +485,7 @@ function AssessmentForm({
             className="flex items-center justify-between gap-4 text-sm"
             key={c.key}
           >
-            {c.label} (maximum {c.max})
+            {tr(c.label)}  {tr("(maximum")} {c.max})
             <input
               className={input + ' !w-24'}
               type="number"
@@ -506,13 +504,12 @@ function AssessmentForm({
           </label>
         ))}
         <p className="font-bold">
-          Total:{' '}
+          {tr("Total:")}{' '}
           {Object.values(scores).reduce<number>((a, b) => a + Number(b), 0)} /
           25
         </p>
         <label className="block text-sm">
-          Assessment rationale
-          <textarea
+          {tr("Assessment rationale")}<textarea
             className={input + ' mt-1'}
             required
             maxLength={2000}
@@ -527,8 +524,7 @@ function AssessmentForm({
           </p>
         )}
         <button disabled={busy} className={primary}>
-          Save monthly evaluation
-        </button>
+          {tr("Save monthly evaluation")}</button>
       </form>
     </Modal>
   )
@@ -542,6 +538,7 @@ function MeetingForm({
   onClose: () => void
   onSave: () => Promise<void>
 }) {
+  const { t: tr, locale } = useLanguage()
   const people = dashboard.people.filter(
     (p) => p.active && p.startDate && p.managerValid
   )
@@ -554,14 +551,14 @@ function MeetingForm({
   const [busy, setBusy] = useState(false),
     [error, setError] = useState('')
   return (
-    <Modal title="Schedule district officer meeting" onClose={onClose}>
+    <Modal title={tr("Schedule district officer meeting")} onClose={onClose}>
       <form
         className="space-y-4"
         onSubmit={async (e) => {
           e.preventDefault()
           setBusy(true)
           try {
-            if (!values.date) throw new Error('Choose a meeting date.')
+            if (!values.date) throw new Error(tr("Choose a meeting date."))
             await ysoApi.meeting(values)
             await onSave()
             onClose()
@@ -578,7 +575,7 @@ function MeetingForm({
             {key === 'date' ? (
               <DatePicker
                 compact
-                ariaLabel="Meeting date"
+                ariaLabel={tr("Meeting date")}
                 className="mt-1 [&>button]:min-h-11"
                 value={values.date}
                 minDate={dashboard.today}
@@ -599,7 +596,7 @@ function MeetingForm({
           </label>
         ))}
         <fieldset className="space-y-2">
-          <legend className="text-sm font-semibold mb-2">Invite YSOs</legend>
+          <legend className="text-sm font-semibold mb-2">{tr("Invite YSOs")}</legend>
           {people.map((p) => (
             <label className="flex gap-2 items-center text-sm" key={p.id}>
               <input
@@ -618,7 +615,7 @@ function MeetingForm({
             </label>
           ))}
           {!people.length && (
-            <p className="text-sm">Activate reporting for your YSOs first.</p>
+            <p className="text-sm">{tr("Activate reporting for your YSOs first.")}</p>
           )}
         </fieldset>
         {error && (
@@ -627,8 +624,7 @@ function MeetingForm({
           </p>
         )}
         <button className={primary} disabled={busy || !values.invitees.length}>
-          Schedule meeting
-        </button>
+          {tr("Schedule meeting")}</button>
       </form>
     </Modal>
   )
@@ -644,6 +640,7 @@ function Analytics({
   period: string
   adId?: string
 }) {
+  const { t: tr, locale } = useLanguage()
   const ids = people.map((p) => p.id),
     ledger = dashboard.ledger.filter(
       (l) => ids.includes(l.personnelId) && (!adId || l.adId === adId)
@@ -696,7 +693,7 @@ function Analytics({
     <div className="space-y-5">
       <div className="grid lg:grid-cols-2 gap-5">
         <section className={panel}>
-          <h3 className="font-bold mb-5">Monthly score trend</h3>
+          <h3 className="font-bold mb-5">{tr("Monthly score trend")}</h3>
           <svg
             viewBox="0 0 520 180"
             role="img"
@@ -729,7 +726,7 @@ function Analytics({
           </svg>
         </section>
         <section className={panel}>
-          <h3 className="font-bold mb-5">Submission engagement</h3>
+          <h3 className="font-bold mb-5">{tr("Submission engagement")}</h3>
           <div className="flex items-center gap-8 flex-wrap">
             <div
               role="img"
@@ -753,19 +750,16 @@ function Analytics({
               ))}
               {!count && (
                 <p className="text-sm text-slate-500">
-                  No submissions this month
-                </p>
+                  {tr("No submissions this month")}</p>
               )}
             </div>
           </div>
         </section>
       </div>
       <section className={panel}>
-        <h3 className="font-bold mb-4">Comparative YSO leaderboard</h3>
+        <h3 className="font-bold mb-4">{tr("Comparative YSO leaderboard")}</h3>
         <p className="text-xs text-slate-500 mb-4">
-          {period} · Approved awards and confirmed deductions. Qualification
-          awards appear only in their credited month.
-        </p>
+          {period} {tr("· Approved awards and confirmed deductions. Qualification awards appear only in their credited month.")}</p>
         {ranking.map((p, i) => (
           <div
             className="grid grid-cols-[1.5rem_1fr_4rem] items-center gap-3 mb-3"
@@ -787,22 +781,22 @@ function Analytics({
           </div>
         ))}
         {!ranking.length && (
-          <p className="text-sm text-slate-500">No YSOs in this scope.</p>
+          <p className="text-sm text-slate-500">{tr("No YSOs in this scope.")}</p>
         )}
       </section>
       <section className={panel}>
-        <h3 className="font-bold mb-4">Task-by-task points</h3>
+        <h3 className="font-bold mb-4">{tr("Task-by-task points")}</h3>
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-right">
             <thead>
               <tr>
-                <th className="text-left p-2">YSO</th>
+                <th className="text-left p-2">{tr("YSO")}</th>
                 {dashboard.tasks.map((t) => (
                   <th className="p-2" title={t.title} key={t.id}>
                     T{t.id}
                   </th>
                 ))}
-                <th className="p-2">Total</th>
+                <th className="p-2">{tr("Total")}</th>
               </tr>
             </thead>
             <tbody>
@@ -826,20 +820,18 @@ function Analytics({
         </div>
       </section>
       <section className={panel}>
-        <h3 className="font-bold mb-1">AD evaluation distribution</h3>
+        <h3 className="font-bold mb-1">{tr("AD evaluation distribution")}</h3>
         <p className="text-xs text-slate-500 mb-4">
-          Compare criterion averages and the number evaluated. A missing
-          evaluation is not a zero score.
-        </p>
+          {tr("Compare criterion averages and the number evaluated. A missing evaluation is not a zero score.")}</p>
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
             <thead>
               <tr>
-                <th className="p-2">Grading AD</th>
-                <th className="p-2">Evaluated</th>
+                <th className="p-2">{tr("Grading AD")}</th>
+                <th className="p-2">{tr("Evaluated")}</th>
                 {dashboard.criteria.map((c) => (
                   <th className="p-2" key={c.key}>
-                    {c.label} / {c.max}
+                    {tr(c.label)} / {c.max}
                   </th>
                 ))}
               </tr>
@@ -888,7 +880,8 @@ function Analytics({
   )
 }
 
-export default function YsoPerformancePage({ user }: { user: AuthUser }) {
+export default function YsoPerformancePage({ user, onUserUpdate }: { user: AuthUser; onUserUpdate: (value: Partial<AuthUser>) => void }) {
+  const { t: tr, locale } = useLanguage()
   const [dashboard, setDashboard] = useState<YsoDashboard | null>(null),
     [error, setError] = useState(''),
     [loading, setLoading] = useState(true)
@@ -970,14 +963,13 @@ export default function YsoPerformancePage({ user }: { user: AuthUser }) {
   if (loading)
     return (
       <div className={panel} role="status">
-        Loading YSO performance…
-      </div>
+        {tr("Loading YSO performance…")}</div>
     )
   if (!dashboard)
     return (
       <div className={panel}>
         <p role="alert" className="text-rose-700">
-          {error || 'Unable to load YSO performance.'}
+          {error || tr("Unable to load YSO performance.")}
         </p>
         <button
           className={secondary + ' mt-4'}
@@ -988,8 +980,7 @@ export default function YsoPerformancePage({ user }: { user: AuthUser }) {
               .finally(() => setLoading(false))
           }}
         >
-          Retry
-        </button>
+          {tr("Retry")}</button>
       </div>
     )
   const d = dashboard,
@@ -1025,25 +1016,25 @@ export default function YsoPerformancePage({ user }: { user: AuthUser }) {
   )
   const weekly = weeklyProgress(d, period)
   const meetingState = (m: YsoMeeting) => {
-    if (m.cancelled) return 'Cancelled — exempt'
-    if (!isYso) return `${m.invitees.length} invited`
+    if (m.cancelled) return tr('Cancelled — exempt')
+    if (!isYso) return `${m.invitees.length} ${tr('invited')}`
     const entries = d.entries.filter(
       (e) => e.task === 2 && e.data.meetingId === m.id && !e.supersededAt
     )
-    if (entries.some(pending)) return 'Attendance awaiting AD approval'
+    if (entries.some(pending)) return tr('Attendance awaiting AD approval')
     const approved = entries.find((e) => e.status === 'APPROVED')
     return approved
-      ? pretty(approved.data.attendance)
+      ? tr(pretty(approved.data.attendance).toUpperCase() === 'APPROVED LEAVE' ? 'APPROVED LEAVE' : pretty(approved.data.attendance))
       : m.date.slice(0, 7) < d.today.slice(0, 7)
-        ? 'Absent — unmarked at month-end'
-        : 'Attendance not marked yet'
+        ? tr('Absent — unmarked at month-end')
+        : tr('Attendance not marked yet')
   }
   const personName = (id: string) =>
     d.people.find((p) => p.id === id)?.name ?? 'YSO'
   const review = (entry: YsoEntry, action: 'APPROVE' | 'REJECT' | 'REVOKE') =>
     setDecision({
-      title: `${pretty(action)} Task ${entry.task}`,
-      description: `${personName(entry.personnelId)} · submitted ${when(entry.submittedAt)}. ${action === 'APPROVE' ? 'The original submission time determines deadline points.' : action === 'REVOKE' ? 'This reverses the approved award and keeps the audit history.' : 'The YSO can correct and resubmit.'}`,
+      title: `${tr(pretty(action))} ${tr('Task')} ${entry.task}`,
+      description: `${personName(entry.personnelId)} · ${tr('submitted')} ${when(entry.submittedAt, locale)}. ${tr(action === 'APPROVE' ? 'The original submission time determines deadline points.' : action === 'REVOKE' ? 'This reverses the approved award and keeps the audit history.' : 'The YSO can correct and resubmit.')}`,
       label:
         action === 'APPROVE'
           ? 'Approve entry'
@@ -1063,7 +1054,7 @@ export default function YsoPerformancePage({ user }: { user: AuthUser }) {
         outcome === 'DEDUCT'
           ? `Confirm ${o.points} point deduction`
           : 'Record exemption',
-      description: `${personName(o.personnelId)} · ${o.reason}`,
+      description: `${personName(o.personnelId)} · ${tr(o.reason)}`,
       label: outcome === 'DEDUCT' ? 'Confirm deduction' : 'Save exemption',
       save: (reason) =>
         mutate(() =>
@@ -1073,19 +1064,19 @@ export default function YsoPerformancePage({ user }: { user: AuthUser }) {
   const entryList = (entries: YsoEntry[], canReview: boolean) => (
     <div className="space-y-3">
       {entries.length === 0 && (
-        <p className="text-sm text-slate-500 py-5">No entries to show.</p>
+        <p className="text-sm text-slate-500 py-5">{tr("No entries to show.")}</p>
       )}
       {entries.map((e) => (
         <article className="rounded-xl border border-slate-200 p-4" key={e.id}>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h4 className="font-semibold text-sm">
-                {!isYso && `${personName(e.personnelId)} · `}Task {e.task}:{' '}
-                {d.tasks.find((t) => t.id === e.task)?.title}
+                {!isYso && `${personName(e.personnelId)} · `}{tr("Task")} {e.task}:{' '}
+                {tr(d.tasks.find((t) => t.id === e.task)?.title ?? '')}
               </h4>
               <p className="text-xs text-slate-500 mt-1">
-                {e.period} · Submitted {when(e.submittedAt)}
-                {e.supersededAt ? ' · Superseded version' : ''}
+                {e.period}  {tr("· Submitted")} {when(e.submittedAt, locale)}
+                {e.supersededAt ? tr(' · Superseded version') : ''}
               </p>
             </div>
             <Status value={e.status} />
@@ -1094,28 +1085,30 @@ export default function YsoPerformancePage({ user }: { user: AuthUser }) {
             {Object.entries(e.data).map(([key, value]) => (
               <div key={key}>
                 <dt className="text-xs text-slate-500">
-                  {d.tasks
+                  {tr(d.tasks
                     .find((t) => t.id === e.task)
-                    ?.fields.find((f) => f.key === key)?.label ?? key}
+                    ?.fields.find((f) => f.key === key)?.label ?? key)}
                 </dt>
                 <dd className="whitespace-pre-wrap break-words">
                   {typeof value === 'boolean'
                     ? value
-                      ? 'Yes'
-                      : 'No'
+                      ? tr('Yes')
+                      : tr('No')
                     : key === 'meetingId'
                       ? (d.meetings.find((m) => m.id === value)?.title ?? value)
                       : key === 'advanceId'
                         ? (d.entries.find((a) => a.id === value)?.data
                             .reference ?? value)
-                        : String(value)}
+                        : ['ATTENDED', 'ABSENT', 'APPROVED_LEAVE', 'ADVANCE', 'SETTLEMENT'].includes(String(value))
+                          ? tr(String(value).replace('_', ' '))
+                          : String(value)}
                 </dd>
               </div>
             ))}
           </dl>
           {e.feedback && (
             <p className="mt-3 bg-amber-50 p-2 rounded text-sm">
-              AD feedback: {e.feedback}
+              {tr("AD feedback:")}{e.feedback}
             </p>
           )}
           <div className="flex flex-wrap gap-2 mt-3">
@@ -1128,8 +1121,7 @@ export default function YsoPerformancePage({ user }: { user: AuthUser }) {
                     .catch((error) => setError(error.message))
                 }
               >
-                Download certificate
-              </button>
+                {tr("Download certificate")}</button>
             )}
             {canReview && pending(e) && (
               <>
@@ -1137,20 +1129,17 @@ export default function YsoPerformancePage({ user }: { user: AuthUser }) {
                   className={primary}
                   onClick={() => review(e, 'APPROVE')}
                 >
-                  Approve
-                </button>
+                  {tr("Approve")}</button>
                 <button
                   className={secondary}
                   onClick={() => review(e, 'REJECT')}
                 >
-                  Reject
-                </button>
+                  {tr("Reject")}</button>
               </>
             )}
             {canReview && e.status === 'APPROVED' && !e.supersededAt && (
               <button className={secondary} onClick={() => review(e, 'REVOKE')}>
-                Revoke approval
-              </button>
+                {tr("Revoke approval")}</button>
             )}
             {isYso &&
               !e.supersededAt &&
@@ -1164,7 +1153,7 @@ export default function YsoPerformancePage({ user }: { user: AuthUser }) {
                     })
                   }
                 >
-                  {e.status === 'REJECTED' ? 'Resubmit' : 'Correct entry'}
+                  {e.status === 'REJECTED' ? tr("Resubmit") : tr("Correct entry")}
                 </button>
               )}
           </div>
@@ -1175,11 +1164,10 @@ export default function YsoPerformancePage({ user }: { user: AuthUser }) {
   const calendar = (
     <section className={panel}>
       <div className="flex justify-between items-center gap-3 mb-4">
-        <h3 className="font-bold">District meeting calendar</h3>
+        <h3 className="font-bold">{tr("District meeting calendar")}</h3>
         {isAd && (
           <button className={secondary} onClick={() => setMeetingForm(true)}>
-            Schedule meeting
-          </button>
+            {tr("Schedule meeting")}</button>
         )}
       </div>
       <div className="space-y-3">
@@ -1208,24 +1196,22 @@ export default function YsoPerformancePage({ user }: { user: AuthUser }) {
                   className={secondary}
                   onClick={() =>
                     setDecision({
-                      title: 'Cancel meeting',
+                      title: tr("Cancel meeting"),
                       description:
-                        'Attendance awards and related absence deductions will be reversed.',
-                      label: 'Cancel meeting',
+                        tr("Attendance awards and related absence deductions will be reversed."),
+                      label: tr("Cancel meeting"),
                       save: (reason) =>
                         mutate(() => ysoApi.cancelMeeting(m.id, reason)),
                     })
                   }
                 >
-                  Cancel
-                </button>
+                  {tr("Cancel")}</button>
               )}
             </div>
           ))}
         {!d.meetings.some((m) => m.date.slice(0, 7) === period) && (
           <p className="text-sm text-slate-500">
-            No meetings scheduled for this month.
-          </p>
+            {tr("No meetings scheduled for this month.")}</p>
         )}
       </div>
     </section>
@@ -1235,29 +1221,29 @@ export default function YsoPerformancePage({ user }: { user: AuthUser }) {
       <header className="flex flex-wrap justify-between items-start gap-4">
         <div>
           <p className="uppercase tracking-widest text-xs font-semibold text-teal-700 mb-2">
-            Youth services ·{' '}
+            {tr("Youth services ·")}{' '}
             {isYso
-              ? 'My performance'
+              ? tr("My performance")
               : isAd
-                ? 'AD workspace'
-                : 'Director overview'}
+                ? tr("AD workspace")
+                : tr("Director overview")}
           </p>
           <h1 className="text-2xl sm:text-3xl font-bold">
-            {isYso ? 'YSO Task Hub' : 'YSO Performance'}
+            {isYso ? tr("YSO Task Hub") : tr("YSO Performance")}
           </h1>
           <p className="text-sm text-slate-500 mt-2">
             {isYso
-              ? 'Record your work, follow approvals and understand your score.'
+              ? tr("Record your work, follow approvals and understand your score.")
               : isAd
-                ? 'Monitor your YSOs, review submissions and assess monthly performance.'
-                : 'Read-only oversight of Provincial AD teams and grading. Historical points retain their original AD attribution.'}
+                ? tr("Monitor your YSOs, review submissions and assess monthly performance.")
+                : tr("Read-only oversight of Provincial AD teams and grading. Historical points retain their original AD attribution.")}
           </p>
         </div>
-        <div className="flex gap-2 items-end">
+        <div className="flex flex-wrap gap-2 items-end">
+          <LanguageToggle user={user} onUserUpdate={onUserUpdate} />
           <label className="text-xs text-slate-500">
-            Reporting month
-            <DatePicker
-              ariaLabel="Reporting month"
+            {tr("Reporting month")}<DatePicker
+              ariaLabel={tr("Reporting month")}
               mode="month"
               compact
               minDate="2000-01-01"
@@ -1273,8 +1259,7 @@ export default function YsoPerformancePage({ user }: { user: AuthUser }) {
             className={secondary}
             onClick={() => refresh().catch((e) => setError(e.message))}
           >
-            Refresh
-          </button>
+            {tr("Refresh")}</button>
         </div>
       </header>
       {error && (
@@ -1289,7 +1274,7 @@ export default function YsoPerformancePage({ user }: { user: AuthUser }) {
         >
           {notice}
           <button
-            aria-label="Dismiss notification"
+            aria-label={tr("Dismiss notification")}
             onClick={() => setNotice('')}
           >
             ✕
@@ -1300,9 +1285,8 @@ export default function YsoPerformancePage({ user }: { user: AuthUser }) {
         <div className="flex flex-wrap gap-3">
           {d.role === 'DIRECTOR' && (
             <label className="text-xs">
-              Provincial AD
-              <Select
-                ariaLabel="Provincial AD"
+              {tr("Provincial AD")}<Select
+                ariaLabel={tr("Provincial AD")}
                 className="mt-1 min-w-44 [&>button]:min-h-11"
                 value={selectedAd}
                 onChange={(value) => {
@@ -1310,21 +1294,20 @@ export default function YsoPerformancePage({ user }: { user: AuthUser }) {
                   setSelectedPerson('')
                 }}
                 options={[
-                  { value: '', label: 'All ADs' },
+                  { value: '', label: tr("All ADs") },
                   ...d.ads.map((ad) => ({ value: ad.id, label: ad.name })),
                 ]}
               />
             </label>
           )}
           <label className="text-xs">
-            YSO
-            <Select
-              ariaLabel="YSO"
+            {tr("YSO")}<Select
+              ariaLabel={tr("YSO")}
               className="mt-1 min-w-44 [&>button]:min-h-11"
               value={selectedPerson}
               onChange={setSelectedPerson}
               options={[
-                { value: '', label: 'All YSOs' },
+                { value: '', label: tr("All YSOs") },
                 ...d.people
                   .filter((p) => !selectedAd || p.adId === selectedAd)
                   .map((p) => ({ value: p.id, label: p.name })),
@@ -1335,14 +1318,14 @@ export default function YsoPerformancePage({ user }: { user: AuthUser }) {
       )}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { label: 'Official monthly score', value: signed(total) },
+          { label: tr("Official monthly score"), value: signed(total) },
           {
-            label: 'Operational points',
+            label: tr("Operational points"),
             value: signed(total - qualifications - evaluation),
           },
-          { label: 'Qualification awards', value: signed(qualifications) },
+          { label: tr("Qualification awards"), value: signed(qualifications) },
           {
-            label: 'AD evaluation',
+            label: tr("AD evaluation"),
             value: `${evaluation}${people.length === 1 ? ' / 25' : ''}`,
           },
         ].map((s) => (
@@ -1353,24 +1336,21 @@ export default function YsoPerformancePage({ user }: { user: AuthUser }) {
         ))}
       </div>
       <p className="text-xs text-slate-500">
-        Official scores include approved submissions and confirmed penalties
-        only. Negative task balances:{' '}
+        {tr("Official scores include approved submissions and confirmed penalties only. Negative task balances:")}{' '}
         {signed(
           Object.values(deductions)
             .filter((v) => v < 0)
             .reduce((a, b) => a + b, 0)
         )}
-        . {queue.length} submission{queue.length === 1 ? '' : 's'} awaiting AD
-        review across all months.
-      </p>
+        . {queue.length} {tr(queue.length === 1 ? 'submission' : 'submissions')} {tr("awaiting AD review across all months.")}</p>
       {isYso ? (
         <>
           {!d.people[0]?.startDate && (
             <div className="bg-amber-50 rounded-xl p-4 text-amber-900 text-sm">
-              Your AD needs to activate reporting before you can submit.{' '}
+              {tr("Your AD needs to activate reporting before you can submit.")}{' '}
               {d.people[0]?.managerValid
-                ? `Assigned AD: ${d.people[0].adName}.`
-                : 'An active Level 3 Provincial AD must be assigned.'}
+                ? `${tr('Assigned AD:')} ${d.people[0].adName}.`
+                : tr("An active Level 3 Provincial AD must be assigned.")}
             </div>
           )}
           <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -1401,36 +1381,32 @@ export default function YsoPerformancePage({ user }: { user: AuthUser }) {
                 >
                   <div className="flex justify-between items-center">
                     <span className="text-xs font-bold text-teal-700">
-                      TASK {String(task.id).padStart(2, '0')}
+                      {tr("TASK")}{String(task.id).padStart(2, '0')}
                     </span>
                     <span className="font-bold">{signed(points)}</span>
                   </div>
-                  <h3 className="font-semibold mt-3 mb-4">{task.title}</h3>
+                  <h3 className="font-semibold mt-3 mb-4">{tr(task.title)}</h3>
                   {task.id === 9 && (
                     <p
                       className={`text-xs mb-3 ${weekly.covered === weekly.expected ? 'text-emerald-700' : 'text-amber-800'}`}
                     >
-                      {weekly.covered} / {weekly.expected} required weeks
-                      covered
-                    </p>
+                      {weekly.covered} / {weekly.expected} {tr("required weeks covered")}</p>
                   )}
                   <div className="mt-auto text-xs text-slate-500 flex flex-wrap gap-2">
                     {task.id === 15 ? (
-                      <span>AD assessment · View details</span>
+                      <span>{tr("AD assessment · View details")}</span>
                     ) : (
                       <>
                         <span className={approved ? 'text-emerald-700' : ''}>
                           {approved ? '✓ ' : ''}
-                          {approved} approved
-                        </span>
-                        <span>{waiting} pending</span>
+                          {approved} {tr("approved")}</span>
+                        <span>{waiting}  {tr("pending")}</span>
                         <span>
                           {
                             taskEntries.filter((e) => e.status === 'REJECTED')
                               .length
                           }{' '}
-                          rejected
-                        </span>
+                          {tr("rejected")}</span>
                       </>
                     )}
                   </div>
@@ -1440,7 +1416,7 @@ export default function YsoPerformancePage({ user }: { user: AuthUser }) {
           </div>
           {selectedTask === 15 && (
             <section className={panel}>
-              <h3 className="font-bold mb-3">Monthly AD evaluation</h3>
+              <h3 className="font-bold mb-3">{tr("Monthly AD evaluation")}</h3>
               {d.assessments
                 .filter((a) => a.period === period)
                 .map((a) => (
@@ -1451,7 +1427,7 @@ export default function YsoPerformancePage({ user }: { user: AuthUser }) {
                           className="flex justify-between text-sm"
                           key={c.key}
                         >
-                          <dt>{c.label}</dt>
+                          <dt>{tr(c.label)}</dt>
                           <dd>
                             {a.scores[c.key]} / {c.max}
                           </dd>
@@ -1463,17 +1439,16 @@ export default function YsoPerformancePage({ user }: { user: AuthUser }) {
                 ))}
               {!d.assessments.some((a) => a.period === period) && (
                 <p className="text-sm text-slate-500">
-                  Your AD has not recorded this month’s evaluation.
-                </p>
+                  {tr("Your AD has not recorded this month’s evaluation.")}</p>
               )}
             </section>
           )}
           <section className={panel}>
             <div className="flex justify-between mb-4">
               <h3 className="font-bold">
-                Submission history{' '}
+                {tr("Submission history")}{' '}
                 {selectedTask && selectedTask < 15
-                  ? `· Task ${selectedTask}`
+                  ? `${tr('· Task')} ${selectedTask}`
                   : ''}
               </h3>
               {selectedTask && (
@@ -1481,8 +1456,7 @@ export default function YsoPerformancePage({ user }: { user: AuthUser }) {
                   className={secondary}
                   onClick={() => setSelectedTask(null)}
                 >
-                  All tasks
-                </button>
+                  {tr("All tasks")}</button>
               )}
             </div>
             {entryList(
@@ -1502,19 +1476,19 @@ export default function YsoPerformancePage({ user }: { user: AuthUser }) {
         <>
           <nav
             className={`grid ${isAd ? 'grid-cols-3' : 'grid-cols-2'} gap-1 rounded-2xl border border-slate-200 bg-slate-100 p-1`}
-            aria-label="YSO workspace tabs"
+            aria-label={tr("YSO workspace tabs")}
           >
             {[
-              { key: 'monitor', label: 'Overview' },
+              { key: 'monitor', label: tr("Overview") },
               ...(isAd
                 ? [
                     {
                       key: 'approvals',
-                      label: 'Approvals',
+                      label: tr("Approvals"),
                     },
                   ]
                 : []),
-              { key: 'analytics', label: 'Analytics' },
+              { key: 'analytics', label: tr("Analytics") },
             ].map((t) => (
               <button
                 className={`min-w-0 min-h-12 flex items-center justify-center gap-1 rounded-xl px-1 py-3 text-xs sm:text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2 ${tab === t.key ? 'bg-teal-700 text-white shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}`}
@@ -1568,13 +1542,12 @@ export default function YsoPerformancePage({ user }: { user: AuthUser }) {
                         </p>
                         <dl className="grid grid-cols-3 gap-2 mt-5 text-sm">
                           <div>
-                            <dt className="text-xs text-slate-500">YSOs</dt>
+                            <dt className="text-xs text-slate-500">{tr("YSOs")}</dt>
                             <dd className="font-bold">{team.length}</dd>
                           </div>
                           <div>
                             <dt className="text-xs text-slate-500">
-                              Avg score
-                            </dt>
+                              {tr("Avg score")}</dt>
                             <dd className="font-bold">
                               {(
                                 teamScore /
@@ -1594,23 +1567,22 @@ export default function YsoPerformancePage({ user }: { user: AuthUser }) {
                             </dd>
                           </div>
                           <div>
-                            <dt className="text-xs text-slate-500">Pending</dt>
+                            <dt className="text-xs text-slate-500">{tr("Pending")}</dt>
                             <dd className="font-bold">{waiting.length}</dd>
                           </div>
                         </dl>
                         <p className="text-xs text-slate-500 mt-3">
                           {waiting.length
-                            ? `Oldest waiting ${Math.max(0, Math.floor((Date.now() - Math.min(...waiting.map((e) => Date.parse(e.submittedAt)))) / 86400000))} days`
-                            : 'Queue clear'}{' '}
-                          · View analytics →
-                        </p>
+                            ? `${tr('Oldest waiting')} ${Math.max(0, Math.floor((Date.now() - Math.min(...waiting.map((e) => Date.parse(e.submittedAt)))) / 86400000))} ${tr('days')}`
+                            : tr("Queue clear")}{' '}
+                          {tr("· View analytics →")}</p>
                       </button>
                     )
                   })}
                 </div>
               )}
               <section className={panel}>
-                <h3 className="font-bold mb-4">YSO directory</h3>
+                <h3 className="font-bold mb-4">{tr("YSO directory")}</h3>
                 <div className="space-y-3">
                   {people.map((p) => (
                     <div
@@ -1624,14 +1596,13 @@ export default function YsoPerformancePage({ user }: { user: AuthUser }) {
                         </p>
                         <p className="text-xs text-slate-500">
                           {p.startDate
-                            ? `Reporting since ${p.startDate}`
-                            : 'Reporting not activated'}{' '}
-                          · {p.adName ?? 'AD not assigned'}
+                            ? `${tr('Reporting since')} ${p.startDate}`
+                            : tr("Reporting not activated")}{' '}
+                          · {p.adName ?? tr("AD not assigned")}
                         </p>
                         {!p.managerValid && (
                           <p className="text-xs text-rose-700">
-                            Active Provincial AD assignment required
-                          </p>
+                            {tr("Active Provincial AD assignment required")}</p>
                         )}
                       </div>
                       <div className="flex gap-2 items-center flex-wrap">
@@ -1644,16 +1615,14 @@ export default function YsoPerformancePage({ user }: { user: AuthUser }) {
                               )
                               .reduce((a, b) => a + b.points, 0)
                           )}{' '}
-                          points
-                        </span>
+                          {tr("points")}</span>
                         <span className="text-xs rounded-full bg-amber-50 px-2 py-1">
                           {
                             d.entries.filter(
                               (e) => e.personnelId === p.id && pending(e)
                             ).length
                           }{' '}
-                          pending
-                        </span>
+                          {tr("pending")}</span>
                         <button
                           className={secondary}
                           onClick={() => {
@@ -1661,8 +1630,7 @@ export default function YsoPerformancePage({ user }: { user: AuthUser }) {
                             setTab('analytics')
                           }}
                         >
-                          View performance
-                        </button>
+                          {tr("View performance")}</button>
                         {isAd && !p.startDate && p.managerValid && p.active && (
                           <button
                             className={primary}
@@ -1671,16 +1639,14 @@ export default function YsoPerformancePage({ user }: { user: AuthUser }) {
                               setActivationDate(d.today)
                             }}
                           >
-                            Activate reporting
-                          </button>
+                            {tr("Activate reporting")}</button>
                         )}
                       </div>
                     </div>
                   ))}
                   {!people.length && (
                     <p className="text-sm text-slate-500">
-                      No YSOs assigned to this team.
-                    </p>
+                      {tr("No YSOs assigned to this team.")}</p>
                   )}
                 </div>
               </section>
@@ -1690,17 +1656,14 @@ export default function YsoPerformancePage({ user }: { user: AuthUser }) {
           {tab === 'approvals' && isAd && (
             <>
               <section className={panel}>
-                <h3 className="font-bold mb-1">Pending submissions</h3>
+                <h3 className="font-bold mb-1">{tr("Pending submissions")}</h3>
                 <p className="text-xs text-slate-500 mb-4">
-                  All reporting months · Review the evidence before approving.
-                  Approval time does not change deadline points.
-                </p>
+                  {tr("All reporting months · Review the evidence before approving. Approval time does not change deadline points.")}</p>
                 {entryList(queue, true)}
               </section>
               <section className={panel}>
                 <h3 className="font-bold mb-4">
-                  Task 15 · Monthly performance evaluation
-                </h3>
+                  {tr("Task 15 · Monthly performance evaluation")}</h3>
                 <div className="flex flex-wrap gap-2">
                   {people
                     .filter((p) => p.active && p.startDate)
@@ -1714,14 +1677,14 @@ export default function YsoPerformancePage({ user }: { user: AuthUser }) {
                         {d.assessments.some(
                           (a) => a.personnelId === p.id && a.period === period
                         )
-                          ? 'Revise'
-                          : 'Evaluate'}
+                          ? tr("Revise")
+                          : tr("Evaluate")}
                       </button>
                     ))}
                 </div>
               </section>
               <section className={panel}>
-                <h3 className="font-bold mb-4">Reviewed entries · {period}</h3>
+                <h3 className="font-bold mb-4">{tr("Reviewed entries ·")} {period}</h3>
                 {entryList(
                   monthEntries.filter((e) => !pending(e)),
                   true
@@ -1741,12 +1704,9 @@ export default function YsoPerformancePage({ user }: { user: AuthUser }) {
         </>
       )}
       <section className={panel}>
-        <h3 className="font-bold mb-1">Requirements & penalty review</h3>
+        <h3 className="font-bold mb-1">{tr("Requirements & penalty review")}</h3>
         <p className="text-xs text-slate-500 mb-4">
-          Unmarked meeting invitations become absent after month-end. Missing
-          reports, weeks and unsettled advances require an AD decision. A
-          pending submission holds a new penalty for review.
-        </p>
+          {tr("Unmarked meeting invitations become absent after month-end. Missing reports, weeks and unsettled advances require an AD decision. A pending submission holds a new penalty for review.")}</p>
         {obligationQueue.length ? (
           <div className="space-y-4">
             {obligationQueue.map((o) => (
@@ -1755,17 +1715,16 @@ export default function YsoPerformancePage({ user }: { user: AuthUser }) {
                   <div>
                     <p className="text-sm font-semibold">
                       {!isYso && `${personName(o.personnelId)} · `}
-                      {o.period} · Task {o.task} · {o.points} points
-                    </p>
-                    <p className="text-sm text-slate-600 mt-1">{o.reason}</p>
+                      {o.period}  {tr("· Task")} {o.task} · {o.points} {tr("points")}</p>
+                    <p className="text-sm text-slate-600 mt-1">{tr(o.reason)}</p>
                     <p className="text-xs text-slate-500 mt-1">
                       {o.blocked
-                        ? 'Awaiting submission review'
+                        ? tr("Awaiting submission review")
                         : o.outcome === 'EXEMPT'
-                          ? 'Exempted by AD'
+                          ? tr("Exempted by AD")
                           : o.outcome === 'DEDUCT'
-                            ? 'Deduction confirmed'
-                            : 'Awaiting AD decision'}
+                            ? tr("Deduction confirmed")
+                            : tr("Awaiting AD decision")}
                       {d.decisions.find(
                         (x) =>
                           x.personnelId === o.personnelId && x.key === o.key
@@ -1779,14 +1738,12 @@ export default function YsoPerformancePage({ user }: { user: AuthUser }) {
                         className={secondary}
                         onClick={() => penalty(o, 'DEDUCT')}
                       >
-                        Confirm deduction
-                      </button>
+                        {tr("Confirm deduction")}</button>
                       <button
                         className={secondary}
                         onClick={() => penalty(o, 'EXEMPT')}
                       >
-                        Exempt
-                      </button>
+                        {tr("Exempt")}</button>
                     </div>
                   )}
                 </div>
@@ -1795,45 +1752,39 @@ export default function YsoPerformancePage({ user }: { user: AuthUser }) {
           </div>
         ) : (
           <p className="text-sm text-slate-500">
-            No overdue requirements awaiting a decision.
-          </p>
+            {tr("No overdue requirements awaiting a decision.")}</p>
         )}
       </section>
       <details className={panel}>
         <summary className="font-bold cursor-pointer">
-          Score history & audit trail
-        </summary>
+          {tr("Score history & audit trail")}</summary>
         <p className="text-xs text-slate-500 mt-3 mb-4">
-          Awards and reversals for {period}; each adjustment preserves the
-          original record.
-        </p>
+          {tr("Awards and reversals for")}{period}{tr("; each adjustment preserves the original record.")}</p>
         <div className="max-h-80 overflow-auto space-y-2">
           {ledger.map((l) => (
             <div key={l.id} className="text-sm border-t pt-2">
               <strong>
-                {signed(l.points)} · Task {l.task}
+                {signed(l.points)}  {tr("· Task")} {l.task}
               </strong>{' '}
               · {personName(l.personnelId)}
               <p className="text-xs text-slate-500">
-                {when(l.createdAt)} · {l.reason}
+                {when(l.createdAt, locale)} · {tr(l.reason)}
               </p>
             </div>
           ))}
           {!ledger.length && (
             <p className="text-sm text-slate-500">
-              No score changes for this month.
-            </p>
+              {tr("No score changes for this month.")}</p>
           )}
         </div>
         <h4 className="font-semibold text-sm mt-5 mb-2">
-          Recent review events
-        </h4>
+          {tr("Recent review events")}</h4>
         <div className="max-h-64 overflow-auto space-y-2">
           {d.events
             .filter((e) => e.personnelId && ids.includes(e.personnelId))
             .map((e) => (
               <div className="text-xs border-t pt-2" key={e.id}>
-                {when(e.createdAt)} · {pretty(e.event)} ·{' '}
+                {when(e.createdAt, locale)} · {pretty(e.event)} ·{' '}
                 {personName(e.personnelId!)}
                 <p className="text-slate-500">
                   {e.data.feedback ??
@@ -1854,7 +1805,7 @@ export default function YsoPerformancePage({ user }: { user: AuthUser }) {
           onSave={async () => {
             await refresh()
             setNotice(
-              'Submitted — pending AD approval. Official points are unchanged.'
+              tr("Submitted — pending AD approval. Official points are unchanged.")
             )
           }}
         />
@@ -1897,7 +1848,7 @@ export default function YsoPerformancePage({ user }: { user: AuthUser }) {
               setBusy(true)
               try {
                 if (!activationDate)
-                  throw new Error('Choose a reporting start date.')
+                  throw new Error(tr("Choose a reporting start date."))
                 await mutate(() =>
                   ysoApi.activate(activation.id, activationDate)
                 )
@@ -1910,14 +1861,11 @@ export default function YsoPerformancePage({ user }: { user: AuthUser }) {
             }}
           >
             <p className="text-sm text-slate-600">
-              Choose when reporting obligations begin. This date is fixed once
-              activated. Partial joining weeks are exempt.
-            </p>
+              {tr("Choose when reporting obligations begin. This date is fixed once activated. Partial joining weeks are exempt.")}</p>
             <label className="block text-sm">
-              Reporting start date
-              <DatePicker
+              {tr("Reporting start date")}<DatePicker
                 compact
-                ariaLabel="Reporting start date"
+                ariaLabel={tr("Reporting start date")}
                 className="mt-1 [&>button]:min-h-11"
                 maxDate={d.today}
                 value={activationDate}
@@ -1925,8 +1873,7 @@ export default function YsoPerformancePage({ user }: { user: AuthUser }) {
               />
             </label>
             <button className={primary} disabled={busy}>
-              Activate reporting
-            </button>
+              {tr("Activate reporting")}</button>
             {error && (
               <p role="alert" className="text-sm text-rose-700">
                 {error}

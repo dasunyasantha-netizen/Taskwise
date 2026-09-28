@@ -13,6 +13,7 @@ datasource db {
 // ─────────────────────────────────────────────────────────────────────────────
 
 model Director {
+  preferredLanguage String     @default("en") // en | si
   id                String     @id @default(uuid())
   email             String?    @unique
   phone             String
@@ -229,6 +230,7 @@ model Department {
 }
 
 model Personnel {
+  preferredLanguage String @default("en") // en | si
   isLetterLogger Boolean @default(false)
   id                 String      @id @default(uuid())
   workspaceId        String

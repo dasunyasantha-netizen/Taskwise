@@ -51,6 +51,7 @@ export const authApi = {
   directorRegister: (data: { phone: string; password: string; name: string; workspaceName?: string }) =>
     api.post<{ token: string; user: unknown }>('/auth/director/register', data),
   me: () => api.get<unknown>('/auth/me'),
+  language: (language: 'en' | 'si') => api.put<{ preferredLanguage: 'en' | 'si' }>('/auth/language', { language }),
   changePassword: (currentPassword: string, newPassword: string) =>
     api.post('/auth/change-password', { currentPassword, newPassword }),
   completeForcedPasswordChange: (newPassword: string) =>

@@ -7,6 +7,7 @@ import BoardView from './BoardView'
 import ProfilePage from './ProfilePage'
 import ElapsedDays from './ElapsedDays'
 import { usePWA } from '../hooks/usePWA'
+import { useLanguage } from '../i18n/Language'
 import ProgressUpdateSheet from './ProgressUpdateSheet'
 import InsuranceManagementPage from './InsuranceManagementPage'
 import YsoPerformancePage from './YsoPerformancePage'
@@ -790,6 +791,7 @@ function MobileUserMenu({ user, onProfile, onLogout }: { user: AuthUser; onProfi
 
 // ── Main dashboard ────────────────────────────────────────────────────────────
 export default function PersonnelDashboard({ user, currentView, setView, onLogout, onUserUpdate, launchSource }: Props) {
+  const { t } = useLanguage()
   const insuranceEnabled = user.features?.includes('insurance_management') === true
   const ysoEnabled = user.features?.includes('four_level_hierarchy') === true && !!user.ysoRole
   const { canInstall, isIOS, installApp, pushEnabled, enablePush } = usePWA()
@@ -926,7 +928,7 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
                 ${currentView === item.view
                   ? 'bg-tw-primary text-white shadow-sm'
                   : 'text-white/70 hover:bg-white/10 hover:text-white'}`}>
-              <span className="text-base">{item.icon}</span>{item.label}
+              <span className="text-base">{item.icon}</span>{t(item.label)}
               {item.view === 'personnel_queue' && queue.length > 0 && (
                 <span className="ml-auto bg-tw-warning text-white text-xs rounded-full px-1.5 py-0.5 font-bold">{queue.length}</span>
               )}
@@ -947,11 +949,11 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
             )}
             <div className="min-w-0 text-left">
               <div className="text-sm font-semibold text-white truncate">{user.name}</div>
-              <div className="text-xs text-white/50">Personnel</div>
+              <div className="text-xs text-white/50">{t('Personnel')}</div>
             </div>
           </button>
           <button onClick={onLogout} className="w-full text-left px-2 py-1 text-xs text-white/40 hover:text-tw-danger transition-colors rounded">
-            Sign out
+            {t('Sign out')}
           </button>
           <p className="text-center text-xs text-white/25 mt-2">Created by SysWise</p>
         </div>
@@ -994,15 +996,15 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
                   : currentView === 'personnel_approval_queue' ? 'Approvals'
                   : currentView === 'project_board' ? (selectedProject ? selectedProject.name : 'Projects')
                   : currentView === 'insurance_management' ? 'Insurance Management'
-                  : currentView === 'letters' ? 'Letters'
-                  : currentView === 'yso_performance' ? 'YSO Performance'
+                  : currentView === 'letters' ? t('Letters')
+                  : currentView === 'yso_performance' ? t('YSO Performance')
                   : 'My Profile'}
               </span>
               <div className="text-xs text-white/50 md:hidden">{user.name}</div>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={load} title="Refresh" className="text-white/70 md:text-tw-text-secondary hover:text-white md:hover:text-tw-primary transition-colors p-1.5 rounded-lg">
+            <button onClick={load} title={t('Refresh')} className="text-white/70 md:text-tw-text-secondary hover:text-white md:hover:text-tw-primary transition-colors p-1.5 rounded-lg">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
@@ -1055,8 +1057,8 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
             )}
             <a
               href={launcherHomeUrl(launchSource)}
-              title={`Back to ${launcherName(launchSource)}`}
-              aria-label={`Back to ${launcherName(launchSource)}`}
+              title={t(`Back to ${launcherName(launchSource)}`)}
+              aria-label={t(`Back to ${launcherName(launchSource)}`)}
               className="flex items-center justify-center text-white/70 md:text-tw-text-secondary hover:text-white md:hover:text-tw-primary transition-colors p-1.5 rounded-lg"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -1309,8 +1311,8 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
           {currentView === 'insurance_management' && insuranceEnabled && (
             <InsuranceManagementPage />
           )}
-          {currentView === 'letters' && <LetterManagement />}
-          {currentView === 'yso_performance' && ysoEnabled && <YsoPerformancePage user={user} />}
+          {currentView === 'letters' && <LetterManagement user={user} onUserUpdate={onUserUpdate} />}
+          {currentView === 'yso_performance' && ysoEnabled && <YsoPerformancePage user={user} onUserUpdate={onUserUpdate} />}
 
           {currentView === 'project_board' && !selectedProject && (
             <div className="p-4 md:p-6">
@@ -1363,7 +1365,7 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
                 <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-tw-primary rounded-full" />
               )}
               <span className="text-lg leading-none">{item.icon}</span>
-              <span className="text-[10px] font-semibold leading-none">{({ yso_performance: 'YSO Hub', personnel_queue: 'Tasks', personnel_approval_queue: 'Approvals', project_board: 'Projects', profile: 'Profile' } as Partial<Record<ViewMode, string>>)[item.view] || item.label}</span>
+              <span className="text-[10px] font-semibold leading-none">{t(({ yso_performance: 'YSO Hub', personnel_queue: 'Tasks', personnel_approval_queue: 'Approvals', project_board: 'Projects', profile: 'Profile' } as Partial<Record<ViewMode, string>>)[item.view] || item.label)}</span>
               {/* Badge */}
               {((item.view === 'personnel_queue' && queue.length > 0) ||
                 (item.badge !== undefined && item.badge > 0)) && (

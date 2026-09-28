@@ -63,8 +63,10 @@ async function main() {
     { cwd: path.resolve(__dirname, '../..'), env: process.env, stdio: 'pipe' }
   )
   const db = (await import('../prisma')).default,
-    router = (await import('../routes/letterRoutes')).default
+    router = (await import('../routes/letterRoutes')).default,
+    authRouter = (await import('../routes/authRoutes')).default
   const app = express()
+  app.use('/api/auth', express.json(), authRouter)
   app.use('/api/letters', router)
   const server = app.listen(0, '127.0.0.1')
   await new Promise<void>((r) => server.once('listening', r))
@@ -207,6 +209,25 @@ async function main() {
     )
   }
   try {
+    await check('profile language is validated, scoped, and returned in later sessions', async () => {
+      const auth = async (who: keyof typeof tokens, route: string, method = 'GET', language?: string) => {
+        const response = await fetch(base.replace('/letters', '/auth') + route, {
+          method,
+          headers: { Authorization: 'Bearer ' + tokens[who], 'Content-Type': 'application/json' },
+          body: language === undefined ? undefined : JSON.stringify({ language }),
+        })
+        return { status: response.status, body: await response.json() as any }
+      }
+      assert.equal((await auth('director', '/me')).body.preferredLanguage, 'en')
+      assert.equal((await auth('director', '/language', 'PUT', 'fr')).status, 400)
+      assert.equal((await auth('director', '/language', 'PUT', 'si')).body.preferredLanguage, 'si')
+      assert.equal((await auth('director', '/me')).body.preferredLanguage, 'si')
+      assert.equal((await auth('logger', '/me')).body.preferredLanguage, 'en')
+      assert.equal((await auth('logger', '/language', 'PUT', 'si')).status, 200)
+      assert.equal((await auth('logger', '/me')).body.preferredLanguage, 'si')
+      assert.equal((await auth('director', '/language', 'PUT', 'en')).status, 200)
+      assert.equal((await auth('director', '/me')).body.preferredLanguage, 'en')
+    })
     await check(
       'only Director can grant Logger permission; ordinary staff cannot log',
       async () => {

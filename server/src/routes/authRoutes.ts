@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import prisma from '../prisma'
 import {
   unifiedLogin, directorRegister, changePassword, completeForcedPasswordChange, getMe,
   listImpersonationTargets, startImpersonation, endImpersonation, listImpersonationSessions, revokeImpersonationSession,
@@ -15,6 +16,27 @@ const router = Router()
 router.post('/login',                   unifiedLogin)
 router.post('/director/register',       directorRegister)
 router.get('/me',                       authenticateToken, getMe)
+router.put('/language', authenticateToken, async (req, res) => {
+  const { actorId, actorType, workspaceId, impersonationSessionId } = req.user!
+  const language = req.body?.language
+  if (language !== 'en' && language !== 'si') { res.status(400).json({ error: 'Choose English or Sinhala.' }); return }
+  if (impersonationSessionId) { res.status(403).json({ error: 'Profile preferences cannot be changed during support access.' }); return }
+  try {
+    const result = actorType === 'director'
+      ? await prisma.director.updateMany({
+          where: { id: actorId, workspaceId, isActive: true },
+          data: { preferredLanguage: language },
+        })
+      : await prisma.personnel.updateMany({
+          where: { id: actorId, workspaceId, isActive: true, deletedAt: null },
+          data: { preferredLanguage: language },
+        })
+    if (!result.count) { res.status(403).json({ error: 'Active account required.' }); return }
+    res.json({ preferredLanguage: language })
+  } catch {
+    res.status(500).json({ error: 'Could not save language preference.' })
+  }
+})
 router.post('/change-password',         authenticateToken, changePassword)
 router.post('/complete-forced-password-change', authenticateToken, completeForcedPasswordChange)
 
