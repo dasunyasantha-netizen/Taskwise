@@ -51,6 +51,9 @@ export const authApi = {
   directorRegister: (data: { phone: string; password: string; name: string; workspaceName?: string }) =>
     api.post<{ token: string; user: unknown }>('/auth/director/register', data),
   me: () => api.get<unknown>('/auth/me'),
+  migrationContact: () => api.get<{ required: boolean; contact: { country: string; phone: string; email: string | null; syncStatus: string } | null }>('/auth/migration-contact'),
+  saveMigrationContact: (data: { country: string; phone: string; email?: string }) =>
+    api.post<{ saved: boolean; syncStatus: 'PENDING' | 'SYNCED' }>('/auth/migration-contact', data),
   language: (language: 'en' | 'si') => api.put<{ preferredLanguage: 'en' | 'si' }>('/auth/language', { language }),
   changePassword: (currentPassword: string, newPassword: string) =>
     api.post('/auth/change-password', { currentPassword, newPassword }),

@@ -7,6 +7,7 @@ import DirectorDashboard from './components/DirectorDashboard'
 import PersonnelDashboard from './components/PersonnelDashboard'
 import ImpersonationBanner from './components/ImpersonationBanner'
 import SetupPrompt from './components/SetupPrompt'
+import MigrationContactModal from './components/MigrationContactModal'
 import InsurancePolicyCompletionPrompt from './components/InsurancePolicyCompletionPrompt'
 import { authApi, noticeApi, type Notice } from './services/apiService'
 import { captureLaunchSource, type LaunchSource } from './services/launchSource'
@@ -65,6 +66,11 @@ export default function App() {
   const [view, setView]         = useState<ViewMode>('login')
   const [loading, setLoading]   = useState(true)
   const [showSetup, setShowSetup] = useState(false)
+  const [showMigration, setShowMigration] = useState(false)
+
+  const checkMigrationContact = () => {
+    authApi.migrationContact().then(result => setShowMigration(result.required)).catch(() => {})
+  }
 
   const persistView = (v: ViewMode) => {
     setView(v)
@@ -99,6 +105,7 @@ export default function App() {
           const updated = { ...parsed, ...(fresh as Partial<AuthUser>) }
           setUser(updated)
           localStorage.setItem(USER_KEY, JSON.stringify(updated))
+          if (!updated.mustChangePassword && !updated.impersonation) checkMigrationContact()
         }).catch(() => {
           localStorage.removeItem(TOKEN_KEY)
           localStorage.removeItem(USER_KEY)
@@ -148,6 +155,7 @@ export default function App() {
     if (!userData.mustChangePassword) {
       persistView(defaultViewFor(userData))
       maybeShowSetup(userData.actorId)
+      if (!userData.impersonation) checkMigrationContact()
     }
   }
 
@@ -159,6 +167,7 @@ export default function App() {
       return next
     })
     persistView(user ? defaultViewFor(user) : 'personnel_queue')
+    checkMigrationContact()
   }
 
   const handleLogout = async () => {
@@ -174,6 +183,7 @@ export default function App() {
     localStorage.removeItem(REAL_USER_KEY)
     setUser(null)
     setView('login')
+    setShowMigration(false)
   }
 
   const handleUserUpdate = (updated: Partial<AuthUser>) => {
@@ -245,8 +255,9 @@ export default function App() {
     const requiresInsurancePolicyCompletion = user.features?.includes('insurance_management') === true && !user.impersonation
     return (
       <LanguageProvider language={user.preferredLanguage === 'si' ? 'si' : 'en'}>
+        {showMigration && !user.impersonation && <MigrationContactModal currentPhone={user.phone} onSaved={() => setShowMigration(false)} />}
         {requiresInsurancePolicyCompletion && <InsurancePolicyCompletionPrompt />}
-        {showSetup && !user.impersonation && (
+        {showSetup && !showMigration && !user.impersonation && (
           <SetupPrompt actorId={user.actorId} onDone={() => setShowSetup(false)} />
         )}
         {isImpersonating && (
@@ -274,7 +285,8 @@ export default function App() {
 
   return (
     <LanguageProvider language={user.preferredLanguage === 'si' ? 'si' : 'en'}>
-      {showSetup && !user.impersonation && (
+      {showMigration && !user.impersonation && <MigrationContactModal currentPhone={user.phone} onSaved={() => setShowMigration(false)} />}
+      {showSetup && !showMigration && !user.impersonation && (
         <SetupPrompt actorId={user.actorId} onDone={() => setShowSetup(false)} />
       )}
       {isImpersonating && (

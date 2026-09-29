@@ -19,6 +19,7 @@ import adminRoutes            from './routes/adminRoutes'
 import letterRoutes from './routes/letterRoutes'
 import { startLetterWorker } from './helpers/letterWorker'
 import ysoRoutes              from './routes/ysoRoutes'
+import { retryPendingMigrationContacts } from './controllers/migrationContactController'
 
 const app  = express()
 const PORT = process.env.PORT || 4300
@@ -60,6 +61,10 @@ app.get('/api/health', (_req, res) => {
 app.listen(PORT, () => {
   console.log(`TaskWise backend running on port ${PORT}`)
   startLetterWorker()
+  if (process.env.SYSWISE_BASE_URL && process.env.SYSWISE_TASKWISE_SERVICE_KEY) {
+    retryPendingMigrationContacts().catch(() => {})
+    setInterval(() => retryPendingMigrationContacts().catch(() => {}), 5 * 60 * 1000).unref()
+  }
 })
 
 export default app

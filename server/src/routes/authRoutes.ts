@@ -10,12 +10,15 @@ import {
   listCredentials, deleteCredential,
 } from '../controllers/webAuthnController'
 import { authenticateToken, requireSyswiseAdmin } from '../middleware/authMiddleware'
+import { getMigrationContact, saveMigrationContact } from '../controllers/migrationContactController'
 
 const router = Router()
 
 router.post('/login',                   unifiedLogin)
 router.post('/director/register',       directorRegister)
 router.get('/me',                       authenticateToken, getMe)
+router.get('/migration-contact',        authenticateToken, getMigrationContact)
+router.post('/migration-contact',       authenticateToken, saveMigrationContact)
 router.put('/language', authenticateToken, async (req, res) => {
   const { actorId, actorType, workspaceId, impersonationSessionId } = req.user!
   const language = req.body?.language
