@@ -17,6 +17,19 @@ export const toLanguage = (value: unknown): Language =>
 export const languageOf = (locale: string): Language =>
   LANGUAGES.find(l => l.locale === locale)?.value ?? 'en'
 
+// During support access the admin may not change the target user's saved
+// preference, so the language they pick is kept for this browser tab only.
+const SUPPORT_LANGUAGE_KEY = 'tw_support_language'
+export function viewingLanguage(user: Pick<AuthUser, 'preferredLanguage' | 'impersonation'>): Language {
+  if (user.impersonation) {
+    try {
+      const saved = sessionStorage.getItem(SUPPORT_LANGUAGE_KEY)
+      if (saved) return toLanguage(saved)
+    } catch { /* storage unavailable */ }
+  }
+  return toLanguage(user.preferredLanguage)
+}
+
 const catalogs: Record<Exclude<Language, 'en'>, Record<string, string>> = { si, ta }
 
 const LanguageContext = createContext<Language>('en')
@@ -113,6 +126,11 @@ export function LanguageToggle({ user, onUserUpdate }: { user: AuthUser; onUserU
   const [error, setError] = React.useState('')
   const select = async (next: Language) => {
     if (next === language || saving) return
+    if (user.impersonation) {
+      try { sessionStorage.setItem(SUPPORT_LANGUAGE_KEY, next) } catch { /* storage unavailable */ }
+      onUserUpdate({ preferredLanguage: next })
+      return
+    }
     setSaving(true); setError('')
     try {
       const saved = await authApi.language(next)
@@ -121,8 +139,8 @@ export function LanguageToggle({ user, onUserUpdate }: { user: AuthUser; onUserU
     finally { setSaving(false) }
   }
   return <div className="flex flex-col items-end gap-1">
-    <div role="group" aria-label={t('Language')} className="seg">
-      {LANGUAGES.map(l => <button key={l.value} type="button" lang={l.value} disabled={saving || !!user.impersonation} aria-pressed={language === l.value} onClick={() => select(l.value)} className={`seg-item min-h-8 ${language === l.value ? 'seg-item-active' : ''}`}>{l.label}</button>)}
+    <div role="group" aria-label={t('Language')} title={user.impersonation ? t('Support access: changes the language for you only.') : undefined} className="seg">
+      {LANGUAGES.map(l => <button key={l.value} type="button" lang={l.value} disabled={saving} aria-pressed={language === l.value} onClick={() => select(l.value)} className={`seg-item min-h-8 ${language === l.value ? 'seg-item-active' : ''}`}>{l.label}</button>)}
     </div>
     {error && <span role="alert" className="text-xs text-rose-700">{error}</span>}
   </div>

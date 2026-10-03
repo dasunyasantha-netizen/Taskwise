@@ -349,5 +349,6 @@ export const si: Record<string, string> = {
   'No matches for “{query}”': 'ගැළපෙන ප්‍රතිඵල නැත: {query}',
   'This file is {size}. The limit is 10 MB.': 'මෙම ගොනුව {size}. උපරිමය 10 MB.',
   'Low': 'අඩු', 'Medium': 'මධ්‍යම', 'High': 'ඉහළ', 'Critical': 'ඉතා හදිසි',
+  'Support access: changes the language for you only.': 'සහාය ප්‍රවේශය: භාෂාව වෙනස් වන්නේ ඔබට පමණි.',
   'Collapse sidebar': 'පැති තීරුව හකුළන්න', 'Expand sidebar': 'පැති තීරුව විහිදන්න',
 }

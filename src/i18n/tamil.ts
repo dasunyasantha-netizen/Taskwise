@@ -23,6 +23,7 @@ export const ta: Record<string, string> = {
   'task is awaiting your approval': 'பணி உங்கள் அங்கீகாரத்திற்காகக் காத்திருக்கிறது',
   'tasks are awaiting your approval': 'பணிகள் உங்கள் அங்கீகாரத்திற்காகக் காத்திருக்கின்றன',
   'Low': 'குறைவு', 'Medium': 'நடுத்தரம்', 'High': 'அதிகம்', 'Critical': 'மிக அவசரம்',
+  'Support access: changes the language for you only.': 'உதவி அணுகல்: மொழி உங்களுக்கு மட்டுமே மாறும்.',
   'Collapse sidebar': 'பக்கப்பட்டியைச் சுருக்கு', 'Expand sidebar': 'பக்கப்பட்டியை விரி',
   'Notifications': 'அறிவித்தல்கள்', 'No notifications yet': 'இன்னும் அறிவித்தல்கள் இல்லை', '{count} new': '{count} புதியவை', 'Mark all read': 'அனைத்தையும் வாசித்ததாகக் குறி',
   'Welcome back': 'மீண்டும் வருக', "Here's what's happening across your workspace.": 'உங்கள் பணியிடத்தில் நடப்பவை இதோ.',
