@@ -102,18 +102,27 @@ export async function saveMigrationContact(req: Request, res: Response): Promise
     if (existing && (existing.phoneE164 !== parsed.number || existing.email !== (country === 'LK' ? null : email))) {
       res.status(409).json({ error: 'This role is already linked. Contact your director to change its assignment.' }); return
     }
-    const contact = await prisma.migrationRoleContact.upsert({
-      where: { actorType_actorId: { actorType, actorId } },
-      create: {
-        actorType, actorId, workspaceId, companyId: actor.companyId,
-        country, phoneE164: parsed.number, email: country === 'LK' ? null : email,
-      },
-      update: {
-        workspaceId, companyId: actor.companyId,
-        country, phoneE164: parsed.number, email: country === 'LK' ? null : email,
-        syncStatus: 'PENDING', syncedAt: null,
-      },
-    })
+    // First collection cannot overwrite an assignment saved concurrently by a supervisor.
+    let contact: RoleContact
+    if (existing) {
+      const updated = await prisma.migrationRoleContact.updateMany({
+        where: { id: existing.id, assignmentVersion: existing.assignmentVersion,
+          phoneE164: existing.phoneE164, email: existing.email },
+        data: { syncStatus: 'PENDING', syncedAt: null },
+      })
+      if (!updated.count) { res.status(409).json({ error: 'This assignment changed. Contact your director.' }); return }
+      contact = existing
+    } else {
+      try {
+        contact = await prisma.migrationRoleContact.create({ data: {
+          actorType, actorId, workspaceId, companyId: actor.companyId,
+          country, phoneE164: parsed.number, email: country === 'LK' ? null : email,
+        } })
+      } catch (e) {
+        if ((e as { code?: string }).code === 'P2002') { res.status(409).json({ error: 'An assignment was just saved. Refresh and contact your director if it needs correction.' }); return }
+        throw e
+      }
+    }
     const synced = await syncMigrationContact(contact)
     res.json({ saved: true, syncStatus: synced ? 'SYNCED' : 'PENDING' })
   } catch {
