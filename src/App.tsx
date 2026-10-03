@@ -309,7 +309,9 @@ export default function App() {
         )}
         <NoticeBanner loggedIn={true} />
         <div className={bannerPad}>
+          {/* Remount per identity so Support Access never shows the previous account's data */}
           <DirectorDashboard
+            key={`${user.actorType}:${user.actorId}:${user.workspaceId}`}
             user={user}
             currentView={view}
             setView={persistView}
@@ -339,6 +341,7 @@ export default function App() {
       <NoticeBanner loggedIn={true} />
       <div className={bannerPad}>
         <PersonnelDashboard
+          key={`${user.actorType}:${user.actorId}:${user.workspaceId}`}
           user={user}
           currentView={view}
           setView={persistView}
