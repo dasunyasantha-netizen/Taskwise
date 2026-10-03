@@ -219,6 +219,10 @@ export async function authenticationVerify(req: Request, res: Response): Promise
 
     const actor = await getActor(actorId, actorType) as Record<string, unknown> | null
     if (!actor) { res.status(404).json({ error: 'User not found' }); return }
+    const assignment = await prisma.migrationRoleContact.findUnique({ where: { actorType_actorId: { actorType, actorId } } })
+    if (assignment?.legacyAccessRevokedAt || !actor.isActive || actor.deletedAt) {
+      res.status(401).json({ error: 'This role changed. Sign in through Syswise.' }); return
+    }
 
     const challenge = (actor as { webAuthnChallenge?: string | null }).webAuthnChallenge
     if (!challenge) { res.status(400).json({ error: 'No pending challenge' }); return }

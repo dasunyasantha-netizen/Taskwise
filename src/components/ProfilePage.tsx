@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react'
 import type { AuthUser } from '../types'
 import { authApi, workspaceApi, webAuthnApi } from '../services/apiService'
 import { startRegistration } from '@simplewebauthn/browser'
+import RoleAssignments from './RoleAssignments'
 
 interface Props {
   user: AuthUser
@@ -129,11 +130,12 @@ export default function ProfilePage({ user, onUserUpdate }: Props) {
     setProfileErr('')
     setProfileMsg('')
     if (!name.trim()) { setProfileErr('Name is required'); return }
-    if (!phone.trim()) { setProfileErr('Phone is required'); return }
+    if (!user.syswiseUserId && !phone.trim()) { setProfileErr('Phone is required'); return }
     setProfileSaving(true)
     try {
-      await workspaceApi.updateProfile({ name: name.trim(), phone: phone.trim(), email: email.trim() || undefined, nic: nic.trim() || undefined })
-      onUserUpdate({ name: name.trim(), phone: phone.trim(), email: email.trim() || undefined, nic: nic.trim() || undefined })
+      const changes = { name: name.trim(), nic: nic.trim() || undefined, ...(!user.syswiseUserId ? { phone: phone.trim(), email: email.trim() || undefined } : {}) }
+      await workspaceApi.updateProfile(changes)
+      onUserUpdate(changes)
       setProfileMsg('Profile updated successfully')
     } catch (err: unknown) {
       setProfileErr(err instanceof Error ? err.message : 'Failed to update profile')
@@ -251,8 +253,8 @@ export default function ProfilePage({ user, onUserUpdate }: Props) {
             </div>
             <div>
               <label className="block text-sm font-medium text-tw-text mb-1">Phone Number</label>
-              <input className="input" type="tel" value={phone} onChange={e => setPhone(e.target.value)} required />
-              {phone.trim() !== (user.phone || '').trim() && (
+              <input className="input" type="tel" disabled={!!user.syswiseUserId} value={phone} onChange={e => setPhone(e.target.value)} required />
+              {!user.syswiseUserId && phone.trim() !== (user.phone || '').trim() && (
                 <p className="mt-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 leading-snug">
                   Your phone number is your login username. After saving, use <strong>{phone.trim()}</strong> to log in next time.
                 </p>
@@ -260,7 +262,7 @@ export default function ProfilePage({ user, onUserUpdate }: Props) {
             </div>
             <div>
               <label className="block text-sm font-medium text-tw-text mb-1">Email <span className="text-tw-text-secondary font-normal">(optional)</span></label>
-              <input className="input" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" />
+              <input className="input" type="email" disabled={!!user.syswiseUserId} value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" />
             </div>
             <div>
               <label className="block text-sm font-medium text-tw-text mb-1">NIC <span className="text-tw-text-secondary font-normal">(optional)</span></label>
@@ -278,8 +280,9 @@ export default function ProfilePage({ user, onUserUpdate }: Props) {
         </form>
       </div>
 
+      {user.syswiseUserId && <div className="card p-6"><h2 className="font-semibold mb-2">Syswise account</h2><p className="text-sm text-tw-text-secondary mb-3">Manage your personal phone number, password and passkeys in Syswise. Ask your supervisor to correct a role assignment.</p><a className="btn-primary inline-block" href={`${window.location.hostname === 'localhost' ? 'http://localhost:3100' : window.location.origin}/pickiti/account`}>Manage account</a></div>}
       {/* Change password */}
-      <div className="card p-6">
+      {!user.syswiseUserId && <div className="card p-6">
         <h2 className="text-base font-semibold text-tw-text mb-4">Change Password</h2>
         <form onSubmit={handlePasswordSave} className="space-y-4">
           <div>
@@ -305,10 +308,10 @@ export default function ProfilePage({ user, onUserUpdate }: Props) {
             {passwordErr && <span className="text-sm text-tw-danger">{passwordErr}</span>}
           </div>
         </form>
-      </div>
+      </div>}
 
       {/* Biometric / Passkey login */}
-      {webAuthnSupported && (
+      {webAuthnSupported && !user.syswiseUserId && (
         <div className="card p-6">
           <h2 className="text-base font-semibold text-tw-text mb-1">Biometric Login</h2>
           <p className="text-xs text-tw-text-secondary mb-4">Use your fingerprint or Face ID to sign in without a password.</p>
@@ -369,6 +372,7 @@ export default function ProfilePage({ user, onUserUpdate }: Props) {
       )}
 
       {/* Role info */}
+      <RoleAssignments />
       <div className="card p-4 flex items-center gap-3">
         <div className="w-8 h-8 rounded-lg bg-tw-primary/10 flex items-center justify-center flex-shrink-0">
           <span className="text-tw-primary text-sm font-bold">{user.actorType === 'director' ? 'D' : 'P'}</span>

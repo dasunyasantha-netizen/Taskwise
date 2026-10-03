@@ -10,9 +10,14 @@ import {
   listCredentials, deleteCredential,
 } from '../controllers/webAuthnController'
 import { authenticateToken, requireSyswiseAdmin } from '../middleware/authMiddleware'
-import { getMigrationContact, saveMigrationContact } from '../controllers/migrationContactController'
+import { getMigrationContact, saveMigrationContact, getManagedMigrationContacts, assignMigrationContact } from '../controllers/migrationContactController'
+import { exchangeSyswiseCode, selectSyswiseRole } from '../controllers/syswiseController'
 
 const router = Router()
+router.post('/syswise/exchange', exchangeSyswiseCode)
+router.post('/syswise/select', selectSyswiseRole)
+router.get('/role-contacts', authenticateToken, getManagedMigrationContacts)
+router.put('/role-contacts/:actorType/:actorId', authenticateToken, assignMigrationContact)
 
 router.post('/login',                   unifiedLogin)
 router.post('/director/register',       directorRegister)

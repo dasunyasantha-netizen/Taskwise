@@ -286,6 +286,7 @@ model MigrationRoleContact {
   phoneE164      String
   email          String?
   syswiseUserId  Int?
+  assignmentVersion Int    @default(1)
   syncStatus     String    @default("PENDING")
   syncedAt       DateTime?
   legacyAccessRevokedAt DateTime?

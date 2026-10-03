@@ -389,6 +389,8 @@ async function approveRequestTransaction(requestId: string, actorId: string, raw
         isActive: true,
       },
     })
+    await tx.migrationRoleContact.create({ data: { actorType: 'director', actorId: admin.id,
+      workspaceId: workspace.id, companyId: company.id, country: 'LK', phoneE164: request.applicantNormalizedPhone } })
     await tx.companyRequest.update({
       where: { id: request.id },
       data: {

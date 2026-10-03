@@ -16,6 +16,7 @@ export interface AuthUser {
   actorType: ActorType
   workspaceId: string
   name: string
+  syswiseUserId?: number
   phone?: string
   email?: string
   nic?: string

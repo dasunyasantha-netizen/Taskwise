@@ -77,6 +77,8 @@ export async function unifiedLogin(req: Request, res: Response): Promise<void> {
       if (!(await bcrypt.compare(password, director.password))) {
         invalid(); return
       }
+      const assignment = await prisma.migrationRoleContact.findUnique({ where: { actorType_actorId: { actorType: 'director', actorId: director.id } } })
+      if (assignment?.legacyAccessRevokedAt) { invalid(); return }
       const token = signToken(director.id, 'director', director.workspaceId!)
 
       // Load workspace branding
@@ -137,6 +139,8 @@ export async function unifiedLogin(req: Request, res: Response): Promise<void> {
       if (!(await bcrypt.compare(password, personnel.password))) {
         invalid(); return
       }
+      const assignment = await prisma.migrationRoleContact.findUnique({ where: { actorType_actorId: { actorType: 'personnel', actorId: personnel.id } } })
+      if (assignment?.legacyAccessRevokedAt) { invalid(); return }
       const layerNumber = personnel.department.layer.number
       const token = signToken(personnel.id, 'personnel', personnel.workspaceId, {
         layerNumber,
@@ -325,6 +329,9 @@ export async function getMe(req: Request, res: Response): Promise<void> {
   try {
     const { actorId, actorType, workspaceId } = req.user!
     const features = await getEnabledFeatures(workspaceId)
+    const assignedContact = req.user!.authenticationMethod === 'syswise'
+      ? await prisma.migrationRoleContact.findUnique({ where: { actorType_actorId: { actorType, actorId } } }) : null
+    const identityContact = assignedContact ? { syswiseUserId: req.user!.syswiseUserId, phone: assignedContact.phoneE164, email: assignedContact.email, mustChangePassword: false } : {}
     if (actorType === 'director') {
       const director = await prisma.director.findUnique({
         where: { id: actorId },
@@ -336,7 +343,7 @@ export async function getMe(req: Request, res: Response): Promise<void> {
             select: { companyName: true, companyLogo: true }
           })
         : null
-      res.json({ actorId, actorType, workspaceId, ...director, companyPrefix: director?.company?.prefix, companyName: workspace?.companyName, companyLogo: workspace?.companyLogo, features })
+      res.json({ actorId, actorType, workspaceId, ...director, companyPrefix: director?.company?.prefix, companyName: workspace?.companyName, companyLogo: workspace?.companyLogo, features, ...identityContact })
     } else {
       const personnel = await prisma.personnel.findUnique({
         where: { id: actorId },
@@ -348,7 +355,7 @@ export async function getMe(req: Request, res: Response): Promise<void> {
             select: { companyName: true, companyLogo: true }
           })
         : null
-      res.json({ actorId, actorType, workspaceId, ...personnel, layerNumber: personnel?.department.layer.number, ysoRole: ysoRole(personnel?.department), companyPrefix: personnel?.company?.prefix, companyName: workspace?.companyName, companyLogo: workspace?.companyLogo, features })
+      res.json({ actorId, actorType, workspaceId, ...personnel, layerNumber: personnel?.department.layer.number, ysoRole: ysoRole(personnel?.department), companyPrefix: personnel?.company?.prefix, companyName: workspace?.companyName, companyLogo: workspace?.companyLogo, features, ...identityContact })
     }
   } catch (err) {
     console.error(err)

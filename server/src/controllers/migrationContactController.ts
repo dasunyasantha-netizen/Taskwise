@@ -2,13 +2,19 @@ import { Request, Response } from 'express'
 import { isSupportedCountry, parsePhoneNumberFromString, type CountryCode } from 'libphonenumber-js/max'
 import prisma from '../prisma'
 
-type RoleContact = { id: string; actorType: string; actorId: string; workspaceId: string; companyId: string | null; country: string; phoneE164: string; email: string | null }
+type RoleContact = { id: string; actorType: string; actorId: string; workspaceId: string; companyId: string | null; country: string; phoneE164: string; email: string | null; assignmentVersion: number }
 
 export async function syncMigrationContact(contact: RoleContact): Promise<boolean> {
   const base = process.env.SYSWISE_BASE_URL?.replace(/\/$/, '')
   const key = process.env.SYSWISE_TASKWISE_SERVICE_KEY
   if (!base || !key) return false
   try {
+    const actor = contact.actorType === 'director'
+      ? await prisma.director.findUnique({ where: { id: contact.actorId }, include: { company: true } })
+      : await prisma.personnel.findUnique({ where: { id: contact.actorId }, include: { company: true, department: true } })
+    const workspace = await prisma.workspace.findUnique({ where: { id: contact.workspaceId } })
+    const active = Boolean(actor?.isActive && actor.workspaceId === contact.workspaceId &&
+      (!('deletedAt' in actor) || !actor.deletedAt) && (!actor.company || actor.company.status === 'ACTIVE'))
     const response = await fetch(`${base}/api/auth/internal/taskwise-role-contact/`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', 'X-Service-Key': key },
@@ -16,13 +22,16 @@ export async function syncMigrationContact(contact: RoleContact): Promise<boolea
         actorType: contact.actorType, actorId: contact.actorId,
         workspaceId: contact.workspaceId, companyId: contact.companyId,
         country: contact.country, phone: contact.phoneE164, email: contact.email || '',
+        assignmentVersion: contact.assignmentVersion, active,
+        companyName: actor?.company?.displayName || actor?.company?.legalName || workspace?.companyName || workspace?.name || 'Company',
+        roleName: contact.actorType === 'director' ? 'Director' : actor && 'department' in actor ? actor.department.name : 'Personnel',
       }),
       signal: AbortSignal.timeout(8000),
     })
     if (!response.ok) return false
     const result = await response.json() as { syswiseUserId?: number | null }
-    await prisma.migrationRoleContact.update({
-      where: { id: contact.id },
+    await prisma.migrationRoleContact.updateMany({
+      where: { id: contact.id, assignmentVersion: contact.assignmentVersion },
       data: {
         syncStatus: 'SYNCED', syncedAt: new Date(),
         syswiseUserId: result.syswiseUserId ?? null,
@@ -36,7 +45,7 @@ export async function syncMigrationContact(contact: RoleContact): Promise<boolea
 
 export async function retryPendingMigrationContacts(): Promise<void> {
   const pending = await prisma.migrationRoleContact.findMany({
-    where: { syncStatus: 'PENDING' }, orderBy: { updatedAt: 'asc' }, take: 50,
+    orderBy: { updatedAt: 'asc' }, take: 1000,
   })
   for (const contact of pending) await syncMigrationContact(contact)
 }
@@ -90,7 +99,7 @@ export async function saveMigrationContact(req: Request, res: Response): Promise
     const existing = await prisma.migrationRoleContact.findUnique({
       where: { actorType_actorId: { actorType, actorId } },
     })
-    if (existing?.syswiseUserId && (existing.phoneE164 !== parsed.number || existing.email !== (email || null))) {
+    if (existing && (existing.phoneE164 !== parsed.number || existing.email !== (country === 'LK' ? null : email))) {
       res.status(409).json({ error: 'This role is already linked. Contact your director to change its assignment.' }); return
     }
     const contact = await prisma.migrationRoleContact.upsert({
@@ -175,7 +184,7 @@ export async function assignMigrationContact(req: Request, res: Response): Promi
       update: { workspaceId, companyId: target.companyId, country,
         phoneE164: parsed.number, email: country === 'LK' ? null : email,
         ...(reassigned ? { syswiseUserId: null, syncStatus: 'PENDING', syncedAt: null,
-          legacyAccessRevokedAt: new Date() } : {}),
+          legacyAccessRevokedAt: new Date(), assignmentVersion: { increment: 1 } } : {}),
       },
     })
     await prisma.auditLog.create({ data: {

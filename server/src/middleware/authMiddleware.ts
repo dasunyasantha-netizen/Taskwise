@@ -14,7 +14,9 @@ export interface AuthPayload {
   impersonationSessionId?: string
   adminId?: string
   adminName?: string
-  authenticationMethod?: 'password' | 'webauthn'
+  authenticationMethod?: 'password' | 'webauthn' | 'syswise'
+  syswiseUserId?: number
+  assignmentVersion?: number
 }
 
 declare global {
@@ -48,9 +50,27 @@ export async function authenticateToken(req: Request, res: Response, next: NextF
 
   try {
     const payload = jwt.verify(token, process.env.JWT_SECRET!) as AuthPayload
+    if (!payload.actorId || !payload.workspaceId || !['director', 'personnel'].includes(payload.actorType)) {
+      res.status(401).json({ error: 'Invalid session' }); return
+    }
     if (!payload.iat || payload.iat * 1000 < startOfTodayInSriLankaUtcMs()) {
       res.status(401).json({ error: 'Session expired. Please sign in again.' })
       return
+    }
+    const actor = payload.actorType === 'director'
+      ? await prisma.director.findFirst({ where: { id: payload.actorId, workspaceId: payload.workspaceId, isActive: true }, select: { company: { select: { status: true } } } })
+      : await prisma.personnel.findFirst({ where: { id: payload.actorId, workspaceId: payload.workspaceId, isActive: true, deletedAt: null }, select: { company: { select: { status: true } } } })
+    if (!actor || (actor.company && actor.company.status !== 'ACTIVE')) {
+      res.status(401).json({ error: 'This role is no longer active.' }); return
+    }
+    const contact = await prisma.migrationRoleContact.findUnique({ where: { actorType_actorId: { actorType: payload.actorType, actorId: payload.actorId } } })
+    if (payload.authenticationMethod === 'syswise') {
+      if (!contact || contact.workspaceId !== payload.workspaceId || contact.assignmentVersion !== payload.assignmentVersion ||
+          !payload.syswiseUserId || contact.syswiseUserId !== payload.syswiseUserId) {
+        res.status(401).json({ error: 'Your role assignment changed. Open Taskwise from Syswise again.' }); return
+      }
+    } else if (!payload.impersonationSessionId && contact?.legacyAccessRevokedAt) {
+      res.status(401).json({ error: 'This role was reassigned. Sign in through Syswise.' }); return
     }
     if (payload.impersonationSessionId) {
       if (!payload.adminId) {

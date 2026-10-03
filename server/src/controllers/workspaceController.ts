@@ -307,6 +307,15 @@ export async function updateProfile(req: Request, res: Response): Promise<void> 
   try {
     const { actorId, actorType } = req.user!
     const { name, phone, nic, email } = req.body
+    if (req.user!.authenticationMethod === 'syswise') {
+      if (phone !== undefined || email !== undefined) { res.status(400).json({ error: 'Manage your account contact details in Syswise. Role assignments are managed by your supervisor.' }); return }
+      if (typeof name !== 'string' || !name.trim()) { res.status(400).json({ error: 'Name is required' }); return }
+      const data = { name: name.trim(), nic: nic || null }
+      const updated = actorType === 'director'
+        ? await prisma.director.update({ where: { id: actorId }, data })
+        : await prisma.personnel.update({ where: { id: actorId }, data })
+      res.json({ name: updated.name, nic: updated.nic }); return
+    }
     if (!name || !phone) { res.status(400).json({ error: 'name and phone are required' }); return }
     const normalized = normalizeSriLankanPhone(phone)
 

@@ -8,6 +8,7 @@ import PersonnelDashboard from './components/PersonnelDashboard'
 import ImpersonationBanner from './components/ImpersonationBanner'
 import SetupPrompt from './components/SetupPrompt'
 import MigrationContactModal from './components/MigrationContactModal'
+import SyswiseCompanySelection from './components/SyswiseCompanySelection'
 import InsurancePolicyCompletionPrompt from './components/InsurancePolicyCompletionPrompt'
 import { authApi, noticeApi, type Notice } from './services/apiService'
 import { captureLaunchSource, type LaunchSource } from './services/launchSource'
@@ -61,6 +62,7 @@ const REAL_TOKEN_KEY = 'taskwise_real_token'
 const REAL_USER_KEY  = 'taskwise_real_user'
 
 export default function App() {
+  const [ssoCode, setSsoCode] = useState(() => new URLSearchParams(window.location.search).get('launch_code') || '')
   const [launchSource] = useState<LaunchSource>(() => captureLaunchSource())
   const [user, setUser]         = useState<AuthUser | null>(null)
   const [view, setView]         = useState<ViewMode>('login')
@@ -85,6 +87,21 @@ export default function App() {
 
   useEffect(() => {
     const launchUrl = new URL(window.location.href)
+    if (ssoCode) {
+      launchUrl.searchParams.delete('launch_code')
+      launchUrl.searchParams.delete('source')
+      window.history.replaceState({}, '', launchUrl.pathname + launchUrl.search + launchUrl.hash)
+      for (const key of [TOKEN_KEY, USER_KEY, VIEW_KEY, REAL_TOKEN_KEY, REAL_USER_KEY]) localStorage.removeItem(key)
+      setLoading(false)
+      return
+    }
+    // A direct app/PWA launch also uses the shared platform account. Explicit
+    // legacy access stays available to people completing the migration.
+    if (!launchUrl.searchParams.has('legacy') && localStorage.getItem('syswise_token')) {
+      const origin = window.location.hostname === 'localhost' ? 'http://localhost:3100' : window.location.origin
+      window.location.replace(`${origin}/sso/taskwise?source=${launchSource}`)
+      return
+    }
     if (launchUrl.searchParams.has('source')) {
       launchUrl.searchParams.delete('source')
       window.history.replaceState({}, '', launchUrl.pathname + launchUrl.search + launchUrl.hash)
@@ -240,6 +257,8 @@ export default function App() {
   }
 
   if (!user) {
+    if (ssoCode) return <SyswiseCompanySelection code={ssoCode} onLogin={(token, selected) => { setSsoCode(''); handleLogin(token, selected) }}
+      onLegacy={() => { setSsoCode(''); const url = new URL(window.location.href); url.searchParams.set('legacy', '1'); window.history.replaceState({}, '', url); }} />
     return <Auth onLogin={handleLogin} />
   }
 
