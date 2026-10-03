@@ -67,7 +67,7 @@ export async function listTaskGroups(req: Request, res: Response): Promise<void>
           include: {
             personnel: {
               select: {
-                id: true, name: true, avatarUrl: true,
+                id: true, name: true,
                 department: { select: { id: true, name: true, layer: { select: { number: true, name: true } } } },
                 supervisor: { select: { id: true, name: true } },
               },
@@ -94,7 +94,7 @@ export async function getTaskGroup(req: Request, res: Response): Promise<void> {
           include: {
             personnel: {
               select: {
-                id: true, name: true, avatarUrl: true, phone: true,
+                id: true, name: true, phone: true,
                 department: { select: { id: true, name: true, layer: { select: { number: true, name: true } } } },
                 supervisor: { select: { id: true, name: true } },
                 supervisorId: true,
@@ -206,7 +206,7 @@ export async function addTaskGroupMember(req: Request, res: Response): Promise<v
       include: {
         personnel: {
           select: {
-            id: true, name: true, avatarUrl: true,
+            id: true, name: true,
             department: { select: { id: true, name: true, layer: { select: { number: true, name: true } } } },
             supervisor: { select: { id: true, name: true } },
           },
@@ -347,7 +347,7 @@ export async function getGroupMonitor(req: Request, res: Response): Promise<void
           include: {
             personnel: {
               select: {
-                id: true, name: true, avatarUrl: true,
+                id: true, name: true,
                 department: { select: { name: true, layer: { select: { number: true, name: true } } } },
               },
             },

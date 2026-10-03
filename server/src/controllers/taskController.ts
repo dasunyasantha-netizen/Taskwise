@@ -12,7 +12,7 @@ const TASK_INCLUDE = {
   parent: { select: { id: true, title: true } },
   assignments: {
     include: {
-      personnel: { select: { id: true, name: true, avatarUrl: true } },
+      personnel: { select: { id: true, name: true } },
       department: { select: { id: true, name: true } },
     }
   },
@@ -1489,7 +1489,7 @@ export async function getTaskChain(req: Request, res: Response): Promise<void> {
           include: {
             assignments: {
               include: {
-                personnel: { select: { id: true, name: true, avatarUrl: true } },
+                personnel: { select: { id: true, name: true } },
                 department: { select: { id: true, name: true } },
               }
             }
@@ -1499,7 +1499,7 @@ export async function getTaskChain(req: Request, res: Response): Promise<void> {
           include: {
             assignments: {
               include: {
-                personnel: { select: { id: true, name: true, avatarUrl: true } },
+                personnel: { select: { id: true, name: true } },
                 department: { select: { id: true, name: true } },
               }
             }
