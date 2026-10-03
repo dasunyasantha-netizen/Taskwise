@@ -16,6 +16,8 @@ const button = 'btn-primary min-h-11'
 const secondary = 'btn-secondary min-h-11'
 const timestamp = (value: string, locale = 'en-GB') =>
   displayDate(value, locale === 'si-LK' ? 'si' : 'en', true)
+const letterColumns =
+  'grid-cols-[140px_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,0.8fr)_100px_64px_76px]'
 const shortDate = (value: string, locale = 'en-GB') =>
   displayDate(value, locale === 'si-LK' ? 'si' : 'en')
 function Field({
@@ -556,7 +558,7 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
     [status, setStatus] = useState(''),
     [mine, setMine] = useState(false),
     [overdue, setOverdue] = useState(false),
-    [sort, setSort] = useState(''),
+    [sort, setSort] = useState<{ key: string; dir: 'asc' | 'desc' }>({ key: '', dir: 'desc' }),
     [from, setFrom] = useState(''),
     [to, setTo] = useState(''),
     [page, setPage] = useState(0),
@@ -578,7 +580,8 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
             status,
             mine: String(mine),
             overdue: String(overdue),
-            sort,
+            sort: sort.key,
+            dir: sort.dir,
             from,
             to,
             page: String(page),
@@ -698,27 +701,30 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
       )}
       {!selected && list && (
         <>
-          <div className="flex flex-wrap items-center gap-2">
-            {[
-              { key: 'all', label: tr("All"), value: list.metrics.open + list.metrics.closed, active: !status && !overdue, set: () => { setStatus(''); setOverdue(false) }, alert: false },
-              { key: 'open', label: tr("Open"), value: list.metrics.open, active: status === 'OPEN' && !overdue, set: () => { setStatus('OPEN'); setOverdue(false) }, alert: false },
-              { key: 'overdue', label: tr("Overdue"), value: list.metrics.overdue, active: overdue, set: () => { setStatus(''); setOverdue(true) }, alert: list.metrics.overdue > 0 },
-              { key: 'closed', label: tr("Closed"), value: list.metrics.closed, active: status === 'CLOSED' && !overdue, set: () => { setStatus('CLOSED'); setOverdue(false) }, alert: false },
-            ].map((c) => (
-              <button
-                key={c.key}
-                aria-pressed={c.active}
-                onClick={() => {
-                  c.set()
-                  setPage(0)
-                }}
-                className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm transition-colors ${c.active ? 'bg-tw-primary border-tw-primary text-white' : 'bg-white border-tw-border hover:bg-tw-hover'}`}
-              >
-                <span className={`font-bold ${!c.active && c.alert ? 'text-red-600' : ''}`}>{c.value}</span>
-                {c.label}
-              </button>
-            ))}
-            <span className="text-xs text-tw-text-secondary ml-auto">
+          <div className="flex flex-wrap items-end gap-x-4 border-b border-tw-border">
+            <div role="tablist" className="flex gap-1 -mb-px overflow-x-auto">
+              {[
+                { key: 'all', label: tr("All"), value: list.metrics.open + list.metrics.closed, active: !status && !overdue, set: () => { setStatus(''); setOverdue(false) }, alert: false },
+                { key: 'open', label: tr("Open"), value: list.metrics.open, active: status === 'OPEN' && !overdue, set: () => { setStatus('OPEN'); setOverdue(false) }, alert: false },
+                { key: 'overdue', label: tr("Overdue"), value: list.metrics.overdue, active: overdue, set: () => { setStatus(''); setOverdue(true) }, alert: list.metrics.overdue > 0 },
+                { key: 'closed', label: tr("Closed"), value: list.metrics.closed, active: status === 'CLOSED' && !overdue, set: () => { setStatus('CLOSED'); setOverdue(false) }, alert: false },
+              ].map((c) => (
+                <button
+                  key={c.key}
+                  role="tab"
+                  aria-selected={c.active}
+                  onClick={() => {
+                    c.set()
+                    setPage(0)
+                  }}
+                  className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${c.active ? 'border-tw-primary text-tw-primary' : 'border-transparent text-tw-text-secondary hover:text-tw-text'}`}
+                >
+                  {c.label}
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${c.alert ? 'bg-red-50 text-red-700' : c.active ? 'bg-blue-50 text-tw-primary' : 'bg-slate-100 text-slate-600'}`}>{c.value}</span>
+                </button>
+              ))}
+            </div>
+            <span className="text-xs text-tw-text-secondary ml-auto pb-2.5">
               {tr("Avg entry delay")} <strong>{list.metrics.averageEntryDays}d</strong>
               {' · '}
               {list.metrics.lateEntries} {tr("late entries")}
@@ -738,26 +744,26 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
                 }}
               />
               <div className="flex gap-2 items-center">
-                <input
-                  type="date"
-                  aria-label={tr("Received from")}
-                  className="input w-full lg:w-40"
+                <DatePicker
+                  ariaLabel={tr("Received from")}
+                  placeholder={tr("From date")}
+                  className="w-full lg:w-40"
                   value={from}
-                  max={to || undefined}
-                  onChange={(e) => {
-                    setFrom(e.target.value)
+                  maxDate={to || undefined}
+                  onChange={(v) => {
+                    setFrom(v)
                     setPage(0)
                   }}
                 />
                 <span className="text-tw-text-secondary text-sm">–</span>
-                <input
-                  type="date"
-                  aria-label={tr("Received to")}
-                  className="input w-full lg:w-40"
+                <DatePicker
+                  ariaLabel={tr("Received to")}
+                  placeholder={tr("To date")}
+                  className="w-full lg:w-40"
                   value={to}
-                  min={from || undefined}
-                  onChange={(e) => {
-                    setTo(e.target.value)
+                  minDate={from || undefined}
+                  onChange={(v) => {
+                    setTo(v)
                     setPage(0)
                   }}
                 />
@@ -773,31 +779,38 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
                 {mine ? tr("✓ Assigned to me") : tr("Assigned to me")}
               </button>
             </div>
-            <div className="hidden md:grid grid-cols-[150px_minmax(0,1fr)_170px_110px_100px_80px] gap-3 px-4 pl-5 text-xs font-semibold uppercase tracking-wide text-tw-text-secondary">
+            <div className={`hidden md:grid ${letterColumns} gap-3 px-4 pl-5 text-xs font-semibold uppercase tracking-wide text-tw-text-secondary`}>
               {[
-                { label: tr("Reference"), key: 'reference' },
-                { label: tr("Subject / sender"), key: '' },
-                { label: tr("With"), key: '' },
-                { label: tr("Received"), key: 'received' },
-                { label: tr("Age"), key: 'age' },
-                { label: tr("Status"), key: '' },
-              ].map((h) =>
-                h.key ? (
+                { label: tr("Reference"), key: 'reference', first: 'desc' },
+                { label: tr("Subject"), key: 'subject', first: 'asc' },
+                { label: tr("Sender"), key: 'sender', first: 'asc' },
+                { label: tr("With"), key: 'with', first: 'asc' },
+                { label: tr("Received"), key: 'received', first: 'desc' },
+                { label: tr("Age"), key: 'age', first: 'desc' },
+                { label: tr("Status"), key: 'status', first: 'asc' },
+              ].map((h) => {
+                const active = sort.key === h.key
+                return (
                   <button
-                    key={h.label}
-                    className={`text-left uppercase hover:text-tw-text ${sort === h.key ? 'text-tw-primary' : ''}`}
+                    key={h.key}
+                    aria-sort={active ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+                    className={`group flex items-center gap-1 text-left uppercase hover:text-tw-text ${active ? 'text-tw-primary' : ''}`}
                     onClick={() => {
-                      setSort((v) => (v === h.key ? '' : h.key))
+                      setSort((s) =>
+                        s.key === h.key
+                          ? { key: h.key, dir: s.dir === 'asc' ? 'desc' : 'asc' }
+                          : { key: h.key, dir: h.first as 'asc' | 'desc' }
+                      )
                       setPage(0)
                     }}
                   >
-                    {h.label}
-                    {sort === h.key ? ' ▾' : ''}
+                    <span className="truncate">{h.label}</span>
+                    <span className={active ? '' : 'opacity-0 group-hover:opacity-50'}>
+                      {active && sort.dir === 'asc' ? '▲' : '▼'}
+                    </span>
                   </button>
-                ) : (
-                  <span key={h.label}>{h.label}</span>
                 )
-              )}
+              })}
             </div>
             <div className="space-y-1.5">
               {list.items.map((t) => {
@@ -818,21 +831,20 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
                   <button
                     key={t.id}
                     onClick={() => open(t.id)}
-                    className={`w-full text-left rounded-xl border border-tw-border border-l-4 ${accent} bg-white px-4 py-2.5 hover:shadow-md transition-shadow`}
+                    className={`w-full text-left rounded-xl border border-tw-border border-l-4 ${accent} bg-white px-4 py-2 hover:shadow-md transition-shadow`}
                   >
-                    <div className="hidden md:grid grid-cols-[150px_minmax(0,1fr)_170px_110px_100px_80px] gap-3 items-center text-sm">
+                    <div className={`hidden md:grid ${letterColumns} gap-3 items-center text-sm`}>
                       <span className="font-mono text-xs font-semibold text-tw-primary truncate">{t.reference}</span>
-                      <span className="min-w-0">
-                        <span className="block font-semibold truncate">{t.subject}</span>
-                        <span className="block text-xs text-tw-text-secondary truncate">{t.sender}</span>
-                      </span>
-                      <span className="truncate">{t.assignedToName}</span>
-                      <span className="text-xs">
+                      <span className="font-semibold truncate" title={t.subject}>{t.subject}</span>
+                      <span className="text-tw-text-secondary truncate" title={t.sender}>{t.sender}</span>
+                      <span className="truncate" title={t.assignedToName}>{t.assignedToName}</span>
+                      <span className="text-xs whitespace-nowrap">
                         {shortDate(t.firstReceivedDate, locale)}
                         {late && (
-                          <span className="block text-amber-700 font-semibold">
-                            {tr("Late entry")} · {t.entryDelayDays}d
-                          </span>
+                          <span
+                            className="ml-1 inline-block h-2 w-2 rounded-full bg-amber-500 align-middle"
+                            title={`${tr("Late entry")} · ${t.entryDelayDays}d`}
+                          />
                         )}
                       </span>
                       <span>

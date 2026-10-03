@@ -488,14 +488,23 @@ router.get(
     const overdueBefore = new Date(
       Date.parse(dateNow + 'T00:00:00Z') - (limit - 1) * 86400000 - 19800000
     )
-    const sorts: Record<string, Prisma.LetterThreadOrderByWithRelationInput[]> =
+    const dir: Prisma.SortOrder = req.query.dir === 'asc' ? 'asc' : 'desc',
+      flip: Prisma.SortOrder = dir === 'asc' ? 'desc' : 'asc'
+    // Age sorts by assignment time, so "oldest first" is ascending assignedAt.
+    const sortFields: Record<string, Prisma.LetterThreadOrderByWithRelationInput> =
       {
-        received: [{ firstReceivedDate: 'desc' }, { id: 'desc' }],
-        reference: [{ reference: 'desc' }],
-        age: [{ assignedAt: 'asc' }, { id: 'asc' }],
-        updated: [{ updatedAt: 'desc' }, { id: 'desc' }],
+        reference: { reference: dir },
+        subject: { subject: dir },
+        sender: { sender: dir },
+        with: { assignedToName: dir },
+        received: { firstReceivedDate: dir },
+        age: { assignedAt: flip },
+        status: { status: dir },
       }
-    const orderBy = sorts[String(req.query.sort)] || sorts.updated
+    const field = sortFields[String(req.query.sort)]
+    const orderBy: Prisma.LetterThreadOrderByWithRelationInput[] = field
+      ? [field, { updatedAt: 'desc' }, { id: 'desc' }]
+      : [{ updatedAt: 'desc' }, { id: 'desc' }]
     const where: Prisma.LetterThreadWhereInput = {
       AND: [
         base,
