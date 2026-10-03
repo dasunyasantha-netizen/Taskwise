@@ -43,7 +43,16 @@ async function main() {
   const ca = await db.migrationRoleContact.create({ data: { actorType: 'director', actorId: director.id, workspaceId: workspaceA.id, companyId: companyA.id, country: 'LK', phoneE164: '+94771234500' } })
   const cb = await db.migrationRoleContact.create({ data: { actorType: 'personnel', actorId: person.id, workspaceId: workspaceB.id, companyId: companyB.id, country: 'LK', phoneE164: '+94771234500' } })
   if (process.argv.includes('--serve')) {
-    for (const c of [ca, cb]) assert.equal(await contacts.syncMigrationContact(c), true)
+    const singleCompany = await db.company.create({ data: { legalName: 'Single Role Company', registrationNumber: 'identity-single', prefix: 'IDS' } })
+    const singleWorkspace = await db.workspace.create({ data: { name: 'Single Role Company', companyId: singleCompany.id } })
+    await db.company.update({ where: { id: singleCompany.id }, data: { workspaceId: singleWorkspace.id } })
+    const single = await db.director.create({ data: { name: 'Single Director Position', phone: '0771234600', loginId: 'IDS0771234600', password: hash, workspaceId: singleWorkspace.id, companyId: singleCompany.id } })
+    const singleContact = await db.migrationRoleContact.create({ data: { actorType: 'director', actorId: single.id, workspaceId: singleWorkspace.id, companyId: singleCompany.id, country: 'LK', phoneE164: '+94771234600' } })
+    const reviewerLayer = await db.layer.create({ data: { workspaceId: workspaceA.id, number: 3, name: 'Reviewers' } })
+    const reviewerDepartment = await db.department.create({ data: { workspaceId: workspaceA.id, layerId: reviewerLayer.id, name: 'Reviewer' } })
+    const reviewer = await db.personnel.create({ data: { name: 'Reviewer Position', phone: '0771234500', password: hash, workspaceId: workspaceA.id, companyId: companyA.id, departmentId: reviewerDepartment.id } })
+    const reviewerContact = await db.migrationRoleContact.create({ data: { actorType: 'personnel', actorId: reviewer.id, workspaceId: workspaceA.id, companyId: companyA.id, country: 'LK', phoneE164: '+94771234500' } })
+    for (const c of [ca, cb, singleContact, reviewerContact]) assert.equal(await contacts.syncMigrationContact(c), true)
     await import('../index')
     console.log('Isolated Taskwise identity fixture ready')
     return
