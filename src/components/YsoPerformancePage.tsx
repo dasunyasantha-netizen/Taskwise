@@ -233,7 +233,7 @@ function EntryForm({
   }
   return (
     <Modal
-      title={`${tr('Task')} ${String(task.id).padStart(2, '0')} · ${tr(task.title)}`}
+      title={tr(task.title)}
       onClose={onClose}
     >
       <div className="rounded-xl border border-teal-200 bg-teal-50 p-3.5 mb-5 flex items-start gap-2.5">
@@ -805,21 +805,28 @@ function Analytics({
           <table className="w-full text-sm text-right">
             <thead>
               <tr>
-                <th className="text-left p-2">{tr("YSO")}</th>
-                {dashboard.tasks.map((t) => (
-                  <th className="p-2" title={t.title} key={t.id}>
-                    T{t.id}
+                <th className="text-left p-2" rowSpan={2}>{tr("YSO")}</th>
+                {groupTasks(dashboard.tasks).map((g) => (
+                  <th className="p-2 text-center border-l border-tw-border whitespace-nowrap" colSpan={g.tasks.length} key={g.key}>
+                    {tr(g.title)}
                   </th>
                 ))}
-                <th className="p-2">{tr("Total")}</th>
+                <th className="p-2 border-l border-tw-border" rowSpan={2}>{tr("Total")}</th>
+              </tr>
+              <tr>
+                {groupTasks(dashboard.tasks).flatMap((g) => g.tasks.map((t, i) => (
+                  <th className={`p-2 text-center ${i === 0 ? 'border-l border-tw-border' : ''}`} title={tr(t.title)} key={t.id}>
+                    {i + 1}
+                  </th>
+                )))}
               </tr>
             </thead>
             <tbody>
               {ranking.map((p) => (
                 <tr className="border-t" key={p.id}>
                   <th className="text-left p-2 whitespace-nowrap">{p.name}</th>
-                  {dashboard.tasks.map((t) => (
-                    <td className="p-2" key={t.id}>
+                  {groupTasks(dashboard.tasks).flatMap((g) => g.tasks).map((t) => (
+                    <td className="p-2 text-center" key={t.id}>
                       {selected
                         .filter(
                           (l) => l.personnelId === p.id && l.task === t.id
@@ -905,12 +912,39 @@ const TASK_GROUPS: Array<{ key: string; title: string; icon: IconName; ids: numb
   { key: 'qualifications', title: 'Qualifications', icon: 'award', ids: [12, 13, 14] },
   { key: 'evaluation', title: 'Evaluation', icon: 'star', ids: [15] },
 ]
-const taskNo = (id: number) => String(id).padStart(2, '0')
+const OTHER_GROUP = { key: 'other', title: 'Other tasks', icon: 'tasks' as IconName, ids: [] as number[] }
+/** Groups with their tasks in display order (unknown task ids go to "Other tasks"). */
+function groupTasks(tasks: YsoTask[]) {
+  return [
+    ...TASK_GROUPS.map((g) => ({ ...g, tasks: g.ids.map((id) => tasks.find((t) => t.id === id)).filter((t): t is YsoTask => !!t) })),
+    { ...OTHER_GROUP, tasks: tasks.filter((t) => !TASK_GROUPS.some((g) => g.ids.includes(t.id))) },
+  ].filter((g) => g.tasks.length > 0)
+}
+/** A task's category and its 1-based position inside that category (what users see). */
+function taskPosition(id: number, tasks: YsoTask[]) {
+  for (const g of groupTasks(tasks)) {
+    const i = g.tasks.findIndex((t) => t.id === id)
+    if (i >= 0) return { group: g, index: i + 1 }
+  }
+  return { group: OTHER_GROUP, index: 0 }
+}
 
-function TaskNumber({ id, size = 'md' }: { id: number; size?: 'sm' | 'md' }) {
+/** Number within its category (1, 2, 3…) — used in the grouped task list. */
+function TaskNumber({ index, size = 'md' }: { index: number; size?: 'sm' | 'md' }) {
   return (
     <span className={`${size === 'sm' ? 'w-8 h-8 rounded-lg text-xs' : 'w-10 h-10 rounded-xl text-sm'} flex-shrink-0 inline-flex items-center justify-center font-bold tabular-nums bg-teal-50 text-teal-700 ring-1 ring-inset ring-teal-100`}>
-      {taskNo(id)}
+      {index}
+    </span>
+  )
+}
+
+/** Category icon — used where tasks from different categories are mixed. */
+function TaskBadge({ id, tasks }: { id: number; tasks: YsoTask[] }) {
+  const { t: tr } = useLanguage()
+  const { group } = taskPosition(id, tasks)
+  return (
+    <span title={tr(group.title)} className="w-8 h-8 rounded-lg flex-shrink-0 inline-flex items-center justify-center bg-teal-50 text-teal-700 ring-1 ring-inset ring-teal-100">
+      <Icon name={group.icon} className="w-4 h-4" />
     </span>
   )
 }
@@ -948,12 +982,12 @@ function Sheet({ title, overline, lead, onClose, footer, children }: {
     return () => document.removeEventListener('keydown', onKey)
   }, [onClose])
   return (
-    <div className="fixed inset-0 z-[90] flex items-end sm:items-stretch justify-end">
-      <div className="absolute inset-0 bg-[#0b1220]/45 backdrop-blur-[2px] animate-fade-in" onClick={onClose} />
+    <div className="fixed inset-0 z-[90] flex items-end sm:items-center justify-center sm:p-6">
+      <div className="absolute inset-0 bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in" onClick={onClose} />
       <section role="dialog" aria-label={typeof title === 'string' ? title : undefined}
-        className="relative w-full sm:max-w-lg max-h-[88dvh] sm:max-h-none sm:m-3 flex flex-col bg-tw-surface border border-tw-border shadow-panel rounded-t-3xl sm:rounded-3xl animate-slide-up sm:animate-slide-in overflow-hidden">
+        className="relative w-full sm:max-w-4xl max-h-[88dvh] sm:max-h-[min(86vh,760px)] flex flex-col bg-tw-surface border border-tw-border shadow-panel rounded-t-3xl sm:rounded-3xl animate-slide-up sm:animate-pop-in overflow-hidden">
         <div className="sm:hidden w-10 h-1 bg-tw-border-strong rounded-full mx-auto mt-3" />
-        <header className="flex items-start gap-3 px-5 pt-4 pb-4 border-b border-tw-border bg-gradient-to-br from-teal-50/70 via-tw-surface to-tw-surface">
+        <header className="flex items-start gap-3 px-5 sm:px-6 pt-4 sm:pt-5 pb-4 border-b border-tw-border bg-gradient-to-br from-teal-50/70 via-tw-surface to-tw-surface">
           {lead}
           <div className="flex-1 min-w-0">
             {overline && <p className="section-label text-teal-600">{overline}</p>}
@@ -963,9 +997,11 @@ function Sheet({ title, overline, lead, onClose, footer, children }: {
             <Icon name="x" className="w-4 h-4" />
           </button>
         </header>
-        <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-5 space-y-5">{children}</div>
+        <div className="flex-1 overflow-y-auto overscroll-contain px-5 sm:px-6 py-5">{children}</div>
         {footer && (
-          <footer className="px-5 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] border-t border-tw-border bg-tw-surface-2/70">{footer}</footer>
+          <footer className="px-5 sm:px-6 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-4 border-t border-tw-border bg-tw-surface-2/70 flex sm:justify-end">
+            <div className="w-full sm:w-auto sm:min-w-[260px]">{footer}</div>
+          </footer>
         )}
       </section>
     </div>
@@ -1147,7 +1183,7 @@ export default function YsoPerformancePage({ user, onUserUpdate }: { user: AuthU
     d.people.find((p) => p.id === id)?.name ?? 'YSO'
   const review = (entry: YsoEntry, action: 'APPROVE' | 'REJECT' | 'REVOKE') =>
     setDecision({
-      title: `${tr(pretty(action))} ${tr('Task')} ${entry.task}`,
+      title: `${tr(pretty(action))} · ${tr(d.tasks.find((t) => t.id === entry.task)?.title ?? '')}`,
       description: `${personName(entry.personnelId)} · ${tr('submitted')} ${when(entry.submittedAt, locale)}. ${tr(action === 'APPROVE' ? 'The original submission time determines deadline points.' : action === 'REVOKE' ? 'This reverses the approved award and keeps the audit history.' : 'The YSO can correct and resubmit.')}`,
       label:
         action === 'APPROVE'
@@ -1159,7 +1195,7 @@ export default function YsoPerformancePage({ user, onUserUpdate }: { user: AuthU
       save: (reason) =>
         mutate(
           () => ysoApi.review(entry.id, action, reason),
-          `Task ${entry.task} reviewed.`
+          `${d.tasks.find((t) => t.id === entry.task)?.title ?? 'Entry'} reviewed.`
         ),
     })
   const penalty = (o: YsoObligation, outcome: string) =>
@@ -1184,7 +1220,7 @@ export default function YsoPerformancePage({ user, onUserUpdate }: { user: AuthU
       {entries.map((e) => (
         <article className="rounded-2xl border border-tw-border bg-tw-surface p-4" key={e.id}>
           <div className="flex items-start gap-3">
-            <TaskNumber id={e.task} size="sm" />
+            <TaskBadge id={e.task} tasks={d.tasks} />
             <div className="flex-1 min-w-0">
               <h4 className="font-semibold text-sm text-tw-text">
                 {!isYso && `${personName(e.personnelId)} · `}{taskTitle(e.task)}
@@ -1356,7 +1392,7 @@ export default function YsoPerformancePage({ user, onUserUpdate }: { user: AuthU
             return (
               <li className="px-4 sm:px-5 py-3" key={`${o.personnelId}/${o.key}`}>
                 <div className="flex items-start gap-3">
-                  <TaskNumber id={o.task} size="sm" />
+                  <TaskBadge id={o.task} tasks={d.tasks} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
                       <p className="text-sm font-semibold text-tw-text">
@@ -1404,10 +1440,7 @@ export default function YsoPerformancePage({ user, onUserUpdate }: { user: AuthU
   }
   const monthAssessment = d.assessments.find((a) => a.period === period)
   const evaluationTotal = monthAssessment ? Object.values(monthAssessment.scores).reduce((a, b) => a + Number(b || 0), 0) : null
-  const groups = [
-    ...TASK_GROUPS.map((g) => ({ ...g, tasks: d.tasks.filter((t) => g.ids.includes(t.id)) })),
-    { key: 'other', title: 'Other tasks', icon: 'tasks' as IconName, ids: [], tasks: d.tasks.filter((t) => !TASK_GROUPS.some((g) => g.ids.includes(t.id))) },
-  ].filter((g) => g.tasks.length > 0)
+  const groups = groupTasks(d.tasks)
   const statusPills = (task: YsoTask) => {
     if (task.id === 15)
       return evaluationTotal === null
@@ -1584,7 +1617,7 @@ export default function YsoPerformancePage({ user, onUserUpdate }: { user: AuthU
                               onClick={() => setSelectedTask(task.id)}
                               className="w-full text-left flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-3.5 hover:bg-tw-hover active:bg-tw-hover transition-colors group"
                             >
-                              <TaskNumber id={task.id} />
+                              <TaskNumber index={taskPosition(task.id, d.tasks).index} />
                               <div className="flex-1 min-w-0">
                                 <p className="font-semibold text-sm text-tw-text truncate">{tr(task.title)}</p>
                                 <p className="text-xs text-tw-text-secondary truncate mt-0.5">{tr(task.rule)}</p>
@@ -1613,7 +1646,7 @@ export default function YsoPerformancePage({ user, onUserUpdate }: { user: AuthU
                     {recentMonthEntries.slice(0, 8).map((e) => (
                       <li key={e.id}>
                         <button onClick={() => setSelectedTask(e.task)} className="w-full text-left flex items-center gap-3 px-4 sm:px-5 py-3 hover:bg-tw-hover transition-colors">
-                          <TaskNumber id={e.task} size="sm" />
+                          <TaskBadge id={e.task} tasks={d.tasks} />
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-tw-text truncate">{taskTitle(e.task)}</p>
                             <p className="text-xs text-tw-text-secondary">{when(e.submittedAt, locale)}</p>
@@ -1772,7 +1805,7 @@ export default function YsoPerformancePage({ user, onUserUpdate }: { user: AuthU
                   {tr("All reporting months · Review the evidence before approving. Approval time does not change deadline points.")}</p>
                 {entryList(queue, true)}
               </SectionCard>
-              <SectionCard title={tr("Task 15 · Monthly performance evaluation")} icon="star">
+              <SectionCard title={tr("Monthly performance evaluation")} icon="star">
                 <div className="flex flex-wrap gap-2">
                   {people
                     .filter((p) => p.active && p.startDate)
@@ -1872,8 +1905,8 @@ export default function YsoPerformancePage({ user, onUserUpdate }: { user: AuthU
         return (
           <Sheet
             onClose={() => setSelectedTask(null)}
-            lead={<TaskNumber id={task.id} />}
-            overline={`${tr("Task")} ${taskNo(task.id)}`}
+            lead={<TaskNumber index={taskPosition(task.id, d.tasks).index} />}
+            overline={`${tr(taskPosition(task.id, d.tasks).group.title)} · ${taskPosition(task.id, d.tasks).index}`}
             title={tr(task.title)}
             footer={
               task.id === 15 ? (
@@ -1893,8 +1926,10 @@ export default function YsoPerformancePage({ user, onUserUpdate }: { user: AuthU
               )
             }
           >
-            <h3 className="section-label -mb-3">{tr("This month")} · {monthLabel}</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="grid md:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-5 md:gap-6">
+              <div className="space-y-4 min-w-0">
+            <h3 className="section-label">{tr("This month")} · {monthLabel}</h3>
+            <div className="grid grid-cols-2 gap-2">
               {[
                 [tr("Points"), signed(task.id === 15 ? evaluation : s.points)],
                 [tr("Approved"), String(s.approved)],
@@ -1925,6 +1960,8 @@ export default function YsoPerformancePage({ user, onUserUpdate }: { user: AuthU
                 </div>
               </div>
             )}
+              </div>
+              <div className="min-w-0">
             {task.id === 15 ? (
               <div>
                 <h3 className="section-label mb-2">{tr("Monthly AD evaluation")}</h3>
@@ -1948,6 +1985,8 @@ export default function YsoPerformancePage({ user, onUserUpdate }: { user: AuthU
                 {entryList(history, false)}
               </div>
             )}
+              </div>
+            </div>
           </Sheet>
         )
       })()}

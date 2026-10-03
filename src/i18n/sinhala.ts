@@ -312,5 +312,6 @@ export const si: Record<string, string> = {
   'No YSOs with active reporting.': 'සක්‍රිය වාර්තාකරණය සහිත තරුණ සේවා නිලධාරීන් නැත.', 'Inactive': 'අක්‍රිය',
   'This month': 'මෙම මාසය',
   'Schedule': 'සැලසුම් කරන්න',
+  'Monthly performance evaluation': 'මාසික කාර්ය සාධන ඇගයීම',
   'Collapse sidebar': 'පැති තීරුව හකුළන්න', 'Expand sidebar': 'පැති තීරුව විහිදන්න',
 }
