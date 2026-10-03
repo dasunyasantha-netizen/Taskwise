@@ -69,8 +69,8 @@ export async function authenticateToken(req: Request, res: Response, next: NextF
           !payload.syswiseUserId || contact.syswiseUserId !== payload.syswiseUserId) {
         res.status(401).json({ error: 'Your role assignment changed. Open Taskwise from Syswise again.' }); return
       }
-    } else if (!payload.impersonationSessionId && contact?.legacyAccessRevokedAt) {
-      res.status(401).json({ error: 'This role was reassigned. Sign in through Syswise.' }); return
+    } else if (!payload.impersonationSessionId && (contact?.syswiseUserId || contact?.legacyAccessRevokedAt)) {
+      res.status(401).json({ error: 'Sign in through Syswise to open this role.', code: 'syswise_signin_required' }); return
     }
     if (payload.impersonationSessionId) {
       if (!payload.adminId) {

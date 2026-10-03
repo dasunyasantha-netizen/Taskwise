@@ -78,7 +78,9 @@ export async function unifiedLogin(req: Request, res: Response): Promise<void> {
         invalid(); return
       }
       const assignment = await prisma.migrationRoleContact.findUnique({ where: { actorType_actorId: { actorType: 'director', actorId: director.id } } })
-      if (assignment?.legacyAccessRevokedAt) { invalid(); return }
+      if (assignment?.syswiseUserId || assignment?.legacyAccessRevokedAt) {
+        res.status(401).json({ error: 'This account has migrated. Sign in through Syswise.', code: 'syswise_signin_required' }); return
+      }
       const token = signToken(director.id, 'director', director.workspaceId!)
 
       // Load workspace branding
@@ -140,7 +142,9 @@ export async function unifiedLogin(req: Request, res: Response): Promise<void> {
         invalid(); return
       }
       const assignment = await prisma.migrationRoleContact.findUnique({ where: { actorType_actorId: { actorType: 'personnel', actorId: personnel.id } } })
-      if (assignment?.legacyAccessRevokedAt) { invalid(); return }
+      if (assignment?.syswiseUserId || assignment?.legacyAccessRevokedAt) {
+        res.status(401).json({ error: 'This account has migrated. Sign in through Syswise.', code: 'syswise_signin_required' }); return
+      }
       const layerNumber = personnel.department.layer.number
       const token = signToken(personnel.id, 'personnel', personnel.workspaceId, {
         layerNumber,

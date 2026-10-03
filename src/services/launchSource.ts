@@ -81,3 +81,14 @@ export function launcherHomeUrl(source: LaunchSource = currentLaunchSource()): s
   const origin = currentLauncherOrigin() || fallbackOrigin;
   return `${origin}${source === 'pickiti' ? '/pickiti' : '/apps'}`;
 }
+
+/** The shared identity site also owns logout, so separate local app origins can clear its session. */
+export function sharedIdentityUrl(action: 'login' | 'logout', source: LaunchSource = currentLaunchSource()): string {
+  const local = ['localhost', '127.0.0.1'].includes(window.location.hostname)
+  const origin = currentLauncherOrigin() || (local ? (import.meta.env.VITE_SYSWISE_FRONTEND_URL || 'http://localhost:3100') : window.location.origin)
+  const next = `/sso/taskwise?source=${source}`
+  const target = new URL(action === 'logout' ? '/auth/logout' : source === 'pickiti' ? '/pickiti/login' : '/auth/login', origin)
+  target.searchParams.set('next', next)
+  if (action === 'logout') target.searchParams.set('source', source)
+  return target.toString()
+}

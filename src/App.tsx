@@ -11,7 +11,7 @@ import MigrationContactModal from './components/MigrationContactModal'
 import SyswiseCompanySelection from './components/SyswiseCompanySelection'
 import InsurancePolicyCompletionPrompt from './components/InsurancePolicyCompletionPrompt'
 import { authApi, noticeApi, type Notice } from './services/apiService'
-import { captureLaunchSource, type LaunchSource } from './services/launchSource'
+import { captureLaunchSource, sharedIdentityUrl, type LaunchSource } from './services/launchSource'
 import { LanguageProvider } from './i18n/Language'
 
 function NoticeBanner({ loggedIn }: { loggedIn: boolean }) {
@@ -128,6 +128,7 @@ export default function App() {
           localStorage.removeItem(USER_KEY)
           setUser(null)
           setView('login')
+          if (parsed.syswiseUserId) window.location.replace(sharedIdentityUrl('login', launchSource))
         })
       } catch {
         localStorage.removeItem(TOKEN_KEY)
@@ -138,7 +139,7 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    const handleSessionExpired = () => {
+    const handleSessionExpired = (event: Event) => {
       const realToken = localStorage.getItem(REAL_TOKEN_KEY)
       const realUser = localStorage.getItem(REAL_USER_KEY)
       if (realToken && realUser) {
@@ -160,6 +161,7 @@ export default function App() {
       localStorage.removeItem(REAL_USER_KEY)
       setUser(null)
       setView('login')
+      if ((event as CustomEvent).detail?.syswise) window.location.replace(sharedIdentityUrl('login', launchSource))
     }
     window.addEventListener('taskwise:session-expired', handleSessionExpired)
     return () => window.removeEventListener('taskwise:session-expired', handleSessionExpired)
@@ -190,6 +192,8 @@ export default function App() {
   const handleLogout = async () => {
     // If in impersonation session, end it on logout
     const currentUser = user
+    let sharedSession = !!currentUser?.syswiseUserId
+    try { sharedSession ||= !!JSON.parse(localStorage.getItem(REAL_USER_KEY) || '{}').syswiseUserId } catch { /* invalid cached support session */ }
     if (currentUser?.impersonation) {
       try { await authApi.endImpersonation('logout') } catch { /* best-effort */ }
     }
@@ -201,6 +205,7 @@ export default function App() {
     setUser(null)
     setView('login')
     setShowMigration(false)
+    if (sharedSession) window.location.replace(sharedIdentityUrl('logout', launchSource))
   }
 
   const handleUserUpdate = (updated: Partial<AuthUser>) => {

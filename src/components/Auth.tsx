@@ -5,7 +5,7 @@ import {
   startAuthentication,
 } from '@simplewebauthn/browser'
 import CompanyRequestModal from './CompanyRequestModal'
-import { launcherHomeUrl, launcherName } from '../services/launchSource'
+import { launcherHomeUrl, launcherName, sharedIdentityUrl } from '../services/launchSource'
 
 interface Props {
   onLogin: (token: string, user: AuthUser) => void
@@ -119,6 +119,9 @@ export default function Auth({ onLogin }: Props) {
         {!showBiometric ? (
           <>
             <h2 className="text-lg font-bold text-tw-text mb-5 text-center">Sign in to your account</h2>
+
+            <a href={sharedIdentityUrl('login')} className="btn-primary w-full text-center block mb-4">Sign in with Syswise</a>
+            <p className="text-xs text-tw-text-secondary text-center mb-4">Existing Taskwise login for users completing migration</p>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>

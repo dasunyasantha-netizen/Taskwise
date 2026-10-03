@@ -24,12 +24,14 @@ async function request<T>(
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: 'Request failed' }))
     if (res.status === 401 && token) {
+      let sharedSession = err.code === 'syswise_signin_required'
+      try { sharedSession ||= !!JSON.parse(localStorage.getItem('taskwise_user') || '{}').syswiseUserId } catch { /* invalid cached session */ }
       localStorage.removeItem('taskwise_token')
       localStorage.removeItem('taskwise_user')
       localStorage.removeItem('taskwise_view')
       localStorage.removeItem('taskwise_real_token')
       localStorage.removeItem('taskwise_real_user')
-      window.dispatchEvent(new CustomEvent('taskwise:session-expired'))
+      window.dispatchEvent(new CustomEvent('taskwise:session-expired', { detail: { syswise: sharedSession } }))
     }
     throw new Error(err.error || `HTTP ${res.status}`)
   }

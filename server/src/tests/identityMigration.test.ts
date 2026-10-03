@@ -93,6 +93,29 @@ async function main() {
     const actor = await db.personnel.findUniqueOrThrow({ where: { id: person.id } })
     assert.equal(actor.phone, '0771234500'); assert.equal(actor.loginId, 'IDB0771234500'); assert.equal(actor.password, hash)
   })
+  await test('migrated roles reject legacy passwords and sessions without changing credentials', async () => {
+    for (const [actor, actorType, workspaceId, loginId] of [
+      [director, 'director', workspaceA.id, 'IDA0771234500'], [person, 'personnel', workspaceB.id, 'IDB0771234500'],
+    ] as const) {
+      const r = res(); await auth.unifiedLogin(req({ phone: loginId, password: 'Legacy-Test!123' }), r)
+      assert.equal(r.statusCode, 401); assert.equal(r.body.code, 'syswise_signin_required'); assert.equal(r.body.token, undefined)
+      const legacy = jwt.sign({ actorId: actor.id, actorType, workspaceId }, process.env.JWT_SECRET!)
+      const denied = await authorize(legacy); assert.equal(denied.r.statusCode, 401); assert.equal(denied.allowed, false)
+    }
+    assert.equal((await db.director.findUniqueOrThrow({ where: { id: director.id } })).password, hash)
+    assert.equal((await db.personnel.findUniqueOrThrow({ where: { id: person.id } })).password, hash)
+    assert.equal((await authorize(directorToken)).allowed, true)
+    assert.equal((await authorize(personnelToken)).allowed, true)
+  })
+  await test('migrated roles reject both legacy passkey entry points', async () => {
+    const passkey = await import('../controllers/webAuthnController')
+    for (const [actorId, actorType, phone] of [[director.id, 'director', '0771234500'], [person.id, 'personnel', 'IDB0771234500']]) {
+      const options = res(); await passkey.authenticationOptions(req({ phone }), options)
+      assert.equal(options.statusCode, 401); assert.equal(options.body.code, 'syswise_signin_required')
+      const verify = res(); await passkey.authenticationVerify(req({ actorId, actorType, response: { id: 'old-passkey' } }), verify)
+      assert.equal(verify.statusCode, 401); assert.equal(verify.body.code, 'syswise_signin_required')
+    }
+  })
   await test('forged foreign role and expired selector are denied', async () => {
     const limited = jwt.sign({ purpose: 'taskwise-role-choice', syswiseUserId: 99, assignments: [assignments[0]] }, process.env.JWT_SECRET!)
     const r = res(); await sso.selectSyswiseRole(req({ selectionToken: limited, contactId: cb.id }), r); assert.equal(r.statusCode, 403)
@@ -127,8 +150,10 @@ async function main() {
   await test('old role chooser cannot reopen a reassigned position', async () => {
     const r = res(); await sso.selectSyswiseRole(req({ selectionToken: choice.selectionToken, contactId: cb.id }), r); assert.equal(r.statusCode, 403)
   })
-  await test('unchanged legacy account and password continue working', async () => {
-    const r = res(); await auth.unifiedLogin(req({ phone: 'IDA0771234500', password: 'Legacy-Test!123' }), r); assert.equal(r.statusCode, 200)
+  await test('unmigrated users keep their legacy login for phone collection', async () => {
+    const legacyActor = await db.director.create({ data: { name: 'Pending migration', phone: '0771234599', loginId: 'IDB0771234599', password: hash, workspaceId: workspaceB.id, companyId: companyB.id } })
+    const r = res(); await auth.unifiedLogin(req({ phone: legacyActor.loginId, password: 'Legacy-Test!123' }), r)
+    assert.equal(r.statusCode, 200); assert.ok(r.body.token); assert.equal((await authorize(r.body.token)).allowed, true)
   })
   await test('service outages do not issue a session or alter an assignment', async () => {
     globalThis.fetch = async () => { throw new Error('fixture outage') }
