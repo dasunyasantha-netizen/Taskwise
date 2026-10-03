@@ -14,10 +14,10 @@ const thread = {
   ],
 }
 
-async function openThread(page: Page, options: { language?: 'en' | 'si'; readOnly?: boolean; failedFile?: boolean; actor?: 'director' | 'personnel' } = {}) {
-  const user = { actorId: 'chairman', actorType: options.actor || 'director', workspaceId: 'letters-fixture', name: 'Chairman', companyName: 'NYSC', preferredLanguage: options.language || 'en', features: ['letters'],
+async function openThread(page: Page, options: { language?: 'en' | 'si'; readOnly?: boolean; failedFile?: boolean; actor?: 'director' | 'personnel'; assigner?: boolean } = {}) {
+  const user = { actorId: 'chairman', actorType: options.actor || 'director', workspaceId: 'letters-fixture', name: options.assigner ? 'Letter Assigner' : 'Chairman', isLetterAssigner: options.assigner, companyName: 'NYSC', preferredLanguage: options.language || 'en', features: ['letters'],
     impersonation: { sessionId: 'ui-fixture', adminId: 'admin', adminName: 'Support', startedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 3600000).toISOString(), reason: 'Local UI fixture' } }
-  const context = { me: { key: 'director:chairman', name: 'Chairman', director: !options.readOnly, logger: true }, today: '2026-10-03', people: [{ key: 'personnel:secretary', name: 'Secretary' }], entryDelayDays: 3, assigneeDays: 7, driveConnected: true }
+  const context = { me: { key: 'director:chairman', name: user.name, director: !options.readOnly && !options.assigner, logger: true, assigner: options.assigner }, today: '2026-10-03', people: [{ key: 'personnel:secretary', name: 'Secretary' }], entryDelayDays: 3, assigneeDays: 7, driveConnected: true }
   const data = structuredClone(thread)
   if (options.readOnly) data.permissions = { canManage: false, canReply: false, canReceive: false }
   if (options.failedFile) Object.assign(data.events[0].attachments[0], { uploadState: 'FAILED', previewState: 'FAILED', uploadError: 'The upload could not finish. Please retry.' })
@@ -34,7 +34,7 @@ async function openThread(page: Page, options: { language?: 'en' | 'si'; readOnl
   await page.addInitScript(user => {
     localStorage.setItem('taskwise_token', 'local-letter-ui-fixture')
     localStorage.setItem('taskwise_user', JSON.stringify(user))
-    localStorage.setItem('taskwise_view', 'letters')
+    if (!user.isLetterAssigner) localStorage.setItem('taskwise_view', 'letters')
     sessionStorage.setItem('taskwise_letter_open', 'thread-1')
   }, user)
   await page.goto('/taskwise/?legacy=1')
@@ -80,7 +80,7 @@ test('document preview, download and letter actions remain available', async ({ 
   const downloaded = page.waitForEvent('download')
   await documents.getByRole('button', { name: `Download ${file.name}`, exact: true }).click()
   expect((await downloaded).suggestedFilename()).toBe(file.name)
-  for (const [action, title] of [['Record reply & close', 'Record outgoing reply & close'], ['Reassign', 'Transfer responsibility'], ['Add note', 'Add internal note'], ['Share view', 'Share for viewing']]) {
+  for (const [action, title] of [['Record reply & close', 'Record outgoing reply & close'], ['Assign', 'Transfer responsibility'], ['Add note', 'Add internal note'], ['Share view', 'Share for viewing']]) {
     await page.getByRole('button', { name: action, exact: true }).click()
     await expect(page.getByRole('dialog').getByRole('heading', { name: title, exact: true })).toBeVisible()
     await page.keyboard.press('Escape')
@@ -92,8 +92,15 @@ test('read-only personnel view has document access without management actions', 
   await page.setViewportSize({ width: 390, height: 844 })
   await openThread(page, { actor: 'personnel', readOnly: true })
   await expect(page.getByRole('button', { name: 'Record reply & close', exact: true })).toHaveCount(0)
-  await expect(page.getByRole('button', { name: 'Reassign', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Assign', exact: true })).toHaveCount(0)
   await expect(page.getByRole('region', { name: 'Documents', exact: true }).getByRole('button', { name: `Download ${file.name}` })).toBeVisible()
+})
+
+test('Letter Assigner opens directly into Letters and can manage existing correspondence without company settings', async ({ page }) => {
+  await openThread(page, { actor: 'personnel', assigner: true })
+  await expect(page.getByRole('button', { name: 'Assign', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Add incoming reply', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Letter settings', exact: true })).toHaveCount(0)
 })
 
 test('failed processing exposes a readable message and retry instead of preview', async ({ page }) => {

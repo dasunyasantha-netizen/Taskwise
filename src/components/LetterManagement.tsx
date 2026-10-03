@@ -1275,11 +1275,11 @@ export function LetterSettingsPanel() {
                   key={p.key}
                   className="flex justify-between items-center gap-3 min-h-11 border-b border-tw-border text-sm"
                 >
-                  <span>{p.name}</span>
+                  <span>{p.name}{p.assigner && <span className="block text-xs text-tw-text-secondary">Manages company letters · change in Roles</span>}</span>
                   <input
                     type="checkbox"
                     checked={!!p.logger}
-                    disabled={busy}
+                    disabled={busy || p.assigner}
                     aria-label={`Letter Logger: ${p.name}`}
                     onChange={(e) =>
                       void run(async () => {

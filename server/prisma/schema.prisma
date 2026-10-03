@@ -236,6 +236,7 @@ model Personnel {
   fixedRole WorkspaceRole?
   preferredLanguage String @default("en") // en | si | ta
   isLetterLogger Boolean @default(false)
+  isLetterAssigner Boolean @default(false)
   id                 String      @id @default(uuid())
   workspaceId        String
   companyId          String?

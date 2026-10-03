@@ -185,6 +185,7 @@ export async function unifiedLogin(req: Request, res: Response): Promise<void> {
           companyPrefix: personnel.company?.prefix,
           layerNumber,
           departmentId: personnel.departmentId,
+          isLetterAssigner: personnel.isLetterAssigner,
           companyName: workspace?.companyName,
           companyLogo: workspace?.companyLogo,
           mustChangePassword: personnel.mustChangePassword,
@@ -353,7 +354,7 @@ export async function getMe(req: Request, res: Response): Promise<void> {
     } else {
       const personnel = await prisma.personnel.findUnique({
         where: { id: actorId },
-        select: { id: true, phone: true, email: true, nic: true, name: true, avatarUrl: true, preferredLanguage: true, departmentId: true, department: { include: { layer: true } }, workspaceId: true, loginId: true, companyId: true, company: { select: { prefix: true } } }
+        select: { id: true, phone: true, email: true, nic: true, name: true, avatarUrl: true, preferredLanguage: true, isLetterAssigner: true, departmentId: true, department: { include: { layer: true } }, workspaceId: true, loginId: true, companyId: true, company: { select: { prefix: true } } }
       })
       const workspace = workspaceId
         ? await prisma.workspace.findUnique({
@@ -573,7 +574,7 @@ export async function startImpersonation(req: Request, res: Response): Promise<v
 
     const isPersonnel = validatedTargetActorType === 'personnel'
     const personnelTarget = isPersonnel
-      ? target as typeof target & { departmentId: string; department: { name: string; officeCategory: string | null; layer: { number: number } } }
+      ? target as typeof target & { isLetterAssigner: boolean; departmentId: string; department: { name: string; officeCategory: string | null; layer: { number: number } } }
       : null
     const layerNumber = personnelTarget?.department.layer.number
     const token = signToken(target.id, validatedTargetActorType, target.workspaceId, {
@@ -604,7 +605,7 @@ export async function startImpersonation(req: Request, res: Response): Promise<v
           preferredLanguage: target.preferredLanguage,
         loginId: target.loginId || target.phone,
         ...(isPersonnel
-          ? { layerNumber, departmentId: personnelTarget!.departmentId, mustChangePassword: false, ysoRole: ysoRole(personnelTarget!.department) }
+          ? { layerNumber, departmentId: personnelTarget!.departmentId, isLetterAssigner: personnelTarget!.isLetterAssigner, mustChangePassword: false, ysoRole: ysoRole(personnelTarget!.department) }
           : {
               isChairman: (target as { isChairman?: boolean }).isChairman,
               isCompanyAdmin: (target as { isCompanyAdmin?: boolean }).isCompanyAdmin,

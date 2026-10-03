@@ -20,7 +20,7 @@ export async function listFixedRoles(req: Request, res: Response): Promise<void>
     return { id: r.id, name: actor.name, actorType, actorId: actor.id, personnelId: r.personnelId,
       departmentId: r.personnel?.departmentId, departmentName: r.personnel?.department.name,
       layerNumber: r.personnel?.department.layer.number, supervisorId: r.personnel?.supervisorId,
-      companyManagement: !!r.director, phone: contact?.phoneE164 || null,
+      companyManagement: !!r.director, isLetterAssigner: r.personnel?.isLetterAssigner === true, phone: contact?.phoneE164 || null,
       accountConnected: !!contact?.syswiseUserId }
   }).sort((a, b) => a.name.localeCompare(b.name)))
 }
@@ -32,8 +32,12 @@ export async function saveFixedRole(req: Request, res: Response): Promise<void> 
   try {
     const name = String(req.body?.name || '').trim(), departmentId = String(req.body?.departmentId || '')
     if (!name || name.length > 150) { res.status(400).json({ error: 'Enter a role name of up to 150 characters.' }); return }
+    if (req.body.isLetterAssigner !== undefined && typeof req.body.isLetterAssigner !== 'boolean') {
+      res.status(400).json({ error: 'Letter Assigner permission must be true or false.' }); return
+    }
     const existing = req.params.id ? await prisma.workspaceRole.findFirst({ where: { id: req.params.id, workspaceId }, include: { personnel: true, director: true } }) : null
     if (req.params.id && !existing) { res.status(404).json({ error: 'Role not found.' }); return }
+    const isLetterAssigner = req.body.isLetterAssigner ?? existing?.personnel?.isLetterAssigner ?? false
     const department = await prisma.department.findFirst({ where: { id: departmentId, workspaceId, deletedAt: null }, include: { layer: true } })
     if (!department) { res.status(400).json({ error: 'Select a department in this company.' }); return }
     const fourLevel = await isFourLevelWorkspace(workspaceId)
@@ -49,17 +53,17 @@ export async function saveFixedRole(req: Request, res: Response): Promise<void> 
     const role = await prisma.$transaction(async tx => {
       let role
       if (existing) {
-        if (existing.personnelId) await tx.personnel.update({ where: { id: existing.personnelId }, data: { name, departmentId, supervisorId: supervisor.value } })
+        if (existing.personnelId) await tx.personnel.update({ where: { id: existing.personnelId }, data: { name, departmentId, supervisorId: supervisor.value, isLetterAssigner } })
         if (existing.directorId) await tx.director.update({ where: { id: existing.directorId }, data: { name } })
         role = existing
       } else {
         const id = randomUUID()
         const position = await tx.personnel.create({ data: { id, name, departmentId, supervisorId: supervisor.value,
-          workspaceId, companyId: company?.id, phone: '', loginId: 'role:' + id, password: hash, mustChangePassword: false } })
+          workspaceId, companyId: company?.id, phone: '', loginId: 'role:' + id, password: hash, mustChangePassword: false, isLetterAssigner } })
         role = await tx.workspaceRole.create({ data: { id, workspaceId, personnelId: position.id } })
       }
       await tx.auditLog.create({ data: { workspaceId, actorType: 'director', actorDirectorId: actorId,
-        event: existing ? 'ROLE_UPDATED' : 'ROLE_CREATED', payload: { roleId: role.id, name, departmentId } } })
+        event: existing ? 'ROLE_UPDATED' : 'ROLE_CREATED', payload: { roleId: role.id, name, departmentId, supervisorId: supervisor.value, isLetterAssigner } } })
       return role
     })
     const contact = await prisma.migrationRoleContact.findUnique({ where: { actorType_actorId: {

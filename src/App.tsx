@@ -58,7 +58,7 @@ function NoticeBanner({ loggedIn }: { loggedIn: boolean }) {
 const TOKEN_KEY      = 'taskwise_token'
 const USER_KEY       = 'taskwise_user'
 const VIEW_KEY       = 'taskwise_view'
-const defaultViewFor = (u: AuthUser): ViewMode => u.ysoRole === 'YSO' && u.features?.includes('four_level_hierarchy') ? 'yso_performance' : u.actorType === 'director' ? 'director_dashboard' : 'personnel_queue'
+const defaultViewFor = (u: AuthUser): ViewMode => u.actorType === 'personnel' && u.isLetterAssigner ? 'letters' : u.ysoRole === 'YSO' && u.features?.includes('four_level_hierarchy') ? 'yso_performance' : u.actorType === 'director' ? 'director_dashboard' : 'personnel_queue'
 // System Admin stores the real session here during short-lived support access.
 const REAL_TOKEN_KEY = 'taskwise_real_token'
 const REAL_USER_KEY  = 'taskwise_real_user'

@@ -98,9 +98,11 @@ export async function scope(db: DB, actor: AuthPayload) {
     key: actorKey(actor),
     name: member.name,
     director: actor.actorType === 'director',
+    assigner: 'isLetterAssigner' in member && member.isLetterAssigner === true,
     logger:
       actor.actorType === 'director' ||
-      ('isLetterLogger' in member && member.isLetterLogger === true),
+      ('isLetterLogger' in member && member.isLetterLogger === true) ||
+      ('isLetterAssigner' in member && member.isLetterAssigner === true),
     prefix: workspace.company?.prefix || 'TW',
   }
 }

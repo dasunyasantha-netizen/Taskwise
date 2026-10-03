@@ -214,7 +214,7 @@ router.get(
     const [people, directors, config] = await Promise.all([
       prisma.personnel.findMany({
         where: { workspaceId: a.workspaceId, isActive: true, deletedAt: null },
-        select: { id: true, name: true, isLetterLogger: true },
+        select: { id: true, name: true, isLetterLogger: true, isLetterAssigner: true },
         orderBy: { name: 'asc' },
       }),
       prisma.director.findMany({
@@ -237,7 +237,8 @@ router.get(
         ...people.map((p) => ({
           key: `personnel:${p.id}`,
           name: p.name,
-          logger: s.director ? p.isLetterLogger : undefined,
+          logger: s.director ? p.isLetterLogger || p.isLetterAssigner : undefined,
+          assigner: s.director ? p.isLetterAssigner : undefined,
         })),
       ],
       entryDelayDays: config?.entryDelayDays ?? 2,
@@ -721,13 +722,13 @@ router.get(
       },
     })
     ensure(t, 404, 'Letter not found')
-    const manage = s.director || t.createdBy === s.key || t.assignedTo === s.key
+    const manage = s.director || s.assigner || t.createdBy === s.key || t.assignedTo === s.key
     res.json({
       ...t,
       permissions: {
         canManage: manage,
         canReply: manage && t.status === 'OPEN',
-        canReceive: s.director || t.createdBy === s.key,
+        canReceive: s.director || s.assigner || t.createdBy === s.key,
       },
       entryDelayDays: days(t.firstReceivedDate, today(t.createdAt)),
       assigneeAgeDays:
@@ -808,18 +809,18 @@ router.post(
           'This letter changed. Refresh before submitting your action.'
         )
         const manager =
-          s.director || t.createdBy === s.key || t.assignedTo === s.key
+          s.director || s.assigner || t.createdBy === s.key || t.assignedTo === s.key
         if (kind === 'INCOMING')
           ensure(
-            s.director || t.createdBy === s.key,
+            s.director || s.assigner || t.createdBy === s.key,
             403,
-            'Only the Director or original letter enterer may record incoming replies and reopen this thread'
+            'Only the Director, Letter Assigner or original letter enterer may record incoming replies and reopen this thread'
           )
         else
           ensure(
             manager,
             403,
-            'Only the current assignee, original enterer or Director may change this letter'
+            'Only the current assignee, original enterer, Letter Assigner or Director may change this letter'
           )
         if (kind === 'TRANSFER' || kind === 'OUTGOING')
           ensure(
@@ -1004,6 +1005,7 @@ router.post(
     ensure(f, 404, 'Attachment not found')
     ensure(
       s.director ||
+        s.assigner ||
         f.event.thread.createdBy === s.key ||
         f.event.thread.assignedTo === s.key,
       403,

@@ -1,5 +1,5 @@
 import { api } from './apiService'
-export type LetterPerson = { key: string; name: string; logger?: boolean }
+export type LetterPerson = { key: string; name: string; logger?: boolean; assigner?: boolean }
 export type LetterContext = {
   me: { key: string; name: string; director: boolean; logger: boolean }
   today: string

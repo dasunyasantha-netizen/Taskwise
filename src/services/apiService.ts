@@ -97,8 +97,8 @@ export type ManagedRoleContact = { actorType: string; actorId: string; name: str
 // ─── Workspace ───────────────────────────────────────────────────────────────
 export const workspaceApi = {
   fixedRoles: () => api.get<FixedRole[]>('/workspace/roles'),
-  createFixedRole: (data: { name: string; departmentId: string; supervisorId?: string }) => api.post('/workspace/roles', data),
-  updateFixedRole: (id: string, data: { name: string; departmentId: string; supervisorId?: string }) => api.put('/workspace/roles/' + id, data),
+  createFixedRole: (data: { name: string; departmentId: string; supervisorId?: string; isLetterAssigner?: boolean }) => api.post('/workspace/roles', data),
+  updateFixedRole: (id: string, data: { name: string; departmentId: string; supervisorId?: string; isLetterAssigner?: boolean }) => api.put('/workspace/roles/' + id, data),
   get:               ()              => api.get('/workspace'),
   update:            (data: unknown) => api.put('/workspace', data),
   updateProfile:     (data: unknown) => api.put('/workspace/profile', data),
@@ -135,7 +135,7 @@ export const workspaceApi = {
 
 export type FixedRole = { id: string; name: string; actorType: 'director' | 'personnel'; actorId: string;
   personnelId: string | null; departmentId?: string; departmentName?: string; layerNumber?: number;
-  supervisorId?: string | null; companyManagement: boolean; phone: string | null; accountConnected: boolean }
+  supervisorId?: string | null; companyManagement: boolean; isLetterAssigner?: boolean; phone: string | null; accountConnected: boolean }
 
 // ─── Projects ────────────────────────────────────────────────────────────────
 export const projectApi = {

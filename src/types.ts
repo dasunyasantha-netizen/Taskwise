@@ -13,6 +13,7 @@ export interface ImpersonationInfo {
 
 export interface AuthUser {
   roleBasedIdentity?: boolean
+  isLetterAssigner?: boolean
   roleId?: string
   personnelRoleId?: string
   actorId: string

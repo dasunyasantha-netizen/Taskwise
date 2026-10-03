@@ -97,7 +97,9 @@ async function main() {
   const logger = await createPerson('Logger'),
     assignee = await createPerson('Assignee'),
     other = await createPerson('Other'),
-    secondLogger = await createPerson('Second Logger')
+    secondLogger = await createPerson('Second Logger'),
+    assigner = await createPerson('Letter Assigner')
+  await db.personnel.update({ where: { id: assigner.id }, data: { isLetterAssigner: true } })
   const director = await db.director.create({
     data: {
       workspaceId: ws.id,
@@ -115,6 +117,10 @@ async function main() {
     },
   })
   const tokens = {
+    assigner: jwt.sign(
+      { actorId: assigner.id, actorType: 'personnel', workspaceId: ws.id },
+      process.env.JWT_SECRET!
+    ),
     logger: jwt.sign(
       { actorId: logger.id, actorType: 'personnel', workspaceId: ws.id },
       process.env.JWT_SECRET!
@@ -717,6 +723,45 @@ async function main() {
         }
       }
     )
+    await check('Letter Assigner can log and assign new letters without Director access', async () => {
+      const context = await call('assigner', '/context')
+      assert.equal(context.me.logger, true)
+      assert.equal(context.me.assigner, true)
+      assert.equal(context.me.director, false)
+      const created = await call('assigner', '/', incoming({ files: [], personKey: 'personnel:' + assignee.id }), 201)
+      const t = await call('assigner', '/' + created.id)
+      assert.equal(t.createdBy, 'personnel:' + assigner.id)
+      assert.equal(t.assignedTo, 'personnel:' + assignee.id)
+      await call('assigner', '/settings', undefined, 403)
+      await call('assigner', '/loggers/' + other.id, { enabled: true }, 403, 'PUT')
+      await call('assigner', '/drive/connect', {}, 403)
+    })
+    await check('Letter Assigner handles existing chains and incoming replies without changing their original owner', async () => {
+      await db.letterSettings.update({ where: { workspaceId: ws.id }, data: { connected: true, encryptedRefreshToken: encrypt('local-test-refresh') } })
+      const created = await call('director', '/', incoming({ files: [], personKey: 'personnel:' + assignee.id }), 201)
+      const route = '/' + created.id
+      let t = await call('assigner', route)
+      const originalReference = t.reference
+      assert.equal(t.permissions.canManage, true)
+      assert.equal(t.permissions.canReceive, true)
+      await call('assigner', route + '/events', { requestId: randomUUID(), kind: 'TRANSFER', version: t.version, personKey: 'personnel:' + other.id, notes: 'Sent for action', files: [] }, 201)
+      t = await call('assigner', route)
+      await call('assigner', route + '/events', { requestId: randomUUID(), kind: 'OUTGOING', version: t.version, correspondenceDate: today(), files: [file] }, 201)
+      t = await call('assigner', route)
+      assert.equal(t.status, 'CLOSED')
+      await call('assigner', route + '/events', { requestId: randomUUID(), kind: 'INCOMING', version: t.version, receivedDate: today(), notes: 'Follow-up in original chain', files: [] }, 201)
+      t = await call('assigner', route)
+      assert.equal(t.status, 'OPEN')
+      assert.equal(t.reference, originalReference)
+      assert.equal(t.createdBy, 'director:' + director.id)
+      assert.equal(t.assignedTo, 'personnel:' + other.id)
+      assert.deepEqual(t.events.map((e: any) => e.kind), ['INCOMING', 'TRANSFER', 'OUTGOING', 'INCOMING'])
+      await call('foreign', route, undefined, 404)
+      await call('assigner', route + '/events', { requestId: randomUUID(), kind: 'TRANSFER', version: t.version, personKey: 'director:' + foreign.id, notes: 'Wrong workspace', files: [] }, 400)
+      await db.personnel.update({ where: { id: assigner.id }, data: { isLetterAssigner: false } })
+      await call('assigner', route, undefined, 404)
+      await call('assigner', '/', incoming({ files: [] }), 403)
+    })
     console.log(`\n${passed} letter integration scenarios passed.`)
   } finally {
     server.close()

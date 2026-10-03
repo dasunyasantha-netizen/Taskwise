@@ -89,6 +89,6 @@ export async function selectSyswiseRole(req: Request, res: Response): Promise<vo
       companyName: actor.company?.displayName || actor.company?.legalName || workspace.companyName || workspace.name,
       companyLogo: workspace.companyLogo, loginId: actor.loginId || actor.phone, mustChangePassword: false,
       ...(!personnel && 'isChairman' in actor ? { isChairman: actor.isChairman, isSyswiseAdmin: actor.isSyswiseAdmin, isCompanyAdmin: actor.isCompanyAdmin } : {}),
-      ...(personnel ? { layerNumber: personnel.department.layer.number, departmentId: personnel.departmentId, ysoRole: ysoRole(personnel.department) } : {}), features } })
+      ...(personnel ? { layerNumber: personnel.department.layer.number, departmentId: personnel.departmentId, isLetterAssigner: personnel.isLetterAssigner, ysoRole: ysoRole(personnel.department) } : {}), features } })
   } catch { res.status(401).json({ error: 'Your company selection expired. Open Taskwise again.' }) }
 }
