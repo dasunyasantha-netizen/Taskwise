@@ -19,7 +19,14 @@ import {
   encrypt,
   encryptionReady,
 } from '../helpers/letters'
-import { oauth, callbackUrl, verifyFolder } from '../helpers/letterDrive'
+import {
+  oauth,
+  callbackUrl,
+  verifyFolder,
+  managedClient,
+  driveScope,
+  ensureFolder,
+} from '../helpers/letterDrive'
 const router = express.Router()
 const safe =
   (fn: (req: Request, res: Response) => Promise<unknown>) =>
@@ -75,6 +82,7 @@ const publicSettings = (c: any) => ({
   assigneeDays: c?.assigneeDays ?? 7,
   encryptionReady: encryptionReady(),
   callbackUrl: callbackUrl(),
+  managed: !!managedClient(),
 })
 
 router.get(
@@ -115,7 +123,8 @@ router.get(
       409,
       'Drive settings changed. Start the connection again.'
     )
-    let refresh: string
+    let refresh: string,
+      folderId = config.folderId
     try {
       const { tokens } = await oauth(config).getToken(req.query.code as string)
       ensure(
@@ -124,7 +133,10 @@ router.get(
         'Google did not return offline access. Start the connection again and allow access.'
       )
       refresh = tokens.refresh_token
-      await verifyFolder({ ...config, encryptedRefreshToken: encrypt(refresh) })
+      const connected = { ...config, encryptedRefreshToken: encrypt(refresh) }
+      if (managedClient())
+        folderId = await ensureFolder(connected, 'Taskwise Letters')
+      else await verifyFolder(connected)
     } catch (e) {
       if (e instanceof LetterError) throw e
       throw new LetterError(
@@ -143,7 +155,11 @@ router.get(
           workspaceId: state.workspaceId,
           updatedAt: state.configVersion,
         },
-        data: { connected: true, encryptedRefreshToken: encrypt(refresh) },
+        data: {
+          connected: true,
+          folderId,
+          encryptedRefreshToken: encrypt(refresh),
+        },
       })
       ensure(updated.count === 1, 409, 'Settings changed. Connect again.')
       await db.letterAttachment.updateMany({
@@ -163,7 +179,7 @@ router.get(
           event: 'LETTER_DRIVE_CONNECTED',
           actorType: 'director',
           actorDirectorId: state.directorId,
-          payload: { folderId: config.folderId },
+          payload: { folderId },
         },
       })
     })
@@ -247,9 +263,15 @@ router.put(
           400,
           'Delay thresholds must be 1–365 calendar days'
         )
-      const folderId = text(b.folderId, 'Folder ID', 200, false),
-        clientId = text(b.clientId, 'OAuth client ID', 300, false),
-        secret = text(b.clientSecret, 'Client secret', 500, false)
+      // With the platform client, Drive fields are server-managed.
+      const managed = !!managedClient(),
+        folderId = managed
+          ? old?.folderId || ''
+          : text(b.folderId, 'Folder ID', 200, false),
+        clientId = managed
+          ? old?.clientId || ''
+          : text(b.clientId, 'OAuth client ID', 300, false),
+        secret = managed ? '' : text(b.clientSecret, 'Client secret', 500, false)
       ensure(
         !folderId || /^[A-Za-z0-9_-]{10,200}$/.test(folderId),
         400,
@@ -347,15 +369,24 @@ router.post(
     const config = await prisma.letterSettings.findUnique({
       where: { workspaceId: a.workspaceId },
     })
-    ensure(config?.folderId, 400, 'Save a destination folder first')
-    const client = oauth(config),
+    ensure(
+      managedClient() || config?.folderId,
+      400,
+      'Save a destination folder first'
+    )
+    const settings =
+      config ??
+      (await prisma.letterSettings.create({
+        data: { workspaceId: a.workspaceId },
+      }))
+    const client = oauth(settings),
       state = randomBytes(32).toString('hex')
     await prisma.letterOAuthState.create({
       data: {
         stateHash: sha(state),
         workspaceId: a.workspaceId,
         directorId: a.actorId,
-        configVersion: config.updatedAt,
+        configVersion: settings.updatedAt,
         expiresAt: new Date(Date.now() + 600000),
       },
     })
@@ -363,8 +394,11 @@ router.post(
       url: client.generateAuthUrl({
         access_type: 'offline',
         prompt: 'consent',
-        scope: ['https://www.googleapis.com/auth/drive'],
+        scope: [driveScope()],
         state,
+        ...(typeof req.body?.email === 'string' && req.body.email.includes('@')
+          ? { login_hint: req.body.email.trim().slice(0, 320) }
+          : {}),
       }),
     })
   })

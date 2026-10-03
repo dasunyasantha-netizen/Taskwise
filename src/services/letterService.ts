@@ -83,6 +83,7 @@ export type DriveSettings = {
   assigneeDays: number
   encryptionReady: boolean
   callbackUrl: string
+  managed: boolean
 }
 export const letters = {
   context: () => api.get<LetterContext>('/letters/context'),

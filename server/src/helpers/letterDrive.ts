@@ -4,22 +4,38 @@ import { decrypt, ensure } from './letters'
 export const callbackUrl = () =>
   process.env.LETTER_OAUTH_CALLBACK ||
   'https://syswise.lk/taskwise-api/api/letters/drive/callback'
+// Platform-wide OAuth client (one Google Cloud app for every workspace).
+// When set, admins only click Connect; Taskwise creates its own folder.
+export const managedClient = () =>
+  process.env.LETTER_GOOGLE_CLIENT_ID && process.env.LETTER_GOOGLE_CLIENT_SECRET
+    ? {
+        id: process.env.LETTER_GOOGLE_CLIENT_ID,
+        secret: process.env.LETTER_GOOGLE_CLIENT_SECRET,
+      }
+    : null
+export const driveScope = () =>
+  managedClient()
+    ? 'https://www.googleapis.com/auth/drive.file'
+    : 'https://www.googleapis.com/auth/drive'
 export function oauth(
   config: Pick<
     LetterSettings,
     'clientId' | 'encryptedSecret' | 'encryptedRefreshToken'
   >
 ) {
+  const managed = managedClient()
   ensure(
-    config.clientId && config.encryptedSecret,
+    managed || (config.clientId && config.encryptedSecret),
     400,
     'Save Google OAuth client configuration first'
   )
-  const client = new OAuth2Client(
-    config.clientId,
-    decrypt(config.encryptedSecret),
-    callbackUrl()
-  )
+  const client = managed
+    ? new OAuth2Client(managed.id, managed.secret, callbackUrl())
+    : new OAuth2Client(
+        config.clientId!,
+        decrypt(config.encryptedSecret!),
+        callbackUrl()
+      )
   if (config.encryptedRefreshToken)
     client.setCredentials({
       refresh_token: decrypt(config.encryptedRefreshToken),
@@ -70,4 +86,26 @@ export async function verifyFolder(config: LetterSettings) {
     'Google account needs permission to add files to this folder'
   )
   return folder.name as string
+}
+export async function createFolder(config: LetterSettings, name: string) {
+  const folder = await driveRequest(config, 'files?fields=id', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name,
+      mimeType: 'application/vnd.google-apps.folder',
+    }),
+  })
+  return folder.id as string
+}
+// Reuse the saved folder when this connection can still write to it,
+// otherwise create a fresh one (drive.file only sees app-created folders).
+export async function ensureFolder(config: LetterSettings, name: string) {
+  if (config.folderId) {
+    try {
+      await verifyFolder(config)
+      return config.folderId
+    } catch {}
+  }
+  return createFolder(config, name)
 }

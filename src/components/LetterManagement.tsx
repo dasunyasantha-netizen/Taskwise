@@ -1201,6 +1201,7 @@ export function LetterSettingsPanel() {
                 />
               </Field>
             </div>
+            {!settings.managed && (<>
             <h3 className="font-semibold pt-2">{tr("Google Drive connection")}</h3>
             <p className="text-sm text-tw-text-secondary">
               {tr("Use an organization-controlled Google account with access to the destination folder. Taskwise saves original documents there without making them public. Credentials are encrypted and never returned to the browser.")}</p>
@@ -1262,9 +1263,17 @@ export function LetterSettingsPanel() {
               <p className="mt-3">
                 {tr("Access to a manually entered existing folder requires the Google Drive scope. Google's consent screen describes this access. Taskwise's upload worker uses only the configured folder; do not share that folder with people who should not see all its letters.")}</p>
             </details>
+            </>)}
             <button className={button} disabled={busy}>
               {tr("Save letter settings")}</button>
           </form>
+          {settings.managed && (
+            <div className="border-t border-tw-border pt-4">
+              <h3 className="font-semibold">{tr("Google Drive connection")}</h3>
+              <p className="text-sm text-tw-text-secondary mt-1">
+                {tr("Click Connect and sign in with your Google account. Taskwise creates a private \"Taskwise Letters\" folder in your Drive and can only access files it creates.")}</p>
+            </div>
+          )}
           <div className="flex flex-wrap items-center gap-2 border-t border-tw-border pt-4">
             <span className="text-sm mr-2">
               {settings.connected
@@ -1273,7 +1282,11 @@ export function LetterSettingsPanel() {
             </span>
             <button
               className={secondary}
-              disabled={busy || !settings.hasClientSecret || !settings.folderId}
+              disabled={
+                busy ||
+                (!settings.managed &&
+                  (!settings.hasClientSecret || !settings.folderId))
+              }
               onClick={() =>
                 void run(async () => {
                   const r = await letters.connect()
