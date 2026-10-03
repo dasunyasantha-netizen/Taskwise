@@ -4,6 +4,7 @@ import { taskApi, workspaceApi } from '../services/apiService'
 import DatePicker from './DatePicker'
 import Select from './Select'
 import ProgressUpdateSheet from './ProgressUpdateSheet'
+import { Icon } from './ui/Icon'
 
 interface Props {
   task: Task
@@ -390,46 +391,40 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in">
+      <div className="modal-panel w-full max-w-2xl max-h-[92vh] flex flex-col overflow-hidden">
 
         {/* ── Return-from-chairman banner ───────────────────────────────── */}
         {showReturnBanner && (
-          <div className="bg-red-600 text-white px-5 py-3.5 flex items-start gap-3 flex-shrink-0">
-            <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
-            </svg>
+          <div className="bg-gradient-to-r from-[#e2445c] to-[#c9304a] text-white px-5 py-3.5 flex items-start gap-3 flex-shrink-0">
+            <Icon name="alert" className="w-5 h-5 flex-shrink-0 mt-0.5" />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-bold leading-snug">This task has been returned to you by the Chairman's office.</p>
-              <p className="text-xs mt-1 text-red-100 leading-relaxed">
+              <p className="text-xs mt-1 text-white/80 leading-relaxed">
                 If you are unsure why it was returned, review the Progress Updates tab for context or contact the Chairman's office directly.
               </p>
               {task.returnReason && (
-                <p className="text-xs mt-1.5 bg-red-700/50 rounded-lg px-3 py-2 leading-relaxed">
+                <p className="text-xs mt-1.5 bg-black/20 rounded-lg px-3 py-2 leading-relaxed">
                   <span className="font-semibold">Reason: </span>{task.returnReason}
                 </p>
               )}
             </div>
             <button
               onClick={dismissReturnBanner}
-              className="flex-shrink-0 w-7 h-7 rounded-lg bg-red-500 hover:bg-red-400 flex items-center justify-center transition-colors mt-0.5"
+              className="flex-shrink-0 w-7 h-7 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center transition-colors mt-0.5"
               title="Dismiss"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
+              <Icon name="x" className="w-4 h-4" />
             </button>
           </div>
         )}
 
         {/* ── Header ───────────────────────────────────────────────────── */}
-        <div className="px-6 py-5 border-b border-tw-border">
+        <div className="px-6 py-5 border-b border-tw-border bg-gradient-to-br from-tw-primary/[0.07] via-tw-surface to-tw-purple/[0.06]">
           {onBack && parentTask && (
             <button onClick={onBack}
               className="flex items-center gap-1.5 text-xs text-tw-text-secondary hover:text-tw-primary mb-3 transition-colors group">
-              <svg className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
+              <Icon name="arrowLeft" className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform" />
               Back to: <span className="font-medium text-tw-text group-hover:text-tw-primary truncate max-w-xs">{parentTask.title}</span>
             </button>
           )}
@@ -438,27 +433,25 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
               <div className="flex flex-wrap items-center gap-2 mb-2">
                 <span className={`badge ${statusColors[task.status]}`}>{displayStatus(task.status)}</span>
                 <span className={`badge ${priorityColors[task.priority]}`}>{task.priority}</span>
-                {task.project && <span className="text-xs text-tw-text-secondary">📋 {task.project.name}</span>}
-                {isOverdue && <span className="text-xs text-tw-danger font-semibold">⚠ OVERDUE</span>}
+                {task.project && <span className="text-xs text-tw-text-secondary inline-flex items-center gap-1"><Icon name="project" className="w-3.5 h-3.5" /> {task.project.name}</span>}
+                {isOverdue && <span className="badge badge-danger"><Icon name="alert" className="w-3 h-3" /> OVERDUE</span>}
               </div>
               {editMode ? (
                 <input className="input text-base font-bold w-full" autoFocus
                   value={editForm.title} onChange={e => setEditForm(f => ({ ...f, title: e.target.value }))} />
               ) : (
-                <h2 className="text-lg font-bold text-tw-text leading-snug">{task.title}</h2>
+                <h2 className="text-lg font-bold text-tw-text leading-snug tracking-tight">{task.title}</h2>
               )}
             </div>
             <div className="flex items-center gap-1 flex-shrink-0">
               {canEdit && !editMode && (
                 <button onClick={() => { setEditForm({ title: task.title, description: task.description || '', deadline: task.deadline ? new Date(task.deadline).toISOString().slice(0, 10) : '' }); setEditMode(true) }}
-                  className="text-xs text-tw-text-secondary hover:text-tw-primary px-2 py-1 rounded hover:bg-tw-hover transition-colors" title="Edit task">
-                  ✎ Edit
+                  className="btn-ghost btn-sm" title="Edit task">
+                  <Icon name="edit" className="w-3.5 h-3.5" /> Edit
                 </button>
               )}
-              <button onClick={onClose} className="w-8 h-8 rounded-lg bg-red-100 hover:bg-red-200 text-red-600 flex items-center justify-center transition-colors flex-shrink-0" title="Close">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12"/>
-                </svg>
+              <button onClick={onClose} className="icon-btn border-tw-border bg-tw-surface" title="Close">
+                <Icon name="x" className="w-4 h-4" />
               </button>
             </div>
           </div>
@@ -466,13 +459,13 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
           {/* Quick meta row */}
           <div className="flex flex-wrap gap-4 mt-3 text-xs text-tw-text-secondary">
             {task.deadline && (
-              <span className={isOverdue ? 'text-tw-danger font-semibold' : ''}>
-                📅 {new Date(task.deadline).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+              <span className={`inline-flex items-center gap-1 ${isOverdue ? 'text-tw-danger font-semibold' : ''}`}>
+                <Icon name="calendar" className="w-3.5 h-3.5" /> {new Date(task.deadline).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
               </span>
             )}
             {task.assignments?.map(a => (
-              <span key={a.id}>
-                👤 {a.personnel?.name || a.department?.name}
+              <span key={a.id} className="inline-flex items-center gap-1">
+                <Icon name="user" className="w-3.5 h-3.5" /> {a.personnel?.name || a.department?.name}
                 {a.departmentId && ' (dept)'}
               </span>
             ))}
@@ -480,9 +473,9 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
 
           {/* Error banner */}
           {actionError && (
-            <div className="mt-3 text-xs text-tw-danger bg-red-50 border border-red-200 rounded-lg px-3 py-2 flex items-center justify-between">
+            <div className="mt-3 alert-error text-xs flex items-center justify-between">
               {actionError}
-              <button onClick={() => setActionError('')} className="ml-2 font-bold text-base leading-none">×</button>
+              <button onClick={() => setActionError('')} className="ml-2"><Icon name="x" className="w-3.5 h-3.5" /></button>
             </div>
           )}
 
@@ -490,61 +483,61 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
           <div className="flex flex-wrap gap-2 mt-4">
             {canAccept && !canSelfAssign && (
               <button disabled={loading} onClick={handleAccept}
-                className="btn-primary text-sm py-2 px-4 flex items-center gap-1.5">
-                ✓ Accept Task
+                className="btn-primary">
+                <Icon name="check" className="w-4 h-4" /> Accept Task
               </button>
             )}
             {canSubmit && (
               <button disabled={loading} onClick={handleSubmitAttempt}
-                className="text-sm py-2 px-4 rounded-lg bg-tw-success text-white font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity flex items-center gap-1.5">
-                ✓ Complete
+                className="btn-success">
+                <Icon name="check" className="w-4 h-4" /> Complete
               </button>
             )}
             {canSubtask && (
               <button onClick={() => { setShowSubtask(true); setActionError('') }}
-                className="btn-secondary text-sm py-2 px-4 flex items-center gap-1.5">
-                + Create Subtask
+                className="btn-secondary">
+                <Icon name="plus" className="w-4 h-4" /> Create Subtask
               </button>
             )}
             {canReopen && (
               <button disabled={loading} onClick={() => doAction(() => taskApi.reopen(task.id))}
-                className="btn-secondary text-sm py-2 px-4">
-                ↻ Reopen
+                className="btn-secondary">
+                <Icon name="refresh" className="w-4 h-4" /> Reopen
               </button>
             )}
             {canExtend && (
               <button onClick={() => { setExtendForm({ newDeadline: '', reason: '', note: '' }); setExtendError(''); setShowExtendModal(true) }}
-                className="btn-secondary text-sm py-2 px-4 text-amber-700 border-amber-300 hover:bg-amber-50">
-                📅 Extend Deadline
+                className="btn-secondary text-amber-700 border-amber-300 hover:bg-amber-50">
+                <Icon name="calendar" className="w-4 h-4" /> Extend Deadline
               </button>
             )}
             {canChangeAssignees && (
               <button onClick={openChangeAssignees}
-                className="btn-secondary text-sm py-2 px-4">
-                👥 Change Assignees
+                className="btn-secondary">
+                <Icon name="users" className="w-4 h-4" /> Change Assignees
               </button>
             )}
             {canReturn && (
               <button disabled={loading} onClick={() => setShowReturn(true)}
-                className="btn-secondary text-sm py-2 px-4 text-tw-danger border-tw-danger hover:bg-red-50">
-                ↩ Return
+                className="btn-outline-danger">
+                <Icon name="sendBack" className="w-4 h-4" /> Return
               </button>
             )}
             {canReassign && (
               <button disabled={loading} onClick={() => setShowReassign(true)}
-                className="btn-secondary text-sm py-2 px-4">
-                {task.status === 'PENDING' ? '👤 Assign' : '⇄ Reassign'}
+                className="btn-secondary">
+                {task.status === 'PENDING' ? <><Icon name="user" className="w-4 h-4" /> Assign</> : <><Icon name="swap" className="w-4 h-4" /> Reassign</>}
               </button>
             )}
           </div>
         </div>
 
         {/* ── Tabs ─────────────────────────────────────────────────────── */}
-        <div className="flex border-b border-tw-border px-6">
+        <div className="flex gap-1 border-b border-tw-border px-5 overflow-x-auto">
           {(['details', 'updates', 'subtasks', 'history'] as TabKey[]).map(t => (
             <button key={t} onClick={() => setTab(t)}
-              className={`py-2.5 px-3 text-xs font-medium border-b-2 transition-colors capitalize
-                ${tab === t ? 'border-tw-primary text-tw-primary' : 'border-transparent text-tw-text-secondary hover:text-tw-text'}`}>
+              className={`py-3 px-3 text-sm font-medium border-b-2 -mb-px transition-colors capitalize whitespace-nowrap
+                ${tab === t ? 'border-tw-primary text-tw-primary-text' : 'border-transparent text-tw-text-secondary hover:text-tw-text'}`}>
               {t}
               {t === 'subtasks' && task._count?.subtasks ? ` (${task._count.subtasks})` : ''}
               {t === 'updates' && progressLogs.length > 0 ? ` (${progressLogs.length})` : ''}
@@ -559,27 +552,27 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
           {tab === 'details' && (
             <div className="space-y-5">
               {editMode ? (
-                <div className="space-y-3 bg-tw-hover rounded-xl p-4">
+                <div className="space-y-3 panel-muted p-4">
                   <div>
-                    <label className="block text-xs font-semibold text-tw-text-secondary mb-1">Description</label>
+                    <label className="label">Description</label>
                     <textarea className="input resize-none w-full" rows={4}
                       placeholder="Task description…"
                       value={editForm.description} onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))} />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-tw-text-secondary mb-1">Deadline</label>
+                    <label className="label">Deadline</label>
                     <DatePicker value={editForm.deadline} onChange={val => setEditForm(f => ({ ...f, deadline: val }))} />
                   </div>
                   <div className="flex gap-2 justify-end pt-1">
                     <button onClick={() => setEditMode(false)} className="btn-secondary text-sm">Cancel</button>
                     <button disabled={!editForm.title.trim() || loading} onClick={handleSaveEdit} className="btn-primary text-sm disabled:opacity-50">
-                      {loading ? 'Saving…' : '✓ Save Changes'}
+                      {loading ? 'Saving…' : <><Icon name="check" className="w-4 h-4" /> Save Changes</>}
                     </button>
                   </div>
                 </div>
               ) : task.description ? (
                 <div>
-                  <div className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-2">Description</div>
+                  <div className="section-label mb-2">Description</div>
                   <p className="text-sm text-tw-text leading-relaxed whitespace-pre-wrap">{task.description}</p>
                 </div>
               ) : (
@@ -589,7 +582,7 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
               {/* Assigned to */}
               {task.assignments?.length > 0 && (
                 <div>
-                  <div className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-2">Assigned To</div>
+                  <div className="section-label mb-2">Assigned To</div>
                   <div className="space-y-1.5">
                     {task.assignments.map(a => (
                       <div key={a.id} className="flex items-center gap-2">
@@ -606,8 +599,8 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
 
               {/* Ownership */}
               {task.actedById && (
-                <div className="bg-blue-50 border border-blue-100 rounded-lg px-4 py-3">
-                  <div className="text-xs font-semibold text-tw-primary mb-0.5">Accepted by</div>
+                <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
+                  <div className="text-xs font-semibold text-tw-primary-text mb-0.5">Accepted by</div>
                   <p className="text-sm text-tw-text">
                     {task.actedByName || (task.actedByType === 'director' ? 'Director' : 'Personnel')}
                   </p>
@@ -627,7 +620,7 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
 
               {/* Return reason */}
               {(task.returnReason || task.cancelReason) && (
-                <div className="rounded-lg p-3 bg-red-50 border border-red-200">
+                <div className="rounded-xl p-3 bg-red-50 border border-red-200">
                   <div className="text-xs font-semibold mb-1 text-tw-danger">
                     {task.status === 'RETURNED' ? 'Returned reason' : 'Rejection reason'}
                   </div>
@@ -637,18 +630,18 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
 
               {/* Subtask progress summary */}
               {(task._count?.subtasks ?? 0) > 0 && (
-                <div className="bg-tw-hover rounded-lg px-4 py-3">
+                <div className="panel-muted px-4 py-3">
                   <div className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">Subtasks</div>
-                  <button onClick={() => setTab('subtasks')} className="text-sm text-tw-primary hover:underline">
-                    View {task._count!.subtasks} subtask{task._count!.subtasks !== 1 ? 's' : ''} →
+                  <button onClick={() => setTab('subtasks')} className="text-sm text-tw-primary-text hover:underline inline-flex items-center gap-1">
+                    View {task._count!.subtasks} subtask{task._count!.subtasks !== 1 ? 's' : ''} <Icon name="arrowRight" className="w-3.5 h-3.5" />
                   </button>
                 </div>
               )}
 
               {/* Dept-pending notice */}
               {canAccept && !canSelfAssign && (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3">
-                  <p className="text-sm text-yellow-800 font-medium">
+                <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+                  <p className="text-sm text-amber-800 font-medium">
                     This task is assigned to your department. Accept it to take personal ownership and start working.
                   </p>
                 </div>
@@ -678,13 +671,13 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
                 </div>
               ) : (
                 <div className="border border-tw-border rounded-xl overflow-hidden">
-                  <table className="w-full text-sm">
+                  <table className="table-modern">
                     <thead>
-                      <tr className="bg-tw-hover border-b border-tw-border">
-                        <th className="px-4 py-2.5 text-left text-xs font-semibold text-tw-text-secondary uppercase tracking-wide w-24">Date</th>
-                        <th className="px-4 py-2.5 text-left text-xs font-semibold text-tw-text-secondary uppercase tracking-wide w-20">Time</th>
-                        <th className="px-4 py-2.5 text-left text-xs font-semibold text-tw-text-secondary uppercase tracking-wide">Update</th>
-                        <th className="px-4 py-2.5 text-left text-xs font-semibold text-tw-text-secondary uppercase tracking-wide w-28">By</th>
+                      <tr>
+                        <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-tw-text-secondary uppercase tracking-[0.08em] w-24">Date</th>
+                        <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-tw-text-secondary uppercase tracking-[0.08em] w-20">Time</th>
+                        <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-tw-text-secondary uppercase tracking-[0.08em]">Update</th>
+                        <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-tw-text-secondary uppercase tracking-[0.08em] w-28">By</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-tw-border">
@@ -714,8 +707,8 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
                   <button
                     disabled={loading}
                     onClick={handleSubmitAttempt}
-                    className="w-full py-2.5 rounded-lg bg-tw-success text-white font-semibold text-sm hover:opacity-90 disabled:opacity-50 transition-opacity flex items-center justify-center gap-2">
-                    ✓ Mark as Complete
+                    className="btn-success w-full py-2.5">
+                    <Icon name="check" className="w-4 h-4" /> Mark as Complete
                   </button>
                 </div>
               )}
@@ -727,8 +720,8 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
             <div>
               {canSubtask && (
                 <button onClick={() => { setShowSubtask(true); setActionError('') }}
-                  className="mb-4 btn-secondary text-sm py-2 px-4">
-                  + Create Subtask
+                  className="mb-4 btn-secondary">
+                  <Icon name="plus" className="w-4 h-4" /> Create Subtask
                 </button>
               )}
               {subtasks.length === 0 ? (
@@ -742,7 +735,7 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
                     const clickable = !!onSubtaskOpen
                     return (
                       <div key={s.id}
-                        className={`card p-3 ${clickable ? 'cursor-pointer hover:border-tw-primary hover:shadow-sm transition-all' : ''}`}
+                        className={`card p-3 ${clickable ? 'cursor-pointer card-hover' : ''}`}
                         onClick={clickable ? () => onSubtaskOpen!(s) : undefined}>
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
@@ -751,15 +744,15 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
                           </div>
                           <div className="flex items-center gap-2 flex-shrink-0">
                             <span className={`badge ${statusColors[s.status]} text-xs`}>{displayStatus(s.status)}</span>
-                            {clickable && <svg className="w-3.5 h-3.5 text-tw-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/></svg>}
+                            {clickable && <Icon name="chevronRight" className="w-4 h-4 text-tw-text-muted" />}
                           </div>
                         </div>
                         <div className="flex items-center gap-3 mt-2 flex-wrap">
                           <span className={`badge ${priorityColors[s.priority]} text-xs`}>{s.priority}</span>
-                          <span className="text-xs text-tw-text-secondary">→ {assigneeName}</span>
+                          <span className="text-xs text-tw-text-secondary inline-flex items-center gap-1"><Icon name="arrowRight" className="w-3 h-3" /> {assigneeName}</span>
                           {s.deadline && (
-                            <span className="text-xs text-tw-text-secondary">
-                              📅 {new Date(s.deadline).toLocaleDateString()}
+                            <span className="text-xs text-tw-text-secondary inline-flex items-center gap-1">
+                              <Icon name="calendar" className="w-3 h-3" /> {new Date(s.deadline).toLocaleDateString()}
                             </span>
                           )}
                         </div>
@@ -799,7 +792,7 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
                           </div>
                           <div className="text-xs text-tw-text-secondary mt-0.5">
                             {new Date(ext.oldDeadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                            {' → '}
+                            <Icon name="arrowRight" className="inline w-3 h-3 mx-1" />
                             {new Date(ext.newDeadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                           </div>
                           <div className="text-xs text-tw-text-secondary mt-0.5 italic">Reason: "{ext.reason}"</div>
@@ -853,8 +846,8 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
 
       {/* ── Extend Deadline modal ───────────────────────────────────────── */}
       {showExtendModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-60 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+        <div className="fixed inset-0 flex items-center justify-center z-[60] p-4 bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in">
+          <div className="modal-panel w-full max-w-sm">
             <div className="px-5 py-4 border-b border-tw-border">
               <h3 className="font-semibold text-tw-text">Extend Deadline</h3>
               <p className="text-xs text-tw-text-secondary mt-0.5">
@@ -865,28 +858,28 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
             </div>
             <div className="px-5 py-4 space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">New Deadline <span className="text-tw-danger">*</span></label>
+                <label className="label">New Deadline <span className="text-tw-danger">*</span></label>
                 <DatePicker
                   value={extendForm.newDeadline}
                   onChange={val => setExtendForm(f => ({ ...f, newDeadline: val }))}
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">Reason <span className="text-tw-danger">*</span></label>
+                <label className="label">Reason <span className="text-tw-danger">*</span></label>
                 <textarea className="input resize-none" rows={2} autoFocus
                   placeholder="Why is the deadline being extended?"
                   value={extendForm.reason}
                   onChange={e => setExtendForm(f => ({ ...f, reason: e.target.value }))} />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">Note <span className="text-tw-text-secondary font-normal">(optional)</span></label>
+                <label className="label">Note <span className="text-tw-text-secondary font-normal">(optional)</span></label>
                 <textarea className="input resize-none" rows={2}
                   placeholder="Additional context for records…"
                   value={extendForm.note}
                   onChange={e => setExtendForm(f => ({ ...f, note: e.target.value }))} />
               </div>
               {extendError && (
-                <div className="text-xs text-tw-danger bg-red-50 border border-red-200 rounded-lg px-3 py-2">{extendError}</div>
+                <div className="alert-error text-xs">{extendError}</div>
               )}
               <div className="flex gap-2 justify-end pt-1">
                 <button onClick={() => { setShowExtendModal(false); setExtendForm({ newDeadline: '', reason: '', note: '' }); setExtendError('') }} className="btn-secondary">
@@ -895,7 +888,7 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
                 <button
                   disabled={!extendForm.newDeadline || !extendForm.reason.trim() || extendSaving}
                   onClick={handleExtendDeadline}
-                  className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold disabled:opacity-50 transition-colors">
+                  className="btn text-white bg-gradient-to-b from-amber-400 to-amber-500 shadow-[0_4px_14px_-4px_rgba(245,158,11,0.7)] hover:brightness-105">
                   {extendSaving ? 'Saving…' : 'Extend Deadline'}
                 </button>
               </div>
@@ -906,8 +899,8 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
 
       {/* ── Return modal ────────────────────────────────────────────────── */}
       {showReturn && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-60 p-4">
-          <div className="bg-white rounded-xl shadow-panel w-full max-w-sm">
+        <div className="fixed inset-0 flex items-center justify-center z-[60] p-4 bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in">
+          <div className="modal-panel w-full max-w-sm">
             <div className="px-5 py-4 border-b border-tw-border">
               <h3 className="font-semibold text-tw-text">Return Task</h3>
               <p className="text-xs text-tw-text-secondary mt-0.5">This task will be returned to the assigning authority with your reason.</p>
@@ -919,7 +912,7 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
               <div className="flex gap-2 justify-end">
                 <button onClick={() => { setShowReturn(false); setReturnReason('') }} className="btn-secondary">Cancel</button>
                 <button disabled={!returnReason.trim() || loading} onClick={handleReturn}
-                  className="px-4 py-2 rounded-lg bg-tw-danger text-white text-sm font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity">
+                  className="btn-danger">
                   Return Task
                 </button>
               </div>
@@ -930,8 +923,8 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
 
       {/* ── Reassign modal ──────────────────────────────────────────────── */}
       {showReassign && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-60 p-4">
-          <div className="bg-white rounded-xl shadow-panel w-full max-w-sm">
+        <div className="fixed inset-0 flex items-center justify-center z-[60] p-4 bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in">
+          <div className="modal-panel w-full max-w-sm">
             <div className="px-5 py-4 border-b border-tw-border">
               <h3 className="font-semibold text-tw-text">{task.status === 'PENDING' ? 'Assign Task' : 'Reassign Task'}</h3>
               <p className="text-xs text-tw-text-secondary mt-0.5">{task.status === 'PENDING' ? 'Choose a person to assign this task to.' : 'Transfer ownership to another team member. A reason is required.'}</p>
@@ -957,10 +950,10 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
 
       {/* ── Submit / Mark Complete confirm ──────────────────────────────── */}
       {showSubmitConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-60 p-4">
-          <div className="bg-white rounded-xl shadow-panel w-full max-w-sm">
+        <div className="fixed inset-0 flex items-center justify-center z-[60] p-4 bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in">
+          <div className="modal-panel w-full max-w-sm">
             <div className="px-5 py-4 border-b border-tw-border">
-              <h3 className="font-semibold text-tw-text">⚠ Incomplete Subtasks</h3>
+              <h3 className="font-semibold text-tw-text inline-flex items-center gap-2"><span className="icon-tile tile-amber w-8 h-8 rounded-lg"><Icon name="alert" className="w-4 h-4" /></span> Incomplete Subtasks</h3>
             </div>
             <div className="px-5 py-4 space-y-3">
               <p className="text-sm text-tw-text">The following subtasks are not yet approved:</p>
@@ -987,8 +980,8 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
 
       {/* ── Supervisor selection modal ───────────────────────────────────── */}
       {showSupervisorModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-[70] p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm">
+        <div className="fixed inset-0 flex items-center justify-center z-[70] p-4 bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in">
+          <div className="modal-panel w-full max-w-sm">
             <div className="px-5 py-4 border-b border-tw-border">
               <h3 className="font-bold text-tw-text text-base">Select Your Supervisor</h3>
               <p className="text-xs text-tw-text-secondary mt-1">
@@ -1000,7 +993,7 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
             </div>
             <div className="px-5 py-4 space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-tw-text-secondary mb-2">
+                <label className="label mb-2">
                   {supervisorType === 'directors' ? 'Director' : 'Supervising Officer'}
                 </label>
                 {supervisorOptions.length === 0 ? (
@@ -1011,7 +1004,7 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
                       <label key={opt.id}
                         className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors
                           ${selectedSupervisor === opt.id
-                            ? 'border-tw-primary bg-blue-50'
+                            ? 'border-tw-primary/50 bg-tw-primary/[0.07]'
                             : 'border-tw-border hover:border-tw-primary/50 hover:bg-tw-hover'}`}>
                         <input type="radio" name="supervisor" value={opt.id}
                           checked={selectedSupervisor === opt.id}
@@ -1029,7 +1022,7 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
                 )}
               </div>
               {supervisorError && (
-                <div className="text-xs text-tw-danger bg-red-50 border border-red-200 rounded px-3 py-2">{supervisorError}</div>
+                <div className="alert-error text-xs">{supervisorError}</div>
               )}
               <div className="flex gap-2 justify-end pt-1">
                 <button onClick={() => setShowSupervisorModal(false)} className="btn-secondary text-sm">
@@ -1059,8 +1052,8 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
           ...caAdded.map(id => ({ personnelId: id, personnel: personnel.find(p => p.id === id) }))
         ]
         return (
-          <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-60 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+          <div className="fixed inset-0 flex items-center justify-center z-[60] p-4 bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in">
+            <div className="modal-panel w-full max-w-md">
               <div className="px-5 py-4 border-b border-tw-border">
                 <h3 className="font-semibold text-tw-text">Change Assignees</h3>
                 <p className="text-xs text-tw-text-secondary mt-0.5">Add or remove people assigned to this task. Removing someone will cancel their subtasks.</p>
@@ -1069,8 +1062,8 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
 
                 {/* Subtask warning */}
                 {caSubtaskWarning.length > 0 && (
-                  <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-xs">
-                    <div className="font-semibold text-amber-800 mb-1">⚠ Subtask Warning</div>
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 text-xs">
+                    <div className="font-semibold text-amber-800 mb-1 inline-flex items-center gap-1.5"><Icon name="alert" className="w-3.5 h-3.5" /> Subtask Warning</div>
                     {caSubtaskWarning.map(w => (
                       <div key={w.personnelId} className="text-amber-700">
                         {w.name} has {w.count} active subtask{w.count !== 1 ? 's' : ''} — removing them will cancel {w.count !== 1 ? 'those subtasks' : 'that subtask'} permanently.
@@ -1081,7 +1074,7 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
 
                 {/* Current + pending assignees */}
                 <div>
-                  <div className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-2">Current Assignees</div>
+                  <div className="section-label mb-2">Current Assignees</div>
                   {effectiveAssignees.length === 0 ? (
                     <p className="text-xs text-tw-text-secondary italic">No assignees after changes.</p>
                   ) : (
@@ -1091,7 +1084,7 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
                         const name = a.personnel?.name ?? pid
                         const isNew = caAdded.includes(pid)
                         return (
-                          <div key={pid} className={`flex items-center justify-between gap-2 px-3 py-2 rounded-lg border ${isNew ? 'border-green-300 bg-green-50' : 'border-tw-border bg-tw-hover'}`}>
+                          <div key={pid} className={`flex items-center justify-between gap-2 px-3 py-2 rounded-lg border ${isNew ? 'border-emerald-300 bg-emerald-50' : 'border-tw-border bg-tw-surface-2'}`}>
                             <div className="flex items-center gap-2">
                               <div className="w-6 h-6 rounded-full bg-tw-primary flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
                                 {name.charAt(0)}
@@ -1107,7 +1100,7 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
                                   setCaRemoved(prev => [...prev, pid])
                                 }
                               }}
-                              className="text-xs text-tw-danger hover:bg-red-50 px-2 py-0.5 rounded transition-colors">
+                              className="text-xs font-medium text-tw-danger hover:bg-tw-danger-light px-2 py-1 rounded-lg transition-colors">
                               Remove
                             </button>
                           </div>
@@ -1120,17 +1113,17 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
                 {/* Add new assignees */}
                 {available.length > 0 && (
                   <div>
-                    <div className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-2">Add People</div>
+                    <div className="section-label mb-2">Add People</div>
                     <div className="space-y-1 max-h-40 overflow-y-auto">
                       {available.map(p => (
                         <button key={p.id}
                           onClick={() => setCaAdded(prev => [...prev, p.id])}
-                          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-tw-border hover:border-tw-primary hover:bg-blue-50 transition-colors text-left">
-                          <div className="w-6 h-6 rounded-full bg-tw-primary/20 flex items-center justify-center text-tw-primary text-xs font-bold flex-shrink-0">
+                          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-tw-border hover:border-tw-primary hover:bg-tw-primary/[0.05] transition-colors text-left">
+                          <div className="w-6 h-6 rounded-full bg-tw-primary/15 flex items-center justify-center text-tw-primary-text text-xs font-bold flex-shrink-0">
                             {p.name.charAt(0)}
                           </div>
                           <span className="text-sm text-tw-text">{p.name}</span>
-                          <span className="ml-auto text-xs text-tw-primary font-medium">+ Add</span>
+                          <span className="ml-auto text-xs text-tw-primary-text font-medium inline-flex items-center gap-0.5"><Icon name="plus" className="w-3 h-3" /> Add</span>
                         </button>
                       ))}
                     </div>
@@ -1139,7 +1132,7 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
 
                 {/* Reason */}
                 <div>
-                  <label className="block text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">
+                  <label className="label">
                     Reason <span className="text-tw-danger">*</span>
                   </label>
                   <textarea className="input resize-none" rows={2}
@@ -1149,7 +1142,7 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
                 </div>
 
                 {caError && (
-                  <div className="text-xs text-tw-danger bg-red-50 border border-red-200 rounded px-3 py-2">{caError}</div>
+                  <div className="alert-error text-xs">{caError}</div>
                 )}
 
                 <div className="flex gap-2 justify-end pt-1">
@@ -1169,8 +1162,8 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
 
       {/* ── Create subtask modal ─────────────────────────────────────────── */}
       {showSubtask && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-60 p-4">
-          <div className="bg-white rounded-xl shadow-panel w-full max-w-md">
+        <div className="fixed inset-0 flex items-center justify-center z-[60] p-4 bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in">
+          <div className="modal-panel w-full max-w-md">
             <div className="px-5 py-4 border-b border-tw-border">
               <h3 className="font-semibold text-tw-text">Create Subtask</h3>
               <p className="text-xs text-tw-text-secondary mt-0.5">Under: {task.title}</p>
@@ -1181,7 +1174,7 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
               <textarea className="input resize-none" rows={2} placeholder="Description (optional)…"
                 value={subtaskForm.description} onChange={e => setSubtaskForm(f => ({ ...f, description: e.target.value }))} />
               <div>
-                <label className="block text-xs font-semibold text-tw-text-secondary mb-1">Assign to *</label>
+                <label className="label">Assign to *</label>
                 <Select
                   value={subtaskForm.assignTo}
                   onChange={val => setSubtaskForm(f => ({ ...f, assignTo: val }))}
@@ -1191,7 +1184,7 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-tw-text-secondary mb-1">Priority</label>
+                  <label className="label">Priority</label>
                   <Select value={subtaskForm.priority} onChange={val => setSubtaskForm(f => ({ ...f, priority: val }))}
                     options={[
                       { value: 'LOW', label: 'Low' }, { value: 'MEDIUM', label: 'Medium' },
@@ -1199,7 +1192,7 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
                     ]} />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-tw-text-secondary mb-1">
+                  <label className="label">
                     Deadline
                     {task.deadline && (
                       <span className="ml-1 font-normal text-tw-text-secondary">
@@ -1211,7 +1204,7 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
                 </div>
               </div>
               {actionError && (
-                <div className="text-xs text-tw-danger bg-red-50 border border-red-200 rounded px-3 py-2">{actionError}</div>
+                <div className="alert-error text-xs">{actionError}</div>
               )}
               <div className="flex gap-2 justify-end pt-1">
                 <button onClick={() => { setShowSubtask(false); setActionError('') }} className="btn-secondary">Cancel</button>

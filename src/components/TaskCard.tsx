@@ -1,6 +1,7 @@
 import React from 'react'
 import type { Task } from '../types'
 import ElapsedDays from './ElapsedDays'
+import { Icon } from './ui/Icon'
 
 interface Props {
   task: Task
@@ -40,10 +41,10 @@ export default function TaskCard({ task, onClick }: Props) {
   return (
     <div
       onClick={() => onClick(task)}
-      className="card p-3 cursor-pointer hover:shadow-panel transition-all group mb-2 relative overflow-hidden"
+      className="card p-3 cursor-pointer card-hover group mb-2 relative overflow-hidden rounded-xl"
     >
       {/* Priority bar */}
-      <div className={`absolute left-0 top-0 bottom-0 w-1 ${priorityColor[task.priority]}`} />
+      <div className={`absolute left-0 top-3 bottom-3 w-1 rounded-r-full ${priorityColor[task.priority]}`} />
 
       {/* Drag handle — visible on hover */}
       <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-40 transition-opacity cursor-grab active:cursor-grabbing">
@@ -60,7 +61,7 @@ export default function TaskCard({ task, onClick }: Props) {
 
         {/* Assignee */}
         {assigneeNames && (
-          <div className="text-xs text-tw-text-secondary mb-2 truncate">→ {assigneeNames}</div>
+          <div className="text-xs text-tw-text-secondary mb-2 truncate inline-flex items-center gap-1 max-w-full"><Icon name="user" className="w-3 h-3 flex-shrink-0" /><span className="truncate">{assigneeNames}</span></div>
         )}
 
 
@@ -92,8 +93,8 @@ export default function TaskCard({ task, onClick }: Props) {
               </span>
             )}
             {task.deadline && (
-              <span className={`text-xs font-medium ${isOverdue ? 'text-tw-danger' : deadlineSoon ? 'text-tw-warning' : 'text-tw-text-secondary'}`}>
-                {isOverdue ? '⚠ ' : ''}{new Date(task.deadline).toLocaleDateString()}
+              <span className={`text-xs font-medium inline-flex items-center gap-1 ${isOverdue ? 'text-tw-danger' : deadlineSoon ? 'text-tw-warning' : 'text-tw-text-secondary'}`}>
+                <Icon name="calendar" className="w-3 h-3" />{new Date(task.deadline).toLocaleDateString()}
               </span>
             )}
           </div>

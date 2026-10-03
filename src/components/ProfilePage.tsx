@@ -3,6 +3,8 @@ import type { AuthUser } from '../types'
 import { authApi, workspaceApi, webAuthnApi } from '../services/apiService'
 import { startRegistration } from '@simplewebauthn/browser'
 import RoleAssignments from './RoleAssignments'
+import { PageHeader, ThemeToggle } from './ui/Primitives'
+import { Icon } from './ui/Icon'
 
 interface Props {
   user: AuthUser
@@ -206,18 +208,18 @@ export default function ProfilePage({ user, onUserUpdate }: Props) {
   const initials = name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
 
   return (
-    <div className="p-6 max-w-2xl mx-auto space-y-6">
-      <h1 className="text-xl font-semibold text-tw-text">My Profile</h1>
+    <div className="page max-w-3xl space-y-5">
+      <PageHeader icon="user" tone="blue" title="My Profile" subtitle="Your photo, personal details, sign-in and appearance." className="!mb-1" />
 
       {/* Avatar */}
       <div className="card p-6">
-        <h2 className="text-base font-semibold text-tw-text mb-4">Profile Photo</h2>
+        <h2 className="text-base font-semibold tracking-tight text-tw-text mb-4">Profile Photo</h2>
         <div className="flex items-center gap-5">
           <div className="relative">
             {avatarPreview ? (
-              <img src={avatarPreview} alt="Avatar" className="w-20 h-20 rounded-full object-cover border-2 border-tw-border" />
+              <img src={avatarPreview} alt="Avatar" className="w-20 h-20 rounded-full object-cover ring-4 ring-tw-surface shadow-card" />
             ) : (
-              <div className="w-20 h-20 rounded-full bg-tw-primary flex items-center justify-center border-2 border-tw-border">
+              <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#3d9bff] to-tw-purple flex items-center justify-center ring-4 ring-tw-surface shadow-card">
                 <span className="text-white font-bold text-xl">{initials}</span>
               </div>
             )}
@@ -242,17 +244,28 @@ export default function ProfilePage({ user, onUserUpdate }: Props) {
         <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
       </div>
 
+      {/* Appearance */}
+      <div className="card p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-base font-semibold tracking-tight text-tw-text">Appearance</h2>
+            <p className="text-xs text-tw-text-secondary mt-1">Choose light or dark, or follow your device setting. Saved on this device.</p>
+          </div>
+          <ThemeToggle className="sm:w-80" />
+        </div>
+      </div>
+
       {/* Profile info */}
       {user.roleBasedIdentity ? <div className="card p-6"><h2 className="font-semibold">Your role</h2><p className="mt-2">{user.name}</p><p className="text-sm text-tw-text-secondary mt-2">The Director manages this position and its phone assignment. Manage your personal details in Syswise.</p></div> : <div className="card p-6">
-        <h2 className="text-base font-semibold text-tw-text mb-4">Personal Information</h2>
+        <h2 className="text-base font-semibold tracking-tight text-tw-text mb-4">Personal Information</h2>
         <form onSubmit={handleProfileSave} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-tw-text mb-1">Full Name</label>
+              <label className="label text-[13px] text-tw-text">Full Name</label>
               <input className="input" value={name} onChange={e => setName(e.target.value)} required />
             </div>
             <div>
-              <label className="block text-sm font-medium text-tw-text mb-1">Phone Number</label>
+              <label className="label text-[13px] text-tw-text">Phone Number</label>
               <input className="input" type="tel" disabled={!!user.syswiseUserId} value={phone} onChange={e => setPhone(e.target.value)} required />
               {!user.syswiseUserId && phone.trim() !== (user.phone || '').trim() && (
                 <p className="mt-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 leading-snug">
@@ -261,11 +274,11 @@ export default function ProfilePage({ user, onUserUpdate }: Props) {
               )}
             </div>
             <div>
-              <label className="block text-sm font-medium text-tw-text mb-1">Email <span className="text-tw-text-secondary font-normal">(optional)</span></label>
+              <label className="label text-[13px] text-tw-text">Email <span className="text-tw-text-secondary font-normal">(optional)</span></label>
               <input className="input" type="email" disabled={!!user.syswiseUserId} value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-tw-text mb-1">NIC <span className="text-tw-text-secondary font-normal">(optional)</span></label>
+              <label className="label text-[13px] text-tw-text">NIC <span className="text-tw-text-secondary font-normal">(optional)</span></label>
               <input className="input" value={nic} onChange={e => setNic(e.target.value)} placeholder="XXXXXXXXXV" />
             </div>
           </div>
@@ -284,19 +297,19 @@ export default function ProfilePage({ user, onUserUpdate }: Props) {
       {user.syswiseUserId && <div className="card p-6"><h2 className="font-semibold mb-2">Syswise account</h2><p className="text-sm text-tw-text-secondary mb-3">Manage your personal phone number, password and passkeys in Syswise. Ask your Director to correct a role assignment.</p><a className="btn-primary inline-block" href={`${window.location.hostname === 'localhost' ? 'http://localhost:3100' : window.location.origin}/pickiti/account`}>Manage account</a></div>}
       {/* Change password */}
       {!user.syswiseUserId && !user.roleBasedIdentity && <div className="card p-6">
-        <h2 className="text-base font-semibold text-tw-text mb-4">Change Password</h2>
+        <h2 className="text-base font-semibold tracking-tight text-tw-text mb-4">Change Password</h2>
         <form onSubmit={handlePasswordSave} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-tw-text mb-1">Current Password</label>
+            <label className="label text-[13px] text-tw-text">Current Password</label>
             <input className="input" type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} placeholder="••••••••" />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-tw-text mb-1">New Password</label>
+              <label className="label text-[13px] text-tw-text">New Password</label>
               <input className="input" type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Min 8 characters" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-tw-text mb-1">Confirm New Password</label>
+              <label className="label text-[13px] text-tw-text">Confirm New Password</label>
               <input className="input" type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="Repeat password" />
             </div>
           </div>
@@ -320,10 +333,10 @@ export default function ProfilePage({ user, onUserUpdate }: Props) {
           {webAuthnCreds.length > 0 && (
             <div className="space-y-2 mb-4">
               {webAuthnCreds.map(cred => (
-                <div key={cred.id} className="flex items-center justify-between bg-tw-bg rounded-xl px-4 py-3">
+                <div key={cred.id} className="flex items-center justify-between panel-muted px-4 py-3">
                   <div className="flex items-center gap-3">
-                    <span className="text-lg">
-                      {cred.deviceType === 'multiDevice' ? '☁️' : '📱'}
+                    <span className="icon-tile tile-blue w-9 h-9">
+                      <Icon name={cred.deviceType === 'multiDevice' ? 'cloud' : 'phone'} className="w-4 h-4" />
                     </span>
                     <div>
                       <p className="text-sm font-medium text-tw-text">
@@ -337,7 +350,7 @@ export default function ProfilePage({ user, onUserUpdate }: Props) {
                   </div>
                   <button
                     onClick={() => handleDeleteCred(cred.id)}
-                    className="w-7 h-7 rounded-lg bg-red-100 hover:bg-red-200 text-red-600 flex items-center justify-center transition-colors flex-shrink-0"
+                    className="icon-btn w-8 h-8 hover:text-tw-danger hover:bg-tw-danger-light flex-shrink-0"
                     title="Remove"
                   >
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">

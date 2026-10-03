@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { insuranceApi } from '../services/apiService'
 import type { IncompleteInsurancePolicy } from '../types'
 import Select from './Select'
+import { Icon } from './ui/Icon'
 
 const BUSINESS_TYPES = [
   { value: 'NEW', label: 'New' },
@@ -64,11 +65,11 @@ export default function InsurancePolicyCompletionPrompt() {
   }
 
   return (
-    <div className="fixed inset-0 z-[10000] bg-slate-950/70 backdrop-blur-sm p-3 sm:p-6 flex items-center justify-center">
-      <form onSubmit={submit} className="w-full max-w-lg rounded-2xl bg-white shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-[10000] p-3 sm:p-6 flex items-center justify-center bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in">
+      <form onSubmit={submit} className="modal-panel max-w-lg overflow-hidden">
         <div className="px-5 sm:px-6 py-5 border-b border-tw-border">
-          <div className="w-11 h-11 rounded-xl bg-blue-100 text-xl flex items-center justify-center mb-3">🛡️</div>
-          <h2 className="text-xl font-bold text-tw-text">Complete Policy Information</h2>
+          <span className="icon-tile tile-blue w-11 h-11 mb-3"><Icon name="shield" className="w-5 h-5" /></span>
+          <h2 className="text-xl font-bold text-tw-text tracking-tight">Complete Policy Information</h2>
           <p className="text-sm text-tw-text-secondary mt-1">Fairfirst now requires Company Policy Number, Sales Code, Business Type, and GWP for every policy.</p>
         </div>
         <div className="px-5 sm:px-6 py-5 space-y-4">
@@ -77,13 +78,13 @@ export default function InsurancePolicyCompletionPrompt() {
             <div className="text-sm text-tw-text-secondary mt-0.5">{current.customerName} · {current.status}</div>
             <div className="text-xs text-blue-700 mt-2">{policies.length} incomplete {policies.length === 1 ? 'policy' : 'policies'} remaining</div>
           </div>
-          {error && <div className="rounded-lg bg-red-50 border border-red-200 text-tw-danger text-sm px-3 py-2">{error}</div>}
-          <label className="block"><span className="block text-xs font-semibold text-tw-text-secondary mb-1.5">Company policy number <span className="text-tw-danger">*</span></span><input className="input text-sm" value={companyPolicyNumber} onChange={event => setCompanyPolicyNumber(event.target.value)} placeholder="Policy number issued by Fairfirst" required autoFocus /></label>
-          <label className="block"><span className="block text-xs font-semibold text-tw-text-secondary mb-1.5">Sales code <span className="text-tw-danger">*</span></span><input className="input text-sm" value={salesCode} onChange={event => setSalesCode(event.target.value)} required /></label>
-          <label className="block"><span className="block text-xs font-semibold text-tw-text-secondary mb-1.5">Business type <span className="text-tw-danger">*</span></span><Select value={businessType} onChange={setBusinessType} options={BUSINESS_TYPES} /></label>
-          <label className="block"><span className="block text-xs font-semibold text-tw-text-secondary mb-1.5">GWP — Gross Written Premium (LKR) <span className="text-tw-danger">*</span></span><input className="input text-sm" type="text" inputMode="decimal" value={formatAmount(gwp)} onChange={event => setGwp(normalizeAmount(event.target.value))} placeholder="0.00" required /></label>
+          {error && <div className="alert-error">{error}</div>}
+          <label className="block"><span className="label">Company policy number <span className="text-tw-danger">*</span></span><input className="input text-sm" value={companyPolicyNumber} onChange={event => setCompanyPolicyNumber(event.target.value)} placeholder="Policy number issued by Fairfirst" required autoFocus /></label>
+          <label className="block"><span className="label">Sales code <span className="text-tw-danger">*</span></span><input className="input text-sm" value={salesCode} onChange={event => setSalesCode(event.target.value)} required /></label>
+          <label className="block"><span className="label">Business type <span className="text-tw-danger">*</span></span><Select value={businessType} onChange={setBusinessType} options={BUSINESS_TYPES} /></label>
+          <label className="block"><span className="label">GWP — Gross Written Premium (LKR) <span className="text-tw-danger">*</span></span><input className="input text-sm" type="text" inputMode="decimal" value={formatAmount(gwp)} onChange={event => setGwp(normalizeAmount(event.target.value))} placeholder="0.00" required /></label>
         </div>
-        <div className="px-5 sm:px-6 py-4 border-t border-tw-border bg-gray-50">
+        <div className="px-5 sm:px-6 py-4 border-t border-tw-border bg-tw-surface-2">
           <button className="btn-primary w-full" disabled={saving}>{saving ? 'Saving…' : policies.length === 1 ? 'Save and Continue' : 'Save and Open Next Policy'}</button>
           <p className="text-xs text-center text-tw-text-secondary mt-2">These mandatory records must be completed before continuing to TaskWise.</p>
         </div>

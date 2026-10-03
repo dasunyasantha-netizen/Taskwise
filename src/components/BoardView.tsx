@@ -8,6 +8,8 @@ import Select from './Select'
 import PersonPickerModal from './PersonPickerModal'
 import FilterBar, { DEFAULT_FILTERS, filterTasks } from './FilterBar'
 import type { ActiveFilters } from './FilterBar'
+import { Icon } from './ui/Icon'
+import { LoadingBlock } from './ui/Primitives'
 
 interface Props {
   project: Project
@@ -76,37 +78,35 @@ function IntermediatePickerModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md flex flex-col" style={{ maxHeight: '80vh' }}>
+    <div className="fixed inset-0 flex items-center justify-center z-[60] p-4 bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in">
+      <div className="modal-panel w-full max-w-md flex flex-col" style={{ maxHeight: '80vh' }}>
         <div className="px-5 py-4 border-b border-tw-border">
           <div className="flex items-center justify-between mb-1">
             <h3 className="font-semibold text-tw-text">Select {layerName} Supervisor(s)</h3>
-            <span className="text-xs font-semibold text-tw-primary bg-blue-50 px-2 py-1 rounded-full">{selected.length} selected</span>
+            <span className="badge badge-primary">{selected.length} selected</span>
           </div>
           <p className="text-xs text-tw-text-secondary">{stepLabel} — mandatory, pick one or more</p>
         </div>
 
         <div className="px-4 pt-3 pb-2">
-          <div className="flex items-center gap-2 border border-tw-border rounded-lg px-3 py-2 focus-within:ring-2 focus-within:ring-tw-primary focus-within:border-tw-primary transition-all">
-            <svg className="w-4 h-4 text-tw-text-secondary flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
-            </svg>
+          <div className="flex items-center gap-2 bg-tw-surface border border-tw-border rounded-xl px-3 py-2.5 focus-within:ring-4 focus-within:ring-tw-primary/15 focus-within:border-tw-primary/60 transition-all">
+            <Icon name="search" className="w-4 h-4 text-tw-text-secondary flex-shrink-0" />
             <input ref={inputRef} className="flex-1 text-sm outline-none bg-transparent placeholder-tw-text-secondary"
               placeholder="Search name, department, phone…"
               value={query} onChange={e => setQuery(e.target.value)} />
-            {query && <button onClick={() => setQuery('')} className="text-tw-text-secondary hover:text-tw-text text-base leading-none">×</button>}
+            {query && <button onClick={() => setQuery('')} className="text-tw-text-secondary hover:text-tw-text"><Icon name="x" className="w-3.5 h-3.5" /></button>}
           </div>
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 pb-3 space-y-3">
           {Object.values(byDept).map(({ deptName, people }) => (
             <div key={deptName}>
-              <div className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1.5">{deptName}</div>
+              <div className="section-label mb-1.5">{deptName}</div>
               <div className="space-y-1">
                 {people.map(p => {
                   const checked = selected.includes(p.id)
                   return (
-                    <label key={p.id} className={`flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-colors ${checked ? 'bg-blue-50 border border-tw-primary' : 'hover:bg-tw-hover border border-transparent'}`}>
+                    <label key={p.id} className={`flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-colors ${checked ? 'bg-tw-primary/[0.07] border border-tw-primary/50' : 'hover:bg-tw-hover border border-transparent'}`}>
                       <input type="checkbox" checked={checked} onChange={() => onToggle(p.id)} className="w-4 h-4 accent-tw-primary" />
                       <div className="w-7 h-7 rounded-full bg-tw-primary flex items-center justify-center text-white text-xs font-bold flex-shrink-0">{p.name.charAt(0)}</div>
                       <div className="flex-1 min-w-0">
@@ -122,12 +122,12 @@ function IntermediatePickerModal({
           {visible.length === 0 && <p className="text-sm text-tw-text-secondary text-center py-6">No results.</p>}
         </div>
 
-        {error && <div className="mx-4 mb-2 text-xs text-tw-danger bg-red-50 border border-red-200 rounded px-3 py-2">{error}</div>}
+        {error && <div className="mx-4 mb-2 alert-error text-xs">{error}</div>}
 
         <div className="px-5 py-4 border-t border-tw-border flex gap-2 justify-between">
           <button onClick={onCancel} className="btn-secondary">Cancel</button>
           <button onClick={onNext} disabled={saving} className="btn-primary disabled:opacity-50">
-            {saving ? 'Creating…' : isLastStep ? '✓ Confirm & Create Task' : 'Next →'}
+            {saving ? 'Creating…' : isLastStep ? <><Icon name="check" className="w-4 h-4" /> Confirm &amp; Create Task</> : <>Next <Icon name="arrowRight" className="w-4 h-4" /></>}
           </button>
         </div>
       </div>
@@ -278,25 +278,27 @@ export default function BoardView({ project, isDirector, actorId }: Props) {
     return dept && layers.find(l => l.number === intermediateLayer)?.departments?.some(d => d.id === dept.id)
   })
 
-  if (loading) return <div className="p-8 text-sm text-tw-text-secondary">Loading board...</div>
+  if (loading) return <LoadingBlock label="Loading board…" />
 
   return (
-    <div className="p-6 h-full flex flex-col">
-      <div className="flex items-center justify-between mb-5">
-        <div className="flex items-center gap-3">
-          <div className="w-4 h-4 rounded-full" style={{ backgroundColor: project.color }} />
-          <h1 className="text-xl font-bold text-tw-text">{project.name}</h1>
+    <div className="page h-full flex flex-col">
+      <div className="flex items-center justify-between gap-3 mb-5 flex-wrap">
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: project.color + '1f', color: project.color }}>
+            <Icon name="board" className="w-5 h-5" />
+          </span>
+          <h1 className="page-title truncate">{project.name}</h1>
           <span className="badge badge-gray">{filteredTasks.length}{filteredTasks.length !== tasks.length ? ` / ${tasks.length}` : ''} tasks</span>
         </div>
         {isDirector && (
-          <button onClick={() => { setShowCreateModal(true); setAssignTarget({ type: 'personnel', id: '' }) }} className="btn-primary">+ New Task</button>
+          <button onClick={() => { setShowCreateModal(true); setAssignTarget({ type: 'personnel', id: '' }) }} className="btn-primary"><Icon name="plus" className="w-4 h-4" /> New Task</button>
         )}
       </div>
 
       {error && (
-        <div className="mb-4 bg-red-50 border border-red-200 text-tw-danger text-sm px-3 py-2 rounded-lg flex items-center justify-between">
+        <div className="mb-4 alert-error flex items-center justify-between">
           {error}
-          <button onClick={() => setError('')} className="text-tw-danger font-bold ml-2">×</button>
+          <button onClick={() => setError('')} className="ml-2"><Icon name="x" className="w-3.5 h-3.5" /></button>
         </div>
       )}
 
@@ -312,19 +314,19 @@ export default function BoardView({ project, isDirector, actorId }: Props) {
         {COLUMNS.map(col => {
           const isDropTarget = dragOverCol === col.status && canDropInto(col.status)
           return (
-            <div key={col.status} className="flex-shrink-0 w-64"
+            <div key={col.status} className="flex-shrink-0 w-72 bg-tw-surface-2/70 border border-tw-border rounded-2xl p-2.5"
               onDragOver={e => { e.preventDefault(); setDragOverCol(col.status) }}
               onDragLeave={() => setDragOverCol(null)}
               onDrop={() => handleDrop(col.status)}
             >
-              <div className="flex items-center gap-2 mb-3">
-                <div className={`w-2.5 h-2.5 rounded-full ${col.color}`} />
-                <span className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide">{col.label}</span>
-                <span className="ml-auto bg-tw-hover text-tw-text-secondary text-xs rounded-full px-1.5 py-0.5 font-medium">
+              <div className="flex items-center gap-2 mb-3 px-1.5 pt-1">
+                <div className={`w-2 h-2 rounded-full ${col.color}`} />
+                <span className="text-xs font-semibold text-tw-text">{col.label}</span>
+                <span className="ml-auto bg-tw-surface border border-tw-border text-tw-text-secondary text-[11px] rounded-full px-2 py-0.5 font-semibold">
                   {columnTasks(col).length}
                 </span>
               </div>
-              <div className={`space-y-0 min-h-12 rounded-xl transition-colors ${isDropTarget ? 'bg-blue-50 ring-2 ring-tw-primary ring-opacity-40' : ''}`}>
+              <div className={`space-y-0 min-h-12 rounded-xl transition-colors ${isDropTarget ? 'bg-tw-primary/[0.06] ring-2 ring-tw-primary/40' : ''}`}>
                 {columnTasks(col).map(task => (
                   <div key={task.id} draggable
                     onDragStart={() => handleDragStart(task)} onDragEnd={handleDragEnd}
@@ -381,29 +383,29 @@ export default function BoardView({ project, isDirector, actorId }: Props) {
 
       {/* Create task modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-panel w-full max-w-lg overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-tw-border bg-gradient-to-r from-[#f0f4ff] via-white to-[#f6f0ff]">
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4 bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in">
+          <div className="modal-panel w-full max-w-lg overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-tw-border bg-gradient-to-br from-tw-primary/[0.07] via-tw-surface to-tw-purple/[0.06]">
               <div>
                 <h3 className="font-bold text-tw-text text-base">New Task</h3>
-                <p className="text-xs text-tw-text-secondary mt-0.5">📋 {project.name}</p>
+                <p className="text-xs text-tw-text-secondary mt-0.5 inline-flex items-center gap-1"><Icon name="project" className="w-3.5 h-3.5" /> {project.name}</p>
               </div>
-              <button onClick={() => setShowCreateModal(false)} className="text-tw-text-secondary hover:text-tw-text text-xl">×</button>
+              <button onClick={() => setShowCreateModal(false)} className="icon-btn w-8 h-8" aria-label="Close"><Icon name="x" className="w-4 h-4" /></button>
             </div>
             <div className="px-5 py-4 space-y-4">
               <div>
-                <label className="block text-sm font-semibold text-tw-text mb-1.5">Title</label>
+                <label className="label text-[13px] text-tw-text">Title</label>
                 <input className="input" placeholder="What needs to be done?" value={form.title}
                   onChange={e => setForm(f => ({ ...f, title: e.target.value }))} autoFocus />
               </div>
               <div>
-                <label className="block text-sm font-semibold text-tw-text mb-1.5">Description</label>
+                <label className="label text-[13px] text-tw-text">Description</label>
                 <textarea className="input resize-none" rows={3} placeholder="Describe the task in detail..."
                   value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-semibold text-tw-text mb-1.5">Priority</label>
+                  <label className="label text-[13px] text-tw-text">Priority</label>
                   <Select value={form.priority} onChange={val => setForm(f => ({ ...f, priority: val }))}
                     options={[
                       { value: 'LOW', label: 'Low' }, { value: 'MEDIUM', label: 'Medium' },
@@ -411,14 +413,14 @@ export default function BoardView({ project, isDirector, actorId }: Props) {
                     ]} />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-tw-text mb-1.5">Deadline</label>
+                  <label className="label text-[13px] text-tw-text">Deadline</label>
                   <DatePicker value={form.deadline} onChange={val => setForm(f => ({ ...f, deadline: val }))} />
                 </div>
               </div>
 
               {isDirector && (
-                <div className="rounded-xl bg-[#f8f9ff] border border-[#0073ea]/15 p-3">
-                  <label className="block text-sm font-semibold text-[#0073ea] mb-2">Assign to</label>
+                <div className="rounded-xl bg-tw-primary/[0.03] border border-tw-primary/15 p-3">
+                  <label className="block text-sm font-semibold text-tw-primary-text mb-2">Assign to</label>
                   <div className="grid grid-cols-2 gap-2">
                     <Select value={assignTarget.type}
                       onChange={val => setAssignTarget({ type: val as 'personnel' | 'department' | '', id: '' })}
@@ -430,7 +432,7 @@ export default function BoardView({ project, isDirector, actorId }: Props) {
 
                     {assignTarget.type === 'personnel' && (
                       <button type="button" onClick={() => setShowPersonPicker(true)}
-                        className="w-full flex items-center justify-between border border-tw-border rounded-lg px-3 py-2 text-sm bg-white hover:border-tw-primary focus:outline-none focus:ring-2 focus:ring-tw-primary transition-colors">
+                        className="w-full flex items-center justify-between border border-tw-border rounded-xl px-3 py-2.5 text-sm bg-tw-surface hover:border-tw-primary/50 focus:outline-none focus:ring-4 focus:ring-tw-primary/15 transition-colors">
                         {assignTarget.id ? (
                           <div className="flex items-center gap-2 min-w-0">
                             <div className="w-5 h-5 rounded-full bg-tw-primary flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
@@ -441,9 +443,7 @@ export default function BoardView({ project, isDirector, actorId }: Props) {
                         ) : (
                           <span className="text-tw-text-secondary">Select person…</span>
                         )}
-                        <svg className="w-4 h-4 text-tw-text-secondary flex-shrink-0 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
-                        </svg>
+                        <Icon name="search" className="w-4 h-4 text-tw-text-secondary flex-shrink-0 ml-2" />
                       </button>
                     )}
                     {assignTarget.type === 'department' && (

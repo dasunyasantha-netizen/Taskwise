@@ -1,32 +1,48 @@
 /** @type {import('tailwindcss').Config} */
+
+// Every colour resolves to a CSS variable so light/dark themes swap at runtime.
+// Semantic tokens (tw-*) live in src/index.css; the stock palette (red-50,
+// gray-700, …) lives in src/styles/palette.css (generated).
+const v = name => `rgb(var(--${name}) / <alpha-value>)`
+
+const FAMILIES = ['slate', 'gray', 'zinc', 'neutral', 'stone', 'red', 'orange', 'amber', 'yellow', 'lime', 'green', 'emerald', 'teal', 'cyan', 'sky', 'blue', 'indigo', 'violet', 'purple', 'fuchsia', 'pink', 'rose']
+const SHADES = ['50', '100', '200', '300', '400', '500', '600', '700', '800', '900', '950']
+const palette = Object.fromEntries(FAMILIES.map(f => [f, Object.fromEntries(SHADES.map(s => [s, v(`c-${f}-${s}`)]))]))
+
 export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
+  darkMode: 'class',
   theme: {
     extend: {
       colors: {
-        'tw-primary':        '#0073ea',
-        'tw-primary-dark':   '#0060c0',
-        'tw-primary-light':  '#cce4ff',
-        'tw-success':        '#00c875',
-        'tw-success-light':  '#b3f5d8',
-        'tw-warning':        '#fdab3d',
-        'tw-warning-light':  '#fef0d6',
-        'tw-danger':         '#e2445c',
-        'tw-danger-light':   '#fcd6dc',
-        'tw-purple':         '#a358df',
-        'tw-purple-light':   '#ecdeff',
-        'tw-teal':           '#0ebdcc',
-        'tw-teal-light':     '#ccf5f8',
-        'tw-orange':         '#ff7575',
-        'tw-orange-light':   '#ffe5e5',
-        'tw-indigo':         '#4353ff',
-        'tw-indigo-light':   '#dde0ff',
-        'tw-bg':             '#f5f6f8',
-        'tw-surface':        '#ffffff',
-        'tw-border':         '#e6e9ef',
-        'tw-text':           '#323338',
-        'tw-text-secondary': '#676879',
-        'tw-hover':          '#f0f2f5',
+        ...palette,
+        'tw-primary':        v('tw-primary'),
+        'tw-primary-dark':   v('tw-primary-dark'),
+        'tw-primary-light':  v('tw-primary-light'),
+        'tw-primary-text':   v('tw-primary-text'),
+        'tw-success':        v('tw-success'),
+        'tw-success-light':  v('tw-success-light'),
+        'tw-warning':        v('tw-warning'),
+        'tw-warning-light':  v('tw-warning-light'),
+        'tw-danger':         v('tw-danger'),
+        'tw-danger-light':   v('tw-danger-light'),
+        'tw-purple':         v('tw-purple'),
+        'tw-purple-light':   v('tw-purple-light'),
+        'tw-teal':           v('tw-teal'),
+        'tw-teal-light':     v('tw-teal-light'),
+        'tw-orange':         v('tw-orange'),
+        'tw-orange-light':   v('tw-orange-light'),
+        'tw-indigo':         v('tw-indigo'),
+        'tw-indigo-light':   v('tw-indigo-light'),
+        'tw-bg':             v('tw-bg'),
+        'tw-surface':        v('tw-surface'),
+        'tw-surface-2':      v('tw-surface-2'),
+        'tw-border':         v('tw-border'),
+        'tw-border-strong':  v('tw-border-strong'),
+        'tw-text':           v('tw-text'),
+        'tw-text-secondary': v('tw-text-secondary'),
+        'tw-text-muted':     v('tw-text-muted'),
+        'tw-hover':          v('tw-hover'),
       },
       fontFamily: {
         sans: ['Figtree', 'Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
@@ -40,12 +56,27 @@ export default {
         '2xl':  ['1.5rem',  { lineHeight: '2rem' }],
       },
       boxShadow: {
-        'card':  '0 1px 4px rgba(0,0,0,0.08)',
-        'panel': '0 4px 16px rgba(0,0,0,0.12)',
+        'card':  'var(--shadow-card)',
+        'panel': 'var(--shadow-panel)',
+        'glow':  '0 0 18px -6px rgba(0,115,234,0.7)',
+        'cta':   '0 4px 14px -4px rgba(0,115,234,0.75)',
       },
       borderRadius: {
         'xl':  '12px',
         '2xl': '16px',
+        '3xl': '20px',
+      },
+      keyframes: {
+        'fade-in':  { from: { opacity: '0' }, to: { opacity: '1' } },
+        'pop-in':   { from: { opacity: '0', transform: 'translateY(6px) scale(.98)' }, to: { opacity: '1', transform: 'none' } },
+        'slide-up': { from: { transform: 'translateY(100%)' }, to: { transform: 'none' } },
+        'slide-in': { from: { transform: 'translateX(100%)' }, to: { transform: 'none' } },
+      },
+      animation: {
+        'fade-in':  'fade-in .15s ease-out',
+        'pop-in':   'pop-in .18s ease-out',
+        'slide-up': 'slide-up .22s cubic-bezier(.2,.8,.2,1)',
+        'slide-in': 'slide-in .22s cubic-bezier(.2,.8,.2,1)',
       },
     },
   },

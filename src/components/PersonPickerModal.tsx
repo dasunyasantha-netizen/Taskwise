@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import type { Personnel, Layer } from '../types'
+import { Icon } from './ui/Icon'
 
 interface Props {
   personnel: Personnel[]
@@ -47,13 +48,13 @@ export default function PersonPickerModal({ personnel, layers, title = 'Select P
   for (const l of layers) layerLabel[l.number] = l.name
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md flex flex-col" style={{ maxHeight: '80vh' }}>
+    <div className="fixed inset-0 flex items-center justify-center z-[60] p-4 bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in">
+      <div className="modal-panel w-full max-w-md flex flex-col" style={{ maxHeight: '80vh' }}>
 
         {/* Header */}
         <div className="px-5 py-4 border-b border-tw-border flex items-center justify-between">
           <h3 className="font-semibold text-tw-text">{title}</h3>
-          <button onClick={onClose} className="text-tw-text-secondary hover:text-tw-text text-xl leading-none">×</button>
+          <button onClick={onClose} className="icon-btn w-8 h-8" aria-label="Close"><Icon name="x" className="w-4 h-4" /></button>
         </div>
 
         {/* Search */}
@@ -91,7 +92,7 @@ export default function PersonPickerModal({ personnel, layers, title = 'Select P
           {layerNums.map(ln => (
             <div key={ln}>
               {!q && (
-                <div className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-2 pt-1">
+                <div className="section-label mb-2 pt-1">
                   {layerLabel[ln] ?? `Layer ${ln}`}
                 </div>
               )}

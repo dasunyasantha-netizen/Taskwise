@@ -5,7 +5,11 @@ import { projectApi, taskApi, auditApi, workspaceApi, taskGroupApi } from '../se
 import DatePicker from './DatePicker'
 import Select from './Select'
 import NotificationsMenu from './NotificationsMenu'
+import MobileUserMenu from './MobileUserMenu'
 import Sidebar, { type SidebarSection } from './Sidebar'
+import MobileNav, { type MobileNavItem } from './MobileNav'
+import { Icon } from './ui/Icon'
+import { PageHeader, EmptyState, StatCard, LoadingBlock, ThemeToggle } from './ui/Primitives'
 import { usePWA } from '../hooks/usePWA'
 import { useLanguage } from '../i18n/Language'
 import HierarchyPanel from './HierarchyPanel'
@@ -177,7 +181,7 @@ function ApprovalTaskRow({
       {/* ── Summary row ── */}
       <tr onClick={toggle}
         className={`cursor-pointer transition-colors border-b border-tw-border
-          ${expanded ? 'bg-blue-50' : 'hover:bg-[#f8f9ff]'}`}>
+          ${expanded ? 'bg-tw-primary/[0.05]' : 'hover:bg-tw-hover'}`}>
         <td className="pl-3 pr-0 py-3 w-1">
           <div className={`w-1 h-8 rounded-full ${
             task.priority === 'CRITICAL' ? 'bg-red-500' :
@@ -214,14 +218,14 @@ function ApprovalTaskRow({
 
       {/* ── Expanded row ── */}
       {expanded && (
-        <tr className="border-b-2 border-tw-primary/20" style={{ background: 'linear-gradient(to right, #eef3ff, #f8f9ff)' }}>
+        <tr className="border-b border-tw-primary/20 bg-tw-primary/[0.03]">
           <td colSpan={7} className="px-0 py-0">
             <div className="px-6 py-5">
 
               {actionError && (
-                <div className="mb-4 text-xs text-tw-danger bg-red-50 border border-red-200 rounded-lg px-3 py-2 flex items-center justify-between">
+                <div className="mb-4 alert-error text-xs flex items-center justify-between">
                   {actionError}
-                  <button onClick={() => setActionError('')} className="font-bold ml-2">×</button>
+                  <button onClick={() => setActionError('')} className="ml-2"><Icon name="x" className="w-3.5 h-3.5" /></button>
                 </div>
               )}
 
@@ -235,7 +239,7 @@ function ApprovalTaskRow({
                 <div className="flex items-start justify-between gap-6">
                   {task.assignments?.length > 0 && (
                     <div>
-                      <div className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-2">Assigned To</div>
+                      <div className="section-label mb-2">Assigned To</div>
                       <div className="flex flex-wrap gap-2">
                         {task.assignments.map(a => (
                           <div key={a.id} className="flex items-center gap-1.5 bg-white border border-tw-border rounded-full px-2.5 py-1">
@@ -251,7 +255,7 @@ function ApprovalTaskRow({
                   )}
                   {task.deadline && (
                     <div className="text-right flex-shrink-0">
-                      <div className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-2">Deadline</div>
+                      <div className="section-label mb-2">Deadline</div>
                       <span className="text-xs font-medium text-tw-text bg-white border border-tw-border rounded-lg px-2.5 py-1 inline-block">
                         {new Date(task.deadline).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
                       </span>
@@ -262,7 +266,7 @@ function ApprovalTaskRow({
                 {/* Comments */}
                 {!loadingS && comments.length > 0 && (
                   <div>
-                    <div className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-2">Comments ({comments.length})</div>
+                    <div className="section-label mb-2">Comments ({comments.length})</div>
                     <div className="space-y-2 max-h-36 overflow-y-auto pr-1">
                       {comments.map(c => (
                         <div key={c.id} className="flex gap-2 bg-white border border-tw-border rounded-lg px-3 py-2">
@@ -304,13 +308,13 @@ function ApprovalTaskRow({
                         const dl = s.deadline ? Math.ceil((new Date(s.deadline).setHours(0,0,0,0) - new Date().setHours(0,0,0,0)) / 86400000) : null
                         const isOverdue = dl !== null && dl < 0
                         return (
-                          <div key={s.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-blue-50 transition-colors">
+                          <div key={s.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-tw-primary/[0.05] transition-colors">
                             <div className={`w-2 h-2 rounded-full flex-shrink-0 ${subtaskStatusDot[s.status] || 'bg-gray-400'}`} />
                             <div className="flex-1 min-w-0">
                               <div className="text-sm font-medium text-tw-text truncate">{s.title}</div>
                               <div className="flex items-center gap-2 mt-0.5">
                                 <span className={`badge text-xs ${subtaskStatusBadge[s.status] || 'badge-gray'}`}>{s.status.replace('_', ' ')}</span>
-                                <span className="text-xs text-tw-text-secondary truncate">→ {assigneeName}</span>
+                                <span className="text-xs text-tw-text-secondary truncate inline-flex items-center gap-1"><Icon name="arrowRight" className="w-3 h-3" /> {assigneeName}</span>
                               </div>
                             </div>
                             <div className="flex items-center gap-3 flex-shrink-0">
@@ -332,7 +336,7 @@ function ApprovalTaskRow({
               </div>
 
               {/* ── Action buttons ── */}
-              <div className="mt-5 pt-4 border-t border-blue-200 flex items-center justify-between gap-3">
+              <div className="mt-5 pt-4 border-t border-tw-border flex items-center justify-between gap-3">
                 <p className="text-xs text-tw-text-secondary">
                   Review the submission above, then approve or send back with feedback.
                 </p>
@@ -340,23 +344,23 @@ function ApprovalTaskRow({
                   <button
                     disabled={actionLoading}
                     onClick={() => { setShowReject(true); setRejectReason('') }}
-                    className="px-4 py-2 rounded-lg border border-tw-danger text-tw-danger bg-white hover:bg-red-50 font-semibold text-sm transition-colors disabled:opacity-50"
+                    className="btn-outline-danger"
                   >
-                    ↩ Send Back
+                    <Icon name="sendBack" className="w-4 h-4" /> Send Back
                   </button>
                   <button
                     disabled={actionLoading}
                     onClick={doApprove}
-                    className="px-4 py-2 rounded-lg bg-tw-success text-white font-semibold text-sm hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center gap-1.5"
+                    className="btn-success"
                   >
-                    ✓ Approve
+                    <Icon name="check" className="w-4 h-4" /> Approve
                   </button>
                   <button
                     disabled={actionLoading}
                     onClick={openAssignNext}
-                    className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                    className="btn-primary"
                   >
-                    ⛓ Approve & Assign Next
+                    <Icon name="chain" className="w-4 h-4" /> Approve & Assign Next
                   </button>
                 </div>
               </div>
@@ -364,8 +368,8 @@ function ApprovalTaskRow({
 
             {/* ── Send Back modal ── */}
             {showReject && (
-              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={e => e.stopPropagation()}>
-                <div className="bg-white rounded-xl shadow-panel w-full max-w-md">
+              <div className="fixed inset-0 flex items-center justify-center z-50 p-4 bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in" onClick={e => e.stopPropagation()}>
+                <div className="modal-panel w-full max-w-md">
                   <div className="px-5 py-4 border-b border-tw-border">
                     <h3 className="font-semibold text-tw-text">Send Back for Revision</h3>
                     <p className="text-xs text-tw-text-secondary mt-0.5">
@@ -386,7 +390,7 @@ function ApprovalTaskRow({
                       <button
                         disabled={!rejectReason.trim() || actionLoading}
                         onClick={doReject}
-                        className="px-4 py-2 rounded-lg bg-tw-danger text-white text-sm font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity"
+                        className="btn-danger"
                       >
                         Send Back
                       </button>
@@ -402,15 +406,15 @@ function ApprovalTaskRow({
       {/* ── Approve & Assign Next modal ── */}
       {showAssignNext && (
         <tr><td colSpan={7} className="p-0">
-          <div className="fixed inset-0 bg-black bg-opacity-60 flex items-start justify-center z-50 p-4 overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg my-4">
+          <div className="fixed inset-0 flex items-start justify-center z-50 p-4 overflow-y-auto bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in" onClick={e => e.stopPropagation()}>
+            <div className="modal-panel w-full max-w-lg my-4">
               <div className="px-5 py-4 border-b border-tw-border">
                 <h3 className="font-bold text-tw-text text-base">Approve &amp; Assign Next Task</h3>
                 <p className="text-xs text-tw-text-secondary mt-0.5">The current task will be approved and the following tasks created and assigned.</p>
               </div>
               <div className="px-5 py-4 space-y-4 max-h-[70vh] overflow-y-auto">
                 <div>
-                  <label className="block text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">Handover Note <span className="font-normal">(optional)</span></label>
+                  <label className="label">Handover Note <span className="font-normal">(optional)</span></label>
                   <textarea className="input resize-none text-sm" rows={2} placeholder="Context to pass to the next assignee(s)..."
                     value={handoverNote} onChange={e => setHandoverNote(e.target.value)} />
                 </div>
@@ -422,7 +426,7 @@ function ApprovalTaskRow({
                   {nextTasks.map((nt, idx) => (
                     <div key={idx} className="border border-tw-border rounded-xl p-4 space-y-3">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-tw-text-secondary uppercase tracking-wide">Task {idx + 1}</span>
+                        <span className="section-label">Task {idx + 1}</span>
                         {nextTasks.length > 1 && (
                           <button onClick={() => setNextTasks(arr => arr.filter((_, i) => i !== idx))}
                             className="text-xs text-tw-danger hover:underline">Remove</button>
@@ -434,25 +438,25 @@ function ApprovalTaskRow({
                         onChange={e => setNextTasks(arr => arr.map((t, i) => i === idx ? { ...t, description: e.target.value } : t))} />
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="block text-xs text-tw-text-secondary mb-1">Priority</label>
+                          <label className="label">Priority</label>
                           <Select value={nt.priority}
                             onChange={val => setNextTasks(arr => arr.map((t, i) => i === idx ? { ...t, priority: val } : t))}
                             options={[{ value: 'LOW', label: 'Low' }, { value: 'MEDIUM', label: 'Medium' }, { value: 'HIGH', label: 'High' }, { value: 'CRITICAL', label: 'Critical' }]} />
                         </div>
                         <div>
-                          <label className="block text-xs text-tw-text-secondary mb-1">Deadline</label>
+                          <label className="label">Deadline</label>
                           <DatePicker value={nt.deadline}
                             onChange={val => setNextTasks(arr => arr.map((t, i) => i === idx ? { ...t, deadline: val } : t))} />
                         </div>
                       </div>
                       <div className="flex gap-2">
                         <button onClick={() => setNextTasks(arr => arr.map((t, i) => i === idx ? { ...t, isGroupTask: false, groupId: '' } : t))}
-                          className={`flex-1 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${!nt.isGroupTask ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-tw-border text-tw-text-secondary hover:bg-tw-hover'}`}>
-                          👤 Individual(s)
+                          className={`flex-1 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${!nt.isGroupTask ? 'border-tw-primary/40 bg-tw-primary/10 text-tw-primary-text' : 'border-tw-border text-tw-text-secondary hover:bg-tw-hover'} inline-flex items-center justify-center gap-1.5`}>
+                          <Icon name="user" className="w-3.5 h-3.5" /> Individual(s)
                         </button>
                         <button onClick={() => setNextTasks(arr => arr.map((t, i) => i === idx ? { ...t, isGroupTask: true, personnelIds: [] } : t))}
-                          className={`flex-1 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${nt.isGroupTask ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-tw-border text-tw-text-secondary hover:bg-tw-hover'}`}>
-                          👥 Group
+                          className={`flex-1 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${nt.isGroupTask ? 'border-tw-primary/40 bg-tw-primary/10 text-tw-primary-text' : 'border-tw-border text-tw-text-secondary hover:bg-tw-hover'} inline-flex items-center justify-center gap-1.5`}>
+                          <Icon name="users" className="w-3.5 h-3.5" /> Group
                         </button>
                       </div>
                       {nt.isGroupTask ? (
@@ -461,7 +465,7 @@ function ApprovalTaskRow({
                           options={allGroups.map(g => ({ value: g.id, label: g.name }))} />
                       ) : (
                         <div>
-                          <label className="block text-xs text-tw-text-secondary mb-1">Assign to (select one or more)</label>
+                          <label className="label">Assign to (select one or more)</label>
                           <input
                             className="input text-sm mb-1"
                             placeholder="Search personnel..."
@@ -482,23 +486,22 @@ function ApprovalTaskRow({
                               </label>
                             ))}
                           </div>
-                          {nt.personnelIds.length > 0 && <div className="text-xs text-indigo-600 mt-1">{nt.personnelIds.length} selected</div>}
+                          {nt.personnelIds.length > 0 && <div className="text-xs text-tw-primary-text mt-1">{nt.personnelIds.length} selected</div>}
                         </div>
                       )}
                     </div>
                   ))}
                 </div>
                 <button onClick={() => setNextTasks(arr => [...arr, emptyNextTask()])}
-                  className="w-full py-2 border-2 border-dashed border-tw-border rounded-xl text-xs font-semibold text-tw-text-secondary hover:border-indigo-400 hover:text-indigo-600 transition-colors">
-                  + Add Another Next Task
+                  className="w-full py-2.5 border-2 border-dashed border-tw-border rounded-xl text-xs font-semibold text-tw-text-secondary hover:border-tw-primary/50 hover:text-tw-primary-text transition-colors inline-flex items-center justify-center gap-1.5">
+                  <Icon name="plus" className="w-3.5 h-3.5" /> Add Another Next Task
                 </button>
-                {assignNextError && <div className="text-xs text-tw-danger bg-red-50 border border-red-200 rounded-lg px-3 py-2">{assignNextError}</div>}
+                {assignNextError && <div className="alert-error text-xs">{assignNextError}</div>}
               </div>
-              <div className="px-5 py-4 border-t border-tw-border flex gap-2 justify-end">
+              <div className="modal-footer">
                 <button onClick={() => setShowAssignNext(false)} className="btn-secondary">Cancel</button>
-                <button disabled={assignNextSaving} onClick={doAssignNext}
-                  className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold disabled:opacity-50 transition-colors">
-                  {assignNextSaving ? 'Processing…' : '⛓ Approve & Assign'}
+                <button disabled={assignNextSaving} onClick={doAssignNext} className="btn-primary">
+                  {assignNextSaving ? 'Processing…' : <><Icon name="chain" className="w-4 h-4" /> Approve &amp; Assign</>}
                 </button>
               </div>
             </div>
@@ -534,7 +537,7 @@ function MobileApprovalCard({ task, actorId, onRefresh, onViewTask }: { task: Ta
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+    <div className="card overflow-hidden">
       {/* Header — always visible */}
       <div className="flex items-center gap-3 px-4 py-3 cursor-pointer select-none" onClick={toggle}>
         <div className={`w-1 h-10 rounded-full flex-shrink-0 ${priorityBar[task.priority] || 'bg-gray-300'}`} />
@@ -550,22 +553,22 @@ function MobileApprovalCard({ task, actorId, onRefresh, onViewTask }: { task: Ta
 
       {/* Expanded details */}
       {expanded && (
-        <div className="px-4 pb-4 border-t border-gray-100 pt-3 space-y-3">
+        <div className="px-4 pb-4 border-t border-tw-border pt-3 space-y-3">
           {task.description && <p className="text-xs text-tw-text-secondary leading-relaxed">{task.description}</p>}
           <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
             {task.project?.name && (
-              <div><div className="text-[10px] font-bold text-tw-text-secondary uppercase tracking-wide">Project</div><div className="text-tw-text font-medium mt-0.5">{task.project.name}</div></div>
+              <div><div className="section-label">Project</div><div className="text-tw-text font-medium mt-0.5">{task.project.name}</div></div>
             )}
-            <div><div className="text-[10px] font-bold text-tw-text-secondary uppercase tracking-wide">Submitted</div><div className="text-tw-text font-medium mt-0.5">{new Date(task.updatedAt).toLocaleDateString('en-GB',{day:'numeric',month:'short'})}</div></div>
+            <div><div className="section-label">Submitted</div><div className="text-tw-text font-medium mt-0.5">{new Date(task.updatedAt).toLocaleDateString('en-GB',{day:'numeric',month:'short'})}</div></div>
             {task.deadline && (
-              <div><div className="text-[10px] font-bold text-tw-text-secondary uppercase tracking-wide">Deadline</div><div className="text-tw-text font-medium mt-0.5">{new Date(task.deadline).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}</div></div>
+              <div><div className="section-label">Deadline</div><div className="text-tw-text font-medium mt-0.5">{new Date(task.deadline).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}</div></div>
             )}
-            <div><div className="text-[10px] font-bold text-tw-text-secondary uppercase tracking-wide">Priority</div><div className="mt-0.5"><span className={`badge ${priorityBadge[task.priority]}`}>{task.priority}</span></div></div>
+            <div><div className="section-label">Priority</div><div className="mt-0.5"><span className={`badge ${priorityBadge[task.priority]}`}>{task.priority}</span></div></div>
           </div>
           {loadingS && <div className="text-xs text-tw-text-secondary">Loading details…</div>}
           {subtasks.length > 0 && (
             <div className="space-y-1">
-              <div className="text-[10px] font-bold text-tw-text-secondary uppercase tracking-wide mb-1">Subtasks ({subtasks.length})</div>
+              <div className="section-label mb-1">Subtasks ({subtasks.length})</div>
               {subtasks.map(s => (
                 <div key={s.id} className="flex items-center gap-2 text-xs">
                   <span className={`badge ${subtaskStatusBadge[s.status] || 'badge-gray'}`}>{s.status.replace('_',' ')}</span>
@@ -576,15 +579,14 @@ function MobileApprovalCard({ task, actorId, onRefresh, onViewTask }: { task: Ta
           )}
           {comments.length > 0 && (
             <div className="space-y-1">
-              <div className="text-[10px] font-bold text-tw-text-secondary uppercase tracking-wide mb-1">Comments ({comments.length})</div>
+              <div className="section-label mb-1">Comments ({comments.length})</div>
               {comments.slice(-2).map(c => (
-                <div key={c.id} className="bg-gray-50 rounded-lg px-3 py-2 text-xs text-tw-text">{c.content}</div>
+                <div key={c.id} className="panel-muted px-3 py-2 text-xs text-tw-text">{c.content}</div>
               ))}
             </div>
           )}
-          <button onClick={() => onViewTask(task)}
-            className="w-full py-3 rounded-xl bg-tw-primary text-white text-sm font-bold active:opacity-80 flex items-center justify-center gap-2">
-            View Task & Progress →
+          <button onClick={() => onViewTask(task)} className="btn-primary w-full py-3">
+            View Task &amp; Progress <Icon name="arrowRight" className="w-4 h-4" />
           </button>
         </div>
       )}
@@ -595,16 +597,12 @@ function MobileApprovalCard({ task, actorId, onRefresh, onViewTask }: { task: Ta
 
 function ApprovalQueueView({ tasks, actorId, onRefresh, onViewTask }: { tasks: Task[]; actorId: string; onRefresh: () => void; onViewTask: (t: Task) => void }) {
   return (
-    <div className="p-4 md:p-6">
-      <h1 className="hidden md:block text-2xl font-bold text-tw-text mb-1">Approval Queue</h1>
-      <p className="text-sm text-tw-text-secondary mb-4 md:mb-6">
-        {tasks.length} task{tasks.length !== 1 ? 's' : ''} waiting for your review
-      </p>
+    <div className="page">
+      <PageHeader icon="approve" tone="purple" title="Approval Queue"
+        subtitle={`${tasks.length} task${tasks.length !== 1 ? 's' : ''} waiting for your review`} />
       {tasks.length === 0 ? (
-        <div className="card p-12 text-center">
-          <div className="text-4xl mb-3">🎉</div>
-          <p className="text-tw-text font-semibold">All caught up!</p>
-          <p className="text-tw-text-secondary text-sm mt-1">No tasks waiting for approval.</p>
+        <div className="card">
+          <EmptyState icon="party" tone="green" title="All caught up!" text="No tasks waiting for approval." />
         </div>
       ) : (
         <>
@@ -616,15 +614,15 @@ function ApprovalQueueView({ tasks, actorId, onRefresh, onViewTask }: { tasks: T
           </div>
           {/* Desktop table */}
           <div className="hidden md:block card overflow-hidden">
-            <table className="w-full text-sm">
+            <table className="table-modern">
               <thead>
-                <tr className="bg-[#f0f4ff] border-b-2 border-tw-primary/20">
+                <tr className="bg-tw-surface-2 border-b border-tw-border">
                   <th className="w-px px-3 py-3"></th>
-                  <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider">Task</th>
-                  <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider">Project</th>
-                  <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider">Submitted</th>
-                  <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider">Priority</th>
-                  <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider">Deadline</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-tw-text-secondary uppercase tracking-[0.08em]">Task</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-tw-text-secondary uppercase tracking-[0.08em]">Project</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-tw-text-secondary uppercase tracking-[0.08em]">Submitted</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-tw-text-secondary uppercase tracking-[0.08em]">Priority</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-tw-text-secondary uppercase tracking-[0.08em]">Deadline</th>
                   <th className="w-8 px-2 py-3"></th>
                 </tr>
               </thead>
@@ -691,11 +689,11 @@ function DeadlineReportCard({
             <div className="p-8 text-center text-tw-text-secondary text-sm">{emptyText}</div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="table-modern">
                 <thead>
-                  <tr className="bg-[#f0f4ff] border-b-2 border-tw-primary/20">
+                  <tr className="bg-tw-surface-2 border-b border-tw-border">
                     {headers.map(h => (
-                      <th key={h} className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider whitespace-nowrap">{h}</th>
+                      <th key={h} className="text-left px-4 py-3 text-[11px] font-semibold text-tw-text-secondary uppercase tracking-[0.08em] whitespace-nowrap">{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -737,63 +735,6 @@ const submittedAfterDeadline = (t: Task) =>
 const byDeadlineAsc = (a: Task, b: Task) =>
   new Date(a.deadline ?? 8640000000000000).getTime() - new Date(b.deadline ?? 8640000000000000).getTime()
 
-// ─── Mobile User Menu ────────────────────────────────────────────────────────
-function MobileUserMenu({ user, onProfile, onSettings, onLogout }: { user: AuthUser; onProfile: () => void; onSettings: () => void; onLogout: () => void }) {
-  const [open, setOpen] = useState(false)
-  const ref = React.useRef<HTMLDivElement>(null)
-  const initials = user.name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
-
-  return (
-    <div ref={ref} className="relative md:hidden">
-      <button onClick={() => setOpen(o => !o)}
-        className="flex items-center gap-1.5 pl-1 pr-2 py-1 rounded-xl bg-white/10 hover:bg-white/20 transition-colors">
-        {user.avatarUrl
-          ? <img src={user.avatarUrl} alt="" className="w-6 h-6 rounded-full object-cover" />
-          : <div className="w-6 h-6 rounded-full bg-tw-primary flex items-center justify-center text-white text-xs font-bold">{initials}</div>
-        }
-        <svg className={`w-3 h-3 text-white/70 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/>
-        </svg>
-      </button>
-      {open && (
-        <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden z-50">
-          {/* User info header */}
-          <div className="px-4 py-3 bg-[#f0f4ff] border-b border-gray-100">
-            <div className="font-semibold text-tw-text text-sm truncate">{user.name}</div>
-            <div className="text-xs text-tw-text-secondary">Director</div>
-          </div>
-          <button onClick={() => { onProfile(); setOpen(false) }}
-            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-tw-text hover:bg-tw-hover transition-colors">
-            <svg className="w-4 h-4 text-tw-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
-            </svg>
-            My Profile
-          </button>
-          <button onClick={() => { onSettings(); setOpen(false) }}
-            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-tw-text hover:bg-tw-hover transition-colors border-t border-gray-50">
-            <svg className="w-4 h-4 text-tw-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-            </svg>
-            Settings
-          </button>
-          <button onClick={() => { onLogout(); setOpen(false) }}
-            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-tw-danger hover:bg-red-50 transition-colors border-t border-gray-100">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
-            </svg>
-            Sign Out
-          </button>
-        </div>
-      )}
-    </div>
-  )
-}
 
 // ─── Director Dashboard ───────────────────────────────────────────────────────
 export default function DirectorDashboard({ user, currentView, setView, onLogout, onUserUpdate, onImpersonationStart, launchSource }: Props) {
@@ -961,31 +902,30 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
   const { canInstall, isIOS, installApp, pushEnabled, enablePush } = usePWA()
   const [showIOSGuide, setShowIOSGuide] = useState(false)
 
-  // Mobile nav items (condensed — 5 max for bottom bar)
-  const mobileNavItems = [
-    { label: 'Dashboard', view: 'director_dashboard' as ViewMode, icon: '⊞' },
-    { label: 'Projects',  view: 'project_board'      as ViewMode, icon: '📋' },
-    { label: 'Approvals', view: 'approval_queue'     as ViewMode, icon: '✅', badge: stats.pending_approval },
-    { label: 'Groups',    view: 'group_tasks'        as ViewMode, icon: '🫂' },
-    { label: 'More',      view: null, icon: '☰' },
+  // Mobile: four primary destinations in the floating bar, the rest in "More"
+  const mobileNavItems: MobileNavItem[] = [
+    { label: 'Dashboard', view: 'director_dashboard', icon: 'dashboard' },
+    { label: 'Projects',  view: 'project_board',      icon: 'project' },
+    { label: 'Approvals', view: 'approval_queue',     icon: 'approve', badge: stats.pending_approval },
+    { label: 'Groups',    view: 'group_tasks',        icon: 'group' },
   ]
-  const [showMobileMore, setShowMobileMore] = useState(false)
-  const mobileMoreItems = [
-    { label: 'Letters', view: 'letters' as ViewMode, icon: '✉' },
-    ...(ysoEnabled ? [{ label: 'YSO Performance', view: 'yso_performance' as ViewMode, icon: '🌱' }] : []),
-    ...(insuranceEnabled ? [{ label: 'Insurance', view: 'insurance_management' as ViewMode, icon: '🛡️' }] : []),
-    { label: 'Tasks',           view: 'tasks'             as ViewMode, icon: '🗂️' },
-    { label: 'Team Hierarchy',  view: 'hierarchy_manager' as ViewMode, icon: '👥' },
-    { label: 'Reports',         view: 'reports'           as ViewMode, icon: '📊' },
-    { label: 'Recent Updates',  view: 'recent_updates'    as ViewMode, icon: '🕐' },
-    { label: 'Broadcasts',      view: 'broadcasts'        as ViewMode, icon: '📢' },
-    { label: 'Overdue Tasks',   view: 'overdue'           as ViewMode, icon: '⏰', badge: stats.overdue },
-    { label: 'Audit Log',       view: 'audit_log'         as ViewMode, icon: '📜' },
-    ...(user.isSyswiseAdmin ? [{ label: 'Support Access', view: 'impersonation' as ViewMode, icon: '🔐' }] : []),
-    { label: 'Settings',        view: 'settings'          as ViewMode, icon: '⚙️' },
-    ...(user.isSyswiseAdmin ? [{ label: 'Company Requests', view: 'company_requests' as ViewMode, icon: 'C' }] : []),
-    ...(user.isSyswiseAdmin ? [{ label: 'Company Features', view: 'company_features' as ViewMode, icon: '🧩' }] : []),
-    { label: 'My Profile',      view: 'profile'           as ViewMode, icon: '👤' },
+  const mobileMoreItems: MobileNavItem[] = [
+    { label: 'Letters', view: 'letters', icon: 'letter' },
+    ...(ysoEnabled ? [{ label: 'YSO Performance', view: 'yso_performance' as ViewMode, icon: 'sprout' as const }] : []),
+    ...(insuranceEnabled ? [{ label: 'Insurance', view: 'insurance_management' as ViewMode, icon: 'shield' as const }] : []),
+    { label: 'Tasks',           view: 'tasks',             icon: 'tasks' },
+    { label: 'Team Hierarchy',  view: 'hierarchy_manager', icon: 'hierarchy' },
+    { label: 'Reports',         view: 'reports',           icon: 'reports' },
+    { label: 'Recent Updates',  view: 'recent_updates',    icon: 'updates' },
+    { label: 'Broadcasts',      view: 'broadcasts',        icon: 'broadcast' },
+    { label: 'Overdue Tasks',   view: 'overdue',           icon: 'overdue', badge: stats.overdue },
+    { label: 'Audit Log',       view: 'audit_log',         icon: 'audit' },
+    { label: 'User Analytics',  view: 'user_analytics',    icon: 'analytics' },
+    ...(user.isSyswiseAdmin ? [{ label: 'Support Access', view: 'impersonation' as ViewMode, icon: 'lock' as const }] : []),
+    { label: 'Settings',        view: 'settings',          icon: 'settings' },
+    ...(user.isSyswiseAdmin ? [{ label: 'Company Requests', view: 'company_requests' as ViewMode, icon: 'building' as const }] : []),
+    ...(user.isSyswiseAdmin ? [{ label: 'Company Features', view: 'company_features' as ViewMode, icon: 'puzzle' as const }] : []),
+    { label: 'My Profile',      view: 'profile',           icon: 'user' },
   ]
 
   return (
@@ -993,8 +933,8 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
 
       {/* ── Watermark ───────────────────────────────────────────────────── */}
       {currentView !== 'letters' && <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
-        <img src="/taskwise/watermark.jpeg" alt="" className="absolute bottom-0 right-0 select-none"
-          style={{ opacity: 0.13, mixBlendMode: 'multiply' as const, width: '100%', maxWidth: '480px', right: '50%', transform: 'translateX(50%)' }} />
+        <img src="/taskwise/watermark.jpeg" alt="" className="tw-watermark absolute bottom-0 select-none"
+          style={{ width: '100%', maxWidth: '480px', right: '50%', transform: 'translateX(50%)' }} />
       </div>}
 
       {/* ── Desktop Sidebar ──────────────────────────────────────────────── */}
@@ -1015,13 +955,13 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
       {/* ── Main ────────────────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-w-0 relative z-10">
         {/* Top bar */}
-        <header className="bg-[#1f2d3d] md:bg-tw-surface border-b border-white/10 md:border-tw-border px-4 md:px-6 py-3 md:py-3.5 flex items-center justify-between flex-shrink-0">
-          <div className="flex items-center gap-2">
+        <header className={`sticky z-20 ${user.impersonation ? 'top-[56px] md:top-[68px]' : 'top-0 md:top-3'} bg-tw-surface/85 backdrop-blur-xl border-b border-tw-border md:border md:rounded-2xl md:mx-3 md:mt-3 md:shadow-card px-3 md:px-4 py-2.5 flex items-center justify-between gap-2 flex-shrink-0`}>
+          <div className="flex items-center gap-2 min-w-0">
             {user.companyLogo ? (
-              <img src={user.companyLogo} alt="Logo" className="w-7 h-7 rounded object-contain md:hidden" />
+              <img src={user.companyLogo} alt="Logo" className="w-8 h-8 rounded-xl object-contain bg-white p-0.5 ring-1 ring-tw-border md:hidden" />
             ) : (
-              <div className="w-7 h-7 bg-tw-primary rounded-lg flex items-center justify-center md:hidden flex-shrink-0">
-                <span className="text-white font-bold text-xs">T</span>
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#3d9bff] to-tw-primary flex items-center justify-center md:hidden flex-shrink-0 shadow-cta">
+                <span className="text-white font-bold text-xs">{(user.companyName || 'T')[0].toUpperCase()}</span>
               </div>
             )}
             {/* Back button — desktop (left of title) and mobile */}
@@ -1035,16 +975,16 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
                     goBack()
                   }
                 }}
-                className="flex items-center gap-1 text-white/70 md:text-tw-text-secondary hover:text-white md:hover:text-tw-primary transition-colors p-1.5 rounded-lg"
+                className="icon-btn w-8 h-8"
                 title="Go back"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/>
-                </svg>
+                <Icon name="arrowLeft" className="w-[18px] h-[18px]" />
               </button>
             )}
-            <div>
-              <div className="font-bold text-white md:text-tw-text text-sm md:text-base">
+            <div className="flex items-center gap-1.5 min-w-0 text-[15px]">
+              <span className="hidden lg:inline text-tw-text-muted truncate max-w-[180px]">{user.companyName || 'TaskWise'}</span>
+              <Icon name="chevronRight" className="hidden lg:block w-3.5 h-3.5 text-tw-text-muted flex-shrink-0" />
+              <span className="font-semibold text-tw-text truncate">
                 {currentView === 'project_board' && selectedProject ? selectedProject.name
                   : currentView === 'director_dashboard' ? 'Dashboard'
                   : currentView === 'approval_queue' ? 'Approvals'
@@ -1068,18 +1008,18 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
                   : currentView === 'company_requests' ? 'Company Requests'
                   : currentView === 'company_features' ? 'Company Features'
                   : 'My Profile'}
-              </div>
+              </span>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             {currentView === 'project_board' && selectedProject && (
-              <div className="hidden md:flex bg-tw-hover rounded-lg p-0.5 gap-0.5">
+              <div className="hidden md:inline-flex seg">
                 <button onClick={() => setProjectSubView('board')}
-                  className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${projectSubView === 'board' ? 'bg-white text-tw-primary shadow-card' : 'text-tw-text-secondary'}`}>
+                  className={`seg-item ${projectSubView === 'board' ? 'seg-item-active' : ''}`}>
                   Board
                 </button>
                 <button onClick={() => setProjectSubView('flowchart')}
-                  className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${projectSubView === 'flowchart' ? 'bg-white text-tw-primary shadow-card' : 'text-tw-text-secondary'}`}>
+                  className={`seg-item ${projectSubView === 'flowchart' ? 'seg-item-active' : ''}`}>
                   Flowchart
                 </button>
               </div>
@@ -1087,17 +1027,15 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
             {/* Install App button — mobile only, show when not installed */}
             {canInstall && (
               <button onClick={isIOS ? () => setShowIOSGuide(true) : installApp}
-                className="md:hidden flex items-center gap-1 bg-white/10 hover:bg-white/20 text-white text-xs font-medium px-2.5 py-1.5 rounded-lg transition-colors"
+                className="md:hidden chip py-1.5 px-2.5"
                 title="Install App">
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-                </svg>
+                <Icon name="download" className="w-3.5 h-3.5" />
                 <span>Install</span>
               </button>
             )}
             {showIOSGuide && (
-              <div className="fixed inset-0 z-50 flex items-end justify-center p-4 bg-black/40" onClick={() => setShowIOSGuide(false)}>
-                <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-5" onClick={e => e.stopPropagation()}>
+              <div className="fixed inset-0 z-50 flex items-end justify-center p-4 bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in" onClick={() => setShowIOSGuide(false)}>
+                <div className="modal-panel w-full max-w-sm p-5" onClick={e => e.stopPropagation()}>
                   <h3 className="font-semibold text-tw-text mb-3 text-center">Install TaskWise</h3>
                   <div className="space-y-3 text-sm text-tw-text-secondary">
                     <div className="flex items-start gap-3">
@@ -1122,23 +1060,20 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
             {/* Push notifications button — mobile only */}
             {!pushEnabled && (
               <button onClick={enablePush}
-                className="md:hidden flex items-center gap-1 bg-white/10 hover:bg-white/20 text-white text-xs font-medium px-2.5 py-1.5 rounded-lg transition-colors"
+                className="md:hidden chip py-1.5 px-2.5"
                 title="Enable Notifications">
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
-                </svg>
+                <Icon name="bell" className="w-3.5 h-3.5" />
                 <span className="hidden xs:inline">Notify</span>
               </button>
             )}
+            <ThemeToggle compact className="hidden md:inline-flex" />
             <a
               href={launcherHomeUrl(launchSource)}
               title={t(`Back to ${launcherName(launchSource)}`)}
               aria-label={t(`Back to ${launcherName(launchSource)}`)}
-              className="flex items-center justify-center text-white/70 md:text-tw-text-secondary hover:text-white md:hover:text-tw-primary transition-colors p-1.5 rounded-lg"
+              className="icon-btn"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
+              <Icon name="grid" className="w-[18px] h-[18px]" />
             </a>
             <NotificationsMenu
               onOpenYso={() => navigate('yso_performance')}
@@ -1153,76 +1088,112 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
               onOpenCompanyRequests={() => navigate('company_requests')}
             />
             {/* Mobile user menu */}
-            <MobileUserMenu user={user} onProfile={() => setView('profile' as ViewMode)} onSettings={() => setView('settings' as ViewMode)} onLogout={onLogout} />
+            <MobileUserMenu user={user} roleLabel="Director" onProfile={() => setView('profile' as ViewMode)} onSettings={() => setView('settings' as ViewMode)} onLogout={onLogout} />
           </div>
         </header>
 
-        <main ref={mainRef} className="flex-1 overflow-auto pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-0">
+        <main ref={mainRef} className="flex-1 overflow-auto pb-[calc(6.5rem+env(safe-area-inset-bottom))] md:pb-0">
 
           {/* DASHBOARD */}
           {currentView === 'director_dashboard' && (
-            <div className="p-4 md:p-6">
-              <h1 className="text-xl md:text-2xl font-bold text-tw-text mb-1">Welcome back, {user.name.split(' ')[0]}</h1>
-              <p className="text-sm text-tw-text-secondary mb-4 md:mb-6">Here's what's happening across your workspace.</p>
+            <div className="page">
+              <PageHeader
+                title={<>{t('Welcome back')}, {user.name.split(' ')[0]}</>}
+                subtitle={t("Here's what's happening across your workspace.")}
+                actions={<button onClick={loadDashboard} className="btn-secondary btn-sm"><Icon name="refresh" className="w-3.5 h-3.5" />{t('Refresh')}</button>}
+              />
 
-              {statsLoading ? <div className="text-sm text-tw-text-secondary">Loading...</div> : (
+              {statsLoading ? <LoadingBlock /> : (
                 <>
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6 md:mb-8">
-                    {[
-                      { label: 'Projects',         value: stats.projects,          color: 'text-tw-primary',   bg: 'bg-blue-50',   icon: '📋', view: 'project_board'   as ViewMode },
-                      { label: 'Total Tasks',       value: stats.totalTasks,        color: 'text-tw-text',      bg: 'bg-gray-50',   icon: '✓',  view: 'project_board'   as ViewMode },
-                      { label: 'Pending Approval',  value: stats.pending_approval,  color: 'text-purple-600',   bg: 'bg-purple-50', icon: '⏳', view: 'approval_queue'  as ViewMode },
-                      { label: 'Overdue',           value: stats.overdue,           color: 'text-tw-danger',    bg: 'bg-red-50',    icon: '⚠',  view: 'overdue'         as ViewMode },
-                    ].map(s => (
-                      <button
-                        key={s.label}
-                        onClick={() => navigate(s.view)}
-                        className={`rounded-2xl p-4 ${s.bg} border border-white/50 flex flex-col items-center justify-center text-center gap-1 hover:shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer`}
-                      >
-                        <div className="text-2xl leading-none mb-1">{s.icon}</div>
-                        <div className={`text-2xl md:text-3xl font-bold ${s.color}`}>{s.value}</div>
-                        <div className="text-xs md:text-sm text-tw-text-secondary">{s.label}</div>
-                      </button>
-                    ))}
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-5 md:mb-6">
+                    <StatCard label={t('Projects')}         value={stats.projects}         icon="project"   tone="blue"   onClick={() => navigate('project_board')} />
+                    <StatCard label={t('Total Tasks')}      value={stats.totalTasks}       icon="tasks"     tone="indigo" onClick={() => navigate('tasks')} />
+                    <StatCard label={t('Pending Approval')} value={stats.pending_approval} icon="hourglass" tone="purple" onClick={() => navigate('approval_queue')} />
+                    <StatCard label={t('Overdue')}          value={stats.overdue}          icon="alert"     tone="red"    onClick={() => navigate('overdue')} />
                   </div>
 
-                  {/* Reports shortcut */}
-                  <button
-                    onClick={() => navigate('reports')}
-                    className="w-full card p-5 flex items-center justify-between hover:shadow-panel transition-shadow group"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="text-2xl">📊</span>
-                      <div className="text-left">
-                        <div className="font-semibold text-tw-text text-sm">Reports</div>
-                        <div className="text-xs text-tw-text-secondary mt-0.5">
-                          Overdue · Due soon · Pending approvals · Sitting longest · By officer · By department &amp; more
+                  <div className="grid lg:grid-cols-3 gap-4 md:gap-5">
+                    {/* Due soon */}
+                    <div className="card lg:col-span-2 overflow-hidden">
+                      <div className="flex items-center justify-between px-5 py-4 border-b border-tw-border">
+                        <div className="flex items-center gap-2.5">
+                          <span className="icon-tile tile-amber w-8 h-8 rounded-lg"><Icon name="calendar" className="w-4 h-4" /></span>
+                          <div>
+                            <div className="font-semibold text-tw-text text-sm">{t('Due in the next 7 days')}</div>
+                            <div className="text-xs text-tw-text-secondary">{dueSoonList.length} {t(dueSoonList.length === 1 ? 'task' : 'tasks')}</div>
+                          </div>
                         </div>
+                        <button onClick={() => navigate('tasks')} className="btn-ghost btn-sm">{t('View all')}<Icon name="arrowRight" className="w-3.5 h-3.5" /></button>
                       </div>
+                      {dueSoonList.length === 0 ? (
+                        <EmptyState icon="check" tone="green" title={t('Nothing due this week')} text={t('No active tasks have a deadline in the next 7 days.')} className="py-10" />
+                      ) : (
+                        <div className="divide-y divide-tw-border">
+                          {dueSoonList.slice(0, 6).map(task => {
+                            const days = Math.ceil((new Date(task.deadline!).setHours(0, 0, 0, 0) - new Date().setHours(0, 0, 0, 0)) / 86400000)
+                            return (
+                              <button key={task.id} onClick={() => setSelectedTask(task)} className="list-row w-full text-left">
+                                <span className={`w-1.5 h-8 rounded-full flex-shrink-0 ${days <= 1 ? 'bg-tw-danger' : days <= 3 ? 'bg-tw-warning' : 'bg-tw-primary/60'}`} />
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-sm font-medium text-tw-text truncate">{task.title}</div>
+                                  <div className="text-xs text-tw-text-secondary truncate">
+                                    {task.project?.name || '—'} · {task.assignments?.[0]?.personnel?.name || task.assignments?.[0]?.department?.name || t('Unassigned')}
+                                  </div>
+                                </div>
+                                <span className={`badge ${days <= 1 ? 'badge-danger' : days <= 3 ? 'badge-warning' : 'badge-gray'}`}>
+                                  {days === 0 ? t('Today') : days === 1 ? t('Tomorrow') : `${days}d`}
+                                </span>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      )}
                     </div>
-                    <svg className="w-5 h-5 text-tw-text-secondary group-hover:text-tw-primary transition-colors flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/>
-                    </svg>
-                  </button>
 
-                  {/* Leaderboard shortcut */}
-                  <button
-                    onClick={() => navigate('leaderboard')}
-                    className="w-full card p-5 flex items-center justify-between hover:shadow-panel transition-shadow group mt-3"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="text-2xl">🏆</span>
-                      <div className="text-left">
-                        <div className="font-semibold text-tw-text text-sm">Leaderboard</div>
-                        <div className="text-xs text-tw-text-secondary mt-0.5">
-                          See who's earning points — daily logins, task updates, on-time submissions &amp; more
+                    {/* Shortcuts */}
+                    <div className="space-y-3">
+                      {[
+                        { title: 'Reports', text: 'Overdue · Due soon · Pending approvals · Sitting longest · By officer · By department & more', icon: 'reports' as const, tone: 'tile-blue', view: 'reports' as ViewMode },
+                        { title: 'Leaderboard', text: "See who's earning points — daily logins, task updates, on-time submissions & more", icon: 'trophy' as const, tone: 'tile-amber', view: 'leaderboard' as ViewMode },
+                        { title: 'Recent Updates', text: 'Latest progress notes and comments across all tasks', icon: 'updates' as const, tone: 'tile-teal', view: 'recent_updates' as ViewMode },
+                      ].map(sc => (
+                        <button key={sc.title} onClick={() => navigate(sc.view)}
+                          className="w-full card card-hover p-4 flex items-center gap-3.5 text-left group">
+                          <span className={`icon-tile ${sc.tone}`}><Icon name={sc.icon} className="w-5 h-5" /></span>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-semibold text-tw-text text-sm">{t(sc.title)}</div>
+                            <div className="text-xs text-tw-text-secondary mt-0.5 line-clamp-2">{t(sc.text)}</div>
+                          </div>
+                          <Icon name="chevronRight" className="w-4 h-4 text-tw-text-muted group-hover:text-tw-primary-text group-hover:translate-x-0.5 transition-all flex-shrink-0" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Sitting longest */}
+                  {stalestList.length > 0 && (
+                    <div className="card overflow-hidden mt-4 md:mt-5">
+                      <div className="flex items-center gap-2.5 px-5 py-4 border-b border-tw-border">
+                        <span className="icon-tile tile-purple w-8 h-8 rounded-lg"><Icon name="hourglass" className="w-4 h-4" /></span>
+                        <div>
+                          <div className="font-semibold text-tw-text text-sm">{t('Sitting longest')}</div>
+                          <div className="text-xs text-tw-text-secondary">{t('Active tasks assigned the longest time ago')}</div>
                         </div>
                       </div>
+                      <div className="grid sm:grid-cols-2 gap-px bg-tw-border">
+                        {stalestList.slice(0, 6).map(task => (
+                          <button key={task.id} onClick={() => setSelectedTask(task)} className="list-row w-full text-left bg-tw-surface">
+                            <span className="icon-tile tile-gray w-8 h-8 rounded-lg"><Icon name="tasks" className="w-4 h-4" /></span>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-medium text-tw-text truncate">{task.title}</div>
+                              <div className="text-xs text-tw-text-secondary truncate">{task.assignments?.[0]?.personnel?.name || task.assignments?.[0]?.department?.name || '—'}</div>
+                            </div>
+                            {task.assignments?.[0]?.assignedAt && <ElapsedDays startedAt={task.assignments[0].assignedAt} />}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                    <svg className="w-5 h-5 text-tw-text-secondary group-hover:text-tw-primary transition-colors flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/>
-                    </svg>
-                  </button>
+                  )}
                 </>
               )}
             </div>
@@ -1299,11 +1270,9 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
             const submittedLate   = approvalQueue.filter(t => submittedAfterDeadline(t)).sort(byDeadlineAsc)
             const submittedOnTime = approvalQueue.filter(t => !submittedAfterDeadline(t)).sort(byDeadlineAsc)
             return (
-              <div className="p-4 md:p-6">
-                <h1 className="text-xl md:text-2xl font-bold text-tw-text mb-1">Task Deadline &amp; Verification Report</h1>
-                <p className="text-sm text-tw-text-secondary mb-4 md:mb-6">
-                  Overdue work and submissions awaiting verification, grouped by deadline outcome.
-                </p>
+              <div className="page">
+                <PageHeader icon="overdue" tone="red" title="Task Deadline & Verification Report"
+                  subtitle="Overdue work and submissions awaiting verification, grouped by deadline outcome." />
                 <div className="space-y-3 md:space-y-4">
                   <DeadlineReportCard
                     title="Task Overdue"
@@ -1365,7 +1334,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
 
           {/* USER MANAGEMENT — Chairman only */}
           {currentView === 'user_management' && user.isChairman && (
-            user.roleBasedIdentity ? <div className="p-6"><FixedRoleManagement user={user} /></div> : <ChairmanUserManagementPage />
+            user.roleBasedIdentity ? <div className="page"><FixedRoleManagement user={user} /></div> : <ChairmanUserManagementPage />
           )}
 
           {/* LEADERBOARD */}
@@ -1383,14 +1352,14 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
 
           {/* AUDIT LOG */}
           {currentView === 'audit_log' && (
-            <div className="p-6">
-              <h1 className="text-2xl font-bold text-tw-text mb-6">Audit Log</h1>
-              <div className="card overflow-hidden">
-                <table className="w-full text-sm">
+            <div className="page">
+              <PageHeader icon="audit" tone="gray" title="Audit Log" subtitle="Every task event, who triggered it and when." />
+              <div className="card overflow-hidden overflow-x-auto">
+                <table className="table-modern">
                   <thead>
-                    <tr className="bg-[#f0f4ff] border-b-2 border-tw-primary/20">
+                    <tr className="bg-tw-surface-2 border-b border-tw-border">
                       {['Event', 'Actor', 'Task', 'Date & Time'].map(h => (
-                        <th key={h} className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider">{h}</th>
+                        <th key={h} className="text-left px-4 py-3 text-[11px] font-semibold text-tw-text-secondary uppercase tracking-[0.08em]">{h}</th>
                       ))}
                     </tr>
                   </thead>
@@ -1400,7 +1369,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
                     )}
                     {(auditLogs as AuditLog[]).map((log: AuditLog) => (
                       <tr key={log.id} className="hover:bg-tw-hover">
-                        <td className="px-4 py-3"><span className="font-mono text-xs bg-tw-hover px-2 py-0.5 rounded">{log.event}</span></td>
+                        <td className="px-4 py-3"><span className="font-mono text-[11px] bg-tw-hover border border-tw-border px-2 py-0.5 rounded-md text-tw-text">{log.event}</span></td>
                         <td className="px-4 py-3 text-tw-text-secondary capitalize">{log.actorName || log.actorType}</td>
                         <td className="px-4 py-3 text-tw-text-secondary text-xs">{log.taskId ? log.taskId.slice(0, 8) + '...' : '—'}</td>
                         <td className="px-4 py-3 text-tw-text-secondary text-xs">{new Date(log.createdAt).toLocaleString()}</td>
@@ -1414,61 +1383,13 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
         </main>
       </div>
 
-      {/* ── Mobile bottom tab bar ──────────────────────────────────────── */}
-      {/* Mobile More drawer */}
-      {showMobileMore && (
-        <div className="md:hidden fixed inset-0 z-30 flex flex-col justify-end">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setShowMobileMore(false)} />
-          <div className="relative bg-white rounded-t-2xl shadow-xl pb-safe">
-            <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mt-3 mb-2" />
-            <div className="px-4 pb-4 grid grid-cols-4 gap-2">
-              {mobileMoreItems.map(item => (
-                <button
-                  key={item.view}
-                  onClick={() => { navigate(item.view); setShowMobileMore(false) }}
-                  className={`flex flex-col items-center justify-center py-3 px-1 gap-1.5 rounded-xl relative transition-colors
-                    ${activeView === item.view ? 'bg-blue-50 text-tw-primary' : 'text-gray-500 hover:bg-gray-50'}`}
-                >
-                  <span className="text-2xl leading-none">{item.icon}</span>
-                  <span className="text-[10px] font-semibold leading-none text-center">{t(item.label)}</span>
-                  {item.badge ? (
-                    <span className="absolute top-1 right-1 bg-red-500 text-white text-[9px] rounded-full w-4 h-4 flex items-center justify-center font-bold">
-                      {item.badge}
-                    </span>
-                  ) : null}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-20 pb-[env(safe-area-inset-bottom)] bg-white border-t border-gray-200 shadow-[0_-2px_16px_rgba(0,0,0,0.08)]">
-        <div className="flex items-stretch">
-          {mobileNavItems.map(item => (
-            <button key={item.view ?? 'more'}
-              onClick={() => {
-                if (item.view === null) { setShowMobileMore(o => !o); return }
-                if (item.view === 'project_board') setSelectedProject(null)
-                setShowMobileMore(false)
-                navigate(item.view)
-              }}
-              className={`flex-1 flex flex-col items-center justify-center py-4 px-1 gap-1 relative transition-colors
-                ${item.view !== null && activeView === item.view ? 'text-tw-primary' : showMobileMore && item.view === null ? 'text-tw-primary' : 'text-gray-400'}`}>
-              {item.view !== null && activeView === item.view && (
-                <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-tw-primary rounded-full" />
-              )}
-              <span className="text-lg leading-none">{item.icon}</span>
-              <span className="text-[10px] font-semibold leading-none">{t(item.label)}</span>
-              {item.badge ? (
-                <span className="absolute top-1.5 right-[20%] bg-red-500 text-white text-[9px] rounded-full w-4 h-4 flex items-center justify-center font-bold">
-                  {item.badge}
-                </span>
-              ) : null}
-            </button>
-          ))}
-        </div>
-      </nav>
+      {/* ── Mobile bottom bar ──────────────────────────────────────────── */}
+      <MobileNav
+        primary={mobileNavItems}
+        more={mobileMoreItems}
+        activeView={activeView}
+        onSelect={v => { if (v === 'project_board') setSelectedProject(null); navigate(v) }}
+      />
 
       {/* ── Task Detail Panel (overdue / flowchart click-through) ─────── */}
       {selectedTask && (

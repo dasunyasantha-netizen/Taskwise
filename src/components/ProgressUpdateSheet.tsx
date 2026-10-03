@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { Icon } from './ui/Icon'
 
 /**
  * Mobile-first progress update input.
@@ -71,9 +72,9 @@ export default function ProgressUpdateSheet({
         <button
           onClick={handleSubmit}
           disabled={!value.trim() || loading}
-          className="btn-primary text-sm px-4 py-2 h-fit flex-shrink-0 disabled:opacity-50"
+          className="btn-primary h-fit flex-shrink-0 py-2.5"
         >
-          {loading ? '…' : 'Add'}
+          {loading ? '…' : <><Icon name="send" className="w-4 h-4" /> Add</>}
         </button>
       </div>
 
@@ -82,7 +83,7 @@ export default function ProgressUpdateSheet({
         {/* Trigger button */}
         <button
           onClick={() => setSheetOpen(true)}
-          className="w-full flex items-center gap-3 px-4 py-3 bg-white rounded-2xl border-2 border-dashed border-tw-primary/30 text-tw-primary/70 hover:border-tw-primary hover:text-tw-primary active:scale-[0.99] transition-all"
+          className="w-full flex items-center gap-3 px-4 py-3 bg-tw-surface rounded-2xl border-2 border-dashed border-tw-primary/30 text-tw-primary-text/80 hover:border-tw-primary hover:text-tw-primary-text active:scale-[0.99] transition-all"
         >
           <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/>
@@ -91,7 +92,7 @@ export default function ProgressUpdateSheet({
             {value.trim() ? `"${value.length > 40 ? value.slice(0, 40) + '…' : value}"` : `Add ${label.toLowerCase()}…`}
           </span>
           {value.trim() && (
-            <span className="ml-auto text-xs bg-tw-primary/10 text-tw-primary font-semibold px-2 py-0.5 rounded-full">Draft</span>
+            <span className="ml-auto badge badge-primary">Draft</span>
           )}
         </button>
 
@@ -100,13 +101,13 @@ export default function ProgressUpdateSheet({
           <div className="fixed inset-0 z-50 flex flex-col justify-end">
             {/* Backdrop */}
             <div
-              className="absolute inset-0 bg-black/50"
+              className="absolute inset-0 bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in"
               onClick={() => setSheetOpen(false)}
             />
 
             {/* Sheet */}
             <div
-              className="relative bg-white rounded-t-3xl shadow-2xl flex flex-col"
+              className="relative bg-tw-surface rounded-t-3xl border-t border-tw-border animate-slide-up shadow-2xl flex flex-col"
               style={{ maxHeight: '80vh' }}
               onClick={e => e.stopPropagation()}
             >
@@ -118,7 +119,7 @@ export default function ProgressUpdateSheet({
                 </div>
                 <button
                   onClick={() => setSheetOpen(false)}
-                  className="w-8 h-8 rounded-full bg-tw-hover flex items-center justify-center text-tw-text-secondary hover:text-tw-text transition-colors"
+                  className="icon-btn w-8 h-8"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12"/>
@@ -130,7 +131,7 @@ export default function ProgressUpdateSheet({
               <div className="flex-1 overflow-y-auto px-5 py-4 min-h-0">
                 <textarea
                   ref={sheetTextareaRef}
-                  className="w-full text-base text-tw-text bg-tw-hover/50 rounded-2xl px-4 py-3.5 resize-none focus:outline-none focus:ring-2 focus:ring-tw-primary/30 leading-relaxed"
+                  className="w-full text-base text-tw-text bg-tw-surface-2 border border-tw-border rounded-2xl px-4 py-3.5 resize-none focus:outline-none focus:ring-4 focus:ring-tw-primary/15 focus:border-tw-primary/60 leading-relaxed"
                   rows={5}
                   placeholder={placeholder}
                   value={value}
@@ -144,20 +145,20 @@ export default function ProgressUpdateSheet({
 
               {/* Submit — pinned to bottom, above keyboard */}
               <div
-                className="flex-shrink-0 px-5 pb-6 pt-3 border-t border-tw-border bg-white"
+                className="flex-shrink-0 px-5 pb-6 pt-3 border-t border-tw-border bg-tw-surface"
                 style={{ paddingBottom: `max(1.5rem, env(safe-area-inset-bottom))` }}
               >
                 <div className="flex gap-3">
                   <button
                     onClick={() => setSheetOpen(false)}
-                    className="flex-1 py-3.5 rounded-2xl border-2 border-gray-200 text-gray-600 font-bold text-sm active:opacity-80"
+                    className="btn-secondary flex-1 py-3"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={handleSubmit}
                     disabled={!value.trim() || loading}
-                    className="flex-1 py-3.5 rounded-2xl bg-tw-success text-white font-bold text-sm disabled:opacity-40 active:opacity-80 transition-opacity"
+                    className="btn-success flex-1 py-3"
                   >
                     {loading ? 'Posting…' : 'Post Update'}
                   </button>

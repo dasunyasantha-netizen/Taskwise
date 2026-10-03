@@ -4,6 +4,8 @@ import type { AuthUser, Layer } from '../types'
 import { OFFICE_CATEGORY_OPTIONS, hasFourLevelHierarchy, levelTakesCategory, officeCategoryLabel } from '../hierarchy'
 import Select from './Select'
 import DatePicker from './DatePicker'
+import { PageHeader, EmptyState, LoadingBlock } from './ui/Primitives'
+import { Icon } from './ui/Icon'
 
 const AUDIENCE_LABELS: Record<string, string> = {
   ALL: 'Everyone',
@@ -72,24 +74,19 @@ export default function BroadcastsPage({ user }: { user: AuthUser }) {
       ]
 
   return (
-    <div className="p-4 md:p-6 max-w-3xl">
-      <div className="flex items-center justify-between mb-4 md:mb-6">
-        <div>
-          <h1 className="text-xl md:text-2xl font-bold text-tw-text">Broadcasts</h1>
-          <p className="text-sm text-tw-text-secondary mt-0.5">Send banner notices to all or selected staff levels.</p>
-        </div>
-        <button onClick={() => setShowForm(s => !s)}
-          className="px-4 py-2 rounded-lg bg-tw-primary text-white text-sm font-semibold hover:opacity-90 transition-opacity flex items-center gap-2">
-          {showForm ? '✕ Cancel' : '+ New Notice'}
-        </button>
-      </div>
+    <div className="page max-w-4xl">
+      <PageHeader icon="broadcast" tone="amber" title="Broadcasts" subtitle="Send banner notices to all or selected staff levels."
+        actions={<button onClick={() => setShowForm(s => !s)}
+          className={showForm ? 'btn-secondary' : 'btn-primary'}>
+          {showForm ? <><Icon name="x" className="w-4 h-4" /> Cancel</> : <><Icon name="plus" className="w-4 h-4" /> New Notice</>}
+        </button>} />
 
       {/* Compose form */}
       {showForm && (
-        <div className="card p-5 mb-6 space-y-4 border-l-4 border-tw-primary">
-          <h2 className="font-semibold text-tw-text">Compose Notice</h2>
+        <div className="card p-5 mb-6 space-y-4 ring-1 ring-tw-primary/25">
+          <h2 className="font-semibold text-tw-text inline-flex items-center gap-2"><span className="icon-tile tile-blue w-8 h-8 rounded-lg"><Icon name="edit" className="w-4 h-4" /></span>Compose Notice</h2>
           <div>
-            <label className="block text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">Message</label>
+            <label className="label">Message</label>
             <textarea
               className="input resize-none w-full"
               rows={5}
@@ -100,7 +97,7 @@ export default function BroadcastsPage({ user }: { user: AuthUser }) {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">Audience</label>
+              <label className="label">Audience</label>
               <Select
                 value={audience}
                 onChange={setAudience}
@@ -112,7 +109,7 @@ export default function BroadcastsPage({ user }: { user: AuthUser }) {
             </div>
             {audience === 'LAYER' && (
               <div>
-                <label className="block text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">Level</label>
+                <label className="label">Level</label>
                 <Select
                   value={String(layerNumber)}
                   onChange={v => { setLayerNumber(Number(v)); setOfficeCategory('') }}
@@ -122,7 +119,7 @@ export default function BroadcastsPage({ user }: { user: AuthUser }) {
             )}
             {canTargetCategory && (
               <div>
-                <label className="block text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">Category</label>
+                <label className="label">Category</label>
                 <Select
                   value={officeCategory}
                   onChange={setOfficeCategory}
@@ -134,7 +131,7 @@ export default function BroadcastsPage({ user }: { user: AuthUser }) {
               </div>
             )}
             <div>
-              <label className="block text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">Expires (optional)</label>
+              <label className="label">Expires (optional)</label>
               <DatePicker value={expiresAt} onChange={setExpiresAt} placeholder="Select date" />
               <p className="text-xs text-tw-text-secondary mt-1">Leave blank to show until manually deleted.</p>
             </div>
@@ -143,7 +140,7 @@ export default function BroadcastsPage({ user }: { user: AuthUser }) {
           <div className="flex justify-end gap-2">
             <button onClick={() => setShowForm(false)} className="btn-secondary text-sm">Cancel</button>
             <button disabled={saving || !message.trim()} onClick={handleCreate}
-              className="px-5 py-2 rounded-lg bg-tw-primary text-white text-sm font-semibold hover:opacity-90 disabled:opacity-50">
+              className="btn-primary">
               {saving ? 'Sending…' : 'Send Notice'}
             </button>
           </div>
@@ -152,25 +149,22 @@ export default function BroadcastsPage({ user }: { user: AuthUser }) {
 
       {/* Notice list */}
       {loading ? (
-        <div className="flex items-center justify-center h-32">
-          <div className="w-6 h-6 border-2 border-tw-primary border-t-transparent rounded-full animate-spin" />
-        </div>
+        <LoadingBlock />
       ) : notices.length === 0 ? (
-        <div className="card p-12 text-center text-tw-text-secondary">
-          <div className="text-4xl mb-3">📢</div>
-          <p className="font-semibold text-tw-text">No notices yet</p>
-          <p className="text-sm mt-1">Click "+ New Notice" to broadcast a message to your staff.</p>
+        <div className="card">
+          <EmptyState icon="broadcast" tone="amber" title="No notices yet" text='Click "New Notice" to broadcast a message to your staff.' />
         </div>
       ) : (
         <div className="space-y-3">
           {notices.map(n => {
             const expired = n.expiresAt && new Date(n.expiresAt) < now
             return (
-              <div key={n.id} className={`card p-4 border-l-4 ${expired ? 'border-gray-300 opacity-60' : 'border-amber-400'}`}>
+              <div key={n.id} className={`card p-4 relative overflow-hidden ${expired ? 'opacity-60' : ''}`}>
+                <span className={`absolute left-0 top-3 bottom-3 w-1 rounded-r-full ${expired ? 'bg-gray-300' : 'bg-amber-400'}`} />
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-2 mb-2">
-                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${expired ? 'bg-gray-100 text-gray-500' : 'bg-amber-100 text-amber-700'}`}>
+                      <span className={`badge ${expired ? 'badge-gray' : 'badge-warning'}`}>
                         {expired ? 'Expired' : 'Active'}
                       </span>
                       <span className="text-xs text-tw-text-secondary font-medium">
@@ -193,8 +187,8 @@ export default function BroadcastsPage({ user }: { user: AuthUser }) {
                     <p className="text-sm text-tw-text whitespace-pre-wrap leading-relaxed">{n.message}</p>
                   </div>
                   <button onClick={() => handleDelete(n.id)}
-                    className="flex-shrink-0 text-tw-text-secondary hover:text-tw-danger transition-colors p-1 rounded">
-                    🗑
+                    className="flex-shrink-0 icon-btn hover:text-tw-danger" aria-label="Delete notice">
+                    <Icon name="trash" className="w-4 h-4" />
                   </button>
                 </div>
               </div>

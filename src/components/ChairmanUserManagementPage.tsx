@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { workspaceApi } from '../services/apiService'
 import { levelNeedsManager, officeCategoryLabel } from '../hierarchy'
+import { Icon } from './ui/Icon'
+import { PageHeader, LoadingBlock } from './ui/Primitives'
 
 interface ManagedUser {
   id: string
@@ -93,43 +95,40 @@ export default function ChairmanUserManagementPage() {
     fourLevel && levelNeedsManager(user.department.layer.number) && !user.supervisorId
   const missingManagerCount = users.filter(missingManager).length
 
-  if (loading) return <div className="flex h-48 items-center justify-center text-sm text-tw-text-secondary">Loading users…</div>
+  if (loading) return <LoadingBlock label="Loading users…" />
 
   return (
-    <div className="p-4 md:p-6 space-y-5">
-      <div>
-        <h1 className="text-xl md:text-2xl font-bold text-tw-text">User Management</h1>
-        <p className="text-sm text-tw-text-secondary mt-0.5">Manage personnel accounts in your company.</p>
-      </div>
+    <div className="page space-y-5">
+      <PageHeader icon="users" tone="blue" title="User Management" subtitle="Manage personnel accounts in your company." className="!mb-0" />
 
       <div className="grid grid-cols-3 gap-3">
-        <div className="card px-4 py-3">
-          <div className="text-xs text-tw-text-secondary">Total users</div>
-          <div className="text-2xl font-bold text-tw-primary mt-1">{users.length}</div>
+        <div className="card px-4 py-4">
+          <div className="flex items-center gap-2 text-xs text-tw-text-secondary"><span className="icon-tile tile-blue w-7 h-7 rounded-lg"><Icon name="users" className="w-3.5 h-3.5" /></span>Total users</div>
+          <div className="text-2xl font-bold tracking-tight text-tw-text mt-2">{users.length}</div>
         </div>
-        <div className="card px-4 py-3">
-          <div className="text-xs text-tw-text-secondary">Active</div>
-          <div className="text-2xl font-bold text-emerald-600 mt-1">{activeCount}</div>
+        <div className="card px-4 py-4">
+          <div className="flex items-center gap-2 text-xs text-tw-text-secondary"><span className="icon-tile tile-green w-7 h-7 rounded-lg"><Icon name="activity" className="w-3.5 h-3.5" /></span>Active</div>
+          <div className="text-2xl font-bold tracking-tight text-tw-text mt-2">{activeCount}</div>
         </div>
-        <div className="card px-4 py-3">
-          <div className="text-xs text-tw-text-secondary">Password change due</div>
-          <div className="text-2xl font-bold text-amber-600 mt-1">{forcedChangeCount}</div>
+        <div className="card px-4 py-4">
+          <div className="flex items-center gap-2 text-xs text-tw-text-secondary"><span className="icon-tile tile-amber w-7 h-7 rounded-lg"><Icon name="key" className="w-3.5 h-3.5" /></span>Password change due</div>
+          <div className="text-2xl font-bold tracking-tight text-tw-text mt-2">{forcedChangeCount}</div>
         </div>
       </div>
 
       {missingManagerCount > 0 && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <div className="alert-warning">
           <strong>{missingManagerCount}</strong> {missingManagerCount === 1 ? 'user has' : 'users have'} no reporting manager.
           A director can set one from Team Hierarchy.
         </div>
       )}
 
-      {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-tw-danger">{error}</div>}
+      {error && <div className="alert-error">{error}</div>}
 
       <div className="card overflow-hidden">
         <div className="border-b border-tw-border px-4 py-3 flex flex-wrap items-center gap-3">
           <div className="relative flex-1 min-w-[220px] max-w-md">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-tw-text-secondary">🔎</span>
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-tw-text-muted"><Icon name="search" className="w-4 h-4" /></span>
             <input
               className="input pl-9 text-sm"
               value={search}
@@ -151,7 +150,7 @@ export default function ChairmanUserManagementPage() {
                   <div className="text-xs text-tw-text-secondary truncate">
                     {[user.department.name, officeCategoryLabel(user.department.officeCategory)].filter(Boolean).join(' · ')}
                   </div>
-                  {missingManager(user) && <div className="text-xs text-amber-700 mt-0.5">⚠ No reporting manager</div>}
+                  {missingManager(user) && <div className="text-xs text-amber-700 mt-0.5 inline-flex items-center gap-1"><Icon name="alert" className="w-3 h-3" /> No reporting manager</div>}
                   <div className="text-xs font-mono text-tw-primary mt-1 truncate">{user.loginId || user.phone}</div>
                 </div>
                 <span className={`text-[10px] font-semibold rounded-full px-2 py-1 ${user.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
@@ -165,11 +164,11 @@ export default function ChairmanUserManagementPage() {
         </div>
 
         <div className="hidden sm:block overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="table-modern">
             <thead>
-              <tr className="bg-[#f0f4ff] border-b-2 border-tw-primary/20">
+              <tr className="bg-tw-surface-2 border-b border-tw-border">
                 {['User', 'Login ID', 'Department', 'Contact', 'Status', 'Password'].map(label => (
-                  <th key={label} className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider whitespace-nowrap">{label}</th>
+                  <th key={label} className="text-left px-4 py-3 text-[11px] font-semibold text-tw-text-secondary uppercase tracking-[0.08em] whitespace-nowrap">{label}</th>
                 ))}
                 <th className="px-4 py-3" />
               </tr>
@@ -194,7 +193,7 @@ export default function ChairmanUserManagementPage() {
                     {officeCategoryLabel(user.department.officeCategory) && (
                       <div className="text-[11px]">{officeCategoryLabel(user.department.officeCategory)}</div>
                     )}
-                    {missingManager(user) && <div className="text-[11px] text-amber-700">⚠ No reporting manager</div>}
+                    {missingManager(user) && <div className="text-[11px] text-amber-700 inline-flex items-center gap-1"><Icon name="alert" className="w-3 h-3" /> No reporting manager</div>}
                   </td>
                   <td className="px-4 py-3 text-xs text-tw-text-secondary">
                     <div>{user.phone}</div>
@@ -221,20 +220,20 @@ export default function ChairmanUserManagementPage() {
       </div>
 
       {selected && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => !resetting && setSelected(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-5" onClick={event => event.stopPropagation()}>
-            <div className="w-12 h-12 rounded-2xl bg-amber-100 flex items-center justify-center text-2xl mb-4">🔑</div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in" onClick={() => !resetting && setSelected(null)}>
+          <div className="modal-panel w-full max-w-md p-5" onClick={event => event.stopPropagation()}>
+            <span className="icon-tile tile-amber w-12 h-12 rounded-2xl mb-4"><Icon name="key" className="w-6 h-6" /></span>
             <h2 className="text-lg font-bold text-tw-text">Reset {selected.name}’s password?</h2>
             <p className="text-sm text-tw-text-secondary mt-2">
               Their temporary password will become <strong className="font-mono text-tw-text">Youth@123</strong>. After signing in, they must create a new private password before accessing TaskWise.
             </p>
-            <div className="mt-3 rounded-xl bg-tw-hover px-3 py-2 text-sm">
+            <div className="mt-3 panel-muted px-3 py-2 text-sm">
               <span className="text-tw-text-secondary">Login ID: </span>
               <strong className="font-mono text-tw-text">{selected.loginId || selected.phone}</strong>
             </div>
             <div className="flex justify-end gap-2 mt-5">
               <button type="button" className="btn-secondary text-sm" disabled={resetting} onClick={() => setSelected(null)}>Cancel</button>
-              <button type="button" className="rounded-lg bg-amber-500 text-white px-4 py-2 text-sm font-semibold disabled:opacity-60" disabled={resetting} onClick={resetPassword}>
+              <button type="button" className="btn text-white bg-gradient-to-b from-amber-400 to-amber-500 shadow-[0_4px_14px_-4px_rgba(245,158,11,0.7)] hover:brightness-105" disabled={resetting} onClick={resetPassword}>
                 {resetting ? 'Resetting…' : 'Reset password'}
               </button>
             </div>
@@ -243,9 +242,9 @@ export default function ChairmanUserManagementPage() {
       )}
 
       {result && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-5">
-            <div className="w-12 h-12 rounded-2xl bg-emerald-100 flex items-center justify-center text-2xl mb-4">✓</div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in">
+          <div className="modal-panel w-full max-w-md p-5">
+            <span className="icon-tile tile-green w-12 h-12 rounded-2xl mb-4"><Icon name="check" className="w-6 h-6" /></span>
             <h2 className="text-lg font-bold text-tw-text">Password reset complete</h2>
             <p className="text-sm text-tw-text-secondary mt-1">Share these temporary credentials securely with {result.user.name}.</p>
             <div className="mt-4 rounded-xl border border-tw-border overflow-hidden">

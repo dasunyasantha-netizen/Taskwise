@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { Icon } from './ui/Icon';
 
 const BUILT_SHA = import.meta.env.VITE_BUILD_SHA ?? '';
 const CHECK_INTERVAL_MS = 5 * 60 * 1000;
@@ -35,22 +36,14 @@ export const VersionBanner: React.FC = () => {
     if (!updateAvailable) return null;
 
     return (
-        <div style={{
-            position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)',
-            zIndex: 9999, display: 'flex', alignItems: 'center', gap: '12px',
-            background: '#fff', border: '1px solid #0073ea', borderRadius: '8px',
-            padding: '10px 16px', boxShadow: '0 4px 20px rgba(0,115,234,0.15)',
-            whiteSpace: 'nowrap', fontFamily: 'Figtree, Inter, sans-serif',
-        }}>
-            <span style={{ color: '#323338', fontSize: '13px' }}>A new version is available</span>
-            <button onClick={() => window.location.reload()} style={{
-                background: '#0073ea', color: '#fff', border: 'none', borderRadius: '6px',
-                padding: '6px 14px', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
-            }}>Refresh</button>
-            <button onClick={() => setUpdateAvailable(false)} style={{
-                background: 'none', border: 'none', color: '#676879', cursor: 'pointer',
-                fontSize: '16px', lineHeight: 1, padding: '0 2px',
-            }}>×</button>
+        <div className="fixed bottom-24 md:bottom-6 left-1/2 -translate-x-1/2 z-[9999] flex items-center gap-3 whitespace-nowrap
+            bg-tw-surface/95 backdrop-blur-xl border border-tw-primary/40 rounded-2xl pl-4 pr-2 py-2 shadow-panel animate-pop-in">
+            <Icon name="sparkles" className="w-4 h-4 text-tw-primary-text" />
+            <span className="text-tw-text text-[13px] font-medium">A new version is available</span>
+            <button onClick={() => window.location.reload()} className="btn-primary btn-sm">Refresh</button>
+            <button onClick={() => setUpdateAvailable(false)} className="icon-btn w-7 h-7" aria-label="Dismiss">
+                <Icon name="x" className="w-3.5 h-3.5" />
+            </button>
         </div>
     );
 };

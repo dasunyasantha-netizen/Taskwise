@@ -3,6 +3,9 @@ import { insuranceApi } from '../services/apiService'
 import type { InsurancePolicy, InsuranceQuotation, InsuranceSummary, InsuranceType } from '../types'
 import Select from './Select'
 import DatePicker from './DatePicker'
+import type { IconName } from './ui/Icon'
+import { PageHeader, LoadingBlock, EmptyState } from './ui/Primitives'
+import { Icon } from './ui/Icon'
 
 type RecordTab = 'quotations' | 'policies'
 type FormData = Record<string, string | boolean>
@@ -217,14 +220,14 @@ function RecordFormModal({ kind, initial, onClose, onSaved }: {
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center sm:p-4 md:p-6" onClick={onClose}>
-      <form onSubmit={submit} className="bg-white shadow-2xl w-full max-w-3xl h-[100dvh] sm:h-auto sm:max-h-[94dvh] flex flex-col sm:rounded-2xl" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 md:p-6 bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in" onClick={onClose}>
+      <form onSubmit={submit} className="bg-tw-surface border border-tw-border shadow-panel w-full max-w-3xl h-[100dvh] sm:h-auto sm:max-h-[94dvh] flex flex-col sm:rounded-3xl animate-pop-in" onClick={e => e.stopPropagation()}>
         <div className="shrink-0 px-5 py-4 border-b border-tw-border flex items-center justify-between">
           <div><h2 className="font-bold text-tw-text">{initial ? 'Edit' : 'Create'} {kind === 'quotation' ? 'Quotation' : 'Policy'}</h2><p className="text-xs text-tw-text-secondary mt-0.5">Fields change according to the insurance type.</p></div>
-          <button type="button" onClick={onClose} className="w-8 h-8 rounded-lg hover:bg-tw-hover text-tw-text-secondary text-xl">×</button>
+          <button type="button" onClick={onClose} className="icon-btn" aria-label="Close"><Icon name="x" className="w-4 h-4" /></button>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-          {error && <div className="mb-4 bg-red-50 border border-red-200 text-tw-danger text-sm px-3 py-2 rounded-lg">{error}</div>}
+          {error && <div className="mb-4 alert-error">{error}</div>}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Field label={kind === 'quotation' ? 'Quotation number' : 'Policy number'}>
               <div className="input text-sm flex items-center bg-gray-50 text-tw-text-secondary">
@@ -271,7 +274,7 @@ function RecordFormModal({ kind, initial, onClose, onSaved }: {
             <div className="md:col-span-2"><Field label="Notes"><textarea className="input text-sm min-h-20 resize-y" value={String(form.notes)} onChange={e => set('notes', e.target.value)} placeholder="Optional notes" /></Field></div>
           </div>
         </div>
-        <div className="shrink-0 px-5 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] border-t border-tw-border bg-white grid grid-cols-2 sm:flex sm:justify-end gap-2">
+        <div className="shrink-0 px-5 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] border-t border-tw-border bg-tw-surface-2 sm:rounded-b-3xl grid grid-cols-2 sm:flex sm:justify-end gap-2">
           <button type="button" className="btn-secondary w-full sm:w-auto" onClick={onClose} disabled={saving}>Cancel</button>
           <button className="btn-primary w-full sm:w-auto" disabled={saving}>{saving ? 'Saving…' : initial ? 'Save Changes' : kind === 'quotation' ? 'Create Quotation' : 'Add Policy'}</button>
         </div>
@@ -293,10 +296,10 @@ function ConvertModal({ quotation, onClose, onSaved }: { quotation: InsuranceQuo
     setSaving(false)
   }
   return (
-    <div className="fixed inset-0 z-[60] bg-black/40 p-4 flex items-center justify-center" onClick={onClose}>
-      <form onSubmit={submit} className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[94dvh] overflow-y-auto p-5" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-[60] p-4 flex items-center justify-center bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in" onClick={onClose}>
+      <form onSubmit={submit} className="modal-panel w-full max-w-lg max-h-[94dvh] overflow-y-auto p-5" onClick={e => e.stopPropagation()}>
         <h2 className="font-bold text-tw-text text-lg">Convert to Policy</h2><p className="text-sm text-tw-text-secondary mb-4">Quotation {quotation.quotationNumber} · {quotation.customerName}</p>
-        {error && <div className="mb-3 bg-red-50 border border-red-200 text-tw-danger text-sm px-3 py-2 rounded-lg">{error}</div>}
+        {error && <div className="mb-3 alert-error">{error}</div>}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="sm:col-span-2"><Field label="Policy number"><div className="input text-sm flex items-center bg-gray-50 text-tw-text-secondary">Assigned automatically when converted</div></Field></div>
           <div className="sm:col-span-2"><Field label="Company policy number" required><TextInput value={String(form.companyPolicyNumber)} onChange={v => setForm(f => ({ ...f, companyPolicyNumber: v }))} placeholder="Policy number issued by Fairfirst" required /></Field></div>
@@ -319,10 +322,10 @@ function RenewModal({ quotation, onClose, onSaved }: { quotation: InsuranceQuota
   const [premium, setPremium] = useState(String(quotation.premium)); const [saving, setSaving] = useState(false); const [error, setError] = useState('')
   const submit = async (e: React.FormEvent) => { e.preventDefault(); setSaving(true); setError(''); try { await insuranceApi.renewQuotation(quotation.id, { premium }); await onSaved(); onClose() } catch (err) { setError(err instanceof Error ? err.message : 'Unable to renew quotation') } setSaving(false) }
   return (
-    <div className="fixed inset-0 z-[60] bg-black/40 p-4 flex items-center justify-center" onClick={onClose}>
-      <form onSubmit={submit} className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-5" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-[60] p-4 flex items-center justify-center bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in" onClick={onClose}>
+      <form onSubmit={submit} className="modal-panel w-full max-w-md p-5" onClick={e => e.stopPropagation()}>
         <h2 className="font-bold text-tw-text text-lg">Renew Quotation</h2><p className="text-sm text-tw-text-secondary mb-4">A new quotation will be valid for 30 days.</p>
-        {error && <div className="mb-3 bg-red-50 border border-red-200 text-tw-danger text-sm px-3 py-2 rounded-lg">{error}</div>}
+        {error && <div className="mb-3 alert-error">{error}</div>}
         <div className="space-y-4"><Field label="New quotation number"><div className="input text-sm flex items-center bg-gray-50 text-tw-text-secondary">Assigned automatically when renewed</div></Field><Field label="Premium (LKR)" required><MoneyInput value={premium} onChange={setPremium} required /></Field></div>
         <div className="flex justify-end gap-2 mt-5"><button type="button" className="btn-secondary" onClick={onClose}>Cancel</button><button className="btn-primary" disabled={saving}>{saving ? 'Renewing…' : 'Create Renewal'}</button></div>
       </form>
@@ -349,11 +352,11 @@ function ReactivatePolicyModal({ policy, onClose, onSaved }: { policy: Insurance
   }
   const set = (key: string, value: string) => setForm(current => ({ ...current, [key]: value }))
   return (
-    <div className="fixed inset-0 z-[60] bg-black/40 p-3 sm:p-4 flex items-center justify-center" onClick={onClose}>
-      <form onSubmit={submit} className="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[94dvh] overflow-y-auto p-5" onClick={event => event.stopPropagation()}>
+    <div className="fixed inset-0 z-[60] p-3 sm:p-4 flex items-center justify-center bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in" onClick={onClose}>
+      <form onSubmit={submit} className="modal-panel w-full max-w-xl max-h-[94dvh] overflow-y-auto p-5" onClick={event => event.stopPropagation()}>
         <h2 className="font-bold text-tw-text text-lg">Reactivate Policy</h2>
         <p className="text-sm text-tw-text-secondary mb-4">{policy.policyNumber} · {policy.customerName}</p>
-        {error && <div className="mb-3 bg-red-50 border border-red-200 text-tw-danger text-sm px-3 py-2 rounded-lg">{error}</div>}
+        {error && <div className="mb-3 alert-error">{error}</div>}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="sm:col-span-2"><Field label="Company policy number" required><TextInput value={String(form.companyPolicyNumber)} onChange={value => set('companyPolicyNumber', value)} placeholder="Policy number issued by Fairfirst" required /></Field></div>
           <Field label="Sales code" required><TextInput value={String(form.salesCode)} onChange={value => set('salesCode', value)} required /></Field>
@@ -394,12 +397,12 @@ function RenewPolicyModal({ policy, onClose, onSaved }: { policy: InsurancePolic
     setSaving(false)
   }
   return (
-    <div className="fixed inset-0 z-[60] bg-black/40 p-3 sm:p-4 flex items-center justify-center" onClick={onClose}>
-      <form onSubmit={submit} className="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[94dvh] overflow-y-auto p-5" onClick={event => event.stopPropagation()}>
+    <div className="fixed inset-0 z-[60] p-3 sm:p-4 flex items-center justify-center bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in" onClick={onClose}>
+      <form onSubmit={submit} className="modal-panel w-full max-w-xl max-h-[94dvh] overflow-y-auto p-5" onClick={event => event.stopPropagation()}>
         <h2 className="font-bold text-tw-text text-lg">Renew Policy</h2>
         <p className="text-sm text-tw-text-secondary mb-1">{policy.policyNumber} · {policy.customerName}</p>
         <p className="text-xs text-tw-text-secondary mb-4">A new policy is issued with its own number. {policy.policyNumber} is kept and marked as renewed, so the GWP already counted in its month stays unchanged.</p>
-        {error && <div className="mb-3 bg-red-50 border border-red-200 text-tw-danger text-sm px-3 py-2 rounded-lg">{error}</div>}
+        {error && <div className="mb-3 alert-error">{error}</div>}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="sm:col-span-2"><Field label="Company policy number" required><TextInput value={String(form.companyPolicyNumber)} onChange={value => set('companyPolicyNumber', value)} placeholder="Policy number issued by Fairfirst" required /></Field></div>
           <Field label="Sales code" required><TextInput value={String(form.salesCode)} onChange={value => set('salesCode', value)} required /></Field>
@@ -421,12 +424,12 @@ function RenewPolicyModal({ policy, onClose, onSaved }: { policy: InsurancePolic
   )
 }
 
-const TYPE_STYLE: Record<InsuranceType, { icon: string; tint: string }> = {
-  MOTOR: { icon: '🚗', tint: 'bg-tw-indigo-light' },
-  FIRE: { icon: '🔥', tint: 'bg-tw-orange-light' },
-  CASUALTY: { icon: '⚖️', tint: 'bg-tw-purple-light' },
-  MARINE: { icon: '🚢', tint: 'bg-tw-teal-light' },
-  TRAVEL: { icon: '✈️', tint: 'bg-tw-success-light' },
+const TYPE_STYLE: Record<InsuranceType, { icon: IconName; tint: string; tile: string }> = {
+  MOTOR: { icon: 'car', tint: 'bg-tw-indigo-light', tile: 'tile-indigo' },
+  FIRE: { icon: 'flame', tint: 'bg-tw-orange-light', tile: 'tile-red' },
+  CASUALTY: { icon: 'scale', tint: 'bg-tw-purple-light', tile: 'tile-purple' },
+  MARINE: { icon: 'ship', tint: 'bg-tw-teal-light', tile: 'tile-teal' },
+  TRAVEL: { icon: 'plane', tint: 'bg-tw-success-light', tile: 'tile-green' },
 }
 
 type SubjectDetail = { label: string; value: string; wide?: boolean }
@@ -527,11 +530,11 @@ function DetailModal({ record, kind, onClose, onEdit, onConvert, onRenew, onReac
   ]
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 p-3 md:p-6 flex items-center justify-center" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92dvh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 p-3 md:p-6 flex items-center justify-center bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in" onClick={onClose}>
+      <div className="modal-panel w-full max-w-2xl max-h-[92dvh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
         <div className={`shrink-0 px-5 sm:px-6 py-4 ${style.tint}`}>
           <div className="flex items-start gap-3">
-            <div className="w-11 h-11 rounded-xl bg-white/70 flex items-center justify-center text-xl shrink-0">{style.icon}</div>
+            <span className={`icon-tile w-11 h-11 bg-tw-surface/80 ${style.tile}`}><Icon name={style.icon} className="w-5 h-5" /></span>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="font-bold text-tw-text text-lg leading-tight">{number}</h2>
@@ -540,7 +543,7 @@ function DetailModal({ record, kind, onClose, onEdit, onConvert, onRenew, onReac
               <p className="text-sm font-semibold text-tw-text mt-1 truncate">{record.customerName}</p>
               <p className="text-xs text-tw-text-secondary mt-0.5">{typeLabel(record.insuranceType)} {kind} · {record.contactNumber}</p>
             </div>
-            <button onClick={onClose} className="w-8 h-8 rounded-lg hover:bg-white/60 text-tw-text-secondary text-xl leading-none shrink-0">×</button>
+            <button onClick={onClose} className="icon-btn shrink-0" aria-label="Close"><Icon name="x" className="w-4 h-4" /></button>
           </div>
         </div>
 
@@ -558,7 +561,7 @@ function DetailModal({ record, kind, onClose, onEdit, onConvert, onRenew, onReac
                 <span className="font-semibold text-tw-text-secondary">Payment received</span>
                 <span className="font-bold text-tw-text">{money(policy.paymentAmount)} of {money(policy.premium)}</span>
               </div>
-              <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+              <div className="h-2 rounded-full bg-tw-hover overflow-hidden">
                 <div className={`h-full rounded-full transition-all ${policy.remainingAmount > 0 ? 'bg-tw-warning' : 'bg-tw-success'}`} style={{ width: `${settledPct}%` }} />
               </div>
               <div className="flex items-center justify-between gap-3 text-xs mt-2">
@@ -572,7 +575,7 @@ function DetailModal({ record, kind, onClose, onEdit, onConvert, onRenew, onReac
 
           {policy?.cancelledAt && (
             <div className="rounded-xl border border-red-200 bg-red-50 p-3.5 flex items-start gap-3">
-              <span className="text-lg leading-none shrink-0">⛔</span>
+              <span className="icon-tile tile-red w-8 h-8 rounded-lg"><Icon name="ban" className="w-4 h-4" /></span>
               <div className="min-w-0">
                 <div className="text-sm font-bold text-tw-danger">Cancelled on {displayDate(policy.cancelledAt)}</div>
                 <div className="text-xs text-tw-text-secondary mt-0.5">The full premium was not received within 30 days of the issue date. This is separate from the expiry date below.</div>
@@ -585,7 +588,7 @@ function DetailModal({ record, kind, onClose, onEdit, onConvert, onRenew, onReac
               <div className="text-[11px] font-semibold uppercase tracking-wide text-tw-text-secondary">Issued</div>
               <div className="text-sm font-bold text-tw-text truncate">{displayDate(quote ? quote.issueDate : policy!.issueDate)}</div>
             </div>
-            <div className="text-tw-text-secondary shrink-0">→</div>
+            <div className="text-tw-text-muted shrink-0"><Icon name="arrowRight" className="w-4 h-4" /></div>
             <div className="min-w-0 flex-1">
               <div className="text-[11px] font-semibold uppercase tracking-wide text-tw-text-secondary">{quote ? 'Valid until' : 'Expires'}</div>
               <div className="text-sm font-bold text-tw-text truncate">{displayDate(periodEnd)}</div>
@@ -702,35 +705,33 @@ export default function InsuranceManagementPage() {
   }, [tab, quotations, policies, search, type, status, cardFilter, summary])
 
   const cards = summary ? (tab === 'quotations' ? [
-    { key: 'q-active', label: 'Active', value: money(summary.quotationTotals.ACTIVE.value), sub: `${summary.quotationTotals.ACTIVE.count} quotations raised this month`, color: 'text-emerald-600', icon: '📝' },
-    { key: 'q-expired', label: 'Expired', value: money(summary.quotationTotals.EXPIRED.value), sub: `${summary.quotationTotals.EXPIRED.count} quotations raised this month`, color: 'text-tw-danger', icon: '⌛' },
-    { key: 'q-renewed', label: 'Renewed', value: money(summary.quotationTotals.RENEWED.value), sub: `${summary.quotationTotals.RENEWED.count} quotations raised this month`, color: 'text-amber-600', icon: '🔄' },
+    { key: 'q-active', label: 'Active', value: money(summary.quotationTotals.ACTIVE.value), sub: `${summary.quotationTotals.ACTIVE.count} quotations raised this month`, color: 'text-emerald-600', icon: 'note' as IconName, tile: 'tile-green' },
+    { key: 'q-expired', label: 'Expired', value: money(summary.quotationTotals.EXPIRED.value), sub: `${summary.quotationTotals.EXPIRED.count} quotations raised this month`, color: 'text-tw-danger', icon: 'hourglass' as IconName, tile: 'tile-amber' },
+    { key: 'q-renewed', label: 'Renewed', value: money(summary.quotationTotals.RENEWED.value), sub: `${summary.quotationTotals.RENEWED.count} quotations raised this month`, color: 'text-amber-600', icon: 'refresh' as IconName, tile: 'tile-amber' },
   ] : [
-    { key: 'p-written', label: 'Written', value: money(summary.policyTotals.written.value), sub: `${summary.policyTotals.written.count} policies issued or renewed · GWP`, color: 'text-emerald-600', icon: '🛡️' },
-    { key: 'p-cancelled', label: 'Cancelled', value: money(summary.policyTotals.cancelled.value), sub: `${summary.policyTotals.cancelled.count} motor policies unpaid at 30 days · GWP`, color: 'text-tw-danger', icon: '⛔' },
-    { key: 'p-expired', label: 'Expired', value: money(summary.policyTotals.expired.value), sub: `${summary.policyTotals.expired.count} policies reached expiry · GWP`, color: 'text-amber-600', icon: '⌛' },
-    { key: 'p-final', label: 'Final', value: money(summary.finalPolicyGwp), sub: 'GWP written − cancelled this month', color: summary.finalPolicyGwp < 0 ? 'text-tw-danger' : 'text-indigo-600', icon: '📊' },
+    { key: 'p-written', label: 'Written', value: money(summary.policyTotals.written.value), sub: `${summary.policyTotals.written.count} policies issued or renewed · GWP`, color: 'text-emerald-600', icon: 'shield' as IconName, tile: 'tile-green' },
+    { key: 'p-cancelled', label: 'Cancelled', value: money(summary.policyTotals.cancelled.value), sub: `${summary.policyTotals.cancelled.count} motor policies unpaid at 30 days · GWP`, color: 'text-tw-danger', icon: 'ban' as IconName, tile: 'tile-red' },
+    { key: 'p-expired', label: 'Expired', value: money(summary.policyTotals.expired.value), sub: `${summary.policyTotals.expired.count} policies reached expiry · GWP`, color: 'text-amber-600', icon: 'hourglass' as IconName, tile: 'tile-amber' },
+    { key: 'p-final', label: 'Final', value: money(summary.finalPolicyGwp), sub: 'GWP written − cancelled this month', color: summary.finalPolicyGwp < 0 ? 'text-tw-danger' : 'text-indigo-600', icon: 'reports' as IconName, tile: 'tile-indigo' },
   ]) : []
 
   return (
-    <div className="p-4 md:p-6 space-y-5">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div><h1 className="text-xl md:text-2xl font-bold text-tw-text">Insurance Management</h1><p className="text-sm text-tw-text-secondary mt-0.5">Fairfirst quotations, policies and customer payments.</p></div>
-        <div className="flex gap-2"><button className="btn-secondary flex-1 sm:flex-none" onClick={() => { setEditing(null); setFormKind('policy') }}>+ Add Policy</button><button className="btn-primary flex-1 sm:flex-none" onClick={() => { setEditing(null); setFormKind('quotation') }}>+ Create Quotation</button></div>
-      </div>
-      {error && <div className="bg-red-50 border border-red-200 text-tw-danger text-sm px-4 py-3 rounded-xl">{error}</div>}
+    <div className="page space-y-5">
+      <PageHeader icon="shield" tone="blue" title="Insurance Management" subtitle="Fairfirst quotations, policies and customer payments." className="!mb-0"
+        actions={<div className="flex gap-2 w-full sm:w-auto"><button className="btn-secondary flex-1 sm:flex-none" onClick={() => { setEditing(null); setFormKind('policy') }}><Icon name="plus" className="w-4 h-4" /> Add Policy</button><button className="btn-primary flex-1 sm:flex-none" onClick={() => { setEditing(null); setFormKind('quotation') }}><Icon name="plus" className="w-4 h-4" /> Create Quotation</button></div>} />
+      {error && <div className="alert-error">{error}</div>}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="text-xs font-semibold text-tw-text-secondary">
           Showing <span className="text-tw-text">{summary?.monthLabel || 'this month'}</span> only · resets when the month rolls over
         </div>
-        {cardFilter && <button type="button" className="badge badge-primary" onClick={() => setCardFilter('')}>Clear card filter ×</button>}
+        {cardFilter && <button type="button" className="badge badge-primary" onClick={() => setCardFilter('')}>Clear card filter <Icon name="x" className="w-3 h-3" /></button>}
       </div>
-      <div className={`grid grid-cols-2 ${tab === 'quotations' ? 'xl:grid-cols-3' : 'xl:grid-cols-4'} gap-3`}>{cards.map(card => <button type="button" key={card.key} onClick={() => setCardFilter(cardFilter === card.key ? '' : card.key)} className={`card p-4 text-left transition-all hover:border-tw-primary ${cardFilter === card.key ? 'ring-2 ring-tw-primary border-tw-primary' : ''}`}><div className="flex items-center gap-2 text-xs text-tw-text-secondary mb-1"><span>{card.icon}</span>{card.label}</div><div className={`text-lg md:text-xl font-bold truncate ${card.color}`}>{card.value}</div><div className="text-xs text-tw-text-secondary mt-1 truncate">{card.sub}</div></button>)}</div>
+      <div className={`grid grid-cols-2 ${tab === 'quotations' ? 'xl:grid-cols-3' : 'xl:grid-cols-4'} gap-3`}>{cards.map(card => <button type="button" key={card.key} onClick={() => setCardFilter(cardFilter === card.key ? '' : card.key)} className={`card card-hover p-4 text-left ${cardFilter === card.key ? 'ring-2 ring-tw-primary/60 border-tw-primary/50' : ''}`}><div className="flex items-center gap-2 text-xs text-tw-text-secondary mb-2"><span className={`icon-tile w-7 h-7 rounded-lg ${card.tile}`}><Icon name={card.icon} className="w-3.5 h-3.5" /></span>{card.label}</div><div className={`text-lg md:text-xl font-bold tracking-tight truncate ${card.color}`}>{card.value}</div><div className="text-xs text-tw-text-secondary mt-1 truncate">{card.sub}</div></button>)}</div>
       <div className="card overflow-hidden">
         <div className="p-3 md:p-4 border-b border-tw-border space-y-3">
-          <div className="inline-flex rounded-xl border border-tw-border bg-gray-50 p-1 w-full sm:w-auto">
-            <button onClick={() => setTab('quotations')} className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-sm font-semibold ${tab === 'quotations' ? 'bg-white text-tw-primary shadow-sm' : 'text-tw-text-secondary'}`}>Quotations ({quotations.length})</button>
-            <button onClick={() => setTab('policies')} className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-sm font-semibold ${tab === 'policies' ? 'bg-white text-tw-primary shadow-sm' : 'text-tw-text-secondary'}`}>Policies ({policies.length})</button>
+          <div className="seg w-full sm:w-auto">
+            <button onClick={() => setTab('quotations')} className={`seg-item flex-1 sm:flex-none px-4 py-2 text-sm ${tab === 'quotations' ? 'seg-item-active' : ''}`}>Quotations ({quotations.length})</button>
+            <button onClick={() => setTab('policies')} className={`seg-item flex-1 sm:flex-none px-4 py-2 text-sm ${tab === 'policies' ? 'seg-item-active' : ''}`}>Policies ({policies.length})</button>
           </div>
           <div className="flex flex-col md:flex-row gap-2">
             <input className="input text-sm flex-1" value={search} onChange={e => setSearch(e.target.value)} placeholder={`Search ${tab} by number, customer, introducer${tab === 'quotations' ? ', partner' : ', company policy number, sales code'} or insured details…`} />
@@ -748,10 +749,10 @@ export default function InsuranceManagementPage() {
             />
           </div>
         </div>
-        {loading ? <div className="py-12 text-center text-sm text-tw-text-secondary">Loading insurance records…</div> : records.length === 0 ? <div className="py-12 text-center"><div className="text-3xl mb-2">🔎</div><div className="font-semibold text-tw-text">No records found</div><div className="text-sm text-tw-text-secondary mt-1">Try changing the search or filters.</div></div> : (
+        {loading ? <LoadingBlock label="Loading insurance records…" /> : records.length === 0 ? <EmptyState icon="search" title="No records found" text="Try changing the search or filters." /> : (
           <>
             <div className="md:hidden divide-y divide-tw-border">{records.map(record => { const isQuote = 'quotationNumber' in record; const policy = !isQuote ? record as InsurancePolicy : null; return <button key={record.id} onClick={() => setSelected(record)} className="w-full text-left p-4 active:bg-tw-hover"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="font-semibold text-tw-text truncate">{isQuote ? record.quotationNumber : policy!.policyNumber}</div>{policy?.companyPolicyNumber && <div className="text-xs text-tw-text-secondary truncate">Company No. {policy.companyPolicyNumber}</div>}<div className="text-sm text-tw-text-secondary truncate">{record.customerName} · {record.contactNumber}</div></div><span className={`badge ${badgeClass[record.status] || 'badge-gray'}`}>{record.status}</span></div><div className="flex items-center justify-between mt-3 text-xs text-tw-text-secondary"><span>{typeLabel(record.insuranceType)}</span><span className="font-semibold text-tw-text">{isQuote ? money(record.premium) : `GWP ${money(policy!.gwp)}`}</span></div>{policy && <div className={`text-xs mt-1 text-right ${policy.remainingAmount > 0 ? 'text-tw-danger' : 'text-emerald-600'}`}>Premium {money(policy.premium)} · Balance {money(policy.remainingAmount)}</div>}</button> })}</div>
-            <div className="hidden md:block overflow-x-auto"><table className="w-full text-sm"><thead><tr className="bg-[#f0f4ff] border-b border-tw-border"><th className="px-4 py-3 text-left text-xs font-bold text-tw-primary uppercase">{tab === 'quotations' ? 'Quotation' : 'Policy'}</th><th className="px-4 py-3 text-left text-xs font-bold text-tw-primary uppercase">Customer</th><th className="px-4 py-3 text-left text-xs font-bold text-tw-primary uppercase">Type</th><th className="px-4 py-3 text-right text-xs font-bold text-tw-primary uppercase">{tab === 'quotations' ? 'Premium' : 'GWP / Premium'}</th><th className="px-4 py-3 text-left text-xs font-bold text-tw-primary uppercase">{tab === 'quotations' ? 'Valid until' : 'Expiry'}</th><th className="px-4 py-3 text-center text-xs font-bold text-tw-primary uppercase">Status</th></tr></thead><tbody className="divide-y divide-tw-border">{records.map(record => { const isQuote = 'quotationNumber' in record; const policy = !isQuote ? record as InsurancePolicy : null; return <tr key={record.id} onClick={() => setSelected(record)} className="hover:bg-tw-hover cursor-pointer"><td className="px-4 py-3 font-semibold text-tw-text">{isQuote ? record.quotationNumber : policy!.policyNumber}{policy?.companyPolicyNumber && <div className="text-xs font-normal text-tw-text-secondary">Company No. {policy.companyPolicyNumber}</div>}</td><td className="px-4 py-3"><div className="font-medium text-tw-text">{record.customerName}</div><div className="text-xs text-tw-text-secondary">{record.contactNumber}</div></td><td className="px-4 py-3 text-tw-text-secondary">{typeLabel(record.insuranceType)}</td><td className="px-4 py-3 text-right font-semibold">{isQuote ? money(record.premium) : <><div>{money(policy!.gwp)}</div><div className="text-xs text-tw-text-secondary">Premium {money(policy!.premium)}</div>{policy!.remainingAmount > 0 && <div className="text-xs text-tw-danger">{money(policy!.remainingAmount)} due</div>}</>}</td><td className="px-4 py-3 text-tw-text-secondary">{displayDate(isQuote ? record.expiresAt : policy!.expiryDate)}</td><td className="px-4 py-3 text-center"><span className={`badge ${badgeClass[record.status] || 'badge-gray'}`}>{record.status}</span></td></tr> })}</tbody></table></div>
+            <div className="hidden md:block overflow-x-auto"><table className="table-modern"><thead><tr className="bg-tw-surface-2 border-b border-tw-border"><th className="px-4 py-3 text-left text-[11px] font-semibold text-tw-text-secondary uppercase tracking-[0.08em]">{tab === 'quotations' ? 'Quotation' : 'Policy'}</th><th className="px-4 py-3 text-left text-[11px] font-semibold text-tw-text-secondary uppercase tracking-[0.08em]">Customer</th><th className="px-4 py-3 text-left text-[11px] font-semibold text-tw-text-secondary uppercase tracking-[0.08em]">Type</th><th className="px-4 py-3 text-right text-[11px] font-semibold text-tw-text-secondary uppercase tracking-[0.08em]">{tab === 'quotations' ? 'Premium' : 'GWP / Premium'}</th><th className="px-4 py-3 text-left text-[11px] font-semibold text-tw-text-secondary uppercase tracking-[0.08em]">{tab === 'quotations' ? 'Valid until' : 'Expiry'}</th><th className="px-4 py-3 text-center text-[11px] font-semibold text-tw-text-secondary uppercase tracking-[0.08em]">Status</th></tr></thead><tbody className="divide-y divide-tw-border">{records.map(record => { const isQuote = 'quotationNumber' in record; const policy = !isQuote ? record as InsurancePolicy : null; return <tr key={record.id} onClick={() => setSelected(record)} className="hover:bg-tw-hover cursor-pointer"><td className="px-4 py-3 font-semibold text-tw-text">{isQuote ? record.quotationNumber : policy!.policyNumber}{policy?.companyPolicyNumber && <div className="text-xs font-normal text-tw-text-secondary">Company No. {policy.companyPolicyNumber}</div>}</td><td className="px-4 py-3"><div className="font-medium text-tw-text">{record.customerName}</div><div className="text-xs text-tw-text-secondary">{record.contactNumber}</div></td><td className="px-4 py-3 text-tw-text-secondary">{typeLabel(record.insuranceType)}</td><td className="px-4 py-3 text-right font-semibold">{isQuote ? money(record.premium) : <><div>{money(policy!.gwp)}</div><div className="text-xs text-tw-text-secondary">Premium {money(policy!.premium)}</div>{policy!.remainingAmount > 0 && <div className="text-xs text-tw-danger">{money(policy!.remainingAmount)} due</div>}</>}</td><td className="px-4 py-3 text-tw-text-secondary">{displayDate(isQuote ? record.expiresAt : policy!.expiryDate)}</td><td className="px-4 py-3 text-center"><span className={`badge ${badgeClass[record.status] || 'badge-gray'}`}>{record.status}</span></td></tr> })}</tbody></table></div>
           </>
         )}
       </div>

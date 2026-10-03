@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { AuthUser, Department } from '../types'
 import { workspaceApi, type FixedRole } from '../services/apiService'
 import RoleAssignments from './RoleAssignments'
+import { Icon } from './ui/Icon'
 
 export default function FixedRoleManagement({ user, createRequest = 0, onChanged }: { user: AuthUser; createRequest?: number; onChanged?: () => void }) {
   const [roles, setRoles] = useState<FixedRole[]>([])
@@ -33,7 +34,7 @@ export default function FixedRoleManagement({ user, createRequest = 0, onChanged
   const filtered = roles.filter(r => [r.name, r.departmentName, r.phone].some(s => s?.toLowerCase().includes(search.toLowerCase())))
   const writable = user.actorType === 'director' && !user.impersonation
   return <div className="space-y-4">
-    <div><h2 className="text-lg font-semibold">Roles</h2><p className="text-sm text-tw-text-secondary">{roles.length} fixed roles. Tasks, reporting relationships and history stay with each role when its phone assignment changes.</p></div>
+    <div><h2 className="text-lg font-semibold tracking-tight inline-flex items-center gap-2"><span className="icon-tile tile-indigo w-8 h-8 rounded-lg"><Icon name="users" className="w-4 h-4" /></span>Roles</h2><p className="text-sm text-tw-text-secondary">{roles.length} fixed roles. Tasks, reporting relationships and history stay with each role when its phone assignment changes.</p></div>
     {writable && <button type="button" className="btn-secondary" onClick={() => { setEditing('new'); setForm({ name: '', departmentId: '', supervisorId: '' }) }}>Create role</button>}
     {error && <p role="alert" className="text-red-700">{error}</p>}
     {editing !== null && writable && <form onSubmit={save} className="card p-5 space-y-4">

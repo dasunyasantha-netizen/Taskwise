@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { companyApi } from '../services/apiService'
+import { Icon } from './ui/Icon'
 
 interface Props {
   onClose: () => void
@@ -68,20 +69,23 @@ export default function CompanyRequestModal({ onClose }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[92vh] overflow-hidden flex flex-col">
-        <div className="px-5 py-4 border-b border-tw-border flex items-center justify-between">
-          <div>
-            <h2 className="font-bold text-tw-text text-lg">Create a New Company</h2>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in">
+      <div className="modal-panel w-full max-w-4xl max-h-[92vh] overflow-hidden flex flex-col">
+        <div className="px-5 py-4 border-b border-tw-border flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <span className="icon-tile tile-green"><Icon name="building" className="w-5 h-5" /></span>
+            <div>
+            <h2 className="font-bold text-tw-text text-lg tracking-tight">Create a New Company</h2>
             <p className="text-xs text-tw-text-secondary">Submission creates a pending request only. Syswise approval is required.</p>
+            </div>
           </div>
-          <button onClick={onClose} className="w-8 h-8 rounded-lg bg-red-100 text-red-600 font-bold">×</button>
+          <button onClick={onClose} className="icon-btn" aria-label="Close"><Icon name="x" className="w-4 h-4" /></button>
         </div>
 
         {result ? (
           <div className="p-6 space-y-4">
-            <div className="rounded-xl bg-green-50 border border-green-200 p-4">
-              <div className="text-sm font-bold text-green-700">Request submitted</div>
+            <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-4">
+              <div className="text-sm font-bold text-emerald-700 inline-flex items-center gap-1.5"><Icon name="approve" className="w-4 h-4" /> Request submitted</div>
               <div className="mt-2 grid md:grid-cols-2 gap-3 text-sm">
                 <div><span className="text-tw-text-secondary">Reference:</span> <span className="font-mono font-semibold">{result.reference}</span></div>
                 <div><span className="text-tw-text-secondary">Status:</span> <span className="font-semibold">{result.status}</span></div>
@@ -98,7 +102,7 @@ export default function CompanyRequestModal({ onClose }: Props) {
         ) : (
           <form onSubmit={submit} className="overflow-y-auto p-5 space-y-6">
             <section>
-              <h3 className="text-sm font-bold text-tw-text mb-3">Company details</h3>
+              <h3 className="section-label mb-3">Company details</h3>
               <div className="grid md:grid-cols-2 gap-3">
                 <input className="input" placeholder="Legal company name *" value={company.legalName} onChange={e => updateCompany('legalName', e.target.value)} required />
                 <input className="input" placeholder="Display or trading name" value={company.displayName} onChange={e => updateCompany('displayName', e.target.value)} />
@@ -108,16 +112,16 @@ export default function CompanyRequestModal({ onClose }: Props) {
                 <input className="input" type="number" min="1" placeholder="Expected number of users" value={company.expectedUsers} onChange={e => updateCompany('expectedUsers', e.target.value)} />
                 <textarea className="input md:col-span-2 resize-none" rows={2} placeholder="Address *" value={company.address} onChange={e => updateCompany('address', e.target.value)} required />
                 <textarea className="input md:col-span-2 resize-none" rows={3} placeholder="Reason for requesting Syswise access *" value={company.reason} onChange={e => updateCompany('reason', e.target.value)} required />
-                <label className="md:col-span-2 border border-dashed border-tw-border rounded-xl p-3 text-sm text-tw-text-secondary cursor-pointer hover:bg-tw-hover">
-                  Supporting registration document, optional
+                <label className="md:col-span-2 border-2 border-dashed border-tw-border rounded-xl p-3 text-sm text-tw-text-secondary cursor-pointer hover:bg-tw-hover hover:border-tw-primary/40 transition-colors flex flex-col items-center gap-1">
+                  <span className="inline-flex items-center gap-1.5"><Icon name="upload" className="w-4 h-4" /> Supporting registration document, optional</span>
                   <input type="file" className="hidden" accept=".pdf,image/png,image/jpeg" onChange={e => handleFile(e.target.files?.[0])} />
-                  {document && <div className="mt-1 font-medium text-tw-primary">{document.name}</div>}
+                  {document && <div className="mt-1 font-medium text-tw-primary-text">{document.name}</div>}
                 </label>
               </div>
             </section>
 
             <section>
-              <h3 className="text-sm font-bold text-tw-text mb-3">First company administrator</h3>
+              <h3 className="section-label mb-3">First company administrator</h3>
               <div className="grid md:grid-cols-3 gap-3">
                 <input className="input" placeholder="First name *" value={applicant.firstName} onChange={e => updateApplicant('firstName', e.target.value)} required />
                 <input className="input" placeholder="Middle name" value={applicant.middleName} onChange={e => updateApplicant('middleName', e.target.value)} />
@@ -130,7 +134,7 @@ export default function CompanyRequestModal({ onClose }: Props) {
               </div>
             </section>
 
-            {error && <div className="bg-red-50 border border-red-200 text-tw-danger text-sm px-3 py-2 rounded-lg">{error}</div>}
+            {error && <div className="alert-error">{error}</div>}
 
             <div className="flex justify-end gap-2 border-t border-tw-border pt-4">
               <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>

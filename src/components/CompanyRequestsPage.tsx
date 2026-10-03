@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react'
 import { companyApi, type CompanyRequestDetail, type CompanyRequestSummary } from '../services/apiService'
 import Select from './Select'
 import DatePicker from './DatePicker'
+import { PageHeader, LoadingBlock } from './ui/Primitives'
+import { Icon } from './ui/Icon'
 
 function fmt(d: string) {
   return new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
@@ -74,14 +76,10 @@ export default function CompanyRequestsPage() {
   }
 
   return (
-    <div className="p-4 md:p-6">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-5">
-        <div>
-          <h1 className="text-2xl font-bold text-tw-text">Company Approval Queue</h1>
-          <p className="text-sm text-tw-text-secondary">{pendingCount} pending request{pendingCount === 1 ? '' : 's'}</p>
-        </div>
-        <button onClick={load} className="btn-secondary">Refresh</button>
-      </div>
+    <div className="page">
+      <PageHeader icon="building" tone="purple" title="Company Approval Queue"
+        subtitle={`${pendingCount} pending request${pendingCount === 1 ? '' : 's'}`}
+        actions={<button onClick={load} className="btn-secondary"><Icon name="refresh" className="w-4 h-4" /> Refresh</button>} />
 
       <div className="card p-4 mb-4">
         <div className="grid md:grid-cols-5 gap-3">
@@ -96,26 +94,26 @@ export default function CompanyRequestsPage() {
           <DatePicker value={filters.from} onChange={v => setFilters(f => ({ ...f, from: v }))} placeholder="From date" />
           <div className="flex gap-2">
             <DatePicker className="flex-1" value={filters.to} onChange={v => setFilters(f => ({ ...f, to: v }))} placeholder="To date" />
-            <button onClick={load} className="btn-primary flex-shrink-0">Filter</button>
+            <button onClick={load} className="btn-primary flex-shrink-0"><Icon name="filter" className="w-4 h-4" /> Filter</button>
           </div>
         </div>
       </div>
 
-      {error && <div className="bg-red-50 border border-red-200 text-tw-danger text-sm px-3 py-2 rounded-lg mb-4">{error}</div>}
+      {error && <div className="alert-error mb-4">{error}</div>}
 
       <div className="grid lg:grid-cols-[1fr_420px] gap-4">
         <div className="card overflow-hidden">
           {loading ? (
-            <div className="p-8 text-sm text-tw-text-secondary">Loading...</div>
+            <LoadingBlock />
           ) : requests.length === 0 ? (
             <div className="p-8 text-sm text-tw-text-secondary">No requests match the filters.</div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="table-modern">
                 <thead>
-                  <tr className="bg-[#f0f4ff] border-b-2 border-tw-primary/20">
+                  <tr className="bg-tw-surface-2 border-b border-tw-border">
                     {['Company', 'Reg No.', 'Applicant', 'Contact', 'Prefix', 'Submitted', 'Status'].map(h => (
-                      <th key={h} className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase whitespace-nowrap">{h}</th>
+                      <th key={h} className="text-left px-4 py-3 text-[11px] font-semibold text-tw-text-secondary uppercase tracking-[0.08em] whitespace-nowrap">{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -172,15 +170,15 @@ export default function CompanyRequestsPage() {
               <textarea className="input resize-none" rows={2} placeholder="Instructions for more information" value={instructions} onChange={e => setInstructions(e.target.value)} />
               <textarea className="input resize-none" rows={2} placeholder="Rejection reason" value={reason} onChange={e => setReason(e.target.value)} />
 
-              {actionError && <div className="bg-red-50 border border-red-200 text-tw-danger text-sm px-3 py-2 rounded-lg">{actionError}</div>}
+              {actionError && <div className="alert-error">{actionError}</div>}
 
               <div className="grid grid-cols-2 gap-2">
-                <button disabled={actionLoading} onClick={() => runAction('approve')} className="bg-green-600 text-white rounded-lg px-3 py-2 font-semibold text-sm">Approve</button>
-                <button disabled={actionLoading} onClick={() => runAction('reject')} className="btn-danger text-sm">Reject</button>
-                <button disabled={actionLoading} onClick={() => runAction('more_info')} className="btn-secondary text-sm">Request More Info</button>
-                <button disabled={actionLoading} onClick={() => runAction('pending')} className="btn-secondary text-sm">Return to Pending</button>
-                <button disabled={actionLoading} onClick={() => runAction('note')} className="btn-secondary text-sm col-span-2">Save Internal Note</button>
-                <button disabled={actionLoading} onClick={() => runAction('prefix')} className="btn-secondary text-sm col-span-2">Save Prefix</button>
+                <button disabled={actionLoading} onClick={() => runAction('approve')} className="btn-success btn-sm">Approve</button>
+                <button disabled={actionLoading} onClick={() => runAction('reject')} className="btn-danger btn-sm">Reject</button>
+                <button disabled={actionLoading} onClick={() => runAction('more_info')} className="btn-secondary btn-sm">Request More Info</button>
+                <button disabled={actionLoading} onClick={() => runAction('pending')} className="btn-secondary btn-sm">Return to Pending</button>
+                <button disabled={actionLoading} onClick={() => runAction('note')} className="btn-secondary btn-sm col-span-2">Save Internal Note</button>
+                <button disabled={actionLoading} onClick={() => runAction('prefix')} className="btn-secondary btn-sm col-span-2">Save Prefix</button>
               </div>
 
               {selected.actions && selected.actions.length > 0 && (

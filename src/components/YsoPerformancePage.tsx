@@ -12,14 +12,15 @@ import type { AuthUser } from '../types'
 import DatePicker from './DatePicker'
 import Select from './Select'
 import { LanguageToggle, useLanguage, displayDate } from '../i18n/Language'
+import { Icon } from './ui/Icon'
 
-const panel = 'bg-white rounded-2xl border border-slate-200 p-5 shadow-sm'
+const panel = 'card p-5'
 const input =
-  'w-full min-h-11 rounded-lg border border-slate-300 px-3 py-2 text-base sm:text-sm bg-white focus:ring-2 focus:ring-teal-500'
+  'input min-h-11 text-base sm:text-sm focus:ring-teal-500/20 focus:border-teal-500/60'
 const primary =
-  'min-h-11 rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:opacity-50'
+  'btn min-h-11 text-white bg-gradient-to-b from-teal-500 to-teal-600 shadow-[0_4px_14px_-4px_rgba(13,148,136,0.7)] hover:brightness-110'
 const secondary =
-  'min-h-11 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-50 disabled:opacity-50'
+  'btn-secondary min-h-11'
 const signed = (n: number) => (n > 0 ? `+${n}` : String(n))
 const pretty = (value: string) => value.replace(/_/g, ' ').toLowerCase()
 const when = (value: string, locale = 'en-GB') =>
@@ -116,7 +117,7 @@ function Modal({
   }, [])
   return (
     <div
-      className="fixed inset-0 z-[100] bg-slate-950/50 flex items-center justify-center p-3"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-3 bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in"
       role="presentation"
     >
       <div
@@ -125,18 +126,18 @@ function Modal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={headingId}
-        className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90dvh] overflow-y-auto overscroll-contain p-4 sm:p-6"
+        className="modal-panel w-full max-w-2xl max-h-[90dvh] overflow-y-auto overscroll-contain p-4 sm:p-6"
       >
         <div className="flex justify-between items-start gap-3 mb-5">
-          <h2 id={headingId} className="text-xl font-bold text-slate-900">
+          <h2 id={headingId} className="text-xl font-bold tracking-tight text-tw-text">
             {tr(title)}
           </h2>
           <button
             onClick={onClose}
-            className={secondary}
+            className="icon-btn border-tw-border"
             aria-label={tr("Close dialog")}
           >
-            ✕
+            <Icon name="x" className="w-4 h-4" />
           </button>
         </div>
         {children}
@@ -693,32 +694,37 @@ function Analytics({
     <div className="space-y-5">
       <div className="grid lg:grid-cols-2 gap-5">
         <section className={panel}>
-          <h3 className="font-bold mb-5">{tr("Monthly score trend")}</h3>
+          <h3 className="font-semibold tracking-tight mb-5">{tr("Monthly score trend")}</h3>
           <svg
             viewBox="0 0 520 180"
             role="img"
             aria-label={`Monthly totals: ${months.map((m, i) => `${m}: ${trend[i]}`).join(', ')}`}
             className="w-full"
           >
-            <line x1="25" x2="495" y1={y(0)} y2={y(0)} stroke="#cbd5e1" />
+            <line x1="25" x2="495" y1={y(0)} y2={y(0)} stroke="currentColor" className="text-tw-border-strong" />
             <polyline
               points={trend.map((v, i) => `${30 + i * 92},${y(v)}`).join(' ')}
               fill="none"
-              stroke="#0f766e"
+              stroke="currentColor"
+              className="text-teal-600"
               strokeWidth="3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
             />
             {trend.map((v, i) => (
               <g key={months[i]}>
-                <circle cx={30 + i * 92} cy={y(v)} r="4" fill="#0f766e" />
+                <circle cx={30 + i * 92} cy={y(v)} r="4.5" fill="currentColor" className="text-teal-600" stroke="rgb(var(--tw-surface))" strokeWidth="2" />
                 <text
                   x={30 + i * 92}
                   y={y(v) - 9}
                   textAnchor="middle"
                   fontSize="12"
+                  fontWeight="600"
+                  className="fill-tw-text"
                 >
                   {v}
                 </text>
-                <text x={30 + i * 92} y="170" textAnchor="middle" fontSize="11">
+                <text x={30 + i * 92} y="170" textAnchor="middle" fontSize="11" className="fill-tw-text-secondary">
                   {months[i]}
                 </text>
               </g>
@@ -726,7 +732,7 @@ function Analytics({
           </svg>
         </section>
         <section className={panel}>
-          <h3 className="font-bold mb-5">{tr("Submission engagement")}</h3>
+          <h3 className="font-semibold tracking-tight mb-5">{tr("Submission engagement")}</h3>
           <div className="flex items-center gap-8 flex-wrap">
             <div
               role="img"
@@ -735,7 +741,9 @@ function Analytics({
                 .join(', ')}
               className="w-32 h-32 rounded-full"
               style={{
-                background: count ? `conic-gradient(${gradient})` : '#e2e8f0',
+                background: count ? `conic-gradient(${gradient})` : 'rgb(var(--tw-hover))',
+                WebkitMask: 'radial-gradient(circle at center, transparent 54%, #000 55%)',
+                mask: 'radial-gradient(circle at center, transparent 54%, #000 55%)',
               }}
             />
             <div className="space-y-3">
@@ -757,7 +765,7 @@ function Analytics({
         </section>
       </div>
       <section className={panel}>
-        <h3 className="font-bold mb-4">{tr("Comparative YSO leaderboard")}</h3>
+        <h3 className="font-semibold tracking-tight mb-4">{tr("Comparative YSO leaderboard")}</h3>
         <p className="text-xs text-slate-500 mb-4">
           {period} {tr("· Approved awards and confirmed deductions. Qualification awards appear only in their credited month.")}</p>
         {ranking.map((p, i) => (
@@ -785,7 +793,7 @@ function Analytics({
         )}
       </section>
       <section className={panel}>
-        <h3 className="font-bold mb-4">{tr("Task-by-task points")}</h3>
+        <h3 className="font-semibold tracking-tight mb-4">{tr("Task-by-task points")}</h3>
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-right">
             <thead>
@@ -1217,10 +1225,10 @@ export default function YsoPerformancePage({ user, onUserUpdate }: { user: AuthU
     </section>
   )
   return (
-    <div className="max-w-7xl mx-auto space-y-6 p-4 sm:p-6 lg:p-8 pb-10 text-slate-800">
+    <div className="page space-y-6 pb-10 text-tw-text">
       <header className="flex flex-wrap justify-between items-start gap-4">
         <div>
-          <p className="uppercase tracking-widest text-xs font-semibold text-teal-700 mb-2">
+          <p className="section-label text-teal-600 mb-2 inline-flex items-center gap-1.5"><Icon name="sprout" className="w-3.5 h-3.5" />
             {tr("Youth services ·")}{' '}
             {isYso
               ? tr("My performance")
@@ -1228,7 +1236,7 @@ export default function YsoPerformancePage({ user, onUserUpdate }: { user: AuthU
                 ? tr("AD workspace")
                 : tr("Director overview")}
           </p>
-          <h1 className="text-2xl sm:text-3xl font-bold">
+          <h1 className="page-title">
             {isYso ? tr("YSO Task Hub") : tr("YSO Performance")}
           </h1>
           <p className="text-sm text-slate-500 mt-2">
@@ -1259,25 +1267,25 @@ export default function YsoPerformancePage({ user, onUserUpdate }: { user: AuthU
             className={secondary}
             onClick={() => refresh().catch((e) => setError(e.message))}
           >
-            {tr("Refresh")}</button>
+            <Icon name="refresh" className="w-4 h-4" />{tr("Refresh")}</button>
         </div>
       </header>
       {error && (
-        <div role="alert" className="bg-rose-50 text-rose-800 rounded-lg p-3">
+        <div role="alert" className="alert-error">
           {error}
         </div>
       )}
       {notice && (
         <div
           role="status"
-          className="bg-teal-50 text-teal-800 rounded-lg p-3 flex justify-between gap-3"
+          className="bg-teal-50 border border-teal-200 text-teal-800 rounded-xl px-3.5 py-2.5 text-sm flex justify-between gap-3"
         >
           {notice}
           <button
             aria-label={tr("Dismiss notification")}
             onClick={() => setNotice('')}
           >
-            ✕
+            <Icon name="x" className="w-4 h-4" />
           </button>
         </div>
       )}
@@ -1331,7 +1339,7 @@ export default function YsoPerformancePage({ user, onUserUpdate }: { user: AuthU
         ].map((s) => (
           <div className={panel} key={s.label}>
             <p className="text-xs text-slate-500">{s.label}</p>
-            <p className="text-2xl font-bold mt-2">{s.value}</p>
+            <p className="text-2xl font-bold tracking-tight mt-2">{s.value}</p>
           </div>
         ))}
       </div>
@@ -1398,7 +1406,7 @@ export default function YsoPerformancePage({ user, onUserUpdate }: { user: AuthU
                     ) : (
                       <>
                         <span className={approved ? 'text-emerald-700' : ''}>
-                          {approved ? '✓ ' : ''}
+                          {approved ? <Icon name="check" className="inline w-3 h-3 mr-0.5" /> : ''}
                           {approved} {tr("approved")}</span>
                         <span>{waiting}  {tr("pending")}</span>
                         <span>
@@ -1475,7 +1483,7 @@ export default function YsoPerformancePage({ user, onUserUpdate }: { user: AuthU
       ) : (
         <>
           <nav
-            className={`grid ${isAd ? 'grid-cols-3' : 'grid-cols-2'} gap-1 rounded-2xl border border-slate-200 bg-slate-100 p-1`}
+            className={`grid ${isAd ? 'grid-cols-3' : 'grid-cols-2'} gap-1 rounded-2xl border border-tw-border bg-tw-hover p-1`}
             aria-label={tr("YSO workspace tabs")}
           >
             {[
@@ -1491,7 +1499,7 @@ export default function YsoPerformancePage({ user, onUserUpdate }: { user: AuthU
               { key: 'analytics', label: tr("Analytics") },
             ].map((t) => (
               <button
-                className={`min-w-0 min-h-12 flex items-center justify-center gap-1 rounded-xl px-1 py-3 text-xs sm:text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2 ${tab === t.key ? 'bg-teal-700 text-white shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}`}
+                className={`min-w-0 min-h-12 flex items-center justify-center gap-1 rounded-xl px-1 py-3 text-xs sm:text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2 ${tab === t.key ? 'bg-tw-surface text-teal-600 shadow-card' : 'text-tw-text-secondary hover:text-tw-text'}`}
                 aria-label={
                   t.key === 'approvals'
                     ? `Approvals (${queue.length} pending)`
@@ -1505,7 +1513,7 @@ export default function YsoPerformancePage({ user, onUserUpdate }: { user: AuthU
                 {t.key === 'approvals' && queue.length > 0 && (
                   <span
                     aria-hidden="true"
-                    className={`inline-flex min-w-4 h-4 items-center justify-center rounded-full px-1 text-[10px] tabular-nums ${tab === t.key ? 'bg-white/20 text-white' : 'bg-teal-100 text-teal-800'}`}
+                    className={`inline-flex min-w-4 h-4 items-center justify-center rounded-full px-1 text-[10px] tabular-nums ${tab === t.key ? 'bg-teal-600 text-white' : 'bg-teal-100 text-teal-800'}`}
                   >
                     {queue.length > 99 ? '99+' : queue.length}
                   </span>
@@ -1582,7 +1590,7 @@ export default function YsoPerformancePage({ user, onUserUpdate }: { user: AuthU
                 </div>
               )}
               <section className={panel}>
-                <h3 className="font-bold mb-4">{tr("YSO directory")}</h3>
+                <h3 className="font-semibold tracking-tight mb-4">{tr("YSO directory")}</h3>
                 <div className="space-y-3">
                   {people.map((p) => (
                     <div
@@ -1662,7 +1670,7 @@ export default function YsoPerformancePage({ user, onUserUpdate }: { user: AuthU
                 {entryList(queue, true)}
               </section>
               <section className={panel}>
-                <h3 className="font-bold mb-4">
+                <h3 className="font-semibold tracking-tight mb-4">
                   {tr("Task 15 · Monthly performance evaluation")}</h3>
                 <div className="flex flex-wrap gap-2">
                   {people
@@ -1684,7 +1692,7 @@ export default function YsoPerformancePage({ user, onUserUpdate }: { user: AuthU
                 </div>
               </section>
               <section className={panel}>
-                <h3 className="font-bold mb-4">{tr("Reviewed entries ·")} {period}</h3>
+                <h3 className="font-semibold tracking-tight mb-4">{tr("Reviewed entries ·")} {period}</h3>
                 {entryList(
                   monthEntries.filter((e) => !pending(e)),
                   true

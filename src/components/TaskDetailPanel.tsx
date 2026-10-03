@@ -4,6 +4,7 @@ import { taskApi, workspaceApi, taskGroupApi } from '../services/apiService'
 import DatePicker from './DatePicker'
 import Select from './Select'
 import ProgressUpdateSheet from './ProgressUpdateSheet'
+import { Icon } from './ui/Icon'
 
 interface Props {
   task: Task
@@ -352,11 +353,11 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
 
   return (
     <div className="fixed inset-0 z-40 flex justify-end">
-      <div className="absolute inset-0 bg-black bg-opacity-30" onClick={onClose} />
-      <div className="relative w-full max-w-xl bg-white shadow-panel flex flex-col h-full overflow-hidden">
+      <div className="absolute inset-0 bg-[#0b1220]/40 backdrop-blur-[2px] animate-fade-in" onClick={onClose} />
+      <div className="relative w-full max-w-xl bg-tw-surface border-l border-tw-border shadow-panel flex flex-col h-full overflow-hidden animate-slide-in sm:m-3 sm:h-[calc(100%-1.5rem)] sm:rounded-3xl sm:border">
 
         {/* Header */}
-        <div className="px-5 py-4 border-b border-tw-border bg-gradient-to-r from-[#f0f4ff] via-white to-[#f6f0ff]">
+        <div className="px-5 py-4 border-b border-tw-border bg-gradient-to-br from-tw-primary/[0.07] via-tw-surface to-tw-purple/[0.06]">
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-2 flex-wrap">
@@ -370,29 +371,27 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
                         <span className="text-tw-text-secondary/50">›</span>
                       </>
                     )}
-                    <span>📋 {task.project.name}</span>
+                    <span className="inline-flex items-center gap-1"><Icon name="project" className="w-3.5 h-3.5" /> {task.project.name}</span>
                   </span>
                 )}
-                {task.parentTaskId && <span className="text-xs text-tw-text-secondary bg-tw-hover px-1.5 py-0.5 rounded font-medium">Subtask</span>}
+                {task.parentTaskId && <span className="badge badge-gray">Subtask</span>}
               </div>
               {editing ? (
                 <input className="input text-sm font-bold w-full" value={editForm.title}
                   onChange={e => setEditForm(f => ({ ...f, title: e.target.value }))} autoFocus />
               ) : (
-                <h2 className="font-bold text-tw-text text-base leading-snug">{task.title}</h2>
+                <h2 className="font-bold text-tw-text text-lg leading-snug tracking-tight">{task.title}</h2>
               )}
             </div>
             <div className="flex items-center gap-1.5 flex-shrink-0">
               {canEdit && !editing && (
                 <button onClick={() => { setEditing(true); setEditForm({ title: task.title, description: task.description || '', priority: task.priority, deadline: task.deadline ? task.deadline.slice(0, 10) : '', assignedTo: currentAssigneeId }) }}
-                  className="text-xs text-tw-primary hover:underline font-medium px-2 py-1 rounded-lg hover:bg-tw-hover transition-colors">
-                  ✎ Edit
+                  className="btn-ghost btn-sm">
+                  <Icon name="edit" className="w-3.5 h-3.5" /> Edit
                 </button>
               )}
-              <button onClick={onClose} className="w-8 h-8 rounded-lg bg-red-100 hover:bg-red-200 text-red-600 flex items-center justify-center transition-colors flex-shrink-0" title="Close">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12"/>
-                </svg>
+              <button onClick={onClose} className="icon-btn border-tw-border bg-tw-surface" title="Close">
+                <Icon name="x" className="w-4 h-4" />
               </button>
             </div>
           </div>
@@ -401,24 +400,24 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
           {editing && (
             <div className="mt-3 space-y-3 border-t border-tw-border pt-3">
               <div>
-                <label className="block text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">Description</label>
+                <label className="label">Description</label>
                 <textarea className="input resize-none text-sm" rows={3} value={editForm.description}
                   onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))} placeholder="Task description..." />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">Priority</label>
+                  <label className="label">Priority</label>
                   <Select value={editForm.priority} onChange={val => setEditForm(f => ({ ...f, priority: val as typeof f.priority }))}
                     options={[{ value: 'LOW', label: 'Low' }, { value: 'MEDIUM', label: 'Medium' }, { value: 'HIGH', label: 'High' }, { value: 'CRITICAL', label: 'Critical' }]} />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">Deadline</label>
+                  <label className="label">Deadline</label>
                   <DatePicker value={editForm.deadline} onChange={val => setEditForm(f => ({ ...f, deadline: val }))} />
                 </div>
               </div>
               {personnel.length > 0 && (
                 <div>
-                  <label className="block text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">Assigned To</label>
+                  <label className="label">Assigned To</label>
                   <Select value={editForm.assignedTo} onChange={val => setEditForm(f => ({ ...f, assignedTo: val }))}
                     placeholder="Unassigned"
                     options={[{ value: '', label: 'Unassigned' }, ...personnel.map(p => ({ value: p.id, label: p.name }))]} />
@@ -435,38 +434,38 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
 
           {/* Action error */}
           {actionError && (
-            <div className="mt-2 text-xs text-tw-danger bg-red-50 border border-red-200 rounded-lg px-3 py-2 flex items-center justify-between">
+            <div className="mt-2 alert-error text-xs flex items-center justify-between">
               {actionError}
-              <button onClick={() => setActionError('')} className="ml-2 font-bold">×</button>
+              <button onClick={() => setActionError('')} className="ml-2"><Icon name="x" className="w-3.5 h-3.5" /></button>
             </div>
           )}
 
           {/* Action buttons */}
           <div className="flex flex-wrap gap-2 mt-3">
-            {canSubmit    && <button disabled={actionLoading} onClick={() => doAction(() => taskApi.submit(task.id))} className="btn-primary text-xs py-1.5">✓ Submit for Approval</button>}
-            {canApprove   && <button disabled={actionLoading} onClick={() => { if (confirm(`Approve "${task.title}"?\n\nThis marks the task as approved.`)) doAction(() => taskApi.approve(task.id)) }} className="bg-tw-success hover:opacity-90 text-white font-semibold px-3 py-1.5 rounded-lg text-xs transition-opacity">✓ Approve</button>}
-            {canHandOver  && <button disabled={actionLoading} onClick={openAssignNext} className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-3 py-1.5 rounded-lg text-xs transition-colors">⛓ Approve & Assign Next</button>}
-            {canReject    && <button disabled={actionLoading} onClick={() => setShowReasonModal('reject')} className="btn-danger text-xs py-1.5">↩ Send Back</button>}
-            {canReopen    && <button disabled={actionLoading} onClick={() => doAction(() => taskApi.reopen(task.id))} className="btn-secondary text-xs py-1.5">↻ Reopen</button>}
-            {canAssign    && <button disabled={actionLoading} onClick={() => setShowAssignModal(true)} className="btn-secondary text-xs py-1.5">👤 Assign</button>}
-            {canSubtask   && <button onClick={() => setShowSubtaskModal(true)} className="btn-secondary text-xs py-1.5">+ Subtask</button>}
+            {canSubmit    && <button disabled={actionLoading} onClick={() => doAction(() => taskApi.submit(task.id))} className="btn-primary btn-sm"><Icon name="send" className="w-3.5 h-3.5" /> Submit for Approval</button>}
+            {canApprove   && <button disabled={actionLoading} onClick={() => { if (confirm(`Approve "${task.title}"?\n\nThis marks the task as approved.`)) doAction(() => taskApi.approve(task.id)) }} className="btn-success btn-sm"><Icon name="check" className="w-3.5 h-3.5" /> Approve</button>}
+            {canHandOver  && <button disabled={actionLoading} onClick={openAssignNext} className="btn-primary btn-sm"><Icon name="chain" className="w-3.5 h-3.5" /> Approve &amp; Assign Next</button>}
+            {canReject    && <button disabled={actionLoading} onClick={() => setShowReasonModal('reject')} className="btn-outline-danger btn-sm"><Icon name="sendBack" className="w-3.5 h-3.5" /> Send Back</button>}
+            {canReopen    && <button disabled={actionLoading} onClick={() => doAction(() => taskApi.reopen(task.id))} className="btn-secondary btn-sm"><Icon name="refresh" className="w-3.5 h-3.5" /> Reopen</button>}
+            {canAssign    && <button disabled={actionLoading} onClick={() => setShowAssignModal(true)} className="btn-secondary btn-sm"><Icon name="user" className="w-3.5 h-3.5" /> Assign</button>}
+            {canSubtask   && <button onClick={() => setShowSubtaskModal(true)} className="btn-secondary btn-sm"><Icon name="plus" className="w-3.5 h-3.5" /> Subtask</button>}
             {canExtend  && (
               <button onClick={openExtendModal}
-                className="btn-secondary text-xs py-1.5 text-amber-700 border-amber-300 hover:bg-amber-50">
-                📅 Extend Deadline
+                className="btn-secondary btn-sm text-amber-700 border-amber-300 hover:bg-amber-50">
+                <Icon name="calendar" className="w-3.5 h-3.5" /> Extend Deadline
               </button>
             )}
-            {canCancel  && <button disabled={actionLoading} onClick={() => setShowReasonModal('cancel')} className="text-xs text-tw-danger hover:underline py-1.5">Cancel task</button>}
+            {canCancel  && <button disabled={actionLoading} onClick={() => setShowReasonModal('cancel')} className="btn-ghost btn-sm text-tw-danger hover:text-tw-danger"><Icon name="ban" className="w-3.5 h-3.5" /> Cancel task</button>}
           </div>
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-tw-border px-5 bg-white overflow-x-auto">
+        <div className="flex gap-1 border-b border-tw-border px-4 bg-tw-surface overflow-x-auto">
           {(['details', 'updates', 'subtasks', 'history', 'chain'] as const).map(t => (
             <button key={t} onClick={() => setTab(t)}
-              className={`py-2.5 px-3 text-sm font-medium border-b-2 transition-colors capitalize whitespace-nowrap ${tab === t ? 'border-tw-primary text-tw-primary' : 'border-transparent text-tw-text-secondary hover:text-tw-text'}`}>
+              className={`py-3 px-3 text-sm font-medium border-b-2 -mb-px transition-colors capitalize whitespace-nowrap inline-flex items-center gap-1.5 ${tab === t ? 'border-tw-primary text-tw-primary-text' : 'border-transparent text-tw-text-secondary hover:text-tw-text'}`}>
               {t === 'updates' ? `Updates${progressLogs.length > 0 ? ` (${progressLogs.length})` : ''}` :
-               t === 'chain'   ? '⛓ Chain' : t}
+               t === 'chain'   ? <><Icon name="chain" className="w-3.5 h-3.5" /> Chain</> : t}
               {t === 'subtasks' && task._count?.subtasks ? ` (${task._count.subtasks})` : ''}
             </button>
           ))}
@@ -480,18 +479,18 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
             <div className="space-y-4">
               {task.description && (
                 <div>
-                  <div className="text-xs font-bold text-tw-text-secondary uppercase tracking-wide mb-1.5">Description</div>
+                  <div className="section-label mb-2">Description</div>
                   <p className="text-sm text-tw-text leading-relaxed whitespace-pre-wrap">{task.description}</p>
                 </div>
               )}
 
               {task.assignments?.length > 0 && (
                 <div>
-                  <div className="text-xs font-bold text-tw-text-secondary uppercase tracking-wide mb-2">Assigned To</div>
+                  <div className="section-label mb-2">Assigned To</div>
                   <div className="flex flex-wrap gap-2">
                     {task.assignments.map(a => (
-                      <span key={a.id} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#e8f0ff] border border-[#0073ea]/20 text-sm font-medium text-[#0073ea]">
-                        <span className="w-5 h-5 rounded-full bg-[#0073ea] flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                      <span key={a.id} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-tw-primary/[0.08] border border-tw-primary/20 text-sm font-medium text-tw-primary-text">
+                        <span className="w-5 h-5 rounded-full bg-tw-primary flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
                           {(a.personnel?.name || a.department?.name || '?').charAt(0)}
                         </span>
                         {a.personnel?.name || a.department?.name}
@@ -502,10 +501,10 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
               )}
 
               {task.actedById && (
-                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-xl p-3">
-                  <div className="text-xs font-bold text-[#0073ea] mb-1.5">Accepted by</div>
+                <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
+                  <div className="text-xs font-bold text-tw-primary-text mb-1.5">Accepted by</div>
                   <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-full bg-[#0073ea] flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+                    <div className="w-7 h-7 rounded-full bg-tw-primary flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
                       {(task.actedByName || (task.actedByType === 'director' ? 'D' : 'P')).charAt(0).toUpperCase()}
                     </div>
                     <span className="text-sm text-tw-text font-semibold">
@@ -516,7 +515,7 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
               )}
 
               {task.deadline && (
-                <div className={`rounded-xl p-3 border ${new Date(task.deadline) < new Date() ? 'bg-red-50 border-red-200' : 'bg-[#f0fff8] border-green-200'}`}>
+                <div className={`rounded-xl p-3 border ${new Date(task.deadline) < new Date() ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-200'}`}>
                   <div className={`text-xs font-bold uppercase tracking-wide mb-1 ${new Date(task.deadline) < new Date() ? 'text-tw-danger' : 'text-green-700'}`}>Deadline</div>
                   <span className={`text-sm font-semibold ${new Date(task.deadline) < new Date() ? 'text-tw-danger' : 'text-green-700'}`}>
                     {new Date(task.deadline).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
@@ -533,7 +532,7 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
 
               {task.parentTaskId && (
                 <div>
-                  <div className="text-xs font-bold text-tw-text-secondary uppercase tracking-wide mb-1">Hierarchy</div>
+                  <div className="section-label mb-1.5">Hierarchy</div>
                   <span className="badge badge-gray">Part of a parent task</span>
                 </div>
               )}
@@ -544,7 +543,7 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
           {tab === 'subtasks' && (
             <div>
               {subtasks.length === 0 ? (
-                <div className="text-center py-8 text-tw-text-secondary text-sm">No subtasks yet.</div>
+                <div className="text-center py-10 text-tw-text-secondary text-sm"><span className="icon-tile tile-gray mx-auto mb-3"><Icon name="layers" className="w-5 h-5" /></span><div>No subtasks yet.</div></div>
               ) : (
                 <div className="space-y-2">
                   {subtasks.map(s => (
@@ -576,13 +575,13 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
             <div className="flex flex-col h-full gap-3">
               <div className="flex-1 space-y-2 overflow-y-auto">
                 {progressLogs.length === 0 ? (
-                  <div className="text-center py-8 text-tw-text-secondary text-sm">No progress updates logged yet.</div>
+                  <div className="text-center py-10 text-tw-text-secondary text-sm"><span className="icon-tile tile-gray mx-auto mb-3"><Icon name="message" className="w-5 h-5" /></span><div>No progress updates logged yet.</div></div>
                 ) : progressLogs.map((log, idx) => {
                   const d = new Date(log.logDate)
-                  const avatarColors = ['bg-[#0073ea]', 'bg-[#9c27b0]', 'bg-[#00a693]', 'bg-[#ff7575]', 'bg-[#ff9800]']
+                  const avatarColors = ['bg-tw-primary', 'bg-purple-600', 'bg-teal-600', 'bg-rose-400', 'bg-amber-500']
                   const avatarColor = avatarColors[idx % avatarColors.length]
                   return (
-                    <div key={log.id} className="rounded-xl border border-tw-border bg-white px-4 py-3 shadow-sm">
+                    <div key={log.id} className="rounded-xl border border-tw-border bg-tw-surface px-4 py-3 shadow-card">
                       <div className="flex items-center justify-between gap-2 mb-1.5">
                         <div className="flex items-center gap-2">
                           <div className={`w-6 h-6 rounded-full ${avatarColor} flex items-center justify-center text-white text-xs font-bold flex-shrink-0`}>
@@ -599,7 +598,7 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
                             <button
                               type="button"
                               onClick={() => beginEditUpdate(log)}
-                              className="inline-flex h-8 w-8 sm:w-auto items-center justify-center gap-1.5 rounded-lg border border-tw-border bg-white px-0 sm:px-3 text-xs font-semibold text-tw-primary shadow-sm transition-colors hover:border-tw-primary hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-tw-primary/30"
+                              className="inline-flex h-8 w-8 sm:w-auto items-center justify-center gap-1.5 rounded-lg border border-tw-border bg-tw-surface px-0 sm:px-3 text-xs font-semibold text-tw-primary-text transition-colors hover:border-tw-primary/50 hover:bg-tw-primary/[0.06]"
                               aria-label={`Edit update by ${log.authorName || log.authorType}`}
                               title="Edit update"
                             >
@@ -657,13 +656,7 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
 
           {/* CHAIN */}
           {tab === 'chain' && (() => {
-            const STATUS_COLORS: Record<string, string> = {
-              PENDING: 'bg-gray-100 text-gray-600', ASSIGNED: 'bg-blue-100 text-blue-700',
-              IN_PROGRESS: 'bg-amber-100 text-amber-700', BLOCKED: 'bg-teal-100 text-teal-700',
-              SUBMITTED: 'bg-purple-100 text-purple-700',
-              APPROVED: 'bg-green-100 text-green-700', RETURNED: 'bg-orange-100 text-orange-700',
-              REJECTED: 'bg-red-100 text-red-700', CANCELLED: 'bg-gray-100 text-gray-500',
-            }
+            const STATUS_COLORS = statusColors
             const chainTasks = chainData?.chain ?? []
 
             return (
@@ -674,33 +667,33 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
                     This task is not part of a chain yet.
                     {isDirector && task.status === 'SUBMITTED' && (
                       <div className="mt-2">
-                        <button onClick={openAssignNext} className="text-indigo-600 hover:underline font-medium text-sm">
-                          Approve &amp; Assign Next Task →
+                        <button onClick={openAssignNext} className="btn-secondary btn-sm">
+                          <Icon name="chain" className="w-3.5 h-3.5" /> Approve &amp; Assign Next Task
                         </button>
                       </div>
                     )}
                   </div>
                 ) : (
                   <div>
-                    <div className="text-xs font-bold text-tw-text-secondary uppercase tracking-wide mb-3">Chain Timeline</div>
+                    <div className="section-label mb-3">Chain Timeline</div>
                     <div className="relative">
                       {chainTasks.map((ct, idx) => (
                         <div key={ct.id} className="flex items-start gap-3 mb-4 last:mb-0">
                           {/* Step indicator */}
                           <div className="flex flex-col items-center flex-shrink-0">
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 ${ct.isCurrentTask ? 'border-indigo-500 bg-indigo-100 text-indigo-700' : 'border-gray-300 bg-white text-gray-500'}`}>
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 ${ct.isCurrentTask ? 'border-tw-primary bg-tw-primary/10 text-tw-primary-text' : 'border-tw-border-strong bg-tw-surface text-tw-text-secondary'}`}>
                               {idx + 1}
                             </div>
-                            {idx < chainTasks.length - 1 && <div className="w-0.5 h-6 bg-gray-200 mt-1" />}
+                            {idx < chainTasks.length - 1 && <div className="w-0.5 h-6 bg-tw-border mt-1" />}
                           </div>
                           {/* Task card */}
-                          <div className={`flex-1 rounded-xl p-3 border ${ct.isCurrentTask ? 'border-indigo-300 bg-indigo-50' : 'border-tw-border bg-white'}`}>
+                          <div className={`flex-1 rounded-xl p-3 border ${ct.isCurrentTask ? 'border-tw-primary/40 bg-tw-primary/[0.06]' : 'border-tw-border bg-tw-surface'}`}>
                             <div className="flex items-start justify-between gap-2">
                               <div>
                                 <div className="text-sm font-semibold text-tw-text">{ct.title}</div>
-                                {ct.isCurrentTask && <span className="text-xs text-indigo-600 font-medium">← Current task</span>}
+                                {ct.isCurrentTask && <span className="text-xs text-tw-primary-text font-medium inline-flex items-center gap-1"><Icon name="arrowLeft" className="w-3 h-3" /> Current task</span>}
                               </div>
-                              <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${STATUS_COLORS[ct.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                              <span className={`badge flex-shrink-0 ${STATUS_COLORS[ct.status] ?? 'badge-gray'}`}>
                                 {ct.status.replace('_', ' ')}
                               </span>
                             </div>
@@ -722,17 +715,17 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
                   const logs = prevHistory.progressLogs
                   return (
                     <div className="border-t border-tw-border pt-4">
-                      <div className="text-xs font-bold text-tw-text-secondary uppercase tracking-wide mb-2">Previous Task History</div>
+                      <div className="section-label mb-2">Previous Task History</div>
                       {prevHistory.handoverNote && (
-                        <div className="rounded-xl bg-indigo-50 border border-indigo-200 px-3 py-2 mb-3">
-                          <div className="text-xs font-semibold text-indigo-600 mb-0.5">Handover note from director</div>
+                        <div className="rounded-xl bg-tw-primary/[0.06] border border-tw-primary/25 px-3 py-2 mb-3">
+                          <div className="text-xs font-semibold text-tw-primary-text mb-0.5">Handover note from director</div>
                           <p className="text-sm text-tw-text italic">"{prevHistory.handoverNote}"</p>
                         </div>
                       )}
-                      <div className="rounded-xl border border-tw-border bg-gray-50 px-3 py-2 mb-3">
+                      <div className="panel-muted px-3 py-2 mb-3">
                         <div className="text-xs text-tw-text-secondary">Continued from: <span className="font-semibold text-tw-text">{pt.title}</span></div>
                         <div className="text-xs text-tw-text-secondary mt-0.5">
-                          Status when handed over: <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${STATUS_COLORS[pt.status] ?? ''}`}>{pt.status.replace('_', ' ')}</span>
+                          Status when handed over: <span className={`badge ${STATUS_COLORS[pt.status] ?? 'badge-gray'}`}>{pt.status.replace('_', ' ')}</span>
                         </div>
                       </div>
                       {logs.length === 0 ? (
@@ -740,9 +733,9 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
                       ) : (
                         <div className="space-y-2">
                           {logs.map((log, idx) => {
-                            const colors = ['bg-[#0073ea]', 'bg-[#9c27b0]', 'bg-[#00a693]', 'bg-[#ff7575]']
+                            const colors = ['bg-tw-primary', 'bg-purple-600', 'bg-teal-600', 'bg-rose-400']
                             return (
-                              <div key={log.id} className="rounded-xl border border-tw-border bg-white px-3 py-2.5">
+                              <div key={log.id} className="rounded-xl border border-tw-border bg-tw-surface px-3 py-2.5">
                                 <div className="flex items-center justify-between mb-1">
                                   <div className="flex items-center gap-1.5">
                                     <div className={`w-5 h-5 rounded-full ${colors[idx % colors.length]} flex items-center justify-center text-white text-xs font-bold`}>
@@ -790,14 +783,14 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
                             <span className="text-sm font-semibold text-tw-text">Deadline extended</span>
                             <span className="text-sm text-amber-700 font-medium">{ext.extendedByName}</span>
                             {!!ext.pointsDeducted && ext.pointsDeducted > 0 && (
-                              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-red-50 text-tw-danger">
+                              <span className="badge badge-danger">
                                 −{ext.pointsDeducted} pts
                               </span>
                             )}
                           </div>
                           <div className="text-xs text-tw-text-secondary mt-0.5">
                             {new Date(ext.oldDeadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                            {' → '}
+                            <Icon name="arrowRight" className="inline w-3 h-3 mx-1" />
                             {new Date(ext.newDeadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                           </div>
                           <div className="text-xs text-tw-text-secondary mt-0.5 italic">Reason: "{ext.reason}"</div>
@@ -843,8 +836,8 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
 
       {/* Reason Modal (Return / Send Back / Cancel) */}
       {showReasonModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-panel w-full max-w-sm">
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4 bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in">
+          <div className="modal-panel w-full max-w-sm">
             <div className="px-5 py-4 border-b border-tw-border">
               <h3 className="font-semibold text-tw-text">
                 {showReasonModal === 'reject' ? 'Send Back Task' : `${showReasonModal.charAt(0).toUpperCase()}${showReasonModal.slice(1)} Task`}
@@ -880,8 +873,8 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
 
       {/* Extend Deadline Modal */}
       {showExtendModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4 bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in">
+          <div className="modal-panel w-full max-w-sm">
             <div className="px-5 py-4 border-b border-tw-border">
               <h3 className="font-semibold text-tw-text">Extend Deadline</h3>
               <p className="text-xs text-tw-text-secondary mt-0.5">
@@ -892,21 +885,21 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
             </div>
             <div className="px-5 py-4 space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">New Deadline <span className="text-tw-danger">*</span></label>
+                <label className="label">New Deadline <span className="text-tw-danger">*</span></label>
                 <DatePicker
                   value={extendForm.newDeadline}
                   onChange={val => setExtendForm(f => ({ ...f, newDeadline: val }))}
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">Reason <span className="text-tw-danger">*</span></label>
+                <label className="label">Reason <span className="text-tw-danger">*</span></label>
                 <textarea className="input resize-none" rows={2} autoFocus
                   placeholder="Why is the deadline being extended?"
                   value={extendForm.reason}
                   onChange={e => setExtendForm(f => ({ ...f, reason: e.target.value }))} />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">Note <span className="text-tw-text-secondary font-normal">(optional)</span></label>
+                <label className="label">Note <span className="text-tw-text-secondary font-normal">(optional)</span></label>
                 <textarea className="input resize-none" rows={2}
                   placeholder="Additional context for records…"
                   value={extendForm.note}
@@ -915,8 +908,8 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
 
               {/* Director-only: deduct points from the assignee alongside the extension */}
               {isDirector && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50/60 px-3 py-2.5">
-                  <label className="block text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5">
+                  <label className="label">
                     Points to deduct <span className="text-tw-text-secondary font-normal">(optional)</span>
                   </label>
                   <input
@@ -946,7 +939,7 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
               )}
 
               {extendError && (
-                <div className="text-xs text-tw-danger bg-red-50 border border-red-200 rounded-lg px-3 py-2">{extendError}</div>
+                <div className="alert-error text-xs">{extendError}</div>
               )}
               <div className="flex gap-2 justify-end pt-1">
                 <button onClick={() => { setShowExtendModal(false); setExtendForm({ newDeadline: '', reason: '', note: '', pointsToDeduct: '' }); setExtendError('') }} className="btn-secondary">
@@ -955,7 +948,7 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
                 <button
                   disabled={!extendForm.newDeadline || !extendForm.reason.trim() || extendSaving || !!deductionError}
                   onClick={handleExtendDeadline}
-                  className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold disabled:opacity-50 transition-colors">
+                  className="btn text-white bg-gradient-to-b from-amber-400 to-amber-500 shadow-[0_4px_14px_-4px_rgba(245,158,11,0.7)] hover:brightness-105">
                   {extendSaving ? 'Saving…' : 'Extend Deadline'}
                 </button>
               </div>
@@ -966,8 +959,8 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
 
       {/* Assign Modal */}
       {showAssignModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-panel w-full max-w-sm">
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4 bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in">
+          <div className="modal-panel w-full max-w-sm">
             <div className="px-5 py-4 border-b border-tw-border">
               <h3 className="font-semibold text-tw-text">Assign Task</h3>
             </div>
@@ -1003,8 +996,8 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
 
       {/* Assign Next Task Modal */}
       {showAssignNextModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-start justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg my-4">
+        <div className="fixed inset-0 flex items-start justify-center z-50 p-4 overflow-y-auto bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in">
+          <div className="modal-panel w-full max-w-lg my-4">
             <div className="px-5 py-4 border-b border-tw-border">
               <h3 className="font-bold text-tw-text text-base">Approve &amp; Assign Next Task</h3>
               <p className="text-xs text-tw-text-secondary mt-0.5">
@@ -1014,7 +1007,7 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
             <div className="px-5 py-4 space-y-4 max-h-[70vh] overflow-y-auto">
               {/* Handover note */}
               <div>
-                <label className="block text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1">Handover Note <span className="text-tw-text-secondary font-normal">(optional)</span></label>
+                <label className="label">Handover Note <span className="text-tw-text-secondary font-normal">(optional)</span></label>
                 <textarea className="input resize-none text-sm" rows={2}
                   placeholder="Context to pass to the next assignee(s)..."
                   value={handoverNote} onChange={e => setHandoverNote(e.target.value)} />
@@ -1031,7 +1024,7 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
                 {nextTasks.map((nt, idx) => (
                   <div key={idx} className="border border-tw-border rounded-xl p-4 space-y-3 relative">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-tw-text-secondary uppercase tracking-wide">Task {idx + 1}</span>
+                      <span className="section-label">Task {idx + 1}</span>
                       {nextTasks.length > 1 && (
                         <button onClick={() => setNextTasks(arr => arr.filter((_, i) => i !== idx))}
                           className="text-xs text-tw-danger hover:underline">Remove</button>
@@ -1044,13 +1037,13 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
                       onChange={e => setNextTasks(arr => arr.map((t, i) => i === idx ? { ...t, description: e.target.value } : t))} />
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="block text-xs text-tw-text-secondary mb-1">Priority</label>
+                        <label className="label">Priority</label>
                         <Select value={nt.priority}
                           onChange={val => setNextTasks(arr => arr.map((t, i) => i === idx ? { ...t, priority: val } : t))}
                           options={[{ value: 'LOW', label: 'Low' }, { value: 'MEDIUM', label: 'Medium' }, { value: 'HIGH', label: 'High' }, { value: 'CRITICAL', label: 'Critical' }]} />
                       </div>
                       <div>
-                        <label className="block text-xs text-tw-text-secondary mb-1">Deadline</label>
+                        <label className="label">Deadline</label>
                         <DatePicker value={nt.deadline}
                           onChange={val => setNextTasks(arr => arr.map((t, i) => i === idx ? { ...t, deadline: val } : t))} />
                       </div>
@@ -1059,13 +1052,13 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
                     <div className="flex gap-2">
                       <button
                         onClick={() => setNextTasks(arr => arr.map((t, i) => i === idx ? { ...t, isGroupTask: false, groupId: '' } : t))}
-                        className={`flex-1 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${!nt.isGroupTask ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-tw-border text-tw-text-secondary hover:bg-tw-hover'}`}>
-                        👤 Individual(s)
+                        className={`flex-1 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${!nt.isGroupTask ? 'border-tw-primary/40 bg-tw-primary/10 text-tw-primary-text' : 'border-tw-border text-tw-text-secondary hover:bg-tw-hover'} inline-flex items-center justify-center gap-1.5`}>
+                        <Icon name="user" className="w-3.5 h-3.5" /> Individual(s)
                       </button>
                       <button
                         onClick={() => setNextTasks(arr => arr.map((t, i) => i === idx ? { ...t, isGroupTask: true, personnelIds: [] } : t))}
-                        className={`flex-1 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${nt.isGroupTask ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-tw-border text-tw-text-secondary hover:bg-tw-hover'}`}>
-                        👥 Group
+                        className={`flex-1 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${nt.isGroupTask ? 'border-tw-primary/40 bg-tw-primary/10 text-tw-primary-text' : 'border-tw-border text-tw-text-secondary hover:bg-tw-hover'} inline-flex items-center justify-center gap-1.5`}>
+                        <Icon name="users" className="w-3.5 h-3.5" /> Group
                       </button>
                     </div>
                     {nt.isGroupTask ? (
@@ -1074,7 +1067,7 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
                         options={allGroups.map(g => ({ value: g.id, label: g.name }))} />
                     ) : (
                       <div>
-                        <label className="block text-xs text-tw-text-secondary mb-1">Assign to (select one or more)</label>
+                        <label className="label">Assign to (select one or more)</label>
                         <input
                           className="input text-sm mb-1"
                           placeholder="Search personnel..."
@@ -1097,7 +1090,7 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
                           ))}
                         </div>
                         {nt.personnelIds.length > 0 && (
-                          <div className="text-xs text-indigo-600 mt-1">{nt.personnelIds.length} selected</div>
+                          <div className="text-xs text-tw-primary-text mt-1">{nt.personnelIds.length} selected</div>
                         )}
                       </div>
                     )}
@@ -1106,21 +1099,21 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
               </div>
 
               <button onClick={() => setNextTasks(arr => [...arr, emptyNextTask()])}
-                className="w-full py-2 border-2 border-dashed border-tw-border rounded-xl text-xs font-semibold text-tw-text-secondary hover:border-indigo-400 hover:text-indigo-600 transition-colors">
-                + Add Another Next Task
+                className="w-full py-2.5 border-2 border-dashed border-tw-border rounded-xl text-xs font-semibold text-tw-text-secondary hover:border-tw-primary/50 hover:text-tw-primary-text transition-colors inline-flex items-center justify-center gap-1.5">
+                <Icon name="plus" className="w-3.5 h-3.5" /> Add Another Next Task
               </button>
 
               {assignNextError && (
-                <div className="text-xs text-tw-danger bg-red-50 border border-red-200 rounded-lg px-3 py-2">{assignNextError}</div>
+                <div className="alert-error text-xs">{assignNextError}</div>
               )}
             </div>
-            <div className="px-5 py-4 border-t border-tw-border flex gap-2 justify-end">
+            <div className="modal-footer">
               <button onClick={() => setShowAssignNextModal(false)} className="btn-secondary">Cancel</button>
               <button
                 disabled={assignNextSaving}
                 onClick={handleAssignNext}
-                className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold disabled:opacity-50 transition-colors">
-                {assignNextSaving ? 'Processing…' : '⛓ Approve & Assign'}
+                className="btn-primary">
+                {assignNextSaving ? 'Processing…' : <><Icon name="chain" className="w-4 h-4" /> Approve &amp; Assign</>}
               </button>
             </div>
           </div>
@@ -1129,8 +1122,8 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
 
       {/* Subtask Modal */}
       {showSubtaskModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-panel w-full max-w-md">
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4 bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in">
+          <div className="modal-panel w-full max-w-md">
             <div className="px-5 py-4 border-b border-tw-border">
               <h3 className="font-semibold text-tw-text">Create Subtask</h3>
               <p className="text-xs text-tw-text-secondary mt-0.5">Under: {task.title}</p>

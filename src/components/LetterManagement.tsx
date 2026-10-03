@@ -12,7 +12,9 @@ import Select from './Select'
 import LetterDocumentCard from './LetterDocumentCard'
 import type { AuthUser } from '../types'
 import { LanguageToggle, useLanguage, displayDate } from '../i18n/Language'
-const box = 'rounded-2xl border border-tw-border bg-white shadow-sm p-4 sm:p-5'
+import { EmptyState } from './ui/Primitives'
+import { Icon } from './ui/Icon'
+const box = 'card p-4 sm:p-5'
 const button = 'btn-primary min-h-[44px]'
 const secondary = 'btn-secondary min-h-[44px]'
 const timestamp = (value: string, locale = 'en-GB') =>
@@ -98,26 +100,26 @@ function Dialog({
     }
   }, [])
   return (
-    <div className="fixed inset-0 z-[100] bg-slate-950/50 p-3 flex items-center justify-center">
+    <div className="fixed inset-0 z-[100] p-3 flex items-center justify-center bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in">
       <div
         ref={ref}
         tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-labelledby={id}
-        className="w-full max-w-2xl max-h-[90dvh] overflow-y-auto overscroll-contain rounded-2xl bg-white p-4 sm:p-6 shadow-xl"
+        className="modal-panel max-w-2xl max-h-[90dvh] overflow-y-auto overscroll-contain p-4 sm:p-6"
       >
         <div className="flex items-start justify-between gap-3 mb-5">
-          <h2 id={id} className="text-xl font-bold">
+          <h2 id={id} className="text-xl font-bold tracking-tight">
             {tr(title)}
           </h2>
           <button
             type="button"
-            className={secondary}
+            className="icon-btn border-tw-border"
             onClick={onClose}
             aria-label={tr("Close dialog")}
           >
-            ✕
+            <Icon name="x" className="w-4 h-4" />
           </button>
         </div>
         {children}
@@ -579,7 +581,7 @@ function Workload({ holders, limit }: { holders: Holder[]; limit: number }) {
                 <button
                   key={h.key}
                   aria-sort={active ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
-                  className={`group flex items-center gap-1 text-left uppercase hover:text-tw-text ${active ? 'text-tw-primary' : ''}`}
+                  className={`group flex items-center gap-1 text-left uppercase hover:text-tw-text ${active ? 'text-tw-primary-text' : ''}`}
                   onClick={() =>
                     setSort((s) =>
                       s.key === h.key ? { key: h.key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key: h.key, dir: h.first }
@@ -588,7 +590,7 @@ function Workload({ holders, limit }: { holders: Holder[]; limit: number }) {
                 >
                   <span className="truncate">{h.label}</span>
                   <span className={active ? '' : 'opacity-0 group-hover:opacity-50'}>
-                    {active && sort.dir === 'asc' ? '▲' : '▼'}
+                    <Icon name={active && sort.dir === 'asc' ? 'chevronUp' : 'chevronDown'} className="w-3.5 h-3.5" />
                   </span>
                 </button>
               )
@@ -601,7 +603,7 @@ function Workload({ holders, limit }: { holders: Holder[]; limit: number }) {
             return (
               <div
                 key={i}
-                className={`grid ${workloadColumns} gap-3 items-center rounded-xl border border-tw-border border-l-4 ${accent} bg-white px-4 py-2 text-sm`}
+                className={`grid ${workloadColumns} gap-3 items-center rounded-xl border border-tw-border border-l-4 ${accent} bg-tw-surface px-4 py-2 text-sm`}
               >
                 <span className="font-semibold truncate" title={h.name}>{h.name}</span>
                 <span>{h.open}</span>
@@ -735,9 +737,9 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
     <div className={`w-full p-4 md:p-6 lg:p-8 space-y-6 mx-auto ${selected ? 'max-w-[1440px]' : 'max-w-7xl'}`} data-letter-workspace>
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-widest text-tw-primary mb-2">
-            {tr("Correspondence")}</p>
-          <h1 className="text-2xl font-bold">
+          <p className="section-label text-tw-primary-text mb-2 inline-flex items-center gap-1.5">
+            <Icon name="letter" className="w-3.5 h-3.5" />{tr("Correspondence")}</p>
+          <h1 className="page-title">
             {selected ? tr("Letter thread") : tr("Letter register")}
           </h1>
           <p className="text-sm text-tw-text-secondary mt-1">
@@ -752,35 +754,35 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
           <LanguageToggle user={user} onUserUpdate={onUserUpdate} />
           {selected && (
             <button className={secondary} onClick={() => open('')}>
-              {tr("← Register")}</button>
+              <Icon name="arrowLeft" className="w-4 h-4" />{tr("Register")}</button>
           )}
           <button
             className={secondary}
             disabled={busy}
             onClick={() => void refresh()}
           >
-            {tr("Refresh")}</button>
+            <Icon name="refresh" className="w-4 h-4" />{tr("Refresh")}</button>
           {context?.me.logger && !selected && (
             <button className={button} onClick={() => setKind('NEW')}>
-              {tr("+ Log letter")}</button>
+              <Icon name="plus" className="w-4 h-4" />{tr("Log letter")}</button>
           )}
         </div>
       </div>
       {error && (
-        <p role="alert" className="p-3 rounded-xl bg-red-50 text-red-700">
+        <p role="alert" className="alert-error">
           {error}
         </p>
       )}
       {!context && busy && <p role="status">{tr("Loading correspondence…")}</p>}
       {context && !context.driveConnected && (
-        <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm text-amber-900">
+        <div className="alert-warning flex items-start gap-2"><Icon name="alert" className="w-4 h-4 flex-shrink-0 mt-0.5" />
           {tr("Google Drive is not connected. Contact your administrator to connect Google Drive before uploading documents.")}</div>
       )}
       {!selected && list && (
         <>
           <section className={box + ' space-y-4 !p-3 sm:!p-4'} aria-label={tr("Filters")}>
             <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-              <div role="tablist" className="inline-flex w-full sm:w-auto rounded-xl bg-slate-100 p-1 gap-1 overflow-x-auto">
+              <div role="tablist" className="seg w-full sm:w-auto overflow-x-auto">
                 {[
                   { key: 'all', label: tr("All"), value: list.metrics.open + list.metrics.closed, active: !status && !overdue, set: () => { setStatus(''); setOverdue(false) }, dot: '' },
                   { key: 'open', label: tr("Open"), value: list.metrics.open, active: status === 'OPEN' && !overdue, set: () => { setStatus('OPEN'); setOverdue(false) }, dot: 'bg-blue-500' },
@@ -795,11 +797,11 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
                       c.set()
                       setPage(0)
                     }}
-                    className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm whitespace-nowrap transition-all ${c.active ? 'bg-white text-tw-text font-semibold shadow-sm' : 'text-tw-text-secondary hover:text-tw-text hover:bg-white/60'}`}
+                    className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm whitespace-nowrap transition-all ${c.active ? 'bg-tw-surface text-tw-text font-semibold shadow-card' : 'text-tw-text-secondary hover:text-tw-text'}`}
                   >
                     {c.dot && <span className={`h-2 w-2 rounded-full ${c.dot}`} />}
                     {c.label}
-                    <span className={`min-w-6 rounded-full px-1.5 py-0.5 text-xs font-semibold tabular-nums ${c.key === 'overdue' && c.value > 0 ? 'bg-red-100 text-red-700' : c.active ? 'bg-blue-50 text-tw-primary' : 'bg-white/80 text-slate-500'}`}>{c.value}</span>
+                    <span className={`min-w-6 rounded-full px-1.5 py-0.5 text-xs font-semibold tabular-nums ${c.key === 'overdue' && c.value > 0 ? 'bg-red-100 text-red-700' : c.active ? 'bg-tw-primary/10 text-tw-primary-text' : 'bg-tw-surface/80 text-tw-text-secondary'}`}>{c.value}</span>
                   </button>
                 ))}
               </div>
@@ -825,7 +827,7 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
                   <div
                     key={m.key}
                     title={m.hint}
-                    className={`flex items-center gap-2.5 rounded-xl border px-3 py-1.5 ${m.warn ? 'border-amber-200 bg-amber-50' : 'border-tw-border bg-white'}`}
+                    className={`flex items-center gap-2.5 rounded-xl border px-3 py-1.5 ${m.warn ? 'border-amber-200 bg-amber-50' : 'border-tw-border bg-tw-surface'}`}
                   >
                     <span className={`grid h-7 w-7 place-items-center rounded-lg ${m.warn ? 'bg-amber-100 text-amber-700' : 'bg-emerald-50 text-emerald-600'}`}>
                       <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">{m.icon}</svg>
@@ -883,11 +885,11 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
                   setPage(0)
                 }}
               >
-                {mine ? tr("✓ Assigned to me") : tr("Assigned to me")}
+                {mine && <Icon name="check" className="w-4 h-4" />}{tr("Assigned to me")}
               </button>
               {(q || from || to || mine || status || overdue) && (
                 <button
-                  className="text-sm font-medium text-tw-primary hover:underline whitespace-nowrap px-2"
+                  className="text-sm font-semibold text-tw-primary-text hover:underline whitespace-nowrap px-2"
                   onClick={() => {
                     setQ('')
                     setFrom('')
@@ -919,7 +921,7 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
                   <button
                     key={h.key}
                     aria-sort={active ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
-                    className={`group flex items-center gap-1 text-left uppercase hover:text-tw-text ${active ? 'text-tw-primary' : ''}`}
+                    className={`group flex items-center gap-1 text-left uppercase hover:text-tw-text ${active ? 'text-tw-primary-text' : ''}`}
                     onClick={() => {
                       setSort((s) =>
                         s.key === h.key
@@ -931,7 +933,7 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
                   >
                     <span className="truncate">{h.label}</span>
                     <span className={active ? '' : 'opacity-0 group-hover:opacity-50'}>
-                      {active && sort.dir === 'asc' ? '▲' : '▼'}
+                      <Icon name={active && sort.dir === 'asc' ? 'chevronUp' : 'chevronDown'} className="w-3.5 h-3.5" />
                     </span>
                   </button>
                 )
@@ -956,10 +958,10 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
                   <button
                     key={t.id}
                     onClick={() => open(t.id)}
-                    className={`w-full text-left rounded-xl border border-tw-border border-l-4 ${accent} bg-white px-4 py-2 hover:shadow-md transition-shadow`}
+                    className={`w-full text-left rounded-xl border border-tw-border border-l-4 ${accent} bg-tw-surface px-4 py-2.5 hover:shadow-panel hover:border-tw-border-strong transition-all`}
                   >
                     <div className={`hidden md:grid ${letterColumns} gap-3 items-center text-sm`}>
-                      <span className="font-medium text-tw-primary whitespace-nowrap">{t.reference}</span>
+                      <span className="font-semibold text-tw-primary-text whitespace-nowrap">{t.reference}</span>
                       <span className="font-semibold truncate" title={t.subject}>{t.subject}</span>
                       <span className="text-tw-text-secondary truncate" title={t.sender}>{t.sender}</span>
                       <span className="truncate" title={t.assignedToName}>{t.assignedToName}</span>
@@ -983,7 +985,7 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
                         <span className={`shrink-0 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${badge}`}>{age}</span>
                       </div>
                       <div className="flex items-center gap-1 text-xs text-tw-text-secondary mt-0.5 min-w-0">
-                        <span className="font-semibold text-tw-primary tabular-nums shrink-0">{t.reference}</span>
+                        <span className="font-semibold text-tw-primary-text tabular-nums shrink-0">{t.reference}</span>
                         <span className="truncate">· {t.sender} · {t.assignedToName}</span>
                       </div>
                     </div>
@@ -992,7 +994,7 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
               })}
               {!list.items.length && (
                 <div className="text-center py-12">
-                  <p className="text-3xl mb-3">✉</p>
+                  <span className="icon-tile tile-blue w-14 h-14 rounded-2xl mx-auto mb-4"><Icon name="letter" className="w-6 h-6" /></span>
                   <p className="font-semibold">{tr("No letters in this view")}</p>
                   <p className="text-sm text-tw-text-secondary mt-1">
                     {context?.me.logger
@@ -1059,7 +1061,7 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
                       {thread.channel === 'DIGITAL' ? tr("Digital") : tr("Physical")}
                     </span>
                   </div>
-                  <h2 className="text-xl sm:text-2xl font-bold mt-3 [overflow-wrap:anywhere]">{thread.subject}</h2>
+                  <h2 className="text-xl sm:text-2xl font-bold tracking-tight mt-3 [overflow-wrap:anywhere]">{thread.subject}</h2>
                   <p className="text-sm text-tw-text-secondary mt-2 [overflow-wrap:anywhere]">
                     {tr("From")} <span className="font-medium text-tw-text">{thread.sender}</span>
                     {thread.senderContact ? ' · ' + thread.senderContact : ''}
@@ -1139,7 +1141,7 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
                               )}
                               {event.kind === 'TRANSFER' && (
                                 <>
-                                  <span className="rounded-md bg-violet-50 text-violet-800 px-2 py-1 [overflow-wrap:anywhere]">{event.fromAssigneeName} → {event.toAssigneeName}</span>
+                                  <span className="rounded-md bg-violet-50 text-violet-800 px-2 py-1 [overflow-wrap:anywhere] inline-flex items-center gap-1 flex-wrap">{event.fromAssigneeName} <Icon name="arrowRight" className="w-3 h-3" /> {event.toAssigneeName}</span>
                                   <span className="rounded-md bg-slate-100 px-2 py-1">{tr("Held")} {duration(event.holdingDays)}</span>
                                 </>
                               )}
@@ -1401,7 +1403,7 @@ export function LetterSettingsPanel() {
                   {tr("Configure the OAuth consent screen for your organization, then create a Web application OAuth client.")}</li>
                 <li>
                   {tr("Add this authorized redirect URI:")}{' '}
-                  <code className="block break-all bg-white p-2 mt-1">
+                  <code className="block break-all bg-tw-surface border border-tw-border rounded-lg p-2 mt-1">
                     {settings.callbackUrl}
                   </code>
                 </li>
@@ -1425,8 +1427,8 @@ export function LetterSettingsPanel() {
           <div className="flex flex-wrap items-center gap-2 border-t border-tw-border pt-4">
             <span className="text-sm mr-2">
               {settings.connected
-                ? tr("● Drive connected")
-                : tr("○ Drive not connected")}
+                ? <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-tw-success" />{tr("Drive connected")}</span>
+                : <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full border border-tw-text-muted" />{tr("Drive not connected")}</span>}
             </span>
             <button
               className={secondary}

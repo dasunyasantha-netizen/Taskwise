@@ -4,6 +4,17 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f4f6fa" />
+    <script>
+      // Apply saved light/dark theme before first paint (see src/hooks/useTheme.ts)
+      (function () {
+        try {
+          var p = localStorage.getItem('tw_theme');
+          var dark = p === 'dark' || (p !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          if (dark) { document.documentElement.classList.add('dark'); document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0b1017'); }
+        } catch (e) {}
+      })();
+    </script>
     <title>TaskWise — Team Task Management, Projects &amp; Approvals</title>
     <meta name="description" content="Manage team projects, task assignments, approval workflows, and audit trails with TaskWise, a structured workspace for modern organizations." />
     <link rel="canonical" href="https://syswise.lk/taskwise/" />

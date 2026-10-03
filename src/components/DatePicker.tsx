@@ -129,7 +129,7 @@ export default function DatePicker({ value, onChange, placeholder = 'Select date
         width: dropPos.width,
         zIndex: 9999,
       }}
-      className="bg-white border border-tw-border rounded-xl shadow-panel overflow-hidden"
+      className="bg-tw-surface border border-tw-border rounded-xl shadow-panel animate-pop-in overflow-hidden"
     >
       {/* Month / Year nav */}
       <div className={`flex items-center justify-between border-b border-tw-border ${compact ? 'px-3 py-2' : 'px-4 py-3'}`}>
@@ -150,7 +150,7 @@ export default function DatePicker({ value, onChange, placeholder = 'Select date
       </div>
 
       {showYearPicker && (
-        <div className={`grid grid-cols-4 gap-1 border-b border-tw-border bg-white ${compact ? 'p-2' : 'p-3'}`}>
+        <div className={`grid grid-cols-4 gap-1 border-b border-tw-border bg-tw-surface ${compact ? 'p-2' : 'p-3'}`}>
           {yearRange.map(y => (
             <button type="button" key={y} onClick={e => { e.preventDefault(); setViewYear(y); setShowYearPicker(false) }}
               className={`py-1.5 rounded-lg text-sm font-medium transition-colors ${y === viewYear ? 'bg-tw-primary text-white' : 'hover:bg-tw-hover text-tw-text'}`}>
@@ -191,10 +191,10 @@ export default function DatePicker({ value, onChange, placeholder = 'Select date
                   onClick={e => { e.preventDefault(); if (!dis) selectDay(day) }}
                   className={`
                     w-full ${compact ? 'h-8' : 'aspect-square'} flex items-center justify-center text-sm rounded-lg font-medium transition-colors
-                    ${sel  ? 'bg-tw-primary text-white shadow-sm'              : ''}
-                    ${!sel && tod  ? 'border border-tw-primary text-tw-primary' : ''}
+                    ${sel  ? 'bg-gradient-to-b from-[#3d9bff] to-tw-primary text-white shadow-cta' : ''}
+                    ${!sel && tod  ? 'ring-1 ring-inset ring-tw-primary/60 text-tw-primary-text' : ''}
                     ${!sel && !dis ? 'hover:bg-tw-hover text-tw-text'           : ''}
-                    ${dis         ? 'text-tw-border cursor-not-allowed'         : ''}
+                    ${dis         ? 'text-tw-text-muted/50 cursor-not-allowed'  : ''}
                   `}
                 >
                   {day}
@@ -202,10 +202,10 @@ export default function DatePicker({ value, onChange, placeholder = 'Select date
               )
             })}
           </div>
-          <div className={`flex items-center justify-between border-t border-tw-border bg-tw-hover ${compact ? 'px-3 py-2' : 'px-4 py-2.5'}`}>
+          <div className={`flex items-center justify-between border-t border-tw-border bg-tw-surface-2 ${compact ? 'px-3 py-2' : 'px-4 py-2.5'}`}>
             <button type="button" onClick={e => { e.preventDefault(); onChange(''); close() }} className="text-xs text-tw-text-secondary hover:text-tw-danger transition-colors font-medium">{t('Clear')}</button>
             <button type="button" onClick={e => { e.preventDefault(); onChange(`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`); close() }}
-              disabled={!!((minD && today < minD) || (maxD && new Date(today.getFullYear(), today.getMonth(), today.getDate()) > maxD))} className="text-xs text-tw-primary hover:underline font-medium disabled:opacity-30">{t('Today')}</button>
+              disabled={!!((minD && today < minD) || (maxD && new Date(today.getFullYear(), today.getMonth(), today.getDate()) > maxD))} className="text-xs text-tw-primary-text hover:underline font-semibold disabled:opacity-30">{t('Today')}</button>
           </div>
         </>
       )}
@@ -221,7 +221,7 @@ export default function DatePicker({ value, onChange, placeholder = 'Select date
         onKeyDown={e => { if (e.key === 'Escape' && open) { e.stopPropagation(); close() } }}
         aria-label={ariaLabel}
         aria-expanded={open}
-        className={triggerClassName ?? 'w-full flex items-center justify-between border border-tw-border rounded-lg px-3 py-2 text-sm bg-white hover:border-tw-primary focus:outline-none focus:ring-2 focus:ring-tw-primary transition-colors'}
+        className={triggerClassName ?? `w-full flex items-center justify-between border rounded-xl px-3.5 py-2.5 text-sm bg-tw-surface hover:border-tw-border-strong focus:outline-none focus:ring-4 focus:ring-tw-primary/15 focus:border-tw-primary/60 transition-all ${open ? 'border-tw-primary/60 ring-4 ring-tw-primary/15' : 'border-tw-border'}`}
       >
         <div className="flex items-center gap-2 min-w-0">
           <svg className="w-4 h-4 text-tw-text-secondary flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">

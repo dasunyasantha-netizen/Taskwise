@@ -5,6 +5,8 @@ import { taskApi, auditApi, workspaceApi } from '../services/apiService'
 import FilterBar, { DEFAULT_FILTERS, filterTasks, computeAvailableOptions, hasActiveFilters } from './FilterBar'
 import type { ActiveFilters, AvailableOptions } from './FilterBar'
 import TaskDetailPanel from './TaskDetailPanel'
+import { PageHeader, LoadingBlock } from './ui/Primitives'
+import { Icon } from './ui/Icon'
 
 // ─── Persisted page state (lifted from parent so it survives view switches) ──
 
@@ -107,8 +109,8 @@ const OVERDUE_TONE: Record<OverdueTone, { bar: string; badge: string; dot: strin
 
 function EmptyState({ message }: { message: string }) {
   return (
-    <div className="py-16 text-center">
-      <div className="text-3xl mb-3">📊</div>
+    <div className="py-16 text-center card">
+      <span className="icon-tile tile-gray w-14 h-14 rounded-2xl mx-auto mb-4"><Icon name="reports" className="w-6 h-6" /></span>
       <p className="text-tw-text font-semibold mb-1">No results</p>
       <p className="text-tw-text-secondary text-sm">{message}</p>
     </div>
@@ -118,8 +120,8 @@ function EmptyState({ message }: { message: string }) {
 function SectionHeader({ title, count }: { title: string; count: number }) {
   return (
     <div className="flex items-center justify-between mb-4">
-      <h2 className="text-base font-bold text-tw-text">{title}</h2>
-      <span className="text-xs font-semibold text-tw-text-secondary bg-tw-hover px-2.5 py-1 rounded-full">
+      <h2 className="text-base font-semibold tracking-tight text-tw-text">{title}</h2>
+      <span className="badge badge-gray">
         {count} {count === 1 ? 'task' : 'tasks'}
       </span>
     </div>
@@ -131,11 +133,11 @@ function ReportTable({ headers, children }: { headers: string[]; children: React
   return (
     <div className="card overflow-hidden">
       <div className="hidden sm:block overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="table-modern">
           <thead>
-            <tr className="bg-[#f0f4ff] border-b-2 border-tw-primary/20">
+            <tr className="bg-tw-surface-2 border-b border-tw-border">
               {headers.map(h => (
-                <th key={h} className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider whitespace-nowrap">{h}</th>
+                <th key={h} className="text-left px-4 py-3 text-[11px] font-semibold text-tw-text-secondary uppercase tracking-[0.08em] whitespace-nowrap">{h}</th>
               ))}
             </tr>
           </thead>
@@ -181,7 +183,7 @@ function PendingApprovalsReport({ tasks, onTaskClick }: { tasks: Task[]; onTaskC
       ))}
       <ReportTable headers={['', 'Task', 'Project', 'Submitted By', 'Submitted Date', 'Priority']}>
         {rows.map(t => (
-          <tr key={t.id} onClick={() => onTaskClick(t)} className="hover:bg-[#f8f9ff] cursor-pointer transition-colors">
+          <tr key={t.id} onClick={() => onTaskClick(t)} className="hover:bg-tw-hover cursor-pointer transition-colors">
             <td className="pl-3 pr-0 py-3 w-1"><div className={`w-1 h-8 rounded-full ${PRIORITY_DOT[t.priority] ?? 'bg-gray-300'}`} /></td>
             <td className="px-4 py-3 font-medium text-tw-text max-w-xs"><div className="truncate">{t.title}</div></td>
             <td className="px-4 py-3 text-tw-text-secondary text-xs">{t.project?.name || '—'}</td>
@@ -257,11 +259,11 @@ function OverdueCategoryCard({
               </div>
               {/* Desktop table */}
               <div className="hidden sm:block overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="table-modern">
                   <thead>
-                    <tr className="bg-[#f0f4ff] border-b-2 border-tw-primary/20">
+                    <tr className="bg-tw-surface-2 border-b border-tw-border">
                       {headers.map(h => (
-                        <th key={h} className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider whitespace-nowrap">{h}</th>
+                        <th key={h} className="text-left px-4 py-3 text-[11px] font-semibold text-tw-text-secondary uppercase tracking-[0.08em] whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
                   </thead>
@@ -366,7 +368,7 @@ function DueSoonReport({ tasks, onTaskClick }: { tasks: Task[]; onTaskClick: (t:
           const d = daysUntil(t.deadline!)
           const urgencyClass = d <= 1 ? 'bg-red-100 text-red-700' : d <= 3 ? 'bg-orange-100 text-orange-700' : 'bg-yellow-50 text-yellow-700'
           return (
-            <tr key={t.id} onClick={() => onTaskClick(t)} className="hover:bg-[#f8f9ff] cursor-pointer transition-colors">
+            <tr key={t.id} onClick={() => onTaskClick(t)} className="hover:bg-tw-hover cursor-pointer transition-colors">
               <td className="pl-3 pr-0 py-3 w-1"><div className={`w-1 h-8 rounded-full ${PRIORITY_DOT[t.priority] ?? 'bg-gray-300'}`} /></td>
               <td className="px-4 py-3 font-medium text-tw-text max-w-xs"><div className="truncate">{t.title}</div></td>
               <td className="px-4 py-3 text-tw-text-secondary text-xs">{t.project?.name || '—'}</td>
@@ -410,7 +412,7 @@ function SittingLongestReport({ tasks, onTaskClick }: { tasks: Task[]; onTaskCli
           const days = daysSince(t.assignments[0].assignedAt)
           const ageClass = days >= 14 ? 'bg-red-100 text-red-700' : days >= 7 ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-600'
           return (
-            <tr key={t.id} onClick={() => onTaskClick(t)} className="hover:bg-[#f8f9ff] cursor-pointer transition-colors">
+            <tr key={t.id} onClick={() => onTaskClick(t)} className="hover:bg-tw-hover cursor-pointer transition-colors">
               <td className="pl-3 pr-0 py-3 w-1"><div className={`w-1 h-8 rounded-full ${PRIORITY_DOT[t.priority] ?? 'bg-gray-300'}`} /></td>
               <td className="px-4 py-3 font-medium text-tw-text max-w-xs"><div className="truncate">{t.title}</div></td>
               <td className="px-4 py-3 text-tw-text-secondary text-xs">{t.project?.name || '—'}</td>
@@ -467,8 +469,8 @@ function ByStatusReport({ tasks }: { tasks: Task[] }) {
   return (
     <>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-base font-bold text-tw-text">Tasks by Status</h2>
-        <span className="text-xs font-semibold text-tw-text-secondary bg-tw-hover px-2.5 py-1 rounded-full">{total} total</span>
+        <h2 className="text-base font-semibold tracking-tight text-tw-text">Tasks by Status</h2>
+        <span className="badge badge-gray">{total} total</span>
       </div>
       <div className="card overflow-hidden">
         <div className="divide-y divide-tw-border">
@@ -480,7 +482,7 @@ function ByStatusReport({ tasks }: { tasks: Task[] }) {
                   {STATUS_LABELS[status] ?? status}
                 </span>
                 <div className="flex-1 bg-tw-hover rounded-full h-2">
-                  <div className="h-2 rounded-full bg-tw-primary transition-all" style={{ width: `${pct}%` }} />
+                  <div className="h-2 rounded-full bg-gradient-to-r from-[#3d9bff] to-tw-primary transition-all" style={{ width: `${pct}%` }} />
                 </div>
                 <span className="text-sm font-bold text-tw-text w-8 text-right">{count}</span>
                 <span className="text-xs text-tw-text-secondary w-8 text-right">{pct}%</span>
@@ -525,17 +527,17 @@ function ByOfficerReport({ tasks, personnel, onTaskClick }: { tasks: Task[]; per
   return (
     <>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-base font-bold text-tw-text">Tasks by Officer</h2>
+        <h2 className="text-base font-semibold tracking-tight text-tw-text">Tasks by Officer</h2>
         <span className="text-xs text-tw-text-secondary">{rows.length} officers</span>
       </div>
       <div className="card overflow-hidden">
         {/* Desktop */}
         <div className="hidden sm:block overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="table-modern">
             <thead>
-              <tr className="bg-[#f0f4ff] border-b-2 border-tw-primary/20">
+              <tr className="bg-tw-surface-2 border-b border-tw-border">
                 {['Officer', 'Total', 'Completed', 'Pending', 'Overdue'].map(h => (
-                  <th key={h} className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider">{h}</th>
+                  <th key={h} className="text-left px-4 py-3 text-[11px] font-semibold text-tw-text-secondary uppercase tracking-[0.08em]">{h}</th>
                 ))}
               </tr>
             </thead>
@@ -543,7 +545,7 @@ function ByOfficerReport({ tasks, personnel, onTaskClick }: { tasks: Task[]; per
               {rows.map(r => (
                 <React.Fragment key={r.id}>
                   <tr onClick={() => setExpandedId(expandedId === r.id ? null : r.id)}
-                    className="hover:bg-[#f8f9ff] cursor-pointer transition-colors">
+                    className="hover:bg-tw-hover cursor-pointer transition-colors">
                     <td className="px-4 py-3 font-medium text-tw-text">
                       <div className="flex items-center gap-2">
                         <div className="w-7 h-7 rounded-full bg-tw-primary/10 text-tw-primary text-xs font-bold flex items-center justify-center flex-shrink-0">
@@ -564,7 +566,7 @@ function ByOfficerReport({ tasks, personnel, onTaskClick }: { tasks: Task[]; per
                         <div className="space-y-1.5 pt-2">
                           {map.get(r.id)!.tasks.map(t => (
                             <div key={t.id} onClick={() => onTaskClick(t)}
-                              className="flex items-center gap-3 px-3 py-2 bg-white rounded-lg border border-tw-border hover:border-tw-primary cursor-pointer transition-colors text-sm">
+                              className="flex items-center gap-3 px-3 py-2 bg-tw-surface rounded-xl border border-tw-border hover:border-tw-primary/50 hover:bg-tw-hover cursor-pointer transition-colors text-sm">
                               <span className={`w-1.5 h-6 rounded-full flex-shrink-0 ${PRIORITY_DOT[t.priority]}`} />
                               <span className="flex-1 font-medium text-tw-text truncate">{t.title}</span>
                               <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${STATUS_COLORS[t.status]}`}>{STATUS_LABELS[t.status]}</span>
@@ -654,7 +656,7 @@ function ByDepartmentReport({ tasks, layers, onTaskClick }: { tasks: Task[]; lay
   return (
     <>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-base font-bold text-tw-text">Tasks by Department</h2>
+        <h2 className="text-base font-semibold tracking-tight text-tw-text">Tasks by Department</h2>
         <span className="text-xs text-tw-text-secondary">{rows.length} departments</span>
       </div>
       {showCategory && (
@@ -666,7 +668,7 @@ function ByDepartmentReport({ tasks, layers, onTaskClick }: { tasks: Task[]; lay
             return (
               <div key={option.value} className="card px-4 py-3">
                 <div className="text-xs text-tw-text-secondary">{option.label}</div>
-                <div className="text-2xl font-bold text-tw-primary mt-1">{total}</div>
+                <div className="text-2xl font-bold tracking-tight text-tw-text mt-1">{total}</div>
                 <div className="text-xs text-tw-text-secondary mt-0.5">
                   {inCategory.length} {inCategory.length === 1 ? 'department' : 'departments'}
                   {overdue > 0 && <span className="text-tw-danger font-semibold"> · {overdue} overdue</span>}
@@ -678,11 +680,11 @@ function ByDepartmentReport({ tasks, layers, onTaskClick }: { tasks: Task[]; lay
       )}
       <div className="card overflow-hidden">
         <div className="hidden sm:block overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="table-modern">
             <thead>
-              <tr className="bg-[#f0f4ff] border-b-2 border-tw-primary/20">
+              <tr className="bg-tw-surface-2 border-b border-tw-border">
                 {['Department', tier, ...(showCategory ? ['Category'] : []), 'Total', 'Completed', 'Pending', 'Overdue'].map(h => (
-                  <th key={h} className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider">{h}</th>
+                  <th key={h} className="text-left px-4 py-3 text-[11px] font-semibold text-tw-text-secondary uppercase tracking-[0.08em]">{h}</th>
                 ))}
               </tr>
             </thead>
@@ -690,7 +692,7 @@ function ByDepartmentReport({ tasks, layers, onTaskClick }: { tasks: Task[]; lay
               {rows.map(r => (
                 <React.Fragment key={r.id}>
                   <tr onClick={() => setExpandedId(expandedId === r.id ? null : r.id)}
-                    className="hover:bg-[#f8f9ff] cursor-pointer transition-colors">
+                    className="hover:bg-tw-hover cursor-pointer transition-colors">
                     <td className="px-4 py-3 font-medium text-tw-text">
                       <div className="flex items-center gap-1.5">
                         {r.name}
@@ -712,7 +714,7 @@ function ByDepartmentReport({ tasks, layers, onTaskClick }: { tasks: Task[]; lay
                         <div className="space-y-1.5 pt-2">
                           {map.get(r.id)!.tasks.map(t => (
                             <div key={t.id} onClick={() => onTaskClick(t)}
-                              className="flex items-center gap-3 px-3 py-2 bg-white rounded-lg border border-tw-border hover:border-tw-primary cursor-pointer transition-colors text-sm">
+                              className="flex items-center gap-3 px-3 py-2 bg-tw-surface rounded-xl border border-tw-border hover:border-tw-primary/50 hover:bg-tw-hover cursor-pointer transition-colors text-sm">
                               <span className={`w-1.5 h-6 rounded-full flex-shrink-0 ${PRIORITY_DOT[t.priority]}`} />
                               <span className="flex-1 font-medium text-tw-text truncate">{t.title}</span>
                               <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${STATUS_COLORS[t.status]}`}>{STATUS_LABELS[t.status]}</span>
@@ -774,7 +776,7 @@ function ApprovalDelayReport({ tasks, onTaskClick }: { tasks: Task[]; onTaskClic
       ))}
       <ReportTable headers={['', 'Task', 'Project', 'Submitted By', 'Submitted Date', 'Days Waiting', 'Priority']}>
         {rows.map(t => (
-          <tr key={t.id} onClick={() => onTaskClick(t)} className={`cursor-pointer transition-colors ${t.daysWaiting >= 3 ? 'hover:bg-red-50' : 'hover:bg-[#f8f9ff]'}`}>
+          <tr key={t.id} onClick={() => onTaskClick(t)} className={`cursor-pointer transition-colors ${t.daysWaiting >= 3 ? 'hover:bg-red-50' : 'hover:bg-tw-hover'}`}>
             <td className="pl-3 pr-0 py-3 w-1"><div className={`w-1 h-8 rounded-full ${PRIORITY_DOT[t.priority] ?? 'bg-gray-300'}`} /></td>
             <td className="px-4 py-3 font-medium text-tw-text max-w-xs"><div className="truncate">{t.title}</div></td>
             <td className="px-4 py-3 text-tw-text-secondary text-xs">{t.project?.name || '—'}</td>
@@ -819,7 +821,7 @@ function UnopenedReport({ tasks, onTaskClick }: { tasks: Task[]; onTaskClick: (t
       <ReportTable headers={['', 'Task', 'Project', 'Assigned To', 'Assigned Date', 'Days Sitting', 'Priority']}>
         {rows.map(t => (
           <tr key={t.id} onClick={() => onTaskClick(t)}
-            className={`cursor-pointer transition-colors ${t.daysSitting >= 3 ? 'hover:bg-red-50' : 'hover:bg-[#f8f9ff]'}`}>
+            className={`cursor-pointer transition-colors ${t.daysSitting >= 3 ? 'hover:bg-red-50' : 'hover:bg-tw-hover'}`}>
             <td className="pl-3 pr-0 py-3 w-1"><div className={`w-1 h-8 rounded-full ${PRIORITY_DOT[t.priority] ?? 'bg-gray-300'}`} /></td>
             <td className="px-4 py-3 font-medium text-tw-text max-w-xs"><div className="truncate">{t.title}</div></td>
             <td className="px-4 py-3 text-tw-text-secondary text-xs">{t.project?.name || '—'}</td>
@@ -912,7 +914,7 @@ export default function ReportsPage({ savedState, onStateChange, scrollContainer
     setSelectedTask(t)
   }
 
-  if (loading) return <div className="p-8 text-sm text-tw-text-secondary">Loading reports…</div>
+  if (loading) return <LoadingBlock label="Loading reports…" />
   if (error)   return (
     <div className="p-8">
       <div className="text-sm text-tw-danger mb-2">{error}</div>
@@ -921,22 +923,12 @@ export default function ReportsPage({ savedState, onStateChange, scrollContainer
   )
 
   return (
-    <div className="p-4 md:p-6 pb-24 md:pb-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-1">
-        <h1 className="text-xl md:text-2xl font-bold text-tw-text">Reports</h1>
-        <button onClick={load} title="Refresh" className="text-tw-text-secondary hover:text-tw-primary transition-colors p-1.5 rounded-lg">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-        </button>
-      </div>
-      <p className="text-sm text-tw-text-secondary mb-5">
-        {hasActiveFilters(filters)
-          ? <>{filteredTasks.length} of {allTasks.length} tasks match filters · <button onClick={() => setFilters(DEFAULT_FILTERS)} className="text-tw-primary hover:underline">Clear filters</button></>
-          : <>{allTasks.length} total tasks</>
-        }
-      </p>
+    <div className="page pb-24 md:pb-8">
+      <PageHeader icon="reports" tone="blue" title="Reports"
+        subtitle={hasActiveFilters(filters)
+          ? <>{filteredTasks.length} of {allTasks.length} tasks match filters · <button onClick={() => setFilters(DEFAULT_FILTERS)} className="text-tw-primary-text font-semibold hover:underline">Clear filters</button></>
+          : <>{allTasks.length} total tasks</>}
+        actions={<button onClick={load} title="Refresh" className="btn-secondary btn-sm"><Icon name="refresh" className="w-3.5 h-3.5" /> Refresh</button>} />
 
       {/* FilterBar */}
       <div className="mb-6">
@@ -952,15 +944,12 @@ export default function ReportsPage({ savedState, onStateChange, scrollContainer
 
       {/* Tab bar */}
       <div className="mb-6 -mx-1">
-        <div className="flex overflow-x-auto gap-1 pb-1 px-1 scrollbar-hide">
+        <div className="flex overflow-x-auto gap-1.5 pb-1 px-1 scrollbar-hide">
           {TABS.map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex-shrink-0 px-3 py-1.5 text-xs font-semibold rounded-full transition-colors whitespace-nowrap
-                ${activeTab === tab.id
-                  ? 'bg-tw-primary text-white shadow-sm'
-                  : 'bg-tw-hover text-tw-text-secondary hover:text-tw-text hover:bg-gray-200'}`}
+              className={`chip flex-shrink-0 whitespace-nowrap font-semibold ${activeTab === tab.id ? 'chip-active' : ''}`}
             >
               {tab.label}
             </button>

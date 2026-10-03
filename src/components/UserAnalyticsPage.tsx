@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { auditApi } from '../services/apiService'
+import type { IconName } from './ui/Icon'
+import { PageHeader, LoadingBlock } from './ui/Primitives'
+import { Icon } from './ui/Icon'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -72,10 +75,10 @@ function SparkBar({ trend }: { trend: TrendDay[] }) {
   }, [trend])
 
   return (
-    <div className="flex items-end gap-0.5 h-10">
+    <div className="flex items-end gap-1 h-24">
       {last30.map(d => (
         <div key={d.day} title={`${fmtDate(d.day)}: ${d.count} login${d.count !== 1 ? 's' : ''}`}
-          className="flex-1 bg-tw-primary/70 rounded-sm transition-all hover:bg-tw-primary"
+          className="flex-1 bg-gradient-to-t from-tw-primary/50 to-[#3d9bff] rounded-t-md transition-all hover:from-tw-primary hover:to-[#6cb4ff]"
           style={{ height: `${Math.max(2, (d.count / max) * 100)}%` }} />
       ))}
     </div>
@@ -107,15 +110,15 @@ function LoginHistoryPanel({ person, onClose }: { person: PersonnelStat; onClose
   }, [logs])
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in">
+      <div className="modal-panel w-full max-w-lg max-h-[80vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-tw-border">
           <div>
             <div className="font-bold text-tw-text">{person.name}</div>
             <div className="text-xs text-tw-text-secondary">{person.department} · Login History</div>
           </div>
-          <button onClick={onClose} className="text-tw-text-secondary hover:text-tw-text text-xl leading-none px-1">×</button>
+          <button onClick={onClose} className="icon-btn" aria-label="Close"><Icon name="x" className="w-4 h-4" /></button>
         </div>
 
         {/* Stats row */}
@@ -217,7 +220,7 @@ export default function UserAnalyticsPage({ onOpenLeaderboard, onOpenUserManagem
   }
 
   const SortIcon = ({ col }: { col: typeof sortBy }) =>
-    sortBy === col ? <span className="ml-1 text-tw-primary">{sortDir === 'asc' ? '↑' : '↓'}</span> : null
+    sortBy === col ? <Icon name={sortDir === 'asc' ? 'arrowUp' : 'arrowDown'} className="inline w-3 h-3 ml-1 text-tw-primary-text" /> : null
 
   // Summary stats
   const activeCount     = overview?.personnel.filter(p => p.loginCount90d > 0).length ?? 0
@@ -227,54 +230,50 @@ export default function UserAnalyticsPage({ onOpenLeaderboard, onOpenUserManagem
     : '0'
 
   if (loading) return (
-    <div className="flex items-center justify-center h-48 text-tw-text-secondary text-sm">Loading analytics…</div>
+    <LoadingBlock label="Loading analytics…" />
   )
   if (error) return (
-    <div className="p-6 text-tw-danger text-sm">{error}</div>
+    <div className="page"><div className="alert-error">{error}</div></div>
   )
   if (!overview) return null
 
   return (
-    <div className="p-4 md:p-6 space-y-5">
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-        <div>
-          <h1 className="text-xl md:text-2xl font-bold text-tw-text">User Analytics</h1>
-          <p className="text-sm text-tw-text-secondary mt-0.5">Login activity and user engagement across the workspace</p>
-        </div>
+    <div className="page space-y-5">
+      <PageHeader icon="analytics" tone="indigo" title="User Analytics" subtitle="Login activity and user engagement across the workspace" className="!mb-0"
+        actions={
         <div className="flex items-center gap-2 w-full sm:w-auto flex-shrink-0">
           {onOpenUserManagement && (
             <button
               onClick={onOpenUserManagement}
-              className="flex-1 sm:flex-none justify-center inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-tw-primary text-tw-primary bg-white text-sm font-semibold hover:bg-blue-50 transition-colors"
+              className="btn-secondary btn-sm flex-1 sm:flex-none"
             >
-              👥 <span className="hidden sm:inline">User Management</span><span className="sm:hidden">Users</span>
+              <Icon name="users" className="w-3.5 h-3.5" /> <span className="hidden sm:inline">User Management</span><span className="sm:hidden">Users</span>
             </button>
           )}
           {onOpenLeaderboard && (
             <button
               onClick={onOpenLeaderboard}
-              className="flex-1 sm:flex-none justify-center inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-tw-primary text-white text-sm font-semibold hover:opacity-90 transition-opacity"
+              className="btn-primary btn-sm flex-1 sm:flex-none justify-center inline-flex items-center gap-1.5"
             >
-              🏆 <span className="hidden sm:inline">View</span> Leaderboard
+              <Icon name="trophy" className="w-3.5 h-3.5" /> <span className="hidden sm:inline">View</span> Leaderboard
             </button>
           )}
-        </div>
-      </div>
+        </div>} />
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
-          { label: 'Total Users', value: overview.personnel.length, icon: '👥', cls: 'text-tw-primary' },
-          { label: 'Active (90d)', value: activeCount, icon: '✅', cls: 'text-emerald-600' },
-          { label: 'Inactive', value: inactiveCount, icon: '💤', cls: 'text-gray-500' },
-          { label: 'Avg Logins (90d)', value: avgLogins, icon: '📊', cls: 'text-indigo-600' },
+          { label: 'Total Users', value: overview.personnel.length, icon: 'users' as IconName, tile: 'tile-blue' },
+          { label: 'Active (90d)', value: activeCount, icon: 'activity' as IconName, tile: 'tile-green' },
+          { label: 'Inactive', value: inactiveCount, icon: 'moon' as IconName, tile: 'tile-gray' },
+          { label: 'Avg Logins (90d)', value: avgLogins, icon: 'reports' as IconName, tile: 'tile-indigo' },
         ].map(s => (
-          <div key={s.label} className="card px-4 py-3">
-            <div className="flex items-center gap-2 mb-1">
-              <span>{s.icon}</span>
+          <div key={s.label} className="card px-4 py-4">
+            <div className="flex items-center gap-2.5 mb-2.5">
+              <span className={`icon-tile w-8 h-8 rounded-lg ${s.tile}`}><Icon name={s.icon} className="w-4 h-4" /></span>
               <span className="text-xs text-tw-text-secondary">{s.label}</span>
             </div>
-            <div className={`text-2xl font-bold ${s.cls}`}>{s.value}</div>
+            <div className="text-2xl font-bold tracking-tight text-tw-text">{s.value}</div>
           </div>
         ))}
       </div>
@@ -300,9 +299,9 @@ export default function UserAnalyticsPage({ onOpenLeaderboard, onOpenUserManagem
       <div className="card overflow-hidden">
         <div className="px-4 py-3 border-b border-tw-border flex items-center gap-3">
           <div className="relative flex-1 max-w-xs">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-tw-text-secondary text-sm">🔍</span>
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-tw-text-muted"><Icon name="search" className="w-4 h-4" /></span>
             <input
-              className="input pl-8 text-sm"
+              className="input pl-9 text-sm"
               placeholder="Search by name or department…"
               value={search}
               onChange={e => setSearch(e.target.value)}
@@ -340,9 +339,9 @@ export default function UserAnalyticsPage({ onOpenLeaderboard, onOpenUserManagem
 
         {/* Desktop table */}
         <div className="hidden sm:block overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="table-modern">
             <thead>
-              <tr className="bg-[#f0f4ff] border-b-2 border-tw-primary/20">
+              <tr className="bg-tw-surface-2 border-b border-tw-border">
                 {[
                   { label: 'Name', col: 'name' as const },
                   { label: 'Department', col: null },
@@ -354,12 +353,12 @@ export default function UserAnalyticsPage({ onOpenLeaderboard, onOpenUserManagem
                 ].map(h => (
                   <th key={h.label}
                     onClick={() => h.col && toggleSort(h.col)}
-                    className={`text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider whitespace-nowrap
+                    className={`text-left px-4 py-3 text-[11px] font-semibold text-tw-text-secondary uppercase tracking-[0.08em] whitespace-nowrap
                       ${h.col ? 'cursor-pointer select-none hover:bg-tw-primary/10' : ''}`}>
                     {h.label}{h.col && <SortIcon col={h.col} />}
                   </th>
                 ))}
-                <th className="px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider"></th>
+                <th className="px-4 py-3 text-[11px] font-semibold text-tw-text-secondary uppercase tracking-[0.08em]"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-tw-border">

@@ -20,7 +20,7 @@ export default function LetterDocumentCard({ file, onPreview, onDownload, onRetr
   const pdf = file.mime === 'application/pdf'
   const size = file.size >= 1048576 ? `${(file.size / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(file.size / 1024))} KB`
   const action = 'inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tw-primary'
-  return <div className="min-w-0 rounded-xl border border-tw-border bg-white p-3.5" data-letter-document>
+  return <div className="min-w-0 rounded-xl border border-tw-border bg-tw-surface p-3.5 hover:border-tw-border-strong transition-colors" data-letter-document>
     <div className="flex items-start gap-3">
       <span aria-hidden="true" className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl text-[10px] font-bold uppercase ${pdf ? 'bg-rose-50 text-rose-600' : 'bg-blue-50 text-blue-700'}`}>
         {pdf ? 'PDF' : file.mime.split('/')[1]?.slice(0, 4)}

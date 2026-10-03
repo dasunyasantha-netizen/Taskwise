@@ -6,6 +6,8 @@ import {
 } from '@simplewebauthn/browser'
 import CompanyRequestModal from './CompanyRequestModal'
 import { launcherHomeUrl, launcherName, sharedIdentityUrl } from '../services/launchSource'
+import { Icon } from './ui/Icon'
+import { ThemeToggle } from './ui/Primitives'
 
 interface Props {
   onLogin: (token: string, user: AuthUser) => void
@@ -96,36 +98,46 @@ export default function Auth({ onLogin }: Props) {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-4 relative overflow-hidden"
-      style={{ background: '#1f2d3d' }}>
-      {/* Login background image */}
+    <div className="min-h-screen flex flex-col items-center justify-center px-4 relative overflow-hidden bg-tw-bg">
+      {/* Backdrop: soft photo + glow (matches the app shell) */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <img src="/taskwise/login-bg.png" alt="" className="w-full h-full object-cover select-none"
-          style={{ opacity: 0.25 }} />
+        <img src="/taskwise/login-bg.png" alt="" className="w-full h-full object-cover select-none opacity-[0.07] dark:opacity-[0.06]" />
+        <div className="absolute -bottom-40 left-1/2 -translate-x-1/2 w-[900px] h-[420px] rounded-[50%] bg-tw-primary/20 dark:bg-tw-primary/30 blur-[90px]" />
+        <div className="absolute -bottom-24 left-[20%] w-[420px] h-[280px] rounded-[50%] bg-tw-purple/25 dark:bg-tw-purple/30 blur-[90px]" />
+      </div>
+
+      <div className="absolute top-4 right-4 z-10">
+        <ThemeToggle compact className="border-tw-border bg-tw-surface/80 backdrop-blur" />
       </div>
 
       {/* Branding above card */}
       <div className="text-center mb-6 relative z-10">
         <div className="inline-flex items-center gap-3 mb-2">
-          <div className="w-12 h-12 bg-tw-primary rounded-2xl flex items-center justify-center shadow-lg">
+          <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-gradient-to-br from-[#3d9bff] to-tw-primary shadow-cta">
             <span className="text-white font-bold text-xl">T</span>
           </div>
-          <span className="text-3xl font-bold text-white">TaskWise</span>
+          <span className="text-3xl font-bold tracking-tight text-tw-text">TaskWise</span>
         </div>
-        <p className="text-white/60 text-sm">National Youth Services Council</p>
+        <p className="text-tw-text-secondary text-sm">National Youth Services Council</p>
       </div>
 
-      <div className="bg-white rounded-3xl p-6 md:p-8 w-full max-w-sm shadow-2xl relative z-10">
+      <div className="bg-tw-surface/90 backdrop-blur-xl border border-tw-border rounded-3xl p-6 md:p-8 w-full max-w-sm shadow-panel relative z-10 animate-pop-in">
         {!showBiometric ? (
           <>
-            <h2 className="text-lg font-bold text-tw-text mb-5 text-center">Sign in to your account</h2>
+            <h2 className="text-lg font-bold text-tw-text mb-5 text-center tracking-tight">Sign in to your account</h2>
 
-            <a href={sharedIdentityUrl('login')} className="btn-primary w-full text-center block mb-4">Sign in with Syswise</a>
-            <p className="text-xs text-tw-text-secondary text-center mb-4">Existing Taskwise login for users completing migration</p>
+            <a href={sharedIdentityUrl('login')} className="btn-primary w-full py-3 mb-3">
+              <Icon name="key" className="w-4 h-4" /> Sign in with Syswise
+            </a>
+            <div className="flex items-center gap-3 my-4">
+              <div className="flex-1 divider" />
+              <span className="text-[11px] text-tw-text-muted text-center max-w-[60%]">Existing Taskwise login for users completing migration</span>
+              <div className="flex-1 divider" />
+            </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-tw-text mb-1">Login ID</label>
+                <label className="label">Login ID</label>
                 <input
                   type="text"
                   className="input"
@@ -137,7 +149,7 @@ export default function Auth({ onLogin }: Props) {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-tw-text mb-1">Password</label>
+                <label className="label">Password</label>
                 <input
                   type="password"
                   className="input"
@@ -149,16 +161,12 @@ export default function Auth({ onLogin }: Props) {
               </div>
 
               {error && (
-                <div className="bg-red-50 border border-red-200 text-tw-danger text-sm px-3 py-2 rounded-lg">
+                <div className="alert-error">
                   {error}
                 </div>
               )}
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-3.5 rounded-2xl bg-tw-primary text-white font-bold text-sm flex items-center justify-center gap-2 active:opacity-80 disabled:opacity-60 mt-2"
-              >
+              <button type="submit" disabled={loading} className="btn-secondary w-full py-3 mt-2">
                 {loading ? 'Signing in…' : 'Sign In'}
               </button>
             </form>
@@ -167,7 +175,7 @@ export default function Auth({ onLogin }: Props) {
               <button
                 type="button"
                 onClick={() => { setShowBiometric(true); setBiometricPhone(phone) }}
-                className="mt-4 w-full py-3 rounded-2xl border-2 border-tw-border text-tw-text text-sm font-medium flex items-center justify-center gap-2 hover:border-tw-primary hover:text-tw-primary transition-colors"
+                className="btn-ghost w-full py-3 mt-2"
               >
                 <FingerprintIcon className="w-5 h-5" />
                 Sign in with Biometrics
@@ -177,9 +185,9 @@ export default function Auth({ onLogin }: Props) {
             <button
               type="button"
               onClick={() => setShowCompanyRequest(true)}
-              className="mt-4 w-full py-3 rounded-2xl bg-green-600 text-white text-sm font-bold hover:bg-green-700 transition-colors"
+              className="btn-success w-full py-3 mt-3"
             >
-              Create a New Company
+              <Icon name="building" className="w-4 h-4" /> Create a New Company
             </button>
           </>
         ) : (
@@ -188,24 +196,22 @@ export default function Auth({ onLogin }: Props) {
               <button
                 type="button"
                 onClick={() => { setShowBiometric(false); setBiometricError('') }}
-                className="w-8 h-8 rounded-lg hover:bg-tw-bg flex items-center justify-center text-tw-text-secondary"
+                className="icon-btn w-8 h-8"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-                </svg>
+                <Icon name="arrowLeft" className="w-4 h-4" />
               </button>
               <h2 className="text-lg font-bold text-tw-text">Biometric Sign In</h2>
             </div>
 
             <div className="flex justify-center mb-5">
-              <div className="w-20 h-20 rounded-full bg-tw-primary/10 flex items-center justify-center">
-                <FingerprintIcon className="w-10 h-10 text-tw-primary" />
+              <div className="w-20 h-20 rounded-3xl bg-tw-primary/10 ring-1 ring-tw-primary/20 flex items-center justify-center">
+                <FingerprintIcon className="w-10 h-10 text-tw-primary-text" />
               </div>
             </div>
 
             <form onSubmit={handleBiometricLogin} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-tw-text mb-1">Phone Number</label>
+                <label className="label">Phone Number</label>
                 <input
                   type="tel"
                   className="input"
@@ -218,16 +224,12 @@ export default function Auth({ onLogin }: Props) {
               </div>
 
               {biometricError && (
-                <div className="bg-red-50 border border-red-200 text-tw-danger text-sm px-3 py-2 rounded-lg">
+                <div className="alert-error">
                   {biometricError}
                 </div>
               )}
 
-              <button
-                type="submit"
-                disabled={biometricLoading}
-                className="w-full py-3.5 rounded-2xl bg-tw-primary text-white font-bold text-sm flex items-center justify-center gap-2 active:opacity-80 disabled:opacity-60"
-              >
+              <button type="submit" disabled={biometricLoading} className="btn-primary w-full py-3">
                 <FingerprintIcon className="w-5 h-5" />
                 {biometricLoading ? 'Waiting for biometric…' : 'Use Fingerprint / Face ID'}
               </button>
@@ -239,15 +241,16 @@ export default function Auth({ onLogin }: Props) {
           </>
         )}
 
-        <div className="mt-5 p-3 bg-[#f0f4ff] rounded-2xl text-center">
+        <div className="mt-5 px-3 py-2.5 panel-muted text-center flex items-center justify-center gap-2">
+          <Icon name="info" className="w-3.5 h-3.5 text-tw-text-muted flex-shrink-0" />
           <p className="text-tw-text-secondary text-xs">Company access is activated only after Syswise approval.</p>
         </div>
       </div>
 
-      <a href={launcherHomeUrl()} className="mt-5 min-h-11 inline-flex items-center px-4 text-white text-sm relative z-10">
-        ← Back to {launcherName()}
+      <a href={launcherHomeUrl()} className="mt-5 min-h-11 inline-flex items-center gap-1.5 px-4 text-tw-text-secondary hover:text-tw-text text-sm relative z-10 transition-colors">
+        <Icon name="arrowLeft" className="w-4 h-4" /> Back to {launcherName()}
       </a>
-      <p className="mt-2 mb-5 text-white/40 text-xs relative z-10">Created by SysWise</p>
+      <p className="mt-2 mb-5 text-tw-text-muted text-xs relative z-10">Created by SysWise</p>
       {showCompanyRequest && <CompanyRequestModal onClose={() => setShowCompanyRequest(false)} />}
     </div>
   )

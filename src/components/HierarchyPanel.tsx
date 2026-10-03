@@ -7,6 +7,8 @@ import {
 } from '../hierarchy'
 import Select from './Select'
 import FixedRoleManagement from './FixedRoleManagement'
+import { Icon } from './ui/Icon'
+import { PageHeader, LoadingBlock } from './ui/Primitives'
 
 export default function HierarchyPanel({ user }: { user: AuthUser }) {
   const [layers, setLayers] = useState<Layer[]>([])
@@ -311,7 +313,7 @@ export default function HierarchyPanel({ user }: { user: AuthUser }) {
   useEffect(() => { if (showPersonnelModal) loadManagers(personnelFormLevel) }, [showPersonnelModal, personnelFormLevel])
   useEffect(() => { if (showMoveModal) loadManagers(moveTargetLevel) }, [showMoveModal, moveTargetLevel])
 
-  if (loading) return <div className="p-8 text-tw-text-secondary text-sm">Loading hierarchy...</div>
+  if (loading) return <LoadingBlock label="Loading hierarchy…" />
 
   const layerColors = ['bg-blue-500', 'bg-indigo-500', 'bg-purple-500', 'bg-teal-500']
 
@@ -330,24 +332,22 @@ export default function HierarchyPanel({ user }: { user: AuthUser }) {
   const loginPreview = personnelForm.phone ? `${user.companyPrefix || ''}${localPhonePreview}` : `${user.companyPrefix || ''}0712345678`
 
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-xl font-bold text-tw-text">Team Hierarchy</h1>
-        <p className="text-sm text-tw-text-secondary mt-0.5 mb-4">Manage {word.toLowerCase()}s, departments and {user.roleBasedIdentity ? 'roles' : 'personnel'}</p>
-        <div className="flex gap-2">
-          <button onClick={() => setShowDeptModal(true)} className="flex-1 btn-secondary text-xs py-2.5 flex items-center justify-center gap-1">
-            <span className="text-base leading-none">+</span> Department
+    <div className="page">
+      <PageHeader icon="hierarchy" tone="indigo" title="Team Hierarchy"
+        subtitle={`Manage ${word.toLowerCase()}s, departments and ${user.roleBasedIdentity ? 'roles' : 'personnel'}`}
+        actions={<>
+          <button onClick={() => setShowDeptModal(true)} className="btn-secondary" aria-label="Add department">
+            <Icon name="plus" className="w-4 h-4" /> Department
           </button>
-          <button onClick={() => { if (user.roleBasedIdentity) { setActiveTab('personnel'); setRoleCreateRequest(n => n + 1) } else setShowPersonnelModal(true) }} className="flex-1 btn-secondary text-xs py-2.5 flex items-center justify-center gap-1">
-            <span className="text-base leading-none">+</span> {user.roleBasedIdentity ? 'Role' : 'Personnel'}
+          <button onClick={() => { if (user.roleBasedIdentity) { setActiveTab('personnel'); setRoleCreateRequest(n => n + 1) } else setShowPersonnelModal(true) }} className="btn-primary" aria-label={user.roleBasedIdentity ? 'Add role' : 'Add personnel'}>
+            <Icon name="plus" className="w-4 h-4" /> {user.roleBasedIdentity ? 'Role' : 'Personnel'}
           </button>
-        </div>
-      </div>
+        </>} />
 
-      {error && <div className="mb-4 bg-red-50 border border-red-200 text-tw-danger text-sm px-3 py-2 rounded-lg">{error}<button className="ml-2 underline" onClick={() => setError('')}>dismiss</button></div>}
+      {error && <div className="mb-4 alert-error">{error}<button className="ml-2 underline" onClick={() => setError('')}>dismiss</button></div>}
 
       {unmanaged.length > 0 && (
-        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+        <div className="mb-4 alert-warning">
           <strong>{unmanaged.length}</strong> {unmanaged.length === 1 ? 'user has' : 'users have'} no reporting manager.
           Their approvals escalate straight to the Director until one is set.
           <button className="ml-2 underline" onClick={() => setActiveTab('personnel')}>Review</button>
@@ -355,10 +355,10 @@ export default function HierarchyPanel({ user }: { user: AuthUser }) {
       )}
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-tw-hover rounded-lg p-1 mb-6 w-fit">
+      <div className="seg mb-6">
         {(['structure', 'personnel'] as const).map(tab => (
           <button key={tab} onClick={() => setActiveTab(tab)}
-            className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors capitalize ${activeTab === tab ? 'bg-white text-tw-primary shadow-card' : 'text-tw-text-secondary hover:text-tw-text'}`}>
+            className={`seg-item px-4 capitalize ${activeTab === tab ? 'seg-item-active' : ''}`}>
             {tab === 'personnel' && user.roleBasedIdentity ? 'Roles' : tab}
           </button>
         ))}
@@ -369,8 +369,8 @@ export default function HierarchyPanel({ user }: { user: AuthUser }) {
         <div className="space-y-4">
           {layers.map((layer, idx) => (
             <div key={layer.id} className="card overflow-hidden">
-              <div className={`px-4 py-3 flex items-center gap-3 ${layerColors[idx]} bg-opacity-10 border-b border-tw-border`}>
-                <div className={`w-6 h-6 rounded-full ${layerColors[idx]} flex items-center justify-center text-white text-xs font-bold flex-shrink-0`}>{layer.number}</div>
+              <div className={`px-4 py-3 flex items-center gap-3 ${layerColors[idx]} bg-opacity-[0.08] border-b border-tw-border`}>
+                <div className={`w-8 h-8 rounded-xl ${layerColors[idx]} flex items-center justify-center text-white text-xs font-bold flex-shrink-0 shadow-card`}>{layer.number}</div>
                 {editingLayerId === layer.id ? (
                   <div className="flex items-center gap-2 flex-1">
                     <input
@@ -381,7 +381,7 @@ export default function HierarchyPanel({ user }: { user: AuthUser }) {
                       autoFocus
                     />
                     <button onClick={() => saveLayerName(layer.id)} disabled={saving} className="btn-primary text-xs py-1 px-3">Save</button>
-                    <button onClick={() => setEditingLayerId(null)} className="btn-secondary text-xs py-1 px-2">✕</button>
+                    <button onClick={() => setEditingLayerId(null)} className="btn-secondary btn-sm px-2"><Icon name="x" className="w-3.5 h-3.5" /></button>
                   </div>
                 ) : (
                   <div className="flex items-center gap-2 flex-1">
@@ -389,7 +389,7 @@ export default function HierarchyPanel({ user }: { user: AuthUser }) {
                       <div className="font-semibold text-tw-text text-sm">{layer.name}</div>
                       <div className="text-xs text-tw-text-secondary">{(layer.departments || []).length} departments</div>
                     </div>
-                    <button onClick={() => startEditLayer(layer)} className="ml-2 text-xs text-tw-text-secondary hover:text-tw-primary" title="Rename layer">✏️</button>
+                    <button onClick={() => startEditLayer(layer)} className="ml-2 icon-btn w-7 h-7" title="Rename layer"><Icon name="edit" className="w-3.5 h-3.5" /></button>
                   </div>
                 )}
               </div>
@@ -400,7 +400,7 @@ export default function HierarchyPanel({ user }: { user: AuthUser }) {
                   {groupDepartments(layer).map(group => (
                     <div key={group.key}>
                       {group.label && (
-                        <div className="px-4 py-1.5 bg-tw-hover text-[11px] font-semibold uppercase tracking-wide text-tw-text-secondary">
+                        <div className="px-4 py-1.5 bg-tw-surface-2 section-label">
                           {group.label}
                         </div>
                       )}
@@ -426,15 +426,15 @@ export default function HierarchyPanel({ user }: { user: AuthUser }) {
                               {deptPersonnel.length > 0 && (
                                 <div className="flex flex-wrap gap-2 mt-2">
                                   {deptPersonnel.map(p => (
-                                    <div key={p.id} className="flex items-center gap-1.5 bg-tw-hover px-2.5 py-1 rounded-full">
+                                    <div key={p.id} className="flex items-center gap-1.5 bg-tw-surface-2 border border-tw-border pl-1 pr-2 py-1 rounded-full">
                                       <div className="w-5 h-5 rounded-full bg-tw-primary flex items-center justify-center text-white text-xs font-bold">
                                         {p.name.charAt(0).toUpperCase()}
                                       </div>
                                       <span className="text-xs text-tw-text">{p.name}</span>
                                       {needsManager(user, layer.number, p.supervisorId) && (
-                                        <span className="text-xs text-amber-600" title="No reporting manager">⚠</span>
+                                        <span className="text-amber-600" title="No reporting manager"><Icon name="alert" className="w-3.5 h-3.5" /></span>
                                       )}
-                                      <button onClick={() => { setMovingPersonnel(p); setShowMoveModal(true) }} className="text-xs text-tw-text-secondary hover:text-tw-primary ml-1" title="Move">⇄</button>
+                                      <button onClick={() => { setMovingPersonnel(p); setShowMoveModal(true) }} className="text-tw-text-secondary hover:text-tw-primary-text ml-1" title="Move"><Icon name="swap" className="w-3.5 h-3.5" /></button>
                                     </div>
                                   ))}
                                 </div>
@@ -474,7 +474,7 @@ export default function HierarchyPanel({ user }: { user: AuthUser }) {
         <Modal title="Create Department" onClose={() => setShowDeptModal(false)}>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-tw-text mb-1">{word}</label>
+              <label className="label text-[13px] text-tw-text">{word}</label>
               <Select
                 value={deptForm.layerId}
                 onChange={val => setDeptForm(f => ({ ...f, layerId: val, officeCategory: '' }))}
@@ -484,7 +484,7 @@ export default function HierarchyPanel({ user }: { user: AuthUser }) {
             </div>
             {deptFormNeedsCategory && (
               <div>
-                <label className="block text-sm font-medium text-tw-text mb-1">Category <span className="text-tw-danger">*</span></label>
+                <label className="label text-[13px] text-tw-text">Category <span className="text-tw-danger">*</span></label>
                 <div className="grid grid-cols-2 gap-2">
                   {OFFICE_CATEGORY_OPTIONS.map(option => (
                     <button
@@ -512,7 +512,7 @@ export default function HierarchyPanel({ user }: { user: AuthUser }) {
               </div>
             )}
             <div>
-              <label className="block text-sm font-medium text-tw-text mb-1">Department Name</label>
+              <label className="label text-[13px] text-tw-text">Department Name</label>
               <input className="input" placeholder={fourLevel && deptFormLevel === 4 ? 'e.g. Doctors' : 'e.g. Engineering'} value={deptForm.name} onChange={e => setDeptForm(f => ({ ...f, name: e.target.value }))} />
             </div>
             <div className="flex gap-2 justify-end">
@@ -537,12 +537,12 @@ export default function HierarchyPanel({ user }: { user: AuthUser }) {
           <Modal title={`Edit ${editingDept.name}`} onClose={() => setEditingDept(null)}>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-tw-text mb-1">Department Name</label>
+                <label className="label text-[13px] text-tw-text">Department Name</label>
                 <input className="input" value={deptEditForm.name} onChange={e => setDeptEditForm(f => ({ ...f, name: e.target.value }))} />
               </div>
               {takesCategory && (
                 <div>
-                  <label className="block text-sm font-medium text-tw-text mb-1">Category <span className="text-tw-danger">*</span></label>
+                  <label className="label text-[13px] text-tw-text">Category <span className="text-tw-danger">*</span></label>
                   <div className="grid grid-cols-2 gap-2">
                     {OFFICE_CATEGORY_OPTIONS.map(option => (
                       <button
@@ -585,24 +585,24 @@ export default function HierarchyPanel({ user }: { user: AuthUser }) {
         <Modal title="Add Personnel" onClose={() => setShowPersonnelModal(false)}>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-tw-text mb-1">Full Name</label>
+              <label className="label text-[13px] text-tw-text">Full Name</label>
               <input className="input" placeholder="John Smith" value={personnelForm.name} onChange={e => setPersonnelForm(f => ({ ...f, name: e.target.value }))} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-tw-text mb-1">Phone Number <span className="text-tw-danger">*</span></label>
+              <label className="label text-[13px] text-tw-text">Phone Number <span className="text-tw-danger">*</span></label>
               <input className="input" type="tel" placeholder="07X XXXXXXX" value={personnelForm.phone} onChange={e => setPersonnelForm(f => ({ ...f, phone: e.target.value }))} />
               <p className="text-xs text-tw-text-secondary mt-0.5">Login ID preview: <span className="font-mono font-semibold text-tw-primary">{loginPreview}</span></p>
             </div>
             <div>
-              <label className="block text-sm font-medium text-tw-text mb-1">Email <span className="text-tw-text-secondary font-normal">(optional)</span></label>
+              <label className="label text-[13px] text-tw-text">Email <span className="text-tw-text-secondary font-normal">(optional)</span></label>
               <input className="input" type="email" placeholder="john@example.com" value={personnelForm.email} onChange={e => setPersonnelForm(f => ({ ...f, email: e.target.value }))} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-tw-text mb-1">NIC <span className="text-tw-text-secondary font-normal">(optional)</span></label>
+              <label className="label text-[13px] text-tw-text">NIC <span className="text-tw-text-secondary font-normal">(optional)</span></label>
               <input className="input" placeholder="XXXXXXXXXV" value={personnelForm.nic} onChange={e => setPersonnelForm(f => ({ ...f, nic: e.target.value }))} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-tw-text mb-1">Temporary Password</label>
+              <label className="label text-[13px] text-tw-text">Temporary Password</label>
               <input className="input" type="password" placeholder="Leave blank to generate securely" value={personnelForm.password} onChange={e => setPersonnelForm(f => ({ ...f, password: e.target.value }))} />
               <p className="text-xs text-tw-text-secondary mt-1">
                 Leave blank to generate a unique temporary password. It will be shown once after creation.
@@ -615,7 +615,7 @@ export default function HierarchyPanel({ user }: { user: AuthUser }) {
             {fourLevel ? (
               <>
                 <div>
-                  <label className="block text-sm font-medium text-tw-text mb-1">{word} <span className="text-tw-danger">*</span></label>
+                  <label className="label text-[13px] text-tw-text">{word} <span className="text-tw-danger">*</span></label>
                   <Select
                     value={personnelForm.layerId}
                     onChange={val => setPersonnelForm(f => ({ ...f, layerId: val, officeCategory: '', departmentId: '', supervisorId: '' }))}
@@ -626,7 +626,7 @@ export default function HierarchyPanel({ user }: { user: AuthUser }) {
 
                 {personnelNeedsCategory && (
                   <div>
-                    <label className="block text-sm font-medium text-tw-text mb-1">Category <span className="text-tw-danger">*</span></label>
+                    <label className="label text-[13px] text-tw-text">Category <span className="text-tw-danger">*</span></label>
                     <div className="grid grid-cols-2 gap-2">
                       {OFFICE_CATEGORY_OPTIONS.map(option => (
                         <button
@@ -648,7 +648,7 @@ export default function HierarchyPanel({ user }: { user: AuthUser }) {
 
                 {personnelForm.layerId && (!personnelNeedsCategory || personnelForm.officeCategory) && (
                   <div>
-                    <label className="block text-sm font-medium text-tw-text mb-1">Department <span className="text-tw-danger">*</span></label>
+                    <label className="label text-[13px] text-tw-text">Department <span className="text-tw-danger">*</span></label>
                     <Select
                       value={personnelForm.departmentId}
                       onChange={val => setPersonnelForm(f => ({ ...f, departmentId: val }))}
@@ -665,7 +665,7 @@ export default function HierarchyPanel({ user }: { user: AuthUser }) {
 
                 {personnelNeedsManager && personnelFormLevel !== undefined && (
                   <div>
-                    <label className="block text-sm font-medium text-tw-text mb-1">
+                    <label className="label text-[13px] text-tw-text">
                       Reporting manager <span className="text-tw-danger">*</span>
                     </label>
                     <Select
@@ -695,7 +695,7 @@ export default function HierarchyPanel({ user }: { user: AuthUser }) {
               </>
             ) : (
               <div>
-                <label className="block text-sm font-medium text-tw-text mb-1">Department <span className="text-tw-danger">*</span></label>
+                <label className="label text-[13px] text-tw-text">Department <span className="text-tw-danger">*</span></label>
                 <Select
                   value={personnelForm.departmentId}
                   onChange={val => setPersonnelForm(f => ({ ...f, departmentId: val }))}
@@ -766,15 +766,15 @@ export default function HierarchyPanel({ user }: { user: AuthUser }) {
         <Modal title={`Edit — ${editingPersonnel.name}`} onClose={() => { setShowEditModal(false); setEditingPersonnel(null) }}>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-tw-text mb-1">Full Name <span className="text-tw-danger">*</span></label>
+              <label className="label text-[13px] text-tw-text">Full Name <span className="text-tw-danger">*</span></label>
               <input className="input" placeholder="John Smith" value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-tw-text mb-1">Phone Number <span className="text-tw-danger">*</span></label>
+              <label className="label text-[13px] text-tw-text">Phone Number <span className="text-tw-danger">*</span></label>
               <input className="input" type="tel" placeholder="07X XXXXXXX" value={editForm.phone} onChange={e => setEditForm(f => ({ ...f, phone: e.target.value }))} />
               {editForm.phone !== (editingPersonnel.phone || '') && (
                 <div className="mt-1.5 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5">
-                  <p className="text-xs text-amber-700">⚠ Changing phone number will also update their login username.</p>
+                  <p className="text-xs text-amber-700 inline-flex items-center gap-1"><Icon name="alert" className="w-3.5 h-3.5" /> Changing phone number will also update their login username.</p>
                 </div>
               )}
               {editForm.phone === (editingPersonnel.phone || '') && (
@@ -782,15 +782,15 @@ export default function HierarchyPanel({ user }: { user: AuthUser }) {
               )}
             </div>
             <div>
-              <label className="block text-sm font-medium text-tw-text mb-1">Email <span className="text-tw-text-secondary font-normal">(optional)</span></label>
+              <label className="label text-[13px] text-tw-text">Email <span className="text-tw-text-secondary font-normal">(optional)</span></label>
               <input className="input" type="email" placeholder="john@example.com" value={editForm.email} onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-tw-text mb-1">NIC <span className="text-tw-text-secondary font-normal">(optional)</span></label>
+              <label className="label text-[13px] text-tw-text">NIC <span className="text-tw-text-secondary font-normal">(optional)</span></label>
               <input className="input" placeholder="XXXXXXXXXV" value={editForm.nic} onChange={e => setEditForm(f => ({ ...f, nic: e.target.value }))} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-tw-text mb-1">
+              <label className="label text-[13px] text-tw-text">
                 {managerRequiredFor(editingPersonnel) ? 'Reporting manager' : 'Supervisor'}
                 {managerRequiredFor(editingPersonnel) && <span className="text-tw-danger"> *</span>}
               </label>
@@ -842,7 +842,7 @@ export default function HierarchyPanel({ user }: { user: AuthUser }) {
             />
             {moveNeedsManager && moveTargetLevel !== undefined && (
               <div>
-                <label className="block text-sm font-medium text-tw-text mb-1">
+                <label className="label text-[13px] text-tw-text">
                   Reporting manager <span className="text-tw-danger">*</span>
                 </label>
                 <p className="text-xs text-tw-text-secondary mb-1">
@@ -929,11 +929,11 @@ function PersonnelCard({ p, avatarColor, dept, supervisor, openEditModal, setMov
               <div className="mt-0.5">
                 {supervisor
                   ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-teal-50 border border-teal-200 text-xs text-teal-700">
-                      <span className="w-3.5 h-3.5 rounded-full bg-[#00a693] flex items-center justify-center text-white text-[9px] font-bold flex-shrink-0">{supervisor.name.charAt(0)}</span>
+                      <span className="w-3.5 h-3.5 rounded-full bg-teal-600 flex items-center justify-center text-white text-[9px] font-bold flex-shrink-0">{supervisor.name.charAt(0)}</span>
                       {supervisor.name}
                     </span>
                   : managerExpected
-                    ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-xs text-amber-600">⚠ Not set</span>
+                    ? <span className="badge badge-warning"><Icon name="alert" className="w-3 h-3" /> Not set</span>
                     : <span className="text-xs text-tw-text-secondary">Director</span>
                 }
               </div>
@@ -941,9 +941,9 @@ function PersonnelCard({ p, avatarColor, dept, supervisor, openEditModal, setMov
           </div>
           {/* Actions */}
           <div className="flex gap-2 pt-0.5">
-            <button onClick={() => openEditModal(p)} className="flex-1 inline-flex items-center justify-center gap-1 py-2 rounded-lg text-xs font-medium bg-[#0073ea] text-white hover:bg-[#0060c0] transition-colors">✏️ Edit</button>
-            <button onClick={() => { setMovingPersonnel(p); setShowMoveModal(true) }} className="flex-1 inline-flex items-center justify-center gap-1 py-2 rounded-lg text-xs font-medium bg-[#9c27b0] text-white hover:bg-[#7b1fa2] transition-colors">⇄ Move</button>
-            <button onClick={() => deletePersonnel(p.id)} className="px-3 py-2 rounded-lg text-xs font-medium bg-red-500 text-white hover:bg-red-600 transition-colors">✕</button>
+            <button onClick={() => openEditModal(p)} className="btn-primary btn-sm flex-1"><Icon name="edit" className="w-3.5 h-3.5" /> Edit</button>
+            <button onClick={() => { setMovingPersonnel(p); setShowMoveModal(true) }} className="btn-secondary btn-sm flex-1"><Icon name="swap" className="w-3.5 h-3.5" /> Move</button>
+            <button onClick={() => deletePersonnel(p.id)} className="btn-outline-danger btn-sm" aria-label="Delete"><Icon name="trash" className="w-3.5 h-3.5" /></button>
           </div>
         </div>
       )}
@@ -967,14 +967,14 @@ interface PersonnelTabProps {
 }
 
 function PersonnelTab({ allPersonnel, layers, allDepts, personnelSearch, setPersonnelSearch, openEditModal, setMovingPersonnel, setShowMoveModal, deletePersonnel, fourLevel }: PersonnelTabProps) {
-  const avatarColors = ['bg-[#0073ea]', 'bg-[#9c27b0]', 'bg-[#00a693]', 'bg-[#ff7575]', 'bg-[#ff9800]', 'bg-[#4caf50]']
+  const avatarColors = ['bg-tw-primary', 'bg-purple-600', 'bg-teal-600', 'bg-rose-400', 'bg-amber-500', 'bg-green-500']
   const deptHeaderColors = [
-    'from-[#e8f0ff] to-[#f0e8ff] border-[#0073ea]/20 text-[#0073ea]',
-    'from-[#f3e8ff] to-[#ffe8f0] border-[#9c27b0]/20 text-[#9c27b0]',
-    'from-[#e8fff8] to-[#e8f8ff] border-[#00a693]/20 text-[#00a693]',
-    'from-[#fff0e8] to-[#ffebe8] border-[#ff7575]/20 text-[#ff5c5c]',
-    'from-[#fff8e8] to-[#fff0e8] border-[#ff9800]/20 text-[#ff9800]',
-    'from-[#edfff0] to-[#e8fff5] border-[#4caf50]/20 text-[#4caf50]',
+    'from-blue-50 to-indigo-50 border-tw-primary/20 text-tw-primary-text',
+    'from-purple-50 to-pink-50 border-purple-600/20 text-purple-600',
+    'from-teal-50 to-sky-50 border-teal-600/20 text-teal-600',
+    'from-orange-50 to-rose-50 border-rose-400/20 text-rose-500',
+    'from-amber-50 to-orange-50 border-amber-500/20 text-amber-600',
+    'from-emerald-50 to-teal-50 border-green-500/20 text-green-600',
   ]
 
   const q = personnelSearch.trim().toLowerCase()
@@ -1041,9 +1041,9 @@ function PersonnelTab({ allPersonnel, layers, allDepts, personnelSearch, setPers
           <col className="w-[28%]" /><col className="w-[20%]" /><col className="w-[18%]" /><col className="w-[20%]" /><col className="w-[14%]" />
         </colgroup>
         <thead>
-          <tr className="bg-tw-hover border-b border-tw-border">
+          <tr className="bg-tw-surface-2 border-b border-tw-border">
             {['Name', 'Contact', 'Department', fourLevel ? 'Reporting manager' : 'Supervisor', 'Actions'].map(h => (
-              <th key={h} className="text-left px-4 py-2 text-xs font-semibold text-tw-text-secondary uppercase tracking-wider">{h}</th>
+              <th key={h} className="text-left px-4 py-2 text-[11px] font-semibold text-tw-text-secondary uppercase tracking-[0.08em]">{h}</th>
             ))}
           </tr>
         </thead>
@@ -1052,7 +1052,7 @@ function PersonnelTab({ allPersonnel, layers, allDepts, personnelSearch, setPers
             const supervisor = allPersonnel.find(s => s.id === p.supervisorId)
             const dept = allDepts.find(d => d.id === p.departmentId)
             return (
-              <tr key={p.id} className="hover:bg-[#f8f9ff] transition-colors">
+              <tr key={p.id} className="hover:bg-tw-hover transition-colors">
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2.5">
                     <div className={`w-8 h-8 rounded-full ${avatarColors[layerIdx % avatarColors.length]} flex items-center justify-center text-white text-sm font-bold shadow-sm`}>
@@ -1069,7 +1069,7 @@ function PersonnelTab({ allPersonnel, layers, allDepts, personnelSearch, setPers
                   {p.email && <div className="text-xs text-tw-text-secondary">{p.email}</div>}
                 </td>
                 <td className="px-4 py-3">
-                  <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-purple-50 text-purple-600 border border-purple-100">
+                  <span className="badge badge-purple">
                     {dept?.name || '—'}
                   </span>
                   {fourLevel && officeCategoryLabel(dept?.officeCategory) && (
@@ -1078,19 +1078,19 @@ function PersonnelTab({ allPersonnel, layers, allDepts, personnelSearch, setPers
                 </td>
                 <td className="px-4 py-3">
                   {supervisor
-                    ? <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-teal-50 border border-teal-200 text-xs text-teal-700">
-                        <div className="w-4 h-4 rounded-full bg-[#00a693] flex items-center justify-center text-white text-xs font-bold">{supervisor.name.charAt(0)}</div>
+                    ? <span className="badge badge-teal py-1">
+                        <div className="w-4 h-4 rounded-full bg-teal-600 flex items-center justify-center text-white text-xs font-bold">{supervisor.name.charAt(0)}</div>
                         {supervisor.name}
                       </span>
                     : managerExpected
-                      ? <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 border border-amber-200 text-xs text-amber-600"><span>⚠</span> Not set</span>
+                      ? <span className="badge badge-warning"><Icon name="alert" className="w-3 h-3" /> Not set</span>
                       : <span className="text-xs text-tw-text-secondary">Director</span>}
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex gap-1.5">
-                    <button onClick={() => openEditModal(p)} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-[#0073ea] text-white hover:bg-[#0060c0] transition-colors shadow-sm">✏️ Edit</button>
-                    <button onClick={() => { setMovingPersonnel(p); setShowMoveModal(true) }} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-[#9c27b0] text-white hover:bg-[#7b1fa2] transition-colors shadow-sm">⇄ Move</button>
-                    <button onClick={() => deletePersonnel(p.id)} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-red-500 text-white hover:bg-red-600 transition-colors shadow-sm">✕</button>
+                    <button onClick={() => openEditModal(p)} className="btn-primary btn-sm"><Icon name="edit" className="w-3.5 h-3.5" /> Edit</button>
+                    <button onClick={() => { setMovingPersonnel(p); setShowMoveModal(true) }} className="btn-secondary btn-sm"><Icon name="swap" className="w-3.5 h-3.5" /> Move</button>
+                    <button onClick={() => deletePersonnel(p.id)} className="btn-outline-danger btn-sm" aria-label="Delete"><Icon name="trash" className="w-3.5 h-3.5" /></button>
                   </div>
                 </td>
               </tr>
@@ -1148,11 +1148,11 @@ function PersonnelTab({ allPersonnel, layers, allDepts, personnelSearch, setPers
 
 function Modal({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-3 sm:p-4 overflow-y-auto">
-      <div className="bg-white rounded-xl shadow-panel w-full max-w-md max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-2rem)] flex flex-col my-auto">
+    <div className="fixed inset-0 flex items-center justify-center z-50 p-3 sm:p-4 overflow-y-auto bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in">
+      <div className="modal-panel w-full max-w-md max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-2rem)] flex flex-col my-auto">
         <div className="flex items-center justify-between px-5 py-4 border-b border-tw-border flex-shrink-0">
           <h3 className="font-semibold text-tw-text">{title}</h3>
-          <button onClick={onClose} className="text-tw-text-secondary hover:text-tw-text text-xl leading-none">×</button>
+          <button onClick={onClose} className="icon-btn w-8 h-8" aria-label="Close"><Icon name="x" className="w-4 h-4" /></button>
         </div>
         <div className="px-5 py-4 overflow-y-auto overscroll-contain">{children}</div>
       </div>

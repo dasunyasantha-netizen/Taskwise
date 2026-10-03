@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useCallback } from 'react'
 import type { Task, Project, AuthUser } from '../types'
 import { taskApi } from '../services/apiService'
+import { LoadingBlock, EmptyState } from './ui/Primitives'
+import { Icon } from './ui/Icon'
 
 interface Props {
   project: Project
@@ -88,7 +90,7 @@ function TaskNodeCard({ node, onTaskClick, isLast, prefix }: NodeProps) {
         {/* Card */}
         <div className="flex-1 mb-2">
           <div
-            className={`border rounded-lg px-3 py-2 cursor-pointer hover:shadow-card transition-shadow ${colorClass}`}
+            className={`border rounded-xl px-3 py-2.5 cursor-pointer hover:shadow-panel hover:-translate-y-px transition-all ${colorClass}`}
             onClick={() => onTaskClick(node)}
           >
             <div className="flex items-center gap-2">
@@ -99,7 +101,7 @@ function TaskNodeCard({ node, onTaskClick, isLast, prefix }: NodeProps) {
                   className="text-xs text-tw-text-secondary hover:text-tw-text flex-shrink-0 px-1"
                   onClick={e => { e.stopPropagation(); setCollapsed(c => !c) }}
                 >
-                  {collapsed ? `▶ ${node.children.length}` : '▼'}
+                  {collapsed ? <span className="inline-flex items-center gap-0.5"><Icon name="chevronRight" className="w-3.5 h-3.5" />{node.children.length}</span> : <Icon name="chevronDown" className="w-3.5 h-3.5" />}
                 </button>
               )}
             </div>
@@ -151,11 +153,7 @@ export default function FlowchartView({ project, user, onTaskClick }: Props) {
   useEffect(() => { load() }, [load])
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-48">
-        <div className="w-6 h-6 border-2 border-tw-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    )
+    return <LoadingBlock />
   }
 
   if (error) {
@@ -171,17 +169,15 @@ export default function FlowchartView({ project, user, onTaskClick }: Props) {
 
   if (roots.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-48 text-tw-text-secondary">
-        <p className="text-sm">No tasks in this project yet.</p>
-      </div>
+      <div className="page"><div className="card"><EmptyState icon="hierarchy" title="No tasks in this project yet." /></div></div>
     )
   }
 
   // Group by top-level tasks
   return (
-    <div className="p-4">
+    <div className="page">
       {/* Legend */}
-      <div className="flex flex-wrap gap-3 mb-5">
+      <div className="flex flex-wrap gap-3 mb-5 card px-4 py-3">
         {Object.entries(STATUS_DOT).map(([status, dot]) => (
           <div key={status} className="flex items-center gap-1.5">
             <span className={`w-2 h-2 rounded-full ${dot}`} />
@@ -193,14 +189,14 @@ export default function FlowchartView({ project, user, onTaskClick }: Props) {
       {/* Project root node */}
       <div className="mb-4 flex items-center gap-2">
         <div
-          className="px-3 py-2 rounded-lg text-sm font-semibold text-white flex items-center gap-2"
+          className="px-3.5 py-2.5 rounded-xl text-sm font-semibold text-white flex items-center gap-2 shadow-cta"
           style={{ backgroundColor: project.color || '#0073ea' }}
         >
-          <span>📁</span>
+          <Icon name="project" className="w-4 h-4" />
           <span>{project.name}</span>
           <span className="opacity-80 font-normal text-xs">({tasks.length} task{tasks.length !== 1 ? 's' : ''})</span>
         </div>
-        <button className="btn-secondary text-xs" onClick={load}>Refresh</button>
+        <button className="btn-secondary btn-sm" onClick={load}><Icon name="refresh" className="w-3.5 h-3.5" /> Refresh</button>
       </div>
 
       {/* Connector line from project node to tasks */}

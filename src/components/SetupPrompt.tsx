@@ -98,9 +98,9 @@ export default function SetupPrompt({ actorId, onDone }: Props) {
 
   if (step === 'push') {
     return (
-      <div className="fixed inset-0 z-[9998] flex items-center justify-center px-4" style={{ background: 'rgba(0,0,0,0.5)' }}>
-        <div className="bg-white rounded-3xl p-7 w-full max-w-sm shadow-2xl text-center">
-          <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center mx-auto mb-4">
+      <div className="fixed inset-0 z-[9998] flex items-center justify-center px-4 bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in">
+        <div className="modal-panel p-7 w-full max-w-sm text-center">
+          <div className="w-16 h-16 rounded-2xl icon-tile tile-blue mx-auto mb-4">
             <svg className="w-8 h-8 text-tw-primary" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
             </svg>
@@ -114,10 +114,10 @@ export default function SetupPrompt({ actorId, onDone }: Props) {
 
   if (step === 'biometric') {
     return (
-      <div className="fixed inset-0 z-[9998] flex items-end sm:items-center justify-center px-4 pb-6 sm:pb-0" style={{ background: 'rgba(0,0,0,0.5)' }}>
-        <div className="bg-white rounded-3xl p-7 w-full max-w-sm shadow-2xl">
+      <div className="fixed inset-0 z-[9998] flex items-end sm:items-center justify-center px-4 pb-6 sm:pb-0 bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in">
+        <div className="modal-panel p-7 w-full max-w-sm">
           {pushDone && (
-            <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-xl px-3 py-2 mb-5">
+            <div className="flex items-center gap-2 alert-success py-2 mb-5">
               <svg className="w-4 h-4 text-green-600 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
               </svg>
@@ -128,8 +128,8 @@ export default function SetupPrompt({ actorId, onDone }: Props) {
           {webAuthnSupported ? (
             <>
               <div className="text-center mb-5">
-                <div className="w-16 h-16 rounded-full bg-tw-primary/10 flex items-center justify-center mx-auto mb-3">
-                  <svg className="w-8 h-8 text-tw-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <div className="w-16 h-16 rounded-2xl bg-tw-primary/10 ring-1 ring-tw-primary/20 text-tw-primary-text flex items-center justify-center mx-auto mb-3">
+                  <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4" />
                     <path d="M14 13.12c0 2.38 0 6.38-1 8.88" />
                     <path d="M17.29 21.02c.12-.6.43-2.3.5-3.02" />
@@ -145,7 +145,7 @@ export default function SetupPrompt({ actorId, onDone }: Props) {
               </div>
 
               {biometricErr && (
-                <div className="bg-red-50 border border-red-200 text-tw-danger text-xs px-3 py-2 rounded-lg mb-4">
+                <div className="alert-error text-xs mb-4">
                   {biometricErr}
                 </div>
               )}
@@ -153,13 +153,13 @@ export default function SetupPrompt({ actorId, onDone }: Props) {
               <button
                 onClick={handleSetupBiometric}
                 disabled={biometricLoading}
-                className="w-full py-3.5 rounded-2xl bg-tw-primary text-white font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-60 mb-3"
+                className="btn-primary w-full py-3 mb-2"
               >
                 {biometricLoading ? 'Setting up…' : 'Set Up Biometrics'}
               </button>
               <button
                 onClick={finish}
-                className="w-full py-2.5 rounded-2xl text-tw-text-secondary text-sm font-medium hover:bg-tw-bg transition-colors"
+                className="btn-ghost w-full"
               >
                 Skip for now
               </button>

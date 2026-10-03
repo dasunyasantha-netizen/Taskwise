@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import type { Layer, Task, Project, Personnel } from '../types'
 import { OFFICE_CATEGORY_OPTIONS, levelTakesCategory, officeCategoryLabel } from '../hierarchy'
+import { Icon } from './ui/Icon'
 import DatePicker from './DatePicker'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -244,7 +245,7 @@ export function PillSelect({ value, options, placeholder, onChange, active, widt
         onMouseDown={e => { e.preventDefault(); open ? setOpen(false) : handleOpen() }}
         className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all whitespace-nowrap ${
           active || selected
-            ? 'bg-[#f0f6ff] border-tw-primary text-tw-primary'
+            ? 'bg-tw-primary/10 border-tw-primary/40 text-tw-primary-text'
             : 'bg-white border-tw-border text-tw-text-secondary hover:border-tw-primary/50 hover:text-tw-text'
         }`}
       >
@@ -255,11 +256,11 @@ export function PillSelect({ value, options, placeholder, onChange, active, widt
       </button>
       {open && createPortal(
         <div style={{ position: 'fixed', top: pos.top, left: pos.left, width: pos.w, zIndex: 9999 }}
-          className="bg-white border border-tw-border rounded-xl shadow-panel overflow-y-auto max-h-60 py-1"
+          className="bg-tw-surface border border-tw-border rounded-xl shadow-panel animate-pop-in overflow-y-auto max-h-60 py-1"
           onMouseDown={e => e.preventDefault()}>
           {options.map(o => (
             <button key={o.value} onMouseDown={() => { onChange(o.value); setOpen(false) }}
-              className={`w-full text-left px-3 py-2 text-xs hover:bg-tw-hover transition-colors ${o.value === value ? 'text-tw-primary font-semibold bg-[#f0f6ff]' : 'text-tw-text'}`}>
+              className={`w-full text-left px-3 py-2 text-xs hover:bg-tw-hover transition-colors ${o.value === value ? 'text-tw-primary-text font-semibold bg-tw-primary/10' : 'text-tw-text'}`}>
               {o.label}
             </button>
           ))}
@@ -275,7 +276,7 @@ function ClearPill({ onClick }: { onClick: () => void }) {
   return (
     <button onClick={onClick}
       className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-tw-border/60 hover:bg-tw-danger hover:text-white text-tw-text-secondary transition-colors text-xs font-bold flex-shrink-0"
-      title="Clear">×</button>
+      title="Clear"><Icon name="x" className="w-3 h-3" /></button>
   )
 }
 
@@ -317,36 +318,36 @@ function LayerDropdown({
 
   return createPortal(
     <div style={{ position: 'fixed', top: pos.top, left: pos.left, width: pos.w, zIndex: 9999 }}
-      className="bg-white border border-tw-border rounded-xl shadow-panel overflow-y-auto max-h-72 py-1"
+      className="bg-tw-surface border border-tw-border rounded-xl shadow-panel animate-pop-in overflow-y-auto max-h-72 py-1"
       onMouseDown={e => e.preventDefault()}>
       <button onMouseDown={() => { onSelect(null); onClose() }}
-        className={`w-full text-left px-3 py-2 text-xs hover:bg-tw-hover transition-colors ${!filter ? 'text-tw-primary font-semibold bg-[#f0f6ff]' : 'text-tw-text'}`}>
+        className={`w-full text-left px-3 py-2 text-xs hover:bg-tw-hover transition-colors ${!filter ? 'text-tw-primary-text font-semibold bg-tw-primary/10' : 'text-tw-text'}`}>
         All
       </button>
       {visibleCategories.length > 0 && <>
-        <div className="px-3 pt-2 pb-1 border-t border-tw-border/30 mt-1"><span className="text-[10px] font-bold text-tw-text-secondary uppercase tracking-wider">Category</span></div>
+        <div className="px-3 pt-2 pb-1 border-t border-tw-border/30 mt-1"><span className="section-label">Category</span></div>
         {visibleCategories.map(option => (
           <button key={option.value} onMouseDown={() => { onSelect({ layerNumber: layer.number, targetType: 'category', targetId: option.value }); onClose() }}
-            className={`w-full text-left px-3 py-2 text-xs hover:bg-tw-hover transition-colors ${filter?.targetType === 'category' && filter.targetId === option.value ? 'text-tw-primary font-semibold bg-[#f0f6ff]' : 'text-tw-text'}`}>
+            className={`w-full text-left px-3 py-2 text-xs hover:bg-tw-hover transition-colors ${filter?.targetType === 'category' && filter.targetId === option.value ? 'text-tw-primary-text font-semibold bg-tw-primary/10' : 'text-tw-text'}`}>
             {option.label}
           </button>
         ))}
       </>}
       {visibleDepts.length > 0 && <>
-        <div className="px-3 pt-2 pb-1"><span className="text-[10px] font-bold text-tw-text-secondary uppercase tracking-wider">Departments</span></div>
+        <div className="px-3 pt-2 pb-1"><span className="section-label">Departments</span></div>
         {visibleDepts.map(d => (
           <button key={d.id} onMouseDown={() => { onSelect({ layerNumber: layer.number, targetType: 'department', targetId: d.id }); onClose() }}
-            className={`w-full text-left px-3 py-2 text-xs hover:bg-tw-hover transition-colors ${filter?.targetType === 'department' && filter.targetId === d.id ? 'text-tw-primary font-semibold bg-[#f0f6ff]' : 'text-tw-text'}`}>
+            className={`w-full text-left px-3 py-2 text-xs hover:bg-tw-hover transition-colors ${filter?.targetType === 'department' && filter.targetId === d.id ? 'text-tw-primary-text font-semibold bg-tw-primary/10' : 'text-tw-text'}`}>
             {d.name}
             {officeCategoryLabel(d.officeCategory) && <span className="ml-1.5 text-tw-text-secondary text-[10px]">· {officeCategoryLabel(d.officeCategory)}</span>}
           </button>
         ))}
       </>}
       {visiblePeople.length > 0 && <>
-        <div className="px-3 pt-2 pb-1 border-t border-tw-border/30 mt-1"><span className="text-[10px] font-bold text-tw-text-secondary uppercase tracking-wider">People</span></div>
+        <div className="px-3 pt-2 pb-1 border-t border-tw-border/30 mt-1"><span className="section-label">People</span></div>
         {visiblePeople.map(({ p, dName }) => (
           <button key={p.id} onMouseDown={() => { onSelect({ layerNumber: layer.number, targetType: 'personnel', targetId: p.id }); onClose() }}
-            className={`w-full text-left px-3 py-2 text-xs hover:bg-tw-hover transition-colors ${filter?.targetType === 'personnel' && filter.targetId === p.id ? 'text-tw-primary font-semibold bg-[#f0f6ff]' : 'text-tw-text'}`}>
+            className={`w-full text-left px-3 py-2 text-xs hover:bg-tw-hover transition-colors ${filter?.targetType === 'personnel' && filter.targetId === p.id ? 'text-tw-primary-text font-semibold bg-tw-primary/10' : 'text-tw-text'}`}>
             {p.name}<span className="ml-1.5 text-tw-text-secondary text-[10px]">· {dName}</span>
           </button>
         ))}
@@ -389,11 +390,11 @@ function LayerGroup({ layer, filter, available, onChange }: LayerGroupProps) {
 
   return (
     <>
-      <span className="text-[11px] font-semibold text-tw-text-secondary uppercase tracking-wide whitespace-nowrap self-center">{layer.name}</span>
+      <span className="section-label whitespace-nowrap self-center">{layer.name}</span>
       <div className="flex items-center gap-1.5 min-w-0">
         <button ref={ref} onMouseDown={e => { e.preventDefault(); handleOpen() }}
           className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all whitespace-nowrap ${
-            filter ? 'bg-[#f0f6ff] border-tw-primary text-tw-primary' : 'bg-white border-tw-border text-tw-text-secondary hover:border-tw-primary/50 hover:text-tw-text'
+            filter ? 'bg-tw-primary/10 border-tw-primary/40 text-tw-primary-text' : 'bg-white border-tw-border text-tw-text-secondary hover:border-tw-primary/50 hover:text-tw-text'
           }`}>
           {displayLabel}
           <svg className={`w-3 h-3 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -411,7 +412,7 @@ function LayerGroup({ layer, filter, available, onChange }: LayerGroupProps) {
 
 const DATE_PILL = (active: boolean) =>
   `inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all whitespace-nowrap focus:outline-none ${
-    active ? 'bg-[#f0f6ff] border-tw-primary text-tw-primary' : 'bg-white border-tw-border text-tw-text-secondary hover:border-tw-primary/50 hover:text-tw-text'
+    active ? 'bg-tw-primary/10 border-tw-primary/40 text-tw-primary-text' : 'bg-white border-tw-border text-tw-text-secondary hover:border-tw-primary/50 hover:text-tw-text'
   }`
 
 interface DateRangeRowProps {
@@ -426,13 +427,13 @@ function DateRangeRow({ label, from, to, onFromChange, onToChange }: DateRangeRo
   const isActive = !!(from || to)
   return (
     <>
-      <span className="text-[11px] font-semibold text-tw-text-secondary uppercase tracking-wide whitespace-nowrap self-center">
+      <span className="section-label whitespace-nowrap self-center">
         {label}
       </span>
       <div className="flex items-center gap-1.5 flex-wrap min-w-0">
         <DatePicker value={from ?? ''} onChange={v => onFromChange(v || null)} placeholder="From…"
           triggerClassName={DATE_PILL(!!from)} />
-        <span className="text-[11px] text-tw-text-secondary">→</span>
+        <Icon name="arrowRight" className="w-3 h-3 text-tw-text-muted" />
         <DatePicker value={to ?? ''} onChange={v => onToChange(v || null)} placeholder="To…"
           triggerClassName={DATE_PILL(!!to)} />
         {isActive && <ClearPill onClick={() => { onFromChange(null); onToChange(null) }} />}
@@ -468,7 +469,7 @@ function ExtraGroup({ filter, personnel, mode, onChange }: ExtraGroupProps) {
   return (
     <>
       {/* Status */}
-      <span className="text-[11px] font-semibold text-tw-text-secondary uppercase tracking-wide whitespace-nowrap self-center">Status</span>
+      <span className="section-label whitespace-nowrap self-center">Status</span>
       <div className="flex items-center gap-1.5 min-w-0">
         <PillSelect value={filter.status ?? ''} options={mode === 'task' ? STATUS_TASK : STATUS_PROJ}
           placeholder="Any" active={!!filter.status}
@@ -481,7 +482,7 @@ function ExtraGroup({ filter, personnel, mode, onChange }: ExtraGroupProps) {
       {/* Priority (tasks only) */}
       {mode === 'task' && (
         <>
-          <span className="text-[11px] font-semibold text-tw-text-secondary uppercase tracking-wide whitespace-nowrap self-center">Priority</span>
+          <span className="section-label whitespace-nowrap self-center">Priority</span>
           <div className="flex items-center gap-1.5 min-w-0">
             <PillSelect value={filter.priority ?? ''} options={PRIORITY}
               placeholder="Any" active={!!filter.priority}
@@ -495,7 +496,7 @@ function ExtraGroup({ filter, personnel, mode, onChange }: ExtraGroupProps) {
       {/* Assigned to (tasks only) */}
       {mode === 'task' && (
         <>
-          <span className="text-[11px] font-semibold text-tw-text-secondary uppercase tracking-wide whitespace-nowrap self-center">Assigned to</span>
+          <span className="section-label whitespace-nowrap self-center">Assigned to</span>
           <div className="flex items-center gap-1.5 min-w-0">
             <PillSelect value={filter.assignedTo ?? ''} options={personnel.map(p => ({ value: p.id, label: p.name }))}
               placeholder="Anyone" active={!!filter.assignedTo} width={180}
@@ -556,10 +557,10 @@ function LayerGroupInline({ layer, filter, available, onChange }: LayerGroupProp
 
   return (
     <div className="inline-flex items-center gap-1">
-      <span className="text-[11px] font-semibold text-tw-text-secondary uppercase tracking-wide whitespace-nowrap">{layer.name}:</span>
+      <span className="section-label whitespace-nowrap">{layer.name}:</span>
       <button ref={ref} onMouseDown={e => { e.preventDefault(); handleOpen() }}
         className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-all whitespace-nowrap ${
-          filter ? 'bg-[#f0f6ff] border-tw-primary text-tw-primary' : 'bg-white border-tw-border text-tw-text-secondary hover:border-tw-primary/50'
+          filter ? 'bg-tw-primary/10 border-tw-primary/40 text-tw-primary-text' : 'bg-white border-tw-border text-tw-text-secondary hover:border-tw-primary/50'
         }`}>
         {displayLabel}
         <svg className={`w-3 h-3 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -606,7 +607,7 @@ function LayerGroupMobile({ layer, filter, available, onChange }: LayerGroupProp
     <div className="flex items-center gap-1.5">
       <button ref={ref} onMouseDown={e => { e.preventDefault(); handleOpen() }}
         className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
-          filter ? 'bg-[#f0f6ff] border-tw-primary text-tw-primary' : 'bg-white border-tw-border text-tw-text-secondary'
+          filter ? 'bg-tw-primary/10 border-tw-primary/40 text-tw-primary-text' : 'bg-white border-tw-border text-tw-text-secondary'
         }`}>
         {displayLabel}
         <svg className={`w-3 h-3 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -648,7 +649,7 @@ function ExtraGroupInline({ filter, personnel, mode, availableStatuses, availabl
   return (
     <>
       <div className="inline-flex items-center gap-1">
-        <span className="text-[11px] font-semibold text-tw-text-secondary uppercase tracking-wide whitespace-nowrap">Status:</span>
+        <span className="section-label whitespace-nowrap">Status:</span>
         <PillSelect value={filter.status ?? ''} options={statusOpts}
           placeholder="Any" active={!!filter.status} onChange={v => onChange({ ...filter, status: v || null })} />
         {filter.status && <ClearPill onClick={() => onChange({ ...filter, status: null })} />}
@@ -656,14 +657,14 @@ function ExtraGroupInline({ filter, personnel, mode, availableStatuses, availabl
       {mode === 'task' && <>
         <span className="self-stretch w-px bg-tw-border/50 mx-1 rounded-full" />
         <div className="inline-flex items-center gap-1">
-          <span className="text-[11px] font-semibold text-tw-text-secondary uppercase tracking-wide whitespace-nowrap">Priority:</span>
+          <span className="section-label whitespace-nowrap">Priority:</span>
           <PillSelect value={filter.priority ?? ''} options={priorityOpts}
             placeholder="Any" active={!!filter.priority} onChange={v => onChange({ ...filter, priority: v || null })} />
           {filter.priority && <ClearPill onClick={() => onChange({ ...filter, priority: null })} />}
         </div>
         <span className="self-stretch w-px bg-tw-border/50 mx-1 rounded-full" />
         <div className="inline-flex items-center gap-1">
-          <span className="text-[11px] font-semibold text-tw-text-secondary uppercase tracking-wide whitespace-nowrap">Assigned:</span>
+          <span className="section-label whitespace-nowrap">Assigned:</span>
           <PillSelect value={filter.assignedTo ?? ''} options={personnel.map(p => ({ value: p.id, label: p.name }))}
             placeholder="Anyone" active={!!filter.assignedTo} width={180} onChange={v => onChange({ ...filter, assignedTo: v || null })} />
           {filter.assignedTo && <ClearPill onClick={() => onChange({ ...filter, assignedTo: null })} />}
@@ -671,17 +672,17 @@ function ExtraGroupInline({ filter, personnel, mode, availableStatuses, availabl
         <span className="self-stretch w-px bg-tw-border/50 mx-1 rounded-full" />
       </>}
       <div className="inline-flex items-center gap-1.5 flex-wrap">
-        <span className="text-[11px] font-semibold text-tw-text-secondary uppercase tracking-wide whitespace-nowrap">Deadline:</span>
+        <span className="section-label whitespace-nowrap">Deadline:</span>
         <DatePicker value={filter.deadlineFrom ?? ''} onChange={v => onChange({ ...filter, deadlineFrom: v || null })} placeholder="From…" triggerClassName={DC(!!filter.deadlineFrom)} />
-        <span className="text-[11px] text-tw-text-secondary">→</span>
+        <Icon name="arrowRight" className="w-3 h-3 text-tw-text-muted" />
         <DatePicker value={filter.deadlineTo ?? ''} onChange={v => onChange({ ...filter, deadlineTo: v || null })} placeholder="To…" triggerClassName={DC(!!filter.deadlineTo)} />
         {(filter.deadlineFrom || filter.deadlineTo) && <ClearPill onClick={() => onChange({ ...filter, deadlineFrom: null, deadlineTo: null })} />}
       </div>
       <span className="text-tw-border/80 text-base select-none">·</span>
       <div className="inline-flex items-center gap-1.5 flex-wrap">
-        <span className="text-[11px] font-semibold text-tw-text-secondary uppercase tracking-wide whitespace-nowrap">Created:</span>
+        <span className="section-label whitespace-nowrap">Created:</span>
         <DatePicker value={filter.createdFrom ?? ''} onChange={v => onChange({ ...filter, createdFrom: v || null })} placeholder="From…" triggerClassName={DC(!!filter.createdFrom)} />
-        <span className="text-[11px] text-tw-text-secondary">→</span>
+        <Icon name="arrowRight" className="w-3 h-3 text-tw-text-muted" />
         <DatePicker value={filter.createdTo ?? ''} onChange={v => onChange({ ...filter, createdTo: v || null })} placeholder="To…" triggerClassName={DC(!!filter.createdTo)} />
         {(filter.createdFrom || filter.createdTo) && <ClearPill onClick={() => onChange({ ...filter, createdFrom: null, createdTo: null })} />}
       </div>
@@ -702,7 +703,7 @@ function ExtraGroupMobile({ filter, personnel, mode, availableStatuses, availabl
 
   const Row = ({ label, children }: { label: string; children: React.ReactNode }) => (
     <div className="flex items-center justify-between gap-3">
-      <span className="text-[11px] font-semibold text-tw-text-secondary uppercase tracking-wide whitespace-nowrap flex-shrink-0">{label}</span>
+      <span className="section-label whitespace-nowrap flex-shrink-0">{label}</span>
       <div className="flex items-center gap-1.5 justify-end flex-wrap">{children}</div>
     </div>
   )
@@ -731,14 +732,14 @@ function ExtraGroupMobile({ filter, personnel, mode, availableStatuses, availabl
       <div className="border-t border-tw-border/30" />
       <Row label="Deadline">
         <DatePicker value={filter.deadlineFrom ?? ''} onChange={v => onChange({ ...filter, deadlineFrom: v || null })} placeholder="From…" triggerClassName={DC(!!filter.deadlineFrom)} />
-        <span className="text-[11px] text-tw-text-secondary">→</span>
+        <Icon name="arrowRight" className="w-3 h-3 text-tw-text-muted" />
         <DatePicker value={filter.deadlineTo ?? ''} onChange={v => onChange({ ...filter, deadlineTo: v || null })} placeholder="To…" triggerClassName={DC(!!filter.deadlineTo)} />
         {(filter.deadlineFrom || filter.deadlineTo) && <ClearPill onClick={() => onChange({ ...filter, deadlineFrom: null, deadlineTo: null })} />}
       </Row>
       <div className="border-t border-tw-border/30" />
       <Row label="Created">
         <DatePicker value={filter.createdFrom ?? ''} onChange={v => onChange({ ...filter, createdFrom: v || null })} placeholder="From…" triggerClassName={DC(!!filter.createdFrom)} />
-        <span className="text-[11px] text-tw-text-secondary">→</span>
+        <Icon name="arrowRight" className="w-3 h-3 text-tw-text-muted" />
         <DatePicker value={filter.createdTo ?? ''} onChange={v => onChange({ ...filter, createdTo: v || null })} placeholder="To…" triggerClassName={DC(!!filter.createdTo)} />
         {(filter.createdFrom || filter.createdTo) && <ClearPill onClick={() => onChange({ ...filter, createdFrom: null, createdTo: null })} />}
       </Row>
@@ -783,11 +784,9 @@ export default function FilterBar({ filters, layers, personnel, mode, availableO
       <div className="flex items-center gap-2">
         <button onClick={() => setExpanded(e => !e)}
           className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
-            isActive ? 'bg-[#f0f6ff] border-tw-primary text-tw-primary' : 'bg-white border-tw-border text-tw-text-secondary hover:border-tw-primary/50 hover:text-tw-text'
+            isActive ? 'bg-tw-primary/10 border-tw-primary/40 text-tw-primary-text' : 'bg-white border-tw-border text-tw-text-secondary hover:border-tw-primary/50 hover:text-tw-text'
           }`}>
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h18M7 8h10M10 12h4" />
-          </svg>
+          <Icon name="filter" className="w-3.5 h-3.5" />
           Filter
           {isActive && <span className="bg-tw-primary text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-bold leading-none">{activeCount}</span>}
           <svg className={`w-3 h-3 flex-shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -799,7 +798,7 @@ export default function FilterBar({ filters, layers, personnel, mode, availableO
 
       {/* Desktop: horizontal inline chips */}
       {expanded && (
-        <div className="hidden md:block mt-3 px-4 py-3 bg-[#f8f9ff] border border-tw-border/60 rounded-xl">
+        <div className="hidden md:block mt-3 px-4 py-3 bg-tw-surface border border-tw-border rounded-2xl shadow-card">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
             {layers.map(layer => (
               <React.Fragment key={layer.id}>
@@ -824,20 +823,20 @@ export default function FilterBar({ filters, layers, personnel, mode, availableO
       {/* Mobile: bottom sheet */}
       {expanded && createPortal(
         <div className="md:hidden fixed inset-0 z-50 flex flex-col justify-end">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setExpanded(false)} />
-          <div className="relative bg-white rounded-t-2xl shadow-xl max-h-[85vh] flex flex-col">
+          <div className="absolute inset-0 bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in" onClick={() => setExpanded(false)} />
+          <div className="relative bg-tw-surface rounded-t-3xl shadow-panel border-t border-tw-border animate-slide-up max-h-[85vh] flex flex-col">
             <div className="flex items-center justify-between px-4 py-3 border-b border-tw-border flex-shrink-0">
               <span className="font-semibold text-sm text-tw-text">Filters</span>
               <div className="flex items-center gap-3">
                 {isActive && <button onClick={clearAll} className="text-xs text-tw-danger font-medium">Clear all</button>}
-                <button onClick={() => setExpanded(false)} className="text-tw-text-secondary text-xl leading-none">×</button>
+                <button onClick={() => setExpanded(false)} className="icon-btn w-8 h-8" aria-label="Close"><Icon name="x" className="w-4 h-4" /></button>
               </div>
             </div>
             <div className="overflow-y-auto flex-1 px-4 py-4 space-y-4">
               {layers.map((layer, i) => (
                 <React.Fragment key={layer.id}>
                   <div className="flex items-center justify-between gap-3">
-                    <span className="text-[11px] font-semibold text-tw-text-secondary uppercase tracking-wide whitespace-nowrap flex-shrink-0">{layer.name}</span>
+                    <span className="section-label whitespace-nowrap flex-shrink-0">{layer.name}</span>
                     <div className="flex justify-end">
                       <LayerGroupMobile layer={layer} filter={filters.layerFilters[layer.number]}
                         available={availableOptions?.layers[layer.number]}

@@ -31,7 +31,7 @@ test('one Chairman role displays management access and only collected phone assi
 
 test('Director creates another role in the existing department without login credentials', async ({ page }) => {
   const fixture = JSON.parse(readFileSync('.cache/roles-fixture.json', 'utf8'))
-  await page.getByRole('button', { name: '+ Role', exact: true }).click()
+  await page.getByRole('button', { name: 'Add role', exact: true }).click()
   const form = page.locator('form').filter({ has: page.getByRole('heading', { name: 'Create role' }) })
   await form.getByLabel('Role name', { exact: true }).fill('Additional secretary')
   await form.getByLabel('Department', { exact: true }).selectOption(fixture.departmentId)

@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { auditApi } from '../services/apiService'
 import Select from './Select'
+import type { IconName } from './ui/Icon'
+import { PageHeader, LoadingBlock } from './ui/Primitives'
+import { Icon } from './ui/Icon'
 
 // ─── Types (mirror /reports/leaderboard) ───────────────────────────────────────
 
@@ -95,13 +98,13 @@ function formatPeriodDate(value: string, includeYear = false) {
 
 // Rank badge — medals for the podium, plain number otherwise
 function RankBadge({ rank }: { rank: number }) {
-  const medal = rank === 1 ? { e: '🥇', cls: 'bg-yellow-50 text-yellow-700 ring-yellow-300' }
-    : rank === 2 ? { e: '🥈', cls: 'bg-gray-50 text-gray-600 ring-gray-300' }
-    : rank === 3 ? { e: '🥉', cls: 'bg-orange-50 text-orange-700 ring-orange-300' }
+  const medal = rank === 1 ? 'bg-amber-50 text-amber-600 ring-amber-300'
+    : rank === 2 ? 'bg-slate-100 text-slate-500 ring-slate-300'
+    : rank === 3 ? 'bg-orange-50 text-orange-600 ring-orange-300'
     : null
   if (medal) return (
-    <span className={`inline-flex items-center gap-1 font-bold text-sm px-2 py-0.5 rounded-full ring-1 ${medal.cls}`}>
-      <span>{medal.e}</span>{rank}
+    <span className={`inline-flex items-center gap-1 font-bold text-sm pl-1.5 pr-2 py-0.5 rounded-full ring-1 ring-inset ${medal}`}>
+      <Icon name="medal" className="w-3.5 h-3.5" />{rank}
     </span>
   )
   return <span className="inline-flex w-7 h-7 items-center justify-center text-tw-text-secondary font-semibold text-sm">{rank}</span>
@@ -116,21 +119,21 @@ function BreakdownModal({ row, points, onClose }: {
 }) {
   // Actual subtotals preserve the rule value that was active for each event.
   const lines = [
-    { label: 'Daily logins',        icon: '📅', unit: points.DAILY_LOGIN,        subtotal: row.loginPoints,        sub: `${row.loginDays} day${row.loginDays !== 1 ? 's' : ''}` },
-    { label: 'Task updates',        icon: '✏️', unit: points.TASK_UPDATE,        subtotal: row.taskUpdatePoints,   sub: `${row.taskUpdates} update${row.taskUpdates !== 1 ? 's' : ''} (max 1/task/day)` },
-    { label: 'On-time submissions', icon: '✅', unit: points.ON_TIME_SUBMISSION, subtotal: row.onTimePoints,       sub: `${row.onTimeCount} task${row.onTimeCount !== 1 ? 's' : ''}` },
-    { label: 'Overdue days',        icon: '⏰', unit: points.OVERDUE_PER_DAY,    subtotal: row.overduePoints,      sub: `${row.overdueDays} day${row.overdueDays !== 1 ? 's' : ''} late` },
-    { label: 'Rejections',          icon: '↩️', unit: points.REJECTION,          subtotal: row.rejectionPoints,    sub: `${row.rejectionCount} rejected` },
-    { label: 'Cancelled tasks',     icon: '🚫', unit: points.CANCELLATION,       subtotal: row.cancellationPoints, sub: `${row.cancellationCount} director-approved deduction${row.cancellationCount !== 1 ? 's' : ''}` },
+    { label: 'Daily logins',        icon: 'calendar' as IconName, unit: points.DAILY_LOGIN,        subtotal: row.loginPoints,        sub: `${row.loginDays} day${row.loginDays !== 1 ? 's' : ''}` },
+    { label: 'Task updates',        icon: 'edit' as IconName, unit: points.TASK_UPDATE,        subtotal: row.taskUpdatePoints,   sub: `${row.taskUpdates} update${row.taskUpdates !== 1 ? 's' : ''} (max 1/task/day)` },
+    { label: 'On-time submissions', icon: 'approve' as IconName, unit: points.ON_TIME_SUBMISSION, subtotal: row.onTimePoints,       sub: `${row.onTimeCount} task${row.onTimeCount !== 1 ? 's' : ''}` },
+    { label: 'Overdue days',        icon: 'overdue' as IconName, unit: points.OVERDUE_PER_DAY,    subtotal: row.overduePoints,      sub: `${row.overdueDays} day${row.overdueDays !== 1 ? 's' : ''} late` },
+    { label: 'Rejections',          icon: 'sendBack' as IconName, unit: points.REJECTION,          subtotal: row.rejectionPoints,    sub: `${row.rejectionCount} rejected` },
+    { label: 'Cancelled tasks',     icon: 'ban' as IconName, unit: points.CANCELLATION,       subtotal: row.cancellationPoints, sub: `${row.cancellationCount} director-approved deduction${row.cancellationCount !== 1 ? 's' : ''}` },
   ]
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in" onClick={onClose}>
+      <div className="modal-panel w-full max-w-md max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-tw-border">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-11 h-11 rounded-full bg-tw-primary/10 text-tw-primary font-bold flex items-center justify-center flex-shrink-0">
+            <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#3d9bff] to-tw-purple text-white font-bold flex items-center justify-center flex-shrink-0">
               {initials(row.name)}
             </div>
             <div className="min-w-0">
@@ -138,23 +141,23 @@ function BreakdownModal({ row, points, onClose }: {
               <div className="text-xs text-tw-text-secondary truncate">{row.department} · Rank #{row.rank}</div>
             </div>
           </div>
-          <button onClick={onClose} className="text-tw-text-secondary hover:text-tw-text text-xl leading-none px-1 flex-shrink-0">×</button>
+          <button onClick={onClose} className="icon-btn flex-shrink-0" aria-label="Close"><Icon name="x" className="w-4 h-4" /></button>
         </div>
 
         {/* Total banner */}
-        <div className="px-5 py-3 bg-tw-hover border-b border-tw-border flex items-center justify-between">
+        <div className="px-5 py-3 bg-tw-surface-2 border-b border-tw-border flex items-center justify-between">
           <span className="text-sm text-tw-text-secondary">Total points</span>
           <span className={`text-2xl font-bold ${row.totalPoints < 0 ? 'text-tw-danger' : 'text-tw-text'}`}>{row.totalPoints}</span>
         </div>
 
         {/* Category breakdown */}
         <div className="flex-1 overflow-y-auto px-5 py-3">
-          <div className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-2">Points by category</div>
+          <div className="section-label mb-2">Points by category</div>
           <div className="divide-y divide-tw-border">
             {lines.map(l => (
               <div key={l.label} className="flex items-center justify-between py-2.5">
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <span className="text-base flex-shrink-0">{l.icon}</span>
+                  <span className="icon-tile tile-gray w-8 h-8 rounded-lg"><Icon name={l.icon} className="w-4 h-4" /></span>
                   <div className="min-w-0">
                     <div className="text-sm font-medium text-tw-text">{l.label}</div>
                     <div className="text-xs text-tw-text-secondary">
@@ -391,9 +394,9 @@ export default function LeaderboardPage() {
   }, [data, search, dept])
 
   if (loading) return (
-    <div className="flex items-center justify-center h-48 text-tw-text-secondary text-sm">Loading leaderboard…</div>
+    <LoadingBlock label="Loading leaderboard…" />
   )
-  if (error) return <div className="p-6 text-tw-danger text-sm">{error}</div>
+  if (error) return <div className="page"><div className="alert-error">{error}</div></div>
   if (!data) return null
 
   const { summary, config } = data
@@ -408,35 +411,32 @@ export default function LeaderboardPage() {
     : `Points earned ${periodLabel[config.period]} · ${formatPeriodDate(config.rangeStart)} – ${formatPeriodDate(config.rangeEnd, true)}`
   const cards = [
     {
-      label: 'Top Performer', icon: '🏆', cls: 'text-yellow-600',
+      label: 'Top Performer', icon: 'trophy' as IconName, cls: 'text-tw-text', tile: 'tile-amber',
       value: summary.topPerformer ? summary.topPerformer.name : '—',
       sub: summary.topPerformer ? `${summary.topPerformer.points} pts · ${summary.topPerformer.department}` : 'No points yet',
     },
     {
-      label: 'Total Points (Workspace)', icon: '⭐', cls: 'text-tw-primary',
+      label: 'Total Points (Workspace)', icon: 'star' as IconName, cls: 'text-tw-text', tile: 'tile-blue',
       value: summary.totalPointsEarned.toLocaleString(),
       sub: `${summary.scoredUserCount} active scorer${summary.scoredUserCount !== 1 ? 's' : ''}`,
     },
     {
-      label: 'Avg User Score', icon: '📊', cls: 'text-indigo-600',
+      label: 'Avg User Score', icon: 'reports' as IconName, cls: 'text-tw-text', tile: 'tile-indigo',
       value: summary.avgScore.toLocaleString(),
       sub: `across ${data.leaderboard.length} user${data.leaderboard.length !== 1 ? 's' : ''}`,
     },
     {
-      label: 'Most Active Department', icon: '🏢', cls: 'text-emerald-600',
+      label: 'Most Active Department', icon: 'building' as IconName, cls: 'text-tw-text', tile: 'tile-green',
       value: summary.mostActiveDept ? summary.mostActiveDept.name : '—',
       sub: summary.mostActiveDept ? `${summary.mostActiveDept.points} pts` : '—',
     },
   ]
 
   return (
-    <div className="p-4 md:p-6 space-y-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-xl md:text-2xl font-bold text-tw-text">🏆 Leaderboard</h1>
-          <p className="text-sm text-tw-text-secondary mt-0.5">{periodDescription}</p>
-        </div>
-        <div className="inline-flex w-full sm:w-auto overflow-x-auto rounded-xl border border-tw-border bg-white p-1 shadow-sm" role="group" aria-label="Leaderboard period">
+    <div className="page space-y-5">
+      <PageHeader icon="trophy" tone="amber" title="Leaderboard" subtitle={periodDescription} className="!mb-0"
+        actions={
+        <div className="seg w-full sm:w-auto overflow-x-auto" role="group" aria-label="Leaderboard period">
           {([
             ['all', 'All Time'],
             ['week', 'This Week'],
@@ -449,24 +449,19 @@ export default function LeaderboardPage() {
               type="button"
               onClick={() => setPeriod(value)}
               aria-pressed={period === value}
-              className={`flex-none rounded-lg px-3 py-2 text-xs font-semibold whitespace-nowrap transition-colors ${
-                period === value
-                  ? 'bg-tw-primary text-white shadow-sm'
-                  : 'text-tw-text-secondary hover:bg-tw-hover hover:text-tw-text'
-              }`}
+              className={`seg-item flex-none whitespace-nowrap ${period === value ? 'seg-item-active' : ''}`}
             >
               {label}
             </button>
           ))}
-        </div>
-      </div>
+        </div>} />
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {cards.map(c => (
-          <div key={c.label} className="card px-4 py-3">
-            <div className="flex items-center gap-2 mb-1">
-              <span>{c.icon}</span>
+          <div key={c.label} className="card px-4 py-4">
+            <div className="flex items-center gap-2.5 mb-2.5">
+              <span className={`icon-tile w-8 h-8 rounded-lg ${c.tile}`}><Icon name={c.icon} className="w-4 h-4" /></span>
               <span className="text-xs text-tw-text-secondary">{c.label}</span>
             </div>
             <div className={`text-xl font-bold truncate ${c.cls}`} title={String(c.value)}>{c.value}</div>
@@ -481,9 +476,9 @@ export default function LeaderboardPage() {
       <div className="card overflow-hidden">
         <div className="px-4 py-3 border-b border-tw-border flex flex-wrap items-center gap-3">
           <div className="relative flex-1 min-w-[180px] max-w-xs">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-tw-text-secondary text-sm">🔍</span>
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-tw-text-muted"><Icon name="search" className="w-4 h-4" /></span>
             <input
-              className="input pl-8 text-sm"
+              className="input pl-9 text-sm"
               placeholder="Search by name or department…"
               value={search}
               onChange={e => setSearch(e.target.value)}
@@ -511,7 +506,7 @@ export default function LeaderboardPage() {
             return (
               <div key={r.id} onClick={() => setSelected(r)} className="flex items-center gap-3 px-4 py-3 cursor-pointer active:bg-tw-hover">
                 <div className="w-8 flex-shrink-0 flex justify-center"><RankBadge rank={r.rank} /></div>
-                <div className="w-9 h-9 rounded-full bg-tw-primary/10 text-tw-primary font-bold text-sm flex items-center justify-center flex-shrink-0">
+                <div className="w-9 h-9 rounded-full bg-tw-primary/10 text-tw-primary-text font-bold text-sm flex items-center justify-center flex-shrink-0">
                   {initials(r.name)}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -532,11 +527,11 @@ export default function LeaderboardPage() {
 
         {/* Desktop table */}
         <div className="hidden sm:block overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="table-modern">
             <thead>
-              <tr className="bg-[#f0f4ff] border-b-2 border-tw-primary/20">
+              <tr className="bg-tw-surface-2 border-b border-tw-border">
                 {['Rank', 'Name', 'Department', 'Total Points', 'Tasks On-Time', 'Deductions', 'Activity Level'].map((h, i) => (
-                  <th key={h} className={`px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider whitespace-nowrap ${i >= 3 && i <= 5 ? 'text-center' : 'text-left'}`}>{h}</th>
+                  <th key={h} className={`px-4 py-3 text-[11px] font-semibold text-tw-text-secondary uppercase tracking-[0.08em] whitespace-nowrap ${i >= 3 && i <= 5 ? 'text-center' : 'text-left'}`}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -550,7 +545,7 @@ export default function LeaderboardPage() {
                     <td className="px-4 py-3"><RankBadge rank={r.rank} /></td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-full bg-tw-primary/10 text-tw-primary font-bold text-xs flex items-center justify-center flex-shrink-0">
+                        <div className="w-8 h-8 rounded-full bg-tw-primary/10 text-tw-primary-text font-bold text-xs flex items-center justify-center flex-shrink-0">
                           {initials(r.name)}
                         </div>
                         <span className="font-medium text-tw-text">{r.name}</span>

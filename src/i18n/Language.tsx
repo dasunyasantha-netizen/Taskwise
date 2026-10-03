@@ -58,8 +58,8 @@ export function LanguageToggle({ user, onUserUpdate }: { user: AuthUser; onUserU
     finally { setSaving(false) }
   }
   return <div className="flex flex-col items-end gap-1">
-    <div role="group" aria-label={language === 'si' ? 'භාෂාව' : 'Language'} className="inline-flex rounded-xl border border-slate-300 bg-white p-0.5 shadow-sm">
-      {(['en', 'si'] as const).map(next => <button key={next} type="button" lang={next} disabled={saving || !!user.impersonation} aria-pressed={language === next} onClick={() => select(next)} className={`min-h-9 rounded-lg px-3 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal-700 ${language === next ? 'bg-teal-700 text-white' : 'text-slate-700 hover:bg-slate-100'}`}>{next === 'en' ? 'English' : 'සිංහල'}</button>)}
+    <div role="group" aria-label={language === 'si' ? 'භාෂාව' : 'Language'} className="seg">
+      {(['en', 'si'] as const).map(next => <button key={next} type="button" lang={next} disabled={saving || !!user.impersonation} aria-pressed={language === next} onClick={() => select(next)} className={`seg-item min-h-8 ${language === next ? 'seg-item-active' : ''}`}>{next === 'en' ? 'English' : 'සිංහල'}</button>)}
     </div>
     {error && <span role="alert" className="text-xs text-rose-700">{error}</span>}
   </div>

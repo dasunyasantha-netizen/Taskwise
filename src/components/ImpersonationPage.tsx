@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { startAuthentication } from '@simplewebauthn/browser'
 import type { AuthUser, ImpersonationSession } from '../types'
 import { authApi } from '../services/apiService'
+import { PageHeader, LoadingBlock } from './ui/Primitives'
+import { Icon } from './ui/Icon'
 
 interface Props {
   user: AuthUser
@@ -121,22 +123,16 @@ export default function ImpersonationPage({ user, onSessionStarted }: Props) {
   }
 
   return (
-    <div className="p-4 sm:p-6 max-w-4xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-xl font-bold text-tw-text">Support Access</h1>
-        <p className="text-sm text-tw-text-secondary mt-1">
-          System Admin only. Sessions require a passkey, expire after 15 minutes, and are fully audited.
-        </p>
-      </div>
+    <div className="page max-w-4xl space-y-6">
+      <PageHeader icon="lock" tone="amber" title="Support Access" className="!mb-0"
+        subtitle="System Admin only. Sessions require a passkey, expire after 15 minutes, and are fully audited." />
 
-      <div className="flex gap-1 bg-tw-hover rounded-xl p-1">
+      <div className="seg flex w-full">
         {(['start', 'history'] as const).map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`flex-1 py-2 px-3 rounded-lg text-sm font-semibold transition-all ${
-              activeTab === tab ? 'bg-white text-tw-text shadow-sm' : 'text-tw-text-secondary hover:text-tw-text'
-            }`}
+            className={`seg-item flex-1 py-2 text-sm ${activeTab === tab ? 'seg-item-active' : ''}`}
           >
             {tab === 'start' ? 'Start Session' : 'Session History'}
           </button>
@@ -145,7 +141,7 @@ export default function ImpersonationPage({ user, onSessionStarted }: Props) {
 
       {activeTab === 'start' && (
         <div className="space-y-4">
-          <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-900">
+          <div className="alert-warning flex items-start gap-2"><Icon name="shield" className="w-4 h-4 flex-shrink-0 mt-0.5" />
             Use support access only for an approved support or administrative purpose. The target role,
             reason, administrator, IP address, session times, and write actions are recorded.
           </div>
@@ -237,7 +233,7 @@ export default function ImpersonationPage({ user, onSessionStarted }: Props) {
       {activeTab === 'history' && (
         <div className="card overflow-hidden">
           {historyLoading ? (
-            <div className="p-8 text-center text-sm text-tw-text-secondary">Loading...</div>
+            <LoadingBlock />
           ) : sessions.length === 0 ? (
             <div className="p-8 text-center text-sm text-tw-text-secondary">No support-access sessions yet.</div>
           ) : (

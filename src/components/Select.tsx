@@ -113,7 +113,7 @@ export default function Select({ value, onChange, options, placeholder = 'Select
       ref={dropRef}
       data-system-picker="true"
       onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); close() } }}
-      className="bg-white border border-tw-border rounded-xl shadow-panel overflow-hidden"
+      className="bg-tw-surface border border-tw-border rounded-xl shadow-panel animate-pop-in overflow-hidden"
     >
       {showSearch && (
         <div className="p-2 border-b border-tw-border">
@@ -136,7 +136,7 @@ export default function Select({ value, onChange, options, placeholder = 'Select
           <button key={opt.value} type="button"
             onClick={() => pick(opt.value)}
             className={`w-full text-left px-3 py-2 text-sm transition-colors flex items-center justify-between gap-2
-              ${opt.value === value ? 'bg-tw-primary-light text-tw-primary font-medium' : 'text-tw-text hover:bg-tw-hover'}`}>
+              ${opt.value === value ? 'bg-tw-primary/10 text-tw-primary-text font-semibold' : 'text-tw-text hover:bg-tw-hover'}`}>
             <span className="flex items-center gap-2 min-w-0">
               {opt.color && <Dot color={opt.color} />}
               <span className="truncate">{opt.label}</span>
@@ -151,14 +151,14 @@ export default function Select({ value, onChange, options, placeholder = 'Select
 
         {hasGroups && Object.entries(groups).map(([group, opts]) => (
           <div key={group}>
-            <div className="px-3 py-1.5 text-xs font-semibold text-tw-text-secondary uppercase tracking-wide bg-tw-hover border-t border-tw-border first:border-t-0">
+            <div className="px-3 py-1.5 section-label bg-tw-surface-2 border-t border-tw-border first:border-t-0">
               {group}
             </div>
             {opts.map(opt => (
               <button key={opt.value} type="button"
                 onClick={() => pick(opt.value)}
                 className={`w-full text-left px-4 py-2 text-sm transition-colors flex items-center justify-between gap-2
-                  ${opt.value === value ? 'bg-tw-primary-light text-tw-primary font-medium' : 'text-tw-text hover:bg-tw-hover'}`}>
+                  ${opt.value === value ? 'bg-tw-primary/10 text-tw-primary-text font-semibold' : 'text-tw-text hover:bg-tw-hover'}`}>
                 <span className="flex items-center gap-2 min-w-0">
                   {opt.color && <Dot color={opt.color} />}
                   <span className="truncate">{opt.label}</span>
@@ -186,9 +186,9 @@ export default function Select({ value, onChange, options, placeholder = 'Select
         onKeyDown={e => { if (e.key === 'Escape' && open) { e.stopPropagation(); close() } }}
         aria-label={ariaLabel}
         aria-expanded={open}
-        className={`w-full flex items-center justify-between border rounded-lg px-3 py-2 text-sm bg-white transition-colors text-left
-          ${disabled ? 'opacity-50 cursor-not-allowed border-tw-border' : 'hover:border-tw-primary cursor-pointer border-tw-border focus:outline-none focus:ring-2 focus:ring-tw-primary'}
-          ${open ? 'border-tw-primary ring-2 ring-tw-primary ring-opacity-20' : ''}`}
+        className={`w-full flex items-center justify-between border rounded-xl px-3.5 py-2.5 text-sm bg-tw-surface transition-all text-left
+          ${disabled ? 'opacity-50 cursor-not-allowed border-tw-border' : 'hover:border-tw-border-strong cursor-pointer border-tw-border focus:outline-none focus:ring-4 focus:ring-tw-primary/15 focus:border-tw-primary/60'}
+          ${open ? 'border-tw-primary/60 ring-4 ring-tw-primary/15' : ''}`}
       >
         <span className={`flex items-center gap-2 min-w-0 ${selected ? 'text-tw-text' : 'text-tw-text-secondary'}`}>
           {selected?.color && <Dot color={selected.color} />}

@@ -3,6 +3,8 @@ import type { Task, Layer, Personnel } from '../types'
 import { taskApi, workspaceApi } from '../services/apiService'
 import FilterBar, { PillSelect, filterTasks, computeAvailableOptions, hasActiveFilters } from './FilterBar'
 import type { ActiveFilters, AvailableOptions } from './FilterBar'
+import { Icon } from './ui/Icon'
+import { PageHeader, EmptyState, LoadingBlock } from './ui/Primitives'
 
 // ─── Sorting ──────────────────────────────────────────────────────────────────
 
@@ -52,15 +54,15 @@ function sortTasks(tasks: Task[], sort: TaskSort): Task[] {
 // ─── Shared status / priority styling (matches the Projects page) ─────────────
 
 const STATUS_STYLES: Record<string, string> = {
-  PENDING:     'bg-gray-100 text-gray-600',
-  ASSIGNED:    'bg-blue-50 text-blue-700',
-  IN_PROGRESS: 'bg-yellow-50 text-yellow-700',
-  BLOCKED:     'bg-teal-50 text-teal-700',
-  SUBMITTED:   'bg-purple-50 text-purple-700',
-  APPROVED:    'bg-green-50 text-green-700',
-  RETURNED:    'bg-orange-50 text-orange-700',
-  REJECTED:    'bg-red-50 text-red-600',
-  CANCELLED:   'bg-red-50 text-red-500',
+  PENDING:     'badge-gray',
+  ASSIGNED:    'badge-primary',
+  IN_PROGRESS: 'badge-warning',
+  BLOCKED:     'badge-teal',
+  SUBMITTED:   'badge-purple',
+  APPROVED:    'badge-success',
+  RETURNED:    'badge bg-orange-50 text-orange-700 ring-orange-200/70',
+  REJECTED:    'badge-danger',
+  CANCELLED:   'badge-danger',
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -108,14 +110,14 @@ function ChildTaskRow({ task, kind, onSelect }: { task: Task; kind: 'subtask' | 
   return (
     <div
       onClick={() => onSelect?.(task)}
-      className={`flex items-center gap-2.5 px-3 py-2 ${onSelect ? 'cursor-pointer hover:bg-blue-50' : ''} transition-colors`}
+      className={`flex items-center gap-2.5 px-3 py-2 ${onSelect ? 'cursor-pointer hover:bg-tw-primary/[0.05]' : ''} transition-colors`}
     >
       <div className={`w-2 h-2 rounded-full flex-shrink-0 ${STATUS_DOTS[task.status] ?? 'bg-gray-400'}`} />
       <span className="text-xs font-medium text-tw-text truncate flex-1 min-w-0">{task.title}</span>
-      <span className="text-[11px] text-tw-text-secondary truncate max-w-[40%]">
-        {kind === 'member' ? '👤 ' : '→ '}{assignee}
+      <span className="text-[11px] text-tw-text-secondary truncate max-w-[40%] inline-flex items-center gap-1">
+        <Icon name={kind === 'member' ? 'user' : 'arrowRight'} className="w-3 h-3 flex-shrink-0" />{assignee}
       </span>
-      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${STATUS_STYLES[task.status] ?? 'bg-gray-100 text-gray-600'}`}>
+      <span className={`badge text-[10px] flex-shrink-0 ${STATUS_STYLES[task.status] ?? 'badge-gray'}`}>
         {STATUS_LABELS[task.status] ?? task.status}
       </span>
       {task.deadline && (
@@ -151,7 +153,7 @@ function TaskCard({ task, instances, onSelect }: { task: Task; instances: Task[]
   }
 
   return (
-    <div className="card overflow-hidden">
+    <div className="card overflow-hidden hover:border-tw-border-strong transition-colors">
       <div className="flex items-stretch">
         {/* Project colour strip */}
         <div
@@ -163,36 +165,33 @@ function TaskCard({ task, instances, onSelect }: { task: Task; instances: Task[]
           {/* Card face — title only; everything else lives in the expansion */}
           <div
             onClick={toggle}
-            className="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-tw-hover transition-colors"
+            className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-tw-hover transition-colors"
           >
             <span className="font-medium text-tw-text text-sm truncate flex-1 min-w-0">{task.title}</span>
             {childCount > 0 && (
-              <span className="text-[11px] font-semibold text-tw-text-secondary flex-shrink-0">{childCount}</span>
+              <span className="badge badge-gray flex-shrink-0" title="Subtasks & group members"><Icon name="layers" className="w-3 h-3" />{childCount}</span>
             )}
             {onSelect && (
               <button
                 onClick={e => { e.stopPropagation(); onSelect(task) }}
-                className="flex-shrink-0 text-xs font-medium px-2.5 py-1 rounded-md bg-tw-primary/10 text-tw-primary hover:bg-tw-primary hover:text-white transition-colors whitespace-nowrap"
+                className="flex-shrink-0 text-xs font-semibold px-2.5 py-1 rounded-lg bg-tw-primary/10 text-tw-primary-text hover:bg-tw-primary hover:text-white transition-colors whitespace-nowrap"
               >
                 Open task
               </button>
             )}
-            <svg className={`w-4 h-4 flex-shrink-0 text-tw-text-secondary transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
-              fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
+            <Icon name="chevronDown" className={`w-4 h-4 flex-shrink-0 text-tw-text-secondary transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} />
           </div>
 
           {/* Breakdown — details, then subtasks and group member instances */}
           {expanded && (
-            <div className="border-t border-tw-border bg-[#f8f9ff]">
+            <div className="border-t border-tw-border bg-tw-primary/[0.03]">
               {/* Details */}
-              <div className="px-3 py-3 space-y-2.5">
+              <div className="px-4 py-3 space-y-2.5">
                 {task.description && (
                   <p className="text-xs text-tw-text leading-relaxed whitespace-pre-wrap line-clamp-4">{task.description}</p>
                 )}
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] text-tw-text-secondary">
-                  <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${STATUS_STYLES[task.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                  <span className={`badge ${STATUS_STYLES[task.status] ?? 'badge-gray'}`}>
                     {STATUS_LABELS[task.status] ?? task.status}
                   </span>
                   <span className={`font-semibold ${PRIORITY_STYLES[task.priority] ?? 'text-gray-400'}`} title="Priority">
@@ -200,8 +199,8 @@ function TaskCard({ task, instances, onSelect }: { task: Task; instances: Task[]
                   </span>
                   {task.project && <span className="truncate max-w-[45%]">{task.project.name}</span>}
                   {instances.length > 0
-                    ? <span>👥 Group · {instances.length} member{instances.length !== 1 ? 's' : ''}</span>
-                    : assignee && <span className="truncate max-w-[45%]">👤 {assignee}</span>
+                    ? <span className="inline-flex items-center gap-1"><Icon name="users" className="w-3.5 h-3.5" /> Group · {instances.length} member{instances.length !== 1 ? 's' : ''}</span>
+                    : assignee && <span className="truncate max-w-[45%] inline-flex items-center gap-1"><Icon name="user" className="w-3.5 h-3.5 flex-shrink-0" /> {assignee}</span>
                   }
                   <span>Created {shortDate(task.createdAt)}</span>
                   {task.deadline && (
@@ -214,7 +213,7 @@ function TaskCard({ task, instances, onSelect }: { task: Task; instances: Task[]
 
               {instances.length > 0 && (
                 <div className="divide-y divide-tw-border/60 border-t border-tw-border/60">
-                  <div className="px-3 pt-2 pb-1 text-[10px] font-bold text-tw-text-secondary uppercase tracking-wider">
+                  <div className="px-4 pt-2.5 pb-1 section-label">
                     Group members ({instances.length})
                   </div>
                   {instances.map(i => <ChildTaskRow key={i.id} task={i} kind="member" onSelect={onSelect} />)}
@@ -222,7 +221,7 @@ function TaskCard({ task, instances, onSelect }: { task: Task; instances: Task[]
               )}
               {subtaskCount > 0 && (
                 <div className="divide-y divide-tw-border/60 border-t border-tw-border/60">
-                  <div className="px-3 pt-2 pb-1 text-[10px] font-bold text-tw-text-secondary uppercase tracking-wider">
+                  <div className="px-4 pt-2.5 pb-1 section-label">
                     Subtasks ({subtaskCount})
                   </div>
                   {loadingSubs
@@ -323,17 +322,14 @@ export default function TasksPage({ filters, onFiltersChange, sort, onSortChange
   )
 
   return (
-    <div className="p-4 md:p-6">
-      <div className="flex items-start justify-between gap-3 mb-4 md:mb-6">
-        <div>
-          <h1 className="text-xl font-bold text-tw-text">Tasks</h1>
-          <p className="text-sm text-tw-text-secondary mt-0.5">
-            {loading ? '…' : `${visible.length} task${visible.length !== 1 ? 's' : ''}`}
-            {!loading && filtersActive && tasks.length !== visible.length ? ` of ${tasks.length}` : ''}
-          </p>
-        </div>
-        <div className="flex items-center gap-1.5 flex-shrink-0">
-          <span className="hidden md:inline text-[11px] font-semibold text-tw-text-secondary uppercase tracking-wide whitespace-nowrap">Sort</span>
+    <div className="page">
+      <PageHeader icon="tasks" tone="indigo" title="Tasks"
+        subtitle={<>
+          {loading ? '…' : `${visible.length} task${visible.length !== 1 ? 's' : ''}`}
+          {!loading && filtersActive && tasks.length !== visible.length ? ` of ${tasks.length}` : ''}
+        </>}
+        actions={<div className="flex items-center gap-1.5 flex-shrink-0">
+          <span className="hidden md:inline section-label whitespace-nowrap">Sort</span>
           <PillSelect
             value={sort}
             options={SORT_OPTIONS}
@@ -342,10 +338,9 @@ export default function TasksPage({ filters, onFiltersChange, sort, onSortChange
             width={200}
             onChange={v => onSortChange((v || DEFAULT_TASK_SORT) as TaskSort)}
           />
-        </div>
-      </div>
+        </div>} />
 
-      {error && <div className="mb-4 bg-red-50 border border-red-200 text-tw-danger text-sm px-3 py-2 rounded-lg">{error}</div>}
+      {error && <div className="mb-4 alert-error">{error}</div>}
 
       <FilterBar
         filters={filters}
@@ -357,46 +352,36 @@ export default function TasksPage({ filters, onFiltersChange, sort, onSortChange
       />
 
       {/* Approved / Cancelled are hidden by default — opt them back in here. */}
-      <div className="flex items-center gap-2 flex-wrap mt-2 mb-1">
-        <span className="text-[11px] font-semibold text-tw-text-secondary uppercase tracking-wide">Include</span>
+      <div className="flex items-center gap-2 flex-wrap mt-3 mb-3">
+        <span className="section-label">Include</span>
         <button
           type="button"
           aria-pressed={includeApproved}
           onClick={() => setIncludeApproved(v => !v)}
-          className={`text-xs font-medium px-3 py-1.5 rounded-full border transition-colors ${
-            includeApproved
-              ? 'bg-green-50 border-green-300 text-green-700'
-              : 'bg-white border-tw-border text-tw-text-secondary hover:bg-tw-hover'
-          }`}
+          className={`chip ${includeApproved ? 'bg-emerald-50 border-emerald-300 text-emerald-700 hover:text-emerald-700' : ''}`}
         >
-          {includeApproved ? '✓ ' : ''}Approved
+          {includeApproved && <Icon name="check" className="w-3.5 h-3.5" />}Approved
         </button>
         <button
           type="button"
           aria-pressed={includeCancelled}
           onClick={() => setIncludeCancelled(v => !v)}
-          className={`text-xs font-medium px-3 py-1.5 rounded-full border transition-colors ${
-            includeCancelled
-              ? 'bg-red-50 border-red-300 text-red-600'
-              : 'bg-white border-tw-border text-tw-text-secondary hover:bg-tw-hover'
-          }`}
+          className={`chip ${includeCancelled ? 'bg-rose-50 border-rose-300 text-rose-700 hover:text-rose-700' : ''}`}
         >
-          {includeCancelled ? '✓ ' : ''}Cancelled
+          {includeCancelled && <Icon name="check" className="w-3.5 h-3.5" />}Cancelled
         </button>
-        <span className="text-[11px] text-tw-text-secondary/70 hidden sm:inline">
+        <span className="text-[11px] text-tw-text-muted hidden sm:inline">
           Hidden by default
         </span>
       </div>
 
       {loading ? (
-        <div className="text-sm text-tw-text-secondary">Loading…</div>
+        <LoadingBlock />
       ) : visible.length === 0 ? (
-        <div className="card p-12 text-center">
-          <div className="text-3xl mb-3">{filtersActive ? '🔍' : '✓'}</div>
-          <p className="text-tw-text font-semibold mb-1">{filtersActive ? 'No tasks found' : 'No tasks yet'}</p>
-          <p className="text-tw-text-secondary text-sm">
-            {filtersActive ? 'No tasks match the selected filters.' : 'Tasks created in your projects will appear here.'}
-          </p>
+        <div className="card">
+          <EmptyState icon={filtersActive ? 'search' : 'tasks'}
+            title={filtersActive ? 'No tasks found' : 'No tasks yet'}
+            text={filtersActive ? 'No tasks match the selected filters.' : 'Tasks created in your projects will appear here.'} />
         </div>
       ) : (
         <div className="space-y-2">

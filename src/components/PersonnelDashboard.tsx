@@ -2,6 +2,10 @@ import React, { useState, useEffect, useRef } from 'react'
 import type { AuthUser, ViewMode, Task, Project, Personnel, TaskProgressLog } from '../types'
 import { taskApi, projectApi, workspaceApi } from '../services/apiService'
 import NotificationsMenu from './NotificationsMenu'
+import MobileUserMenu from './MobileUserMenu'
+import MobileNav, { type MobileNavItem } from './MobileNav'
+import { Icon } from './ui/Icon'
+import { PageHeader, EmptyState, LoadingBlock, ThemeToggle } from './ui/Primitives'
 import Sidebar, { type SidebarSection } from './Sidebar'
 import PersonnelTaskModal from './PersonnelTaskModal'
 import BoardView from './BoardView'
@@ -54,9 +58,9 @@ const subtaskStatusDot: Record<string, string> = {
 function daysLeftLabel(deadline?: string) {
   if (!deadline) return null
   const d = Math.ceil((new Date(deadline).setHours(0,0,0,0) - new Date().setHours(0,0,0,0)) / 86400000)
-  if (d < 0)  return <span className="inline-flex text-xs font-semibold text-white bg-tw-danger rounded-full px-2 py-0.5">{Math.abs(d)}d overdue</span>
-  if (d === 0) return <span className="inline-flex text-xs font-semibold text-orange-800 bg-orange-100 border border-orange-300 rounded-full px-2 py-0.5">Due today</span>
-  if (d <= 3)  return <span className="inline-flex text-xs font-semibold text-orange-700 bg-orange-50 border border-orange-200 rounded-full px-2 py-0.5">{d}d left</span>
+  if (d < 0)  return <span className="badge bg-tw-danger text-white ring-tw-danger">{Math.abs(d)}d overdue</span>
+  if (d === 0) return <span className="badge badge-warning">Due today</span>
+  if (d <= 3)  return <span className="badge badge-warning">{d}d left</span>
   return <span className="text-xs text-tw-text-secondary">{d}d left</span>
 }
 
@@ -138,26 +142,26 @@ function ExpandedRow({ task, colSpan, actorId, departmentId, onOpen, onSubtaskCl
   return (
     <>
     {confirmNote !== '' && (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setConfirmNote('')}>
-        <div className="bg-white rounded-xl shadow-xl w-full max-w-sm mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
+      <div className="fixed inset-0 flex items-center justify-center z-50 bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in" onClick={() => setConfirmNote('')}>
+        <div className="modal-panel w-full max-w-sm mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
           <div className="px-5 py-4 border-b border-tw-border">
             <h3 className="font-semibold text-tw-text">Post Progress Update?</h3>
             <p className="text-xs text-tw-text-secondary mt-0.5">This update will be visible to your director.</p>
           </div>
           <div className="px-5 py-4">
-            <p className="text-sm text-tw-text bg-gray-50 rounded-lg px-3 py-2 italic">"{confirmNote}"</p>
+            <p className="text-sm text-tw-text panel-muted px-3 py-2 italic">"{confirmNote}"</p>
           </div>
           <div className="px-5 py-4 border-t border-tw-border flex justify-end gap-2">
             <button className="btn-secondary text-sm" onClick={() => setConfirmNote('')}>Cancel</button>
             <button disabled={progressLoading} onClick={handleAddLog}
-              className="px-4 py-2 rounded-lg bg-tw-success text-white text-sm font-semibold hover:opacity-90 disabled:opacity-50">
+              className="btn-success">
               {progressLoading ? '…' : 'Post Update'}
             </button>
           </div>
         </div>
       </div>
     )}
-    <tr className="border-b-2 border-tw-primary/20" style={{ background: 'linear-gradient(135deg, #f0f4ff 0%, #f8f9ff 100%)' }}>
+    <tr className="border-b border-tw-primary/20 bg-tw-primary/[0.03]">
       <td colSpan={colSpan} className="px-0 py-0">
         <div className="px-6 py-5 space-y-4">
 
@@ -204,7 +208,7 @@ function ExpandedRow({ task, colSpan, actorId, departmentId, onOpen, onSubtaskCl
           </div>
 
           {(task.returnReason || task.cancelReason) && (
-            <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm">
+            <div className="alert-error">
               <span className="font-semibold text-tw-danger">
                 {'Returned: '}
               </span>
@@ -235,13 +239,13 @@ function ExpandedRow({ task, colSpan, actorId, departmentId, onOpen, onSubtaskCl
                     return (
                       <div key={s.id}
                         onClick={e => { e.stopPropagation(); onSubtaskClick(s) }}
-                        className="flex items-center gap-3 px-4 py-2.5 hover:bg-blue-50 cursor-pointer transition-colors">
+                        className="flex items-center gap-3 px-4 py-2.5 hover:bg-tw-primary/[0.05] cursor-pointer transition-colors">
                         <div className={`w-2 h-2 rounded-full flex-shrink-0 ${subtaskStatusDot[s.status] || 'bg-gray-400'}`} />
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-medium text-tw-text truncate">{s.title}</div>
                           <div className="flex items-center gap-2 mt-0.5">
                             <span className={`badge text-xs ${statusBadge[s.status] || 'badge-gray'}`}>{displayStatus(s.status)}</span>
-                            <span className="text-xs text-tw-text-secondary truncate">→ {assigneeName}</span>
+                            <span className="text-xs text-tw-text-secondary truncate inline-flex items-center gap-1"><Icon name="arrowRight" className="w-3 h-3" /> {assigneeName}</span>
                           </div>
                         </div>
                         <div className="flex-shrink-0 text-right">
@@ -309,41 +313,41 @@ function ExpandedRow({ task, colSpan, actorId, departmentId, onOpen, onSubtaskCl
 
           {/* ── Action bar ── */}
           {actionError && (
-            <div className="text-sm text-tw-danger bg-tw-danger-light border border-tw-danger/30 rounded-lg px-3 py-2 flex items-center justify-between">
+            <div className="alert-error flex items-center justify-between">
               {actionError}
-              <button onClick={() => setActionError('')} className="ml-2 font-bold">×</button>
+              <button onClick={() => setActionError('')} className="ml-2"><Icon name="x" className="w-3.5 h-3.5" /></button>
             </div>
           )}
           <div className="flex flex-wrap items-center gap-2 justify-between">
             <div className="flex flex-wrap gap-2">
               {canAccept && (
                 <button disabled={actionLoading} onClick={e => { e.stopPropagation(); handleAccept() }}
-                  className="text-sm py-2 px-4 rounded-lg bg-tw-primary text-white font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity">
-                  ✓ Accept Task
+                  className="btn-primary">
+                  <Icon name="check" className="w-4 h-4" /> Accept Task
                 </button>
               )}
               {canComplete && (
                 <button disabled={actionLoading} onClick={e => { e.stopPropagation(); handleComplete() }}
-                  className="text-sm py-2 px-4 rounded-lg bg-tw-success text-white font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity">
-                  {actionLoading ? '…' : '✓ Complete'}
+                  className="btn-success">
+                  {actionLoading ? '…' : <><Icon name="check" className="w-4 h-4" /> Complete</>}
                 </button>
               )}
               {canReturn && (
                 <button disabled={actionLoading} onClick={e => { e.stopPropagation(); setShowReturn(true) }}
-                  className="text-sm py-2 px-4 rounded-lg border border-tw-danger text-tw-danger bg-white hover:bg-tw-danger-light font-semibold disabled:opacity-50 transition-colors">
-                  ↩ Return
+                  className="btn-outline-danger">
+                  <Icon name="sendBack" className="w-4 h-4" /> Return
                 </button>
               )}
             </div>
-            <button onClick={e => { e.stopPropagation(); onOpen() }} className="btn-secondary text-sm py-2 px-4">
-              Open Task →
+            <button onClick={e => { e.stopPropagation(); onOpen() }} className="btn-secondary">
+              Open Task <Icon name="arrowRight" className="w-4 h-4" />
             </button>
           </div>
 
           {/* ── Return reason modal ── */}
           {showReturn && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={e => e.stopPropagation()}>
-              <div className="bg-white rounded-xl shadow-panel w-full max-w-sm">
+            <div className="fixed inset-0 flex items-center justify-center z-50 p-4 bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in" onClick={e => e.stopPropagation()}>
+              <div className="modal-panel w-full max-w-sm">
                 <div className="px-5 py-4 border-b border-tw-border">
                   <h3 className="font-semibold text-tw-text">Return Task</h3>
                   <p className="text-xs text-tw-text-secondary mt-0.5">Reason for returning this task.</p>
@@ -355,7 +359,7 @@ function ExpandedRow({ task, colSpan, actorId, departmentId, onOpen, onSubtaskCl
                   <div className="flex gap-2 justify-end">
                     <button onClick={() => { setShowReturn(false); setReturnReason('') }} className="btn-secondary">Cancel</button>
                     <button disabled={!returnReason.trim() || actionLoading} onClick={handleReturn}
-                      className="px-4 py-2 rounded-lg bg-tw-danger text-white text-sm font-semibold hover:opacity-90 disabled:opacity-50">
+                      className="btn-danger">
                       Return Task
                     </button>
                   </div>
@@ -388,7 +392,7 @@ function PersonnelApprovalRow({ task, onRefresh, onOpen }: { task: Task; onRefre
 
   return (
     <>
-      <tr className="hover:bg-[#f8f9ff] transition-colors">
+      <tr className="hover:bg-tw-hover transition-colors">
         <td className="pl-3 pr-0 py-3.5">
           <div className={`w-1.5 h-9 rounded-full ${priorityBar[task.priority]}`} />
         </td>
@@ -407,23 +411,23 @@ function PersonnelApprovalRow({ task, onRefresh, onOpen }: { task: Task; onRefre
         <td className="px-4 py-3.5">
           <div className="flex items-center gap-2">
             <button disabled={loading} onClick={() => { if (confirm(`Approve "${task.title}"?\n\nThis marks the task as approved.`)) doAction(() => taskApi.approve(task.id)) }}
-              className="px-3 py-1.5 rounded-lg bg-tw-success text-white text-xs font-semibold hover:opacity-90 disabled:opacity-50">
-              ✓ Approve
+              className="btn-success btn-sm">
+              <Icon name="check" className="w-3.5 h-3.5" /> Approve
             </button>
             <button disabled={loading} onClick={() => setShowReject(true)}
-              className="px-3 py-1.5 rounded-lg border border-tw-danger text-tw-danger bg-white hover:bg-red-50 text-xs font-semibold disabled:opacity-50">
-              ↩ Reject
+              className="btn-outline-danger btn-sm">
+              <Icon name="sendBack" className="w-3.5 h-3.5" /> Reject
             </button>
-            <button onClick={onOpen} className="px-3 py-1.5 rounded-lg border border-tw-border text-tw-text-secondary text-xs hover:bg-tw-hover">
-              View →
+            <button onClick={onOpen} className="btn-secondary btn-sm">
+              View <Icon name="arrowRight" className="w-3.5 h-3.5" />
             </button>
           </div>
           {error && <div className="text-xs text-tw-danger mt-1">{error}</div>}
         </td>
       </tr>
       {showReject && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-panel w-full max-w-sm">
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4 bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in">
+          <div className="modal-panel w-full max-w-sm">
             <div className="px-5 py-4 border-b border-tw-border">
               <h3 className="font-semibold text-tw-text">Reject / Send Back</h3>
               <p className="text-xs text-tw-text-secondary mt-0.5">Provide feedback so the assignee knows what to fix.</p>
@@ -436,7 +440,7 @@ function PersonnelApprovalRow({ task, onRefresh, onOpen }: { task: Task; onRefre
                 <button onClick={() => { setShowReject(false); setRejectReason('') }} className="btn-secondary">Cancel</button>
                 <button disabled={!rejectReason.trim() || loading}
                   onClick={() => { doAction(() => taskApi.reject(task.id, rejectReason)); setShowReject(false); setRejectReason('') }}
-                  className="px-4 py-2 rounded-lg bg-tw-danger text-white text-sm font-semibold hover:opacity-90 disabled:opacity-50">
+                  className="btn-danger">
                   Reject
                 </button>
               </div>
@@ -516,7 +520,7 @@ function MobileExpandedCard({ task, actorId, departmentId, onOpen, onSubtaskClic
       )}
 
       {(task.returnReason || task.cancelReason) && (
-        <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-sm">
+        <div className="alert-error">
           <span className="font-semibold text-tw-danger">{'Returned: '}</span>
           <span className="text-tw-danger italic">{task.returnReason || task.cancelReason}</span>
         </div>
@@ -529,15 +533,13 @@ function MobileExpandedCard({ task, actorId, departmentId, onOpen, onSubtaskClic
           <div className="space-y-2">
             {subtasks.map(s => (
               <div key={s.id} onClick={e => { e.stopPropagation(); onSubtaskClick(s) }}
-                className="bg-white rounded-xl border border-tw-border px-3 py-2.5 flex items-center gap-3 active:bg-blue-50">
+                className="bg-tw-surface rounded-xl border border-tw-border px-3 py-2.5 flex items-center gap-3 active:bg-tw-hover">
                 <div className={`w-2 h-2 rounded-full flex-shrink-0 ${subtaskStatusDot[s.status] || 'bg-gray-400'}`} />
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium text-tw-text truncate">{s.title}</div>
                   <span className={`badge text-xs ${statusBadge[s.status] || 'badge-gray'}`}>{displayStatus(s.status)}</span>
                 </div>
-                <svg className="w-4 h-4 text-gray-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7"/>
-                </svg>
+                <Icon name="chevronRight" className="w-4 h-4 text-tw-text-muted flex-shrink-0" />
               </div>
             ))}
           </div>
@@ -562,19 +564,19 @@ function MobileExpandedCard({ task, actorId, departmentId, onOpen, onSubtaskClic
           </div>
         )}
         {confirmNote !== '' && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setConfirmNote('')}>
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-sm mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
+          <div className="fixed inset-0 flex items-center justify-center z-50 bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in" onClick={() => setConfirmNote('')}>
+            <div className="modal-panel w-full max-w-sm mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
               <div className="px-5 py-4 border-b border-tw-border">
                 <h3 className="font-semibold text-tw-text">Post Progress Update?</h3>
                 <p className="text-xs text-tw-text-secondary mt-0.5">This update will be visible to your director.</p>
               </div>
               <div className="px-5 py-4">
-                <p className="text-sm text-tw-text bg-gray-50 rounded-lg px-3 py-2 italic">"{confirmNote}"</p>
+                <p className="text-sm text-tw-text panel-muted px-3 py-2 italic">"{confirmNote}"</p>
               </div>
               <div className="px-5 py-4 border-t border-tw-border flex justify-end gap-2">
                 <button className="btn-secondary text-sm" onClick={() => setConfirmNote('')}>Cancel</button>
                 <button disabled={progressLoading} onClick={handleAddLog}
-                  className="px-4 py-2 rounded-lg bg-tw-success text-white text-sm font-semibold hover:opacity-90 disabled:opacity-50">
+                  className="btn-success">
                   {progressLoading ? '…' : 'Post Update'}
                 </button>
               </div>
@@ -584,7 +586,7 @@ function MobileExpandedCard({ task, actorId, departmentId, onOpen, onSubtaskClic
         {progressLogs.length > 0 && (
           <div className="space-y-2">
             {progressLogs.map(log => (
-              <div key={log.id} className="bg-white rounded-xl border border-tw-border px-3 py-2.5">
+              <div key={log.id} className="bg-tw-surface rounded-xl border border-tw-border px-3 py-2.5">
                 <div className="flex justify-between items-center mb-1">
                   <span className="text-xs text-tw-text-secondary">{new Date(log.logDate).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</span>
                   <span className="text-xs font-medium text-tw-text-secondary">{log.authorName}</span>
@@ -598,8 +600,8 @@ function MobileExpandedCard({ task, actorId, departmentId, onOpen, onSubtaskClic
 
       {/* Action error */}
       {actionError && (
-        <div className="text-sm text-tw-danger bg-tw-danger-light border border-tw-danger/30 rounded-xl px-3 py-2 flex items-center justify-between">
-          {actionError}<button onClick={() => setActionError('')} className="ml-2 font-bold">×</button>
+        <div className="alert-error flex items-center justify-between">
+          {actionError}<button onClick={() => setActionError('')} className="ml-2"><Icon name="x" className="w-3.5 h-3.5" /></button>
         </div>
       )}
 
@@ -607,42 +609,42 @@ function MobileExpandedCard({ task, actorId, departmentId, onOpen, onSubtaskClic
       <div className="grid grid-cols-2 gap-2">
         {canAccept && (
           <button disabled={actionLoading} onClick={e => { e.stopPropagation(); doAction(() => taskApi.accept(task.id)) }}
-            className="col-span-2 py-3 rounded-xl bg-tw-primary text-white font-bold text-sm active:opacity-80 disabled:opacity-50">
-            ✓ Accept Task
+            className="btn-primary col-span-2 py-3">
+            <Icon name="check" className="w-4 h-4" /> Accept Task
           </button>
         )}
         {canComplete && (
           <button disabled={actionLoading} onClick={e => { e.stopPropagation(); doAction(async () => { if (task.status === 'ASSIGNED') await taskApi.accept(task.id); await taskApi.submit(task.id) }) }}
-            className="py-3 rounded-xl bg-[#00c875] text-white font-bold text-sm active:opacity-80 disabled:opacity-50">
-            {actionLoading ? '…' : '✓ Complete'}
+            className="btn-success py-3">
+            {actionLoading ? '…' : <><Icon name="check" className="w-4 h-4" /> Complete</>}
           </button>
         )}
         {canReturn && (
           <button disabled={actionLoading} onClick={e => { e.stopPropagation(); setShowReturn(true) }}
-            className="py-3 rounded-xl border-2 border-tw-danger text-tw-danger font-bold text-sm active:opacity-80">
-            ↩ Return
+            className="btn-outline-danger py-3">
+            <Icon name="sendBack" className="w-4 h-4" /> Return
           </button>
         )}
         <button onClick={e => { e.stopPropagation(); onOpen() }}
-          className={`py-3 rounded-xl border-2 border-tw-primary text-tw-primary font-bold text-sm active:opacity-80 ${canComplete || canReturn ? '' : 'col-span-2'}`}>
-          Open Task →
+          className={`btn-secondary py-3 ${canComplete || canReturn ? '' : 'col-span-2'}`}>
+          Open Task <Icon name="arrowRight" className="w-4 h-4" />
         </button>
       </div>
 
       {/* Return modal */}
       {showReturn && (
-        <div className="fixed inset-0 bg-black/60 flex items-end justify-center z-50 p-0" onClick={e => e.stopPropagation()}>
-          <div className="bg-white rounded-t-3xl w-full max-w-lg px-5 py-6 space-y-4">
-            <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-2" />
+        <div className="fixed inset-0 flex items-end justify-center z-50 p-0 bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in" onClick={e => e.stopPropagation()}>
+          <div className="bg-tw-surface border-t border-tw-border rounded-t-3xl w-full max-w-lg px-5 py-6 space-y-4 animate-slide-up">
+            <div className="w-10 h-1 bg-tw-border-strong rounded-full mx-auto mb-2" />
             <h3 className="font-bold text-tw-text text-lg">Return Task</h3>
             <textarea className="input resize-none text-sm" rows={4} autoFocus
               placeholder="Reason for returning…" value={returnReason} onChange={e => setReturnReason(e.target.value)} />
             <div className="grid grid-cols-2 gap-3">
               <button onClick={() => { setShowReturn(false); setReturnReason('') }}
-                className="py-3 rounded-xl border-2 border-gray-200 text-gray-600 font-bold text-sm">Cancel</button>
+                className="btn-secondary py-3">Cancel</button>
               <button disabled={!returnReason.trim() || actionLoading}
                 onClick={() => { doAction(() => taskApi.return(task.id, returnReason)); setShowReturn(false); setReturnReason('') }}
-                className="py-3 rounded-xl bg-tw-danger text-white font-bold text-sm disabled:opacity-50">
+                className="btn-danger py-3">
                 Return
               </button>
             </div>
@@ -672,7 +674,7 @@ function MobileApprovalCard({ task, onRefresh, onOpen }: { task: Task; onRefresh
   const priorityBar: Record<string, string> = { CRITICAL: 'bg-red-500', HIGH: 'bg-orange-400', MEDIUM: 'bg-yellow-400', LOW: 'bg-gray-300' }
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+    <div className="card overflow-hidden">
       {/* Header row — always visible, tap to expand */}
       <div className="flex items-center gap-3 px-4 py-3 cursor-pointer select-none" onClick={() => setExpanded(e => !e)}>
         <div className={`w-1 h-10 rounded-full flex-shrink-0 ${priorityBar[task.priority] || 'bg-gray-300'}`} />
@@ -687,7 +689,7 @@ function MobileApprovalCard({ task, onRefresh, onOpen }: { task: Task; onRefresh
 
       {/* Expandable details */}
       {expanded && (
-        <div className="px-4 pb-4 border-t border-gray-100 pt-3 space-y-3">
+        <div className="px-4 pb-4 border-t border-tw-border pt-3 space-y-3">
           {task.description && <p className="text-xs text-tw-text-secondary line-clamp-3">{task.description}</p>}
           <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs text-tw-text-secondary">
             {task.project?.name && (
@@ -702,34 +704,34 @@ function MobileApprovalCard({ task, onRefresh, onOpen }: { task: Task; onRefresh
           {error && <div className="text-xs text-tw-danger">{error}</div>}
           <div className="grid grid-cols-3 gap-2 pt-1">
             <button disabled={loading} onClick={() => { if (confirm(`Approve "${task.title}"?\n\nThis marks the task as approved.`)) doAction(() => taskApi.approve(task.id)) }}
-              className="py-2.5 rounded-xl bg-[#00c875] text-white text-xs font-bold active:opacity-80 disabled:opacity-50">
-              ✓ Approve
+              className="btn-success btn-sm py-2.5">
+              <Icon name="check" className="w-3.5 h-3.5" /> Approve
             </button>
             <button disabled={loading} onClick={() => setShowReject(true)}
-              className="py-2.5 rounded-xl border-2 border-tw-danger text-tw-danger text-xs font-bold active:opacity-80">
-              ↩ Reject
+              className="btn-outline-danger btn-sm py-2.5">
+              <Icon name="sendBack" className="w-3.5 h-3.5" /> Reject
             </button>
             <button onClick={onOpen}
-              className="py-2.5 rounded-xl border-2 border-tw-primary text-tw-primary text-xs font-bold active:opacity-80">
-              View →
+              className="btn-secondary btn-sm py-2.5">
+              View <Icon name="arrowRight" className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
       )}
 
       {showReject && (
-        <div className="fixed inset-0 bg-black/60 flex items-end justify-center z-50">
-          <div className="bg-white rounded-t-3xl w-full max-w-lg px-5 py-6 space-y-4">
-            <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-2" />
+        <div className="fixed inset-0 flex items-end justify-center z-50 bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in">
+          <div className="bg-tw-surface border-t border-tw-border rounded-t-3xl w-full max-w-lg px-5 py-6 space-y-4 animate-slide-up">
+            <div className="w-10 h-1 bg-tw-border-strong rounded-full mx-auto mb-2" />
             <h3 className="font-bold text-tw-text text-lg">Reject Task</h3>
             <textarea className="input resize-none text-sm" rows={4} autoFocus
               placeholder="Reason for rejecting…" value={rejectReason} onChange={e => setRejectReason(e.target.value)} />
             <div className="grid grid-cols-2 gap-3">
               <button onClick={() => { setShowReject(false); setRejectReason('') }}
-                className="py-3 rounded-xl border-2 border-gray-200 text-gray-600 font-bold text-sm">Cancel</button>
+                className="btn-secondary py-3">Cancel</button>
               <button disabled={!rejectReason.trim() || loading}
                 onClick={() => { doAction(() => taskApi.reject(task.id, rejectReason)); setShowReject(false); setRejectReason('') }}
-                className="py-3 rounded-xl bg-tw-danger text-white font-bold text-sm disabled:opacity-50">
+                className="btn-danger py-3">
                 Reject
               </button>
             </div>
@@ -740,55 +742,6 @@ function MobileApprovalCard({ task, onRefresh, onOpen }: { task: Task; onRefresh
   )
 }
 
-// ── Mobile User Menu ─────────────────────────────────────────────────────────
-function MobileUserMenu({ user, onProfile, onLogout }: { user: AuthUser; onProfile: () => void; onLogout: () => void }) {
-  const [open, setOpen] = useState(false)
-  const ref = React.useRef<HTMLDivElement>(null)
-  const initials = user.name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
-
-  return (
-    <div ref={ref} className="relative md:hidden">
-      <button onClick={() => setOpen(o => !o)}
-        className="flex items-center gap-1.5 pl-1 pr-2 py-1 rounded-xl bg-white/10 hover:bg-white/20 transition-colors">
-        {user.avatarUrl
-          ? <img src={user.avatarUrl} alt="" className="w-6 h-6 rounded-full object-cover" />
-          : <div className="w-6 h-6 rounded-full bg-tw-primary flex items-center justify-center text-white text-xs font-bold">{initials}</div>
-        }
-        <svg className={`w-3 h-3 text-white/70 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/>
-        </svg>
-      </button>
-      {open && (
-        <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden z-50">
-          <div className="px-4 py-3 bg-[#f0f4ff] border-b border-gray-100">
-            <div className="font-semibold text-tw-text text-sm truncate">{user.name}</div>
-            <div className="text-xs text-tw-text-secondary">Personnel</div>
-          </div>
-          <button onClick={() => { onProfile(); setOpen(false) }}
-            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-tw-text hover:bg-tw-hover transition-colors">
-            <svg className="w-4 h-4 text-tw-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
-            </svg>
-            My Profile
-          </button>
-          <button onClick={() => { onLogout(); setOpen(false) }}
-            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-tw-danger hover:bg-red-50 transition-colors border-t border-gray-100">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
-            </svg>
-            Sign Out
-          </button>
-        </div>
-      )}
-    </div>
-  )
-}
 
 // ── Main dashboard ────────────────────────────────────────────────────────────
 export default function PersonnelDashboard({ user, currentView, setView, onLogout, onUserUpdate, launchSource }: Props) {
@@ -890,15 +843,17 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
     ] },
   ]
 
-  // Mobile bottom tab bar
-  const navItems = [
-    { label: 'Letters', view: 'letters' as ViewMode, icon: '✉' },
-    ...(ysoEnabled ? [{ label: user.ysoRole === 'YSO' ? 'YSO Task Hub' : 'YSO Performance', view: 'yso_performance' as ViewMode, icon: '🌱' }] : []),
-    ...(insuranceEnabled ? [{ label: 'Insurance', view: 'insurance_management' as ViewMode, icon: '🛡️' }] : []),
-    { label: 'My Queue',       view: 'personnel_queue'          as ViewMode, icon: '📋' },
-    { label: 'Approval Queue', view: 'personnel_approval_queue' as ViewMode, icon: '✅', badge: approvalTasks.length },
-    { label: 'Board View',     view: 'project_board'            as ViewMode, icon: '⊞' },
-    { label: 'My Profile',     view: 'profile'                  as ViewMode, icon: '👤' },
+  // Mobile: primary destinations in the floating bar, the rest in "More"
+  const mobileNavItems: MobileNavItem[] = [
+    { label: 'Tasks',     view: 'personnel_queue',          icon: 'queue',   badge: queue.length },
+    { label: 'Approvals', view: 'personnel_approval_queue', icon: 'approve', badge: approvalTasks.length },
+    { label: 'Projects',  view: 'project_board',            icon: 'board' },
+    { label: 'Letters',   view: 'letters',                  icon: 'letter' },
+  ]
+  const mobileMoreItems: MobileNavItem[] = [
+    ...(ysoEnabled ? [{ label: user.ysoRole === 'YSO' ? 'YSO Hub' : 'YSO Performance', view: 'yso_performance' as ViewMode, icon: 'sprout' as const }] : []),
+    ...(insuranceEnabled ? [{ label: 'Insurance', view: 'insurance_management' as ViewMode, icon: 'shield' as const }] : []),
+    { label: 'My Profile', view: 'profile', icon: 'user' },
   ]
   const pendingAccept = queue.filter(t =>
     t.assignments?.some(a => a.departmentId === user.departmentId) &&
@@ -912,8 +867,8 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
 
       {/* ── Watermark ───────────────────────────────────────────────────── */}
       {currentView !== 'letters' && <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
-        <img src="/taskwise/watermark.jpeg" alt="" className="absolute bottom-0 select-none"
-          style={{ opacity: 0.13, mixBlendMode: 'multiply' as const, width: '100%', maxWidth: '480px', left: '50%', transform: 'translateX(-50%)' }} />
+        <img src="/taskwise/watermark.jpeg" alt="" className="tw-watermark absolute bottom-0 select-none"
+          style={{ width: '100%', maxWidth: '480px', left: '50%', transform: 'translateX(-50%)' }} />
       </div>}
 
       {/* ── Desktop Sidebar ──────────────────────────────────────────────── */}
@@ -934,13 +889,13 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
       {/* ── Main ────────────────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-w-0 relative z-10">
         {/* Top bar */}
-        <header className="bg-[#1f2d3d] md:bg-tw-surface border-b border-white/10 md:border-tw-border px-4 md:px-6 py-3 md:py-3.5 flex items-center justify-between">
-          <div className="flex items-center gap-2">
+        <header className={`sticky z-20 ${user.impersonation ? 'top-[56px] md:top-[68px]' : 'top-0 md:top-3'} bg-tw-surface/85 backdrop-blur-xl border-b border-tw-border md:border md:rounded-2xl md:mx-3 md:mt-3 md:shadow-card px-3 md:px-4 py-2.5 flex items-center justify-between gap-2`}>
+          <div className="flex items-center gap-2 min-w-0">
             {user.companyLogo ? (
-              <img src={user.companyLogo} alt="Logo" className="w-7 h-7 rounded object-contain md:hidden" />
+              <img src={user.companyLogo} alt="Logo" className="w-8 h-8 rounded-xl object-contain bg-white p-0.5 ring-1 ring-tw-border md:hidden" />
             ) : (
-              <div className="w-7 h-7 bg-tw-primary rounded-lg flex items-center justify-center md:hidden flex-shrink-0">
-                <span className="text-white font-bold text-xs">T</span>
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#3d9bff] to-tw-primary flex items-center justify-center md:hidden flex-shrink-0 shadow-cta">
+                <span className="text-white font-bold text-xs">{(user.companyName || 'T')[0].toUpperCase()}</span>
               </div>
             )}
             {/* Back button */}
@@ -954,47 +909,45 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
                     goBack()
                   }
                 }}
-                className="flex items-center gap-1 text-white/70 md:text-tw-text-secondary hover:text-white md:hover:text-tw-primary transition-colors p-1.5 rounded-lg"
+                className="icon-btn w-8 h-8"
                 title="Go back"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/>
-                </svg>
+                <Icon name="arrowLeft" className="w-[18px] h-[18px]" />
               </button>
             )}
-            <div>
-              <span className="font-bold text-white md:text-tw-text text-sm md:text-base capitalize">
-                {currentView === 'personnel_queue' ? 'My Queue'
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 text-[15px]">
+                <span className="hidden lg:inline text-tw-text-muted truncate max-w-[180px]">{user.companyName || 'TaskWise'}</span>
+                <Icon name="chevronRight" className="hidden lg:block w-3.5 h-3.5 text-tw-text-muted flex-shrink-0" />
+                <span className="font-semibold text-tw-text truncate">
+                  {currentView === 'personnel_queue' ? 'My Queue'
                   : currentView === 'personnel_approval_queue' ? 'Approvals'
                   : currentView === 'project_board' ? (selectedProject ? selectedProject.name : 'Projects')
                   : currentView === 'insurance_management' ? 'Insurance Management'
                   : currentView === 'letters' ? t('Letters')
                   : currentView === 'yso_performance' ? t('YSO Performance')
                   : 'My Profile'}
-              </span>
-              <div className="text-xs text-white/50 md:hidden">{user.name}</div>
+                </span>
+              </div>
+              <div className="text-[11px] text-tw-text-secondary md:hidden truncate">{user.name}</div>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button onClick={load} title={t('Refresh')} className="text-white/70 md:text-tw-text-secondary hover:text-white md:hover:text-tw-primary transition-colors p-1.5 rounded-lg">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
+          <div className="flex items-center gap-1.5">
+            <button onClick={load} title={t('Refresh')} className="icon-btn">
+              <Icon name="refresh" className="w-[18px] h-[18px]" />
             </button>
             {/* Install App button — mobile only */}
             {canInstall && (
               <button onClick={isIOS ? () => setShowIOSGuide(true) : installApp}
-                className="md:hidden flex items-center gap-1 bg-white/10 hover:bg-white/20 text-white text-xs font-medium px-2.5 py-1.5 rounded-lg transition-colors"
+                className="md:hidden chip py-1.5 px-2.5"
                 title="Install App">
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-                </svg>
+                <Icon name="download" className="w-3.5 h-3.5" />
                 <span>Install</span>
               </button>
             )}
             {showIOSGuide && (
-              <div className="fixed inset-0 z-50 flex items-end justify-center p-4 bg-black/40" onClick={() => setShowIOSGuide(false)}>
-                <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-5" onClick={e => e.stopPropagation()}>
+              <div className="fixed inset-0 z-50 flex items-end justify-center p-4 bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in" onClick={() => setShowIOSGuide(false)}>
+                <div className="modal-panel w-full max-w-sm p-5" onClick={e => e.stopPropagation()}>
                   <h3 className="font-semibold text-tw-text mb-3 text-center">Install TaskWise</h3>
                   <div className="space-y-3 text-sm text-tw-text-secondary">
                     <div className="flex items-start gap-3">
@@ -1019,23 +972,20 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
             {/* Push notifications button — mobile only */}
             {!pushEnabled && (
               <button onClick={enablePush}
-                className="md:hidden flex items-center gap-1 bg-white/10 hover:bg-white/20 text-white text-xs font-medium px-2.5 py-1.5 rounded-lg transition-colors"
+                className="md:hidden chip py-1.5 px-2.5"
                 title="Enable Notifications">
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
-                </svg>
+                <Icon name="bell" className="w-3.5 h-3.5" />
                 <span className="hidden xs:inline">Notify</span>
               </button>
             )}
+            <ThemeToggle compact className="hidden md:inline-flex" />
             <a
               href={launcherHomeUrl(launchSource)}
               title={t(`Back to ${launcherName(launchSource)}`)}
               aria-label={t(`Back to ${launcherName(launchSource)}`)}
-              className="flex items-center justify-center text-white/70 md:text-tw-text-secondary hover:text-white md:hover:text-tw-primary transition-colors p-1.5 rounded-lg"
+              className="icon-btn"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
+              <Icon name="grid" className="w-[18px] h-[18px]" />
             </a>
             <NotificationsMenu
               onOpenYso={() => navigate('yso_performance')}
@@ -1049,40 +999,35 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
                 }
               }}
             />
-            <MobileUserMenu user={user} onProfile={() => navigate('profile' as ViewMode)} onLogout={onLogout} />
+            <MobileUserMenu user={user} roleLabel="Personnel" onProfile={() => navigate('profile' as ViewMode)} onLogout={onLogout} />
           </div>
         </header>
 
-        <main ref={mainRef} className="flex-1 overflow-auto pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-0">
+        <main ref={mainRef} className="flex-1 overflow-auto pb-[calc(6.5rem+env(safe-area-inset-bottom))] md:pb-0">
           {/* ── MY QUEUE ──────────────────────────────────────────────── */}
           {currentView === 'personnel_queue' && (
-            <div className="p-4 md:p-6">
-              {/* Mobile header */}
-              <div className="mb-4 md:mb-6">
-                <h1 className="hidden md:block text-2xl font-bold text-tw-text mb-1">My Task Queue</h1>
-                <p className="text-sm text-tw-text-secondary">
+            <div className="page">
+              <PageHeader icon="queue" tone="blue" title="My Task Queue"
+                subtitle={<>
                   {queue.length} active task{queue.length !== 1 ? 's' : ''} assigned to you
                   {pendingAccept > 0 && (
-                    <span className="ml-2 inline-flex items-center gap-1 text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5 text-xs font-semibold">
-                      ⚡ {pendingAccept} pending acceptance
+                    <span className="ml-2 badge badge-warning">
+                      <Icon name="zap" className="w-3 h-3" /> {pendingAccept} pending acceptance
                     </span>
                   )}
-                </p>
-              </div>
+                </>} />
 
               {error && (
-                <div className="mb-4 bg-red-50 border border-red-200 text-tw-danger text-sm px-3 py-2 rounded-lg">
+                <div className="mb-4 alert-error">
                   {error} — <button onClick={load} className="underline">Try again</button>
                 </div>
               )}
 
               {loading ? (
-                <div className="text-sm text-tw-text-secondary">Loading...</div>
+                <LoadingBlock />
               ) : queue.length === 0 ? (
-                <div className="card p-12 text-center">
-                  <div className="text-4xl mb-3">🎉</div>
-                  <p className="text-tw-text font-semibold">All clear!</p>
-                  <p className="text-tw-text-secondary text-sm mt-1">No tasks assigned to you right now.</p>
+                <div className="card">
+                  <EmptyState icon="party" tone="green" title="All clear!" text="No tasks assigned to you right now." />
                 </div>
               ) : (
                 <>
@@ -1092,39 +1037,38 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
                       const isExpanded = expandedId === t.id
                       const isDeptPending = t.assignments?.some(a => a.departmentId === user.departmentId) && !t.assignments?.some(a => a.personnelId)
                       const isOverdue = t.deadline && new Date(t.deadline) < new Date()
-                      const priorityColors: Record<string, string> = { CRITICAL: 'border-l-red-500', HIGH: 'border-l-orange-400', MEDIUM: 'border-l-yellow-400', LOW: 'border-l-gray-300' }
+                      const priorityColors: Record<string, string> = { CRITICAL: 'bg-red-500', HIGH: 'bg-orange-400', MEDIUM: 'bg-yellow-400', LOW: 'bg-gray-300' }
                       return (
                         <React.Fragment key={t.id}>
                           <div
                             onClick={() => setExpandedId(isExpanded ? null : t.id)}
-                            className={`bg-white rounded-2xl shadow-sm border border-gray-100 border-l-4 ${priorityColors[t.priority]} overflow-hidden transition-all active:scale-[0.99]`}
+                            className="card relative overflow-hidden transition-all active:scale-[0.99]"
                           >
+                            <span className={`absolute left-0 top-3 bottom-3 w-1 rounded-r-full ${priorityColors[t.priority]}`} />
                             <div className="px-4 py-3.5">
                               <div className="flex items-start justify-between gap-2 mb-2">
                                 <div className="flex-1 min-w-0">
                                   <div className="font-semibold text-tw-text text-sm leading-snug">{t.title}</div>
-                                  {t.parentTaskId && <span className="text-xs text-purple-600 font-medium">↳ subtask</span>}
+                                  {t.parentTaskId && <span className="text-xs text-purple-600 font-medium inline-flex items-center gap-1"><Icon name="cornerDownRight" className="w-3 h-3" /> subtask</span>}
                                 </div>
                                 <div className="flex items-center gap-1.5 flex-shrink-0">
-                                  {isDeptPending && <span className="bg-amber-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">Accept</span>}
-                                  <svg className={`w-4 h-4 text-tw-primary transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
-                                  </svg>
+                                  {isDeptPending && <span className="badge bg-amber-500 text-white ring-amber-500">Accept</span>}
+                                  <Icon name="chevronDown" className={`w-4 h-4 text-tw-text-secondary transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                                 </div>
                               </div>
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span className={`badge text-xs ${statusBadge[t.status] || 'badge-gray'}`}>{displayStatus(t.status)}</span>
                                 {t.startedAt && !['APPROVED','CANCELLED','REJECTED'].includes(t.status) && <ElapsedDays startedAt={t.startedAt} />}
                                 {t.parentTaskId
-                                  ? <span className="text-xs text-purple-500 font-medium truncate max-w-[120px]">↳ {t.parent?.title}</span>
-                                  : t.project?.name && <span className="text-xs text-tw-text-secondary truncate max-w-[120px]">📁 {t.project.name}</span>}
-                                {t.deadline && <span className={`text-xs font-medium ${isOverdue ? 'text-red-500' : 'text-tw-text-secondary'}`}>📅 {new Date(t.deadline).toLocaleDateString('en-GB',{day:'numeric',month:'short'})}</span>}
+                                  ? <span className="text-xs text-purple-500 font-medium truncate max-w-[120px] inline-flex items-center gap-1"><Icon name="cornerDownRight" className="w-3 h-3 flex-shrink-0" /> {t.parent?.title}</span>
+                                  : t.project?.name && <span className="text-xs text-tw-text-secondary truncate max-w-[120px] inline-flex items-center gap-1"><Icon name="project" className="w-3 h-3 flex-shrink-0" /> {t.project.name}</span>}
+                                {t.deadline && <span className={`text-xs font-medium inline-flex items-center gap-1 ${isOverdue ? 'text-red-500' : 'text-tw-text-secondary'}`}><Icon name="calendar" className="w-3 h-3" /> {new Date(t.deadline).toLocaleDateString('en-GB',{day:'numeric',month:'short'})}</span>}
                                 {daysLeftLabel(t.deadline ?? undefined)}
                               </div>
                             </div>
                           </div>
                           {isExpanded && (
-                            <div className="bg-[#f8f9ff] rounded-2xl border border-tw-primary/15 overflow-hidden -mt-1 mb-1 mx-0.5 shadow-sm">
+                            <div className="bg-tw-primary/[0.03] rounded-2xl border border-tw-primary/20 overflow-hidden -mt-1 mb-1 mx-0.5">
                               <MobileExpandedCard
                                 task={t}
                                 actorId={user.actorId}
@@ -1145,16 +1089,16 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
 
                   {/* ── Desktop table ── */}
                   <div className="hidden md:block card overflow-hidden">
-                    <table className="w-full text-sm">
+                    <table className="table-modern">
                       <thead>
-                        <tr className="bg-[#f0f4ff] border-b-2 border-tw-primary/20">
+                        <tr className="bg-tw-surface-2 border-b border-tw-border">
                           <th className="w-px px-3 py-3"></th>
-                          <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider w-[50%]">Task</th>
-                          <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider w-[30%]">Project</th>
-                          <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider whitespace-nowrap">Status</th>
-                          <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider whitespace-nowrap">Priority</th>
-                          <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider whitespace-nowrap">Deadline</th>
-                          <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider whitespace-nowrap">Days Left</th>
+                          <th className="text-left px-4 py-3 text-[11px] font-semibold text-tw-text-secondary uppercase tracking-[0.08em] w-[50%]">Task</th>
+                          <th className="text-left px-4 py-3 text-[11px] font-semibold text-tw-text-secondary uppercase tracking-[0.08em] w-[30%]">Project</th>
+                          <th className="text-left px-4 py-3 text-[11px] font-semibold text-tw-text-secondary uppercase tracking-[0.08em] whitespace-nowrap">Status</th>
+                          <th className="text-left px-4 py-3 text-[11px] font-semibold text-tw-text-secondary uppercase tracking-[0.08em] whitespace-nowrap">Priority</th>
+                          <th className="text-left px-4 py-3 text-[11px] font-semibold text-tw-text-secondary uppercase tracking-[0.08em] whitespace-nowrap">Deadline</th>
+                          <th className="text-left px-4 py-3 text-[11px] font-semibold text-tw-text-secondary uppercase tracking-[0.08em] whitespace-nowrap">Days Left</th>
                           <th className="w-8 px-2 py-3"></th>
                         </tr>
                       </thead>
@@ -1169,15 +1113,15 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
                           return (
                             <React.Fragment key={t.id}>
                               <tr onClick={() => setExpandedId(isExpanded ? null : t.id)}
-                                className={`cursor-pointer transition-colors border-b border-tw-border ${isExpanded ? 'bg-blue-50' : 'hover:bg-[#f8f9ff]'}`}>
+                                className={`cursor-pointer transition-colors border-b border-tw-border ${isExpanded ? 'bg-tw-primary/[0.05]' : 'hover:bg-tw-hover'}`}>
                                 <td className="pl-3 pr-0 py-3.5">
                                   <div className={`w-1.5 h-9 rounded-full ${priorityBar[t.priority]}`} />
                                 </td>
                                 <td className="px-4 py-3.5">
                                   <div className="font-semibold text-tw-text text-sm">{t.title}</div>
                                   <div className="flex items-center gap-2 mt-0.5">
-                                    {t.parentTaskId && <span className="text-xs text-purple-600 font-medium">↳ subtask</span>}
-                                    {(t._count?.subtasks ?? 0) > 0 && <span className="text-xs text-tw-indigo font-medium">⊞ {t._count!.subtasks} subtask{t._count!.subtasks !== 1 ? 's' : ''}</span>}
+                                    {t.parentTaskId && <span className="text-xs text-purple-600 font-medium inline-flex items-center gap-1"><Icon name="cornerDownRight" className="w-3 h-3" /> subtask</span>}
+                                    {(t._count?.subtasks ?? 0) > 0 && <span className="text-xs text-tw-indigo font-medium inline-flex items-center gap-1"><Icon name="layers" className="w-3 h-3" /> {t._count!.subtasks} subtask{t._count!.subtasks !== 1 ? 's' : ''}</span>}
                                   </div>
                                 </td>
                                 <td className="px-4 py-3.5 text-sm text-tw-text-secondary">
@@ -1198,16 +1142,14 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
                                 </td>
                                 <td className="px-4 py-3.5 text-sm whitespace-nowrap">
                                   {t.deadline
-                                    ? <span className={isOverdue ? 'text-tw-danger font-semibold' : 'text-tw-text-secondary'}>📅 {new Date(t.deadline).toLocaleDateString()}</span>
+                                    ? <span className={`inline-flex items-center gap-1 ${isOverdue ? 'text-tw-danger font-semibold' : 'text-tw-text-secondary'}`}><Icon name="calendar" className="w-3.5 h-3.5" /> {new Date(t.deadline).toLocaleDateString()}</span>
                                     : <span className="text-tw-text-secondary">—</span>}
                                 </td>
                                 <td className="px-4 py-3.5 whitespace-nowrap">{daysLeftLabel(t.deadline ?? undefined)}</td>
                                 <td className="px-3 py-3.5 whitespace-nowrap">
                                   <div className="flex items-center justify-end gap-2">
-                                    {isDeptPending && <span className="bg-tw-warning text-white text-xs font-bold px-2 py-0.5 rounded-full">Accept</span>}
-                                    <svg className={`w-5 h-5 text-tw-primary transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                    </svg>
+                                    {isDeptPending && <span className="badge bg-tw-warning text-white ring-tw-warning">Accept</span>}
+                                    <Icon name="chevronDown" className={`w-4 h-4 text-tw-text-secondary transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
                                   </div>
                                 </td>
                               </tr>
@@ -1234,16 +1176,12 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
 
           {/* ── APPROVAL QUEUE ────────────────────────────────────────── */}
           {currentView === 'personnel_approval_queue' && (
-            <div className="p-4 md:p-6">
-              <h1 className="hidden md:block text-2xl font-bold text-tw-text mb-1">Approval Queue</h1>
-              <p className="text-sm text-tw-text-secondary mb-4 md:mb-6">
-                {approvalTasks.length} task{approvalTasks.length !== 1 ? 's' : ''} submitted to you for approval
-              </p>
+            <div className="page">
+              <PageHeader icon="approve" tone="purple" title="Approval Queue"
+                subtitle={`${approvalTasks.length} task${approvalTasks.length !== 1 ? 's' : ''} submitted to you for approval`} />
               {approvalTasks.length === 0 ? (
-                <div className="card p-12 text-center">
-                  <div className="text-4xl mb-3">🎉</div>
-                  <p className="text-tw-text font-semibold">All clear!</p>
-                  <p className="text-tw-text-secondary text-sm mt-1">No tasks awaiting your approval.</p>
+                <div className="card">
+                  <EmptyState icon="party" tone="green" title="All clear!" text="No tasks awaiting your approval." />
                 </div>
               ) : (
                 <>
@@ -1255,16 +1193,16 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
                   </div>
                   {/* Desktop table */}
                   <div className="hidden md:block card overflow-hidden">
-                    <table className="w-full text-sm">
+                    <table className="table-modern">
                       <thead>
-                        <tr className="bg-[#f0f4ff] border-b-2 border-tw-primary/20">
+                        <tr className="bg-tw-surface-2 border-b border-tw-border">
                           <th className="w-px px-3 py-3"></th>
-                          <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider">Task</th>
-                          <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider">Project</th>
-                          <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider">Submitted By</th>
-                          <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider">Priority</th>
-                          <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider">Deadline</th>
-                          <th className="text-left px-4 py-3 text-xs font-bold text-tw-primary uppercase tracking-wider">Actions</th>
+                          <th className="text-left px-4 py-3 text-[11px] font-semibold text-tw-text-secondary uppercase tracking-[0.08em]">Task</th>
+                          <th className="text-left px-4 py-3 text-[11px] font-semibold text-tw-text-secondary uppercase tracking-[0.08em]">Project</th>
+                          <th className="text-left px-4 py-3 text-[11px] font-semibold text-tw-text-secondary uppercase tracking-[0.08em]">Submitted By</th>
+                          <th className="text-left px-4 py-3 text-[11px] font-semibold text-tw-text-secondary uppercase tracking-[0.08em]">Priority</th>
+                          <th className="text-left px-4 py-3 text-[11px] font-semibold text-tw-text-secondary uppercase tracking-[0.08em]">Deadline</th>
+                          <th className="text-left px-4 py-3 text-[11px] font-semibold text-tw-text-secondary uppercase tracking-[0.08em]">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-tw-border">
@@ -1287,15 +1225,15 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
           {currentView === 'yso_performance' && ysoEnabled && <YsoPerformancePage user={user} onUserUpdate={onUserUpdate} />}
 
           {currentView === 'project_board' && !selectedProject && (
-            <div className="p-4 md:p-6">
-              <h1 className="hidden md:block text-xl font-bold text-tw-text mb-4 md:mb-6">Projects</h1>
+            <div className="page">
+              <PageHeader icon="project" tone="teal" title="Projects" subtitle="Projects where you have assigned work." />
               {projects.length === 0 ? (
-                <div className="card p-12 text-center text-tw-text-secondary text-sm">No projects available.</div>
+                <div className="card"><EmptyState icon="project" title="No projects available." /></div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
                   {projects.filter(p => p.status === 'active').map(p => (
                     <div key={p.id} onClick={() => { const scrollTop = mainRef.current?.scrollTop ?? 0; setViewHistory(h => [...h, { view: currentView, scrollTop }]); setSelectedProject(p) }}
-                      className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 cursor-pointer active:scale-[0.98] hover:shadow-md transition-all">
+                      className="card card-hover p-4 cursor-pointer active:scale-[0.98] group">
                       <div className="flex items-center gap-3 mb-2">
                         <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: p.color + '22' }}>
                           <div className="w-4 h-4 rounded-full" style={{ backgroundColor: p.color }} />
@@ -1304,7 +1242,7 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
                       </div>
                       {p.description && <p className="text-xs text-tw-text-secondary leading-relaxed">{p.description}</p>}
                       <div className="mt-3 flex items-center justify-end">
-                        <span className="text-xs text-tw-primary font-semibold flex items-center gap-1">View Board <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7"/></svg></span>
+                        <span className="text-xs text-tw-primary-text font-semibold flex items-center gap-1">View Board <Icon name="arrowRight" className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" /></span>
                       </div>
                     </div>
                   ))}
@@ -1324,31 +1262,13 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
         </main>
       </div>
 
-      {/* ── Mobile bottom tab bar ──────────────────────────────────────── */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-20 pb-[env(safe-area-inset-bottom)] bg-white border-t border-gray-200 shadow-[0_-2px_16px_rgba(0,0,0,0.08)]">
-        <div className="flex items-stretch">
-          {navItems.map(item => (
-            <button key={item.view}
-              onClick={() => { navigate(item.view); setSelectedProject(null) }}
-              className={`flex-1 flex flex-col items-center justify-center py-4 px-1 gap-1 relative transition-colors
-                ${currentView === item.view ? 'text-tw-primary' : 'text-gray-400'}`}>
-              {/* Active indicator */}
-              {currentView === item.view && (
-                <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-tw-primary rounded-full" />
-              )}
-              <span className="text-lg leading-none">{item.icon}</span>
-              <span className="text-[10px] font-semibold leading-none">{t(({ yso_performance: 'YSO Hub', personnel_queue: 'Tasks', personnel_approval_queue: 'Approvals', project_board: 'Projects', profile: 'Profile' } as Partial<Record<ViewMode, string>>)[item.view] || item.label)}</span>
-              {/* Badge */}
-              {((item.view === 'personnel_queue' && queue.length > 0) ||
-                (item.badge !== undefined && item.badge > 0)) && (
-                <span className="absolute top-1.5 right-[20%] bg-red-500 text-white text-[9px] rounded-full w-4 h-4 flex items-center justify-center font-bold">
-                  {item.view === 'personnel_queue' ? queue.length : item.badge}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-      </nav>
+      {/* ── Mobile bottom bar ──────────────────────────────────────────── */}
+      <MobileNav
+        primary={mobileNavItems}
+        more={mobileMoreItems}
+        activeView={currentView}
+        onSelect={v => { navigate(v); setSelectedProject(null) }}
+      />
 
       {/* ── Task modal ─────────────────────────────────────────────────── */}
       {selectedTask && (

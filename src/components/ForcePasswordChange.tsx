@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import type { AuthUser } from '../types'
 import { authApi } from '../services/apiService'
+import { Icon } from './ui/Icon'
 
 interface Props {
   user: AuthUser
@@ -39,57 +40,54 @@ export default function ForcePasswordChange({ user, onPasswordChanged, onLogout 
   }
 
   return (
-    <div className="min-h-screen bg-[#1f2d3d] flex flex-col items-center justify-center px-4 relative overflow-hidden">
-      {/* Watermark */}
-      <div className="pointer-events-none absolute inset-0 flex items-end justify-center overflow-hidden">
-        <img src="/taskwise/watermark.jpeg" alt="" className="w-72 select-none object-contain"
-          style={{ opacity: 0.08, marginBottom: '-20px' }} />
+    <div className="min-h-screen bg-tw-bg flex flex-col items-center justify-center px-4 relative overflow-hidden">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -bottom-40 left-1/2 -translate-x-1/2 w-[900px] h-[420px] rounded-[50%] bg-tw-primary/20 dark:bg-tw-primary/30 blur-[90px]" />
+        <div className="absolute -bottom-24 left-[20%] w-[420px] h-[280px] rounded-[50%] bg-tw-purple/25 dark:bg-tw-purple/30 blur-[90px]" />
       </div>
 
       <div className="text-center mb-6 relative z-10">
         <div className="inline-flex items-center gap-3 mb-1">
-          <div className="w-10 h-10 bg-tw-primary rounded-xl flex items-center justify-center shadow-lg">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-gradient-to-br from-[#3d9bff] to-tw-primary shadow-cta">
             <span className="text-white font-bold text-lg">T</span>
           </div>
-          <span className="text-2xl font-bold text-white">TaskWise</span>
+          <span className="text-2xl font-bold tracking-tight text-tw-text">TaskWise</span>
         </div>
       </div>
 
-      <div className="bg-white rounded-3xl p-6 md:p-8 w-full max-w-sm shadow-2xl relative z-10">
+      <div className="bg-tw-surface/90 backdrop-blur-xl border border-tw-border rounded-3xl p-6 md:p-8 w-full max-w-sm shadow-panel relative z-10 animate-pop-in">
         <div className="text-center mb-5">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-yellow-100 mb-3">
-            <span className="text-2xl">🔒</span>
-          </div>
+          <span className="icon-tile tile-amber w-12 h-12 rounded-2xl mb-3"><Icon name="lock" className="w-6 h-6" /></span>
           <h1 className="text-lg font-bold text-tw-text">Set Your Password</h1>
           <p className="text-sm text-tw-text-secondary mt-1">
             Welcome, <span className="font-medium text-tw-text">{user.name}</span>
           </p>
         </div>
 
-        <div className="bg-blue-50 rounded-2xl px-4 py-3 mb-5">
-          <p className="text-xs text-blue-700">
+        <div className="alert-info mb-5">
+          <p className="text-xs">
             Choose a new private password for your account. You will use it for future TaskWise sign-ins.
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1.5">New Password</label>
+            <label className="label">New Password</label>
             <input type="password" className="input rounded-xl" placeholder="Min 8 characters"
               value={newPassword} onChange={e => setNewPassword(e.target.value)} required autoFocus />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-1.5">Confirm Password</label>
+            <label className="label">Confirm Password</label>
             <input type="password" className="input rounded-xl" placeholder="Repeat new password"
               value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required />
           </div>
 
           {error && (
-            <div className="bg-red-50 border border-red-200 text-tw-danger text-sm px-3 py-2 rounded-xl">{error}</div>
+            <div className="alert-error">{error}</div>
           )}
 
           <button type="submit" disabled={loading}
-            className="w-full py-3.5 rounded-2xl bg-tw-primary text-white font-bold text-sm active:opacity-80 disabled:opacity-60 mt-1">
+            className="btn-primary w-full py-3 mt-1">
             {loading ? 'Saving…' : 'Set Password & Continue'}
           </button>
         </form>
@@ -100,7 +98,7 @@ export default function ForcePasswordChange({ user, onPasswordChanged, onLogout 
         </button>
       </div>
 
-      <p className="mt-5 text-white/40 text-xs relative z-10">Created by SysWise</p>
+      <p className="mt-5 text-tw-text-muted text-xs relative z-10">Created by SysWise</p>
     </div>
   )
 }

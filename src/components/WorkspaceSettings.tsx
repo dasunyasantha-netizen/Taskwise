@@ -2,6 +2,8 @@ import React, { useState, useRef } from 'react'
 import type { AuthUser } from '../types'
 import { LetterSettingsPanel } from './LetterManagement'
 import { workspaceApi } from '../services/apiService'
+import { PageHeader } from './ui/Primitives'
+import { Icon } from './ui/Icon'
 
 interface Props {
   user: AuthUser
@@ -107,8 +109,8 @@ export default function WorkspaceSettings({ user, onUpdate }: Props) {
   }
 
   return (
-    <div className="p-6 max-w-2xl mx-auto space-y-6">
-      <h1 className="text-xl font-semibold text-tw-text">Workspace Settings</h1>
+    <div className="page max-w-3xl space-y-5">
+      <PageHeader icon="settings" tone="gray" title="Workspace Settings" subtitle="Branding and details shared across your workspace." className="!mb-1" />
 
       {/* Company branding */}
       <div className="card p-6">
@@ -119,11 +121,11 @@ export default function WorkspaceSettings({ user, onUpdate }: Props) {
         <div className="mb-5">
           <label className="block text-sm font-medium text-tw-text mb-2">Company Logo</label>
           <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-xl border-2 border-dashed border-tw-border flex items-center justify-center overflow-hidden bg-tw-hover">
+            <div className="w-16 h-16 rounded-2xl border-2 border-dashed border-tw-border flex items-center justify-center overflow-hidden bg-tw-surface-2">
               {logoPreview ? (
                 <img src={logoPreview} alt="Logo" className="w-full h-full object-contain" />
               ) : (
-                <span className="text-tw-text-secondary text-2xl">🏢</span>
+                <Icon name="building" className="w-7 h-7 text-tw-text-muted" />
               )}
             </div>
             <div>
@@ -157,7 +159,7 @@ export default function WorkspaceSettings({ user, onUpdate }: Props) {
         {/* Company name + save */}
         <form onSubmit={handleSave} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-tw-text mb-1">Company Name <span className="text-tw-text-secondary font-normal">(optional)</span></label>
+            <label className="label text-[13px] text-tw-text">Company Name <span className="text-tw-text-secondary font-normal">(optional)</span></label>
             <input
               className="input max-w-xs"
               value={companyName}

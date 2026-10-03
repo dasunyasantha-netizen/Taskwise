@@ -4,6 +4,8 @@ import type { Personnel, Layer, Task } from '../types'
 import { taskGroupApi, workspaceApi, projectApi } from '../services/apiService'
 import Select from './Select'
 import DatePicker from './DatePicker'
+import { Icon } from './ui/Icon'
+import { PageHeader, EmptyState, LoadingBlock } from './ui/Primitives'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -137,14 +139,14 @@ function MemberHistoryModal({
   }, [groupId, taskId, memberId])
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[85vh] flex flex-col">
+    <div className="fixed inset-0 flex items-center justify-center z-50 p-4 bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in">
+      <div className="modal-panel w-full max-w-lg max-h-[85vh] flex flex-col">
         <div className="flex items-center justify-between px-5 py-4 border-b border-tw-border flex-shrink-0">
           <div>
             <h3 className="font-bold text-tw-text">{memberName}</h3>
             <p className="text-xs text-tw-text-secondary mt-0.5">{taskTitle}</p>
           </div>
-          <button onClick={onClose} className="text-tw-text-secondary hover:text-tw-text text-xl leading-none">×</button>
+          <button onClick={onClose} className="icon-btn w-8 h-8" aria-label="Close"><Icon name="x" className="w-4 h-4" /></button>
         </div>
         <div className="overflow-y-auto flex-1 px-5 py-4">
           {loading ? (
@@ -160,7 +162,7 @@ function MemberHistoryModal({
 
               {/* Progress logs */}
               <div>
-                <h4 className="text-xs font-bold text-tw-text-secondary uppercase tracking-wide mb-2">
+                <h4 className="section-label mb-2">
                   Progress Updates ({(data as unknown as { progressLogs: ProgressLog[] }).progressLogs?.length || 0})
                 </h4>
                 {((data as unknown as { progressLogs: ProgressLog[] }).progressLogs?.length || 0) === 0 ? (
@@ -200,7 +202,7 @@ function MemberTaskCard({
 }) {
   const latestLog = instance.progressLogs?.[0]
   return (
-    <div className="bg-white border border-tw-border rounded-xl p-3 hover:border-tw-primary/40 transition-colors">
+    <div className="card p-3 hover:border-tw-primary/40 transition-colors">
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="flex items-center gap-2 min-w-0">
           <Avatar name={memberName} size={7} />
@@ -229,9 +231,9 @@ function MemberTaskCard({
 
       <button
         onClick={onViewHistory}
-        className="text-xs text-tw-primary hover:underline font-medium"
+        className="text-xs text-tw-primary-text hover:underline font-semibold inline-flex items-center gap-1"
       >
-        View full history →
+        View full history <Icon name="arrowRight" className="w-3.5 h-3.5" />
       </button>
     </div>
   )
@@ -257,7 +259,7 @@ function GroupTaskRow({
 
   return (
     <>
-      <div className={`card overflow-hidden transition-shadow ${expanded ? 'shadow-md' : ''}`}>
+      <div className={`card overflow-hidden transition-all ${expanded ? 'shadow-panel border-tw-border-strong' : ''}`}>
         {/* Header row */}
         <button
           className="w-full text-left px-4 py-3.5 flex items-center gap-3 hover:bg-tw-hover transition-colors"
@@ -313,7 +315,7 @@ function GroupTaskRow({
 
         {/* Expanded member cards */}
         {expanded && (
-          <div className="px-4 pb-4 pt-3 border-t border-tw-border bg-[#f8f9ff]">
+          <div className="px-4 pb-4 pt-3 border-t border-tw-border bg-tw-primary/[0.03]">
             {instances.length === 0 ? (
               <p className="text-sm text-tw-text-secondary italic text-center py-4">No member assignments yet.</p>
             ) : (
@@ -398,12 +400,10 @@ function GroupCard({
 
   return (
     <>
-      <div className={`card overflow-hidden transition-shadow ${expanded ? 'shadow-md' : ''}`}>
+      <div className={`card overflow-hidden transition-all ${expanded ? 'shadow-panel border-tw-border-strong' : ''}`}>
         {/* Group header */}
         <button className="w-full text-left px-4 py-3.5 flex items-center gap-3 hover:bg-tw-hover transition-colors" onClick={toggle}>
-          <div className="w-9 h-9 rounded-xl bg-tw-primary/10 flex items-center justify-center flex-shrink-0">
-            <span className="text-tw-primary font-bold text-sm">👥</span>
-          </div>
+          <span className="icon-tile tile-blue w-9 h-9"><Icon name="users" className="w-4 h-4" /></span>
           <div className="flex-1 min-w-0">
             <div className="font-semibold text-tw-text">{group.name}</div>
             <div className="text-xs text-tw-text-secondary mt-0.5">
@@ -419,7 +419,7 @@ function GroupCard({
             </button>
             <button
               onClick={e => { e.stopPropagation(); onAssignTask(group) }}
-              className="hidden sm:flex text-xs px-2.5 py-1.5 rounded-lg bg-tw-primary text-white hover:opacity-90 transition-opacity items-center gap-1"
+              className="btn-primary btn-sm hidden sm:flex items-center gap-1"
             >
               + Task
             </button>
@@ -454,10 +454,10 @@ function GroupCard({
             {/* Members list */}
             <div className="px-4 pt-3 pb-2">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold text-tw-text-secondary uppercase tracking-wide">Members</span>
+                <span className="section-label">Members</span>
                 <div className="flex gap-2 sm:hidden">
                   <button onClick={() => onAddMember(group)} className="text-xs px-2.5 py-1 rounded-lg border border-tw-border text-tw-text-secondary">+ Member</button>
-                  <button onClick={() => onAssignTask(group)} className="text-xs px-2.5 py-1 rounded-lg bg-tw-primary text-white">+ Task</button>
+                  <button onClick={() => onAssignTask(group)} className="btn-primary btn-sm">+ Task</button>
                 </div>
               </div>
               {members.length === 0 ? (
@@ -480,7 +480,7 @@ function GroupCard({
             {/* Projects */}
             {projects.length > 0 && (
               <div className="px-4 py-2 border-t border-tw-border">
-                <span className="text-xs font-bold text-tw-text-secondary uppercase tracking-wide block mb-2">Projects</span>
+                <span className="section-label block mb-2">Projects</span>
                 <div className="flex flex-wrap gap-2">
                   {projects.map(gp => (
                     <div key={gp.id} className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-white text-xs font-medium"
@@ -499,14 +499,14 @@ function GroupCard({
             )}
 
             {/* Tasks */}
-            <div className="px-4 pt-2 pb-3 border-t border-tw-border bg-[#f8f9ff]">
-              <span className="text-xs font-bold text-tw-text-secondary uppercase tracking-wide block mb-3">Active Tasks</span>
+            <div className="px-4 pt-2 pb-3 border-t border-tw-border bg-tw-primary/[0.03]">
+              <span className="section-label block mb-3">Active Tasks</span>
               {loadingMonitor ? (
                 <div className="flex justify-center py-4"><div className="w-5 h-5 border-2 border-tw-primary border-t-transparent rounded-full animate-spin" /></div>
               ) : monitor && monitor.parentTasks.length > 0 ? (
                 <div className="space-y-3">
                   {monitor.parentTasks.map(pt => (
-                    <div key={pt.id} className="bg-white rounded-xl border border-tw-border p-3">
+                    <div key={pt.id} className="card p-3">
                       <div className="flex items-center justify-between gap-2 mb-2">
                         <span className="font-medium text-sm text-tw-text">{pt.title}</span>
                         <StatusBadge status={pt.status} />
@@ -518,7 +518,7 @@ function GroupCard({
                           const memberId = assignedPersonnel?.id || ''
                           const latestLog = instance.progressLogs?.[0]
                           return (
-                            <div key={instance.id} className="bg-tw-hover rounded-lg p-2.5 cursor-pointer hover:bg-blue-50 transition-colors"
+                            <div key={instance.id} className="bg-tw-hover rounded-lg p-2.5 cursor-pointer hover:bg-tw-primary/[0.05] transition-colors"
                               onClick={() => setHistoryTarget({ taskId: instance.id, memberId, memberName })}>
                               <div className="flex items-center gap-1.5 mb-1">
                                 <Avatar name={memberName} size={5} />
@@ -563,7 +563,7 @@ function GroupCard({
         <>
           <div className="fixed inset-0 z-[90]" onClick={() => setMenuOpen(false)} />
           <div
-            className="fixed z-[91] bg-white rounded-xl shadow-panel border border-tw-border py-1 w-36"
+            className="fixed z-[91] modal-panel border border-tw-border py-1 w-36"
             style={{ top: menuPos.top, right: menuPos.right }}
           >
             <button
@@ -638,13 +638,13 @@ function SupervisorPickerModal({
   })).filter(g => g.people.length > 0)
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[60] p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[80vh] flex flex-col">
+    <div className="fixed inset-0 flex items-center justify-center z-[60] p-4 bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in">
+      <div className="modal-panel w-full max-w-md max-h-[80vh] flex flex-col">
         {/* Header */}
         <div className="px-5 py-4 border-b border-tw-border flex-shrink-0">
           <div className="flex items-center justify-between mb-1">
             <h3 className="font-bold text-tw-text">Assign Supervisor</h3>
-            <button onClick={onCancel} className="text-tw-text-secondary hover:text-tw-text text-xl leading-none">×</button>
+            <button onClick={onCancel} className="icon-btn w-8 h-8" aria-label="Close"><Icon name="x" className="w-4 h-4" /></button>
           </div>
           <div className="flex items-center gap-2 mb-3">
             <Avatar name={forPerson.name} size={6} />
@@ -720,15 +720,15 @@ function EditGroupModal({ group, onClose, onSaved }: { group: TaskGroup; onClose
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-sm">
+    <div className="fixed inset-0 flex items-center justify-center z-50 p-4 bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in">
+      <div className="modal-panel w-full max-w-sm">
         <div className="flex items-center justify-between px-5 py-4 border-b border-tw-border">
           <h3 className="font-bold text-tw-text">Edit Group</h3>
-          <button onClick={onClose} className="text-tw-text-secondary hover:text-tw-text text-xl">×</button>
+          <button onClick={onClose} className="icon-btn w-8 h-8" aria-label="Close"><Icon name="x" className="w-4 h-4" /></button>
         </div>
         <div className="px-5 py-4 space-y-4">
           <div>
-            <label className="block text-sm font-semibold text-tw-text mb-1.5">Group Name</label>
+            <label className="label text-[13px] text-tw-text">Group Name</label>
             <input
               autoFocus
               className="input w-full"
@@ -738,7 +738,7 @@ function EditGroupModal({ group, onClose, onSaved }: { group: TaskGroup; onClose
             />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-tw-text mb-1.5">Description <span className="font-normal text-tw-text-secondary">(optional)</span></label>
+            <label className="label text-[13px] text-tw-text">Description <span className="font-normal text-tw-text-secondary">(optional)</span></label>
             <textarea
               className="input w-full resize-none"
               rows={3}
@@ -912,15 +912,15 @@ function AddMemberModal({
 
   return (
     <>
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[85vh] flex flex-col">
+      <div className="fixed inset-0 flex items-center justify-center z-50 p-4 bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in">
+        <div className="modal-panel w-full max-w-md max-h-[85vh] flex flex-col">
           {/* Header */}
           <div className="flex items-center justify-between px-5 py-4 border-b border-tw-border flex-shrink-0">
             <div>
               <h3 className="font-bold text-tw-text">Add Member — {group.name}</h3>
               <p className="text-xs text-tw-text-secondary mt-0.5">Select any personnel from any level</p>
             </div>
-            <button onClick={onClose} className="text-tw-text-secondary hover:text-tw-text text-xl">×</button>
+            <button onClick={onClose} className="icon-btn w-8 h-8" aria-label="Close"><Icon name="x" className="w-4 h-4" /></button>
           </div>
 
           {/* Search */}
@@ -992,11 +992,11 @@ function AddMemberModal({
                       <div className="font-medium text-sm text-tw-text">{p.name}</div>
                       <div className="text-xs text-tw-text-secondary">{layer?.name} · {dept?.name}</div>
                       {chainOk ? (
-                        <div className="text-xs text-green-600 mt-0.5">✓ Chain complete</div>
+                        <div className="text-xs text-emerald-600 mt-0.5 inline-flex items-center gap-1"><Icon name="check" className="w-3 h-3" /> Chain complete</div>
                       ) : chainGap?.id === p.id ? (
-                        <div className="text-xs text-amber-600 mt-0.5">⚠ No supervisor — tap to assign one</div>
+                        <div className="text-xs text-amber-600 mt-0.5 inline-flex items-center gap-1"><Icon name="alert" className="w-3 h-3" /> No supervisor — tap to assign one</div>
                       ) : (
-                        <div className="text-xs text-amber-600 mt-0.5">⚠ Supervisor chain incomplete — tap to fix</div>
+                        <div className="text-xs text-amber-600 mt-0.5 inline-flex items-center gap-1"><Icon name="alert" className="w-3 h-3" /> Supervisor chain incomplete — tap to fix</div>
                       )}
                     </div>
                     {!chainOk && (
@@ -1139,14 +1139,14 @@ function AssignTaskModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 flex items-center justify-center z-50 p-4 bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in">
+      <div className="modal-panel w-full max-w-lg max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between px-5 py-4 border-b border-tw-border flex-shrink-0">
           <div>
             <h3 className="font-bold text-tw-text">Assign Group Task — {group.name}</h3>
             <p className="text-xs text-tw-text-secondary mt-0.5">Each member will get their own task instance</p>
           </div>
-          <button onClick={onClose} className="text-tw-text-secondary hover:text-tw-text text-xl">×</button>
+          <button onClick={onClose} className="icon-btn w-8 h-8" aria-label="Close"><Icon name="x" className="w-4 h-4" /></button>
         </div>
         <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
 
@@ -1156,9 +1156,9 @@ function AssignTaskModal({
               <label className="text-sm font-semibold text-tw-text">Project</label>
               <button
                 onClick={() => { setShowNewProject(v => !v); setNewProjectError('') }}
-                className="text-xs text-tw-primary hover:underline font-medium flex items-center gap-1"
+                className="text-xs text-tw-primary-text hover:underline font-semibold flex items-center gap-1"
               >
-                {showNewProject ? '✕ Cancel' : '+ New project'}
+                {showNewProject ? <><Icon name="x" className="w-3 h-3" /> Cancel</> : <><Icon name="plus" className="w-3 h-3" /> New project</>}
               </button>
             </div>
 
@@ -1223,14 +1223,14 @@ function AssignTaskModal({
 
           {/* Title */}
           <div>
-            <label className="block text-sm font-semibold text-tw-text mb-1.5">Task Title</label>
+            <label className="label text-[13px] text-tw-text">Task Title</label>
             <input className="input w-full" placeholder="What needs to be done?"
               value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />
           </div>
 
           {/* Description */}
           <div>
-            <label className="block text-sm font-semibold text-tw-text mb-1.5">Description <span className="text-tw-text-secondary font-normal">(optional)</span></label>
+            <label className="label text-[13px] text-tw-text">Description <span className="text-tw-text-secondary font-normal">(optional)</span></label>
             <textarea className="input resize-none w-full" rows={2} placeholder="Additional details..."
               value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
           </div>
@@ -1238,7 +1238,7 @@ function AssignTaskModal({
           {/* Priority & Deadline */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-semibold text-tw-text mb-1.5">Priority</label>
+              <label className="label text-[13px] text-tw-text">Priority</label>
               <Select
                 value={form.priority}
                 onChange={val => setForm(f => ({ ...f, priority: val }))}
@@ -1251,7 +1251,7 @@ function AssignTaskModal({
               />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-tw-text mb-1.5">Deadline <span className="text-tw-text-secondary font-normal">(optional)</span></label>
+              <label className="label text-[13px] text-tw-text">Deadline <span className="text-tw-text-secondary font-normal">(optional)</span></label>
               <DatePicker value={form.deadline}
                 onChange={v => setForm(f => ({ ...f, deadline: v }))} />
             </div>
@@ -1323,20 +1323,20 @@ function CreateGroupModal({ onClose, onCreate }: { onClose: () => void; onCreate
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-sm">
+    <div className="fixed inset-0 flex items-center justify-center z-50 p-4 bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in">
+      <div className="modal-panel w-full max-w-sm">
         <div className="flex items-center justify-between px-5 py-4 border-b border-tw-border">
           <h3 className="font-bold text-tw-text">Create Task Group</h3>
-          <button onClick={onClose} className="text-tw-text-secondary hover:text-tw-text text-xl">×</button>
+          <button onClick={onClose} className="icon-btn w-8 h-8" aria-label="Close"><Icon name="x" className="w-4 h-4" /></button>
         </div>
         <div className="px-5 py-4 space-y-4">
           <div>
-            <label className="block text-sm font-semibold text-tw-text mb-1.5">Group Name</label>
+            <label className="label text-[13px] text-tw-text">Group Name</label>
             <input className="input w-full" placeholder="e.g. National Coordinators"
               value={name} onChange={e => setName(e.target.value)} autoFocus />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-tw-text mb-1.5">Description <span className="text-tw-text-secondary font-normal">(optional)</span></label>
+            <label className="label text-[13px] text-tw-text">Description <span className="text-tw-text-secondary font-normal">(optional)</span></label>
             <textarea className="input resize-none w-full" rows={2} placeholder="What is this group for?"
               value={description} onChange={e => setDescription(e.target.value)} />
           </div>
@@ -1378,22 +1378,22 @@ function CreateProjectModal({ group, onClose, onCreated }: { group: TaskGroup; o
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-sm">
+    <div className="fixed inset-0 flex items-center justify-center z-50 p-4 bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in">
+      <div className="modal-panel w-full max-w-sm">
         <div className="flex items-center justify-between px-5 py-4 border-b border-tw-border">
           <div>
             <h3 className="font-bold text-tw-text">New Project — {group.name}</h3>
           </div>
-          <button onClick={onClose} className="text-tw-text-secondary hover:text-tw-text text-xl">×</button>
+          <button onClick={onClose} className="icon-btn w-8 h-8" aria-label="Close"><Icon name="x" className="w-4 h-4" /></button>
         </div>
         <div className="px-5 py-4 space-y-4">
           <div>
-            <label className="block text-sm font-semibold text-tw-text mb-1.5">Project Name</label>
+            <label className="label text-[13px] text-tw-text">Project Name</label>
             <input className="input w-full" placeholder="e.g. Youth Development 2026"
               value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} autoFocus />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-tw-text mb-1.5">Color</label>
+            <label className="label text-[13px] text-tw-text">Color</label>
             <div className="flex gap-2">
               {colors.map(c => (
                 <button key={c} onClick={() => setForm(f => ({ ...f, color: c }))}
@@ -1481,49 +1481,40 @@ export default function GroupWiseTasksPage() {
 
   if (loading) {
     return (
-      <div className="p-6 flex justify-center py-20">
-        <div className="w-6 h-6 border-2 border-tw-primary border-t-transparent rounded-full animate-spin" />
-      </div>
+      <LoadingBlock />
     )
   }
 
   return (
-    <div className="p-4 md:p-6">
-      {/* Page header */}
-      <div className="flex items-start justify-between mb-5 gap-4 flex-wrap">
-        <div>
-          <h1 className="text-xl md:text-2xl font-bold text-tw-text">Group-wise Tasks</h1>
-          <p className="text-sm text-tw-text-secondary mt-0.5">
-            Create cross-department groups, assign tasks to all members, and monitor progress.
-          </p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
+    <div className="page">
+      <PageHeader icon="group" tone="teal" title="Group-wise Tasks"
+        subtitle="Create cross-department groups, assign tasks to all members, and monitor progress."
+        actions={<>
           {/* View toggle */}
-          <div className="flex gap-1 bg-tw-hover rounded-lg p-1">
+          <div className="seg">
             <button
               onClick={() => setViewMode('group')}
-              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${viewMode === 'group' ? 'bg-white text-tw-primary shadow-card' : 'text-tw-text-secondary hover:text-tw-text'}`}
+              className={`seg-item inline-flex items-center gap-1.5 ${viewMode === 'group' ? 'seg-item-active' : ''}`}
             >
-              👥 Groups
+              <Icon name="users" className="w-3.5 h-3.5" /> Groups
             </button>
             <button
               onClick={() => setViewMode('project')}
-              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${viewMode === 'project' ? 'bg-white text-tw-primary shadow-card' : 'text-tw-text-secondary hover:text-tw-text'}`}
+              className={`seg-item inline-flex items-center gap-1.5 ${viewMode === 'project' ? 'seg-item-active' : ''}`}
             >
-              📋 Projects
+              <Icon name="project" className="w-3.5 h-3.5" /> Projects
             </button>
           </div>
           <button
             onClick={() => setShowCreateGroup(true)}
-            className="px-4 py-2 rounded-lg bg-tw-primary text-white text-sm font-semibold hover:opacity-90 transition-opacity flex items-center gap-2"
+            className="btn-primary"
           >
-            + New Group
+            <Icon name="plus" className="w-4 h-4" /> New Group
           </button>
-        </div>
-      </div>
+        </>} />
 
       {error && (
-        <div className="mb-4 bg-red-50 border border-red-200 text-tw-danger text-sm px-3 py-2 rounded-lg">
+        <div className="mb-4 alert-error">
           {error}
           <button className="ml-2 underline" onClick={() => setError('')}>dismiss</button>
         </div>
@@ -1533,11 +1524,9 @@ export default function GroupWiseTasksPage() {
       {viewMode === 'group' && (
         <>
           {groups.length === 0 ? (
-            <div className="card p-12 text-center text-tw-text-secondary">
-              <div className="text-5xl mb-4">👥</div>
-              <p className="font-semibold text-tw-text text-lg">No groups yet</p>
-              <p className="text-sm mt-1 mb-4">Create a cross-department group and assign tasks to all members at once.</p>
-              <button onClick={() => setShowCreateGroup(true)} className="btn-primary">+ Create First Group</button>
+            <div className="card">
+              <EmptyState icon="users" tone="teal" title="No groups yet" text="Create a cross-department group and assign tasks to all members at once."
+                action={<button onClick={() => setShowCreateGroup(true)} className="btn-primary"><Icon name="plus" className="w-4 h-4" /> Create First Group</button>} />
             </div>
           ) : (
             <div className="space-y-3">
@@ -1564,10 +1553,8 @@ export default function GroupWiseTasksPage() {
       {viewMode === 'project' && (
         <>
           {groups.filter(g => (g.groupProjects || []).length > 0).length === 0 ? (
-            <div className="card p-12 text-center text-tw-text-secondary">
-              <div className="text-5xl mb-4">📋</div>
-              <p className="font-semibold text-tw-text text-lg">No group projects yet</p>
-              <p className="text-sm mt-1">Create a group first, then add projects to it.</p>
+            <div className="card">
+              <EmptyState icon="project" tone="blue" title="No group projects yet" text="Create a group first, then add projects to it." />
             </div>
           ) : (
             <div className="space-y-4">
@@ -1578,7 +1565,7 @@ export default function GroupWiseTasksPage() {
                   return (
                     <div key={group.id}>
                       <div className="flex items-center gap-2 mb-2">
-                        <span className="text-xs font-bold text-tw-text-secondary uppercase tracking-wide">Group:</span>
+                        <span className="section-label">Group:</span>
                         <span className="text-sm font-semibold text-tw-text">{group.name}</span>
                         <span className="badge badge-gray">{(group.members || []).length} members</span>
                       </div>
@@ -1596,7 +1583,7 @@ export default function GroupWiseTasksPage() {
                                 <span className="font-semibold text-tw-text">{gp.project?.name}</span>
                                 <button
                                   onClick={() => setAssignTaskTarget(group)}
-                                  className="ml-auto text-xs px-2.5 py-1 rounded-lg bg-tw-primary text-white hover:opacity-90"
+                                  className="btn-primary btn-sm ml-auto"
                                 >
                                   + Assign Task
                                 </button>

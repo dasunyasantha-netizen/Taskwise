@@ -13,6 +13,8 @@ import InsurancePolicyCompletionPrompt from './components/InsurancePolicyComplet
 import { authApi, noticeApi, type Notice } from './services/apiService'
 import { captureLaunchSource, sharedIdentityUrl, type LaunchSource } from './services/launchSource'
 import { LanguageProvider } from './i18n/Language'
+import { Icon } from './components/ui/Icon'
+import { LoadingBlock } from './components/ui/Primitives'
 
 function NoticeBanner({ loggedIn }: { loggedIn: boolean }) {
   const [notices, setNotices] = useState<Notice[]>([])
@@ -32,18 +34,18 @@ function NoticeBanner({ loggedIn }: { loggedIn: boolean }) {
   return (
     <div className="fixed inset-x-0 top-0 z-[9999] space-y-0">
       {notices.map(notice => (
-        <div key={notice.id} className="bg-amber-50 border-b-2 border-amber-300 shadow-lg">
+        <div key={notice.id} className="bg-amber-50 border-b border-amber-300 shadow-panel">
           <div className="max-w-3xl mx-auto px-4 py-4">
             <div className="flex items-start justify-between gap-4">
               <div className="flex items-start gap-3">
-                <span className="text-amber-500 text-xl flex-shrink-0 mt-0.5">⚠️</span>
-                <p className="text-sm text-amber-900 whitespace-pre-wrap leading-relaxed">{notice.message}</p>
+                <span className="icon-tile tile-amber w-8 h-8 rounded-lg flex-shrink-0"><Icon name="alert" className="w-4 h-4" /></span>
+                <p className="text-sm text-amber-900 whitespace-pre-wrap leading-relaxed pt-1">{notice.message}</p>
               </div>
               <button
                 onClick={() => dismiss(notice.id)}
-                className="flex-shrink-0 bg-amber-400 hover:bg-amber-500 text-white font-bold text-base leading-none rounded-lg w-8 h-8 flex items-center justify-center shadow transition-colors"
+                className="flex-shrink-0 icon-btn w-8 h-8 text-amber-800 hover:bg-amber-100"
                 aria-label="Dismiss">
-                ✕
+                <Icon name="x" className="w-4 h-4" />
               </button>
             </div>
           </div>
@@ -272,7 +274,7 @@ export default function App() {
   if (loading) {
     return (
       <div className="min-h-screen bg-tw-bg flex items-center justify-center">
-        <div className="text-tw-text-secondary text-sm">Loading...</div>
+        <LoadingBlock />
       </div>
     )
   }

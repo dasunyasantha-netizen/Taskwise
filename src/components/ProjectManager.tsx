@@ -4,6 +4,8 @@ import { projectApi, projectCategoryApi, taskApi, workspaceApi } from '../servic
 import FilterBar, { DEFAULT_FILTERS, filterTasks, computeAvailableOptions, hasActiveFilters } from './FilterBar'
 import type { ActiveFilters, AvailableOptions } from './FilterBar'
 import Select from './Select'
+import { PageHeader, EmptyState, LoadingBlock } from './ui/Primitives'
+import { Icon } from './ui/Icon'
 
 interface Props {
   onSelectProject: (project: Project) => void
@@ -89,19 +91,22 @@ function ProjectCard({ project: p, onSelect, onEdit, onArchive, canEdit }: Proje
     <div
       {...longPressProps}
       onClick={e => { lpClick(e); if (!e.defaultPrevented) onSelect(p) }}
-      className="card p-4 cursor-pointer hover:shadow-panel transition-shadow group select-none"
+      className="card card-hover p-4 cursor-pointer group select-none relative overflow-hidden"
     >
+      <div className="absolute inset-x-0 top-0 h-0.5 opacity-80" style={{ backgroundColor: p.color }} />
       <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: p.color }} />
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: p.color + '1f', color: p.color }}>
+            <Icon name="project" className="w-[18px] h-[18px]" />
+          </span>
           <span className="font-semibold text-tw-text text-sm truncate">{p.name}</span>
         </div>
         {canEdit && (
           <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0 ml-2">
             <button onClick={e => { e.stopPropagation(); onEdit(p, e) }}
-              className="text-xs font-medium px-2.5 py-1 rounded-md bg-tw-primary/10 text-tw-primary hover:bg-tw-primary hover:text-white transition-colors">Edit</button>
+              className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-tw-primary/10 text-tw-primary-text hover:bg-tw-primary hover:text-white transition-colors">Edit</button>
             <button onClick={e => onArchive(p.id, e)}
-              className="text-xs font-medium px-2.5 py-1 rounded-md bg-gray-100 text-tw-text-secondary hover:bg-tw-danger hover:text-white transition-colors">Archive</button>
+              className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-tw-hover text-tw-text-secondary hover:bg-tw-danger hover:text-white transition-colors">Archive</button>
           </div>
         )}
       </div>
@@ -128,7 +133,7 @@ function FilteredTaskCard({ task, onSelect }: { task: Task; onSelect?: (t: Task)
 
   return (
     <div
-      className={`card p-4 space-y-2.5 ${onSelect ? 'cursor-pointer hover:border-tw-primary/40 hover:shadow-md transition-all active:scale-[0.99]' : ''}`}
+      className={`card p-4 space-y-2.5 ${onSelect ? 'cursor-pointer card-hover active:scale-[0.99]' : ''}`}
       onClick={() => onSelect?.(task)}
     >
       <div className="flex items-start justify-between gap-2">
@@ -138,7 +143,7 @@ function FilteredTaskCard({ task, onSelect }: { task: Task; onSelect?: (t: Task)
           </span>
           <span className="font-medium text-tw-text text-sm leading-snug">{task.title}</span>
         </div>
-        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${STATUS_STYLES[task.status] ?? 'bg-gray-100 text-gray-600'}`}>
+        <span className={`badge flex-shrink-0 ring-0 ${STATUS_STYLES[task.status] ?? 'bg-gray-100 text-gray-600'}`}>
           {STATUS_LABELS[task.status] ?? task.status}
         </span>
       </div>
@@ -146,7 +151,7 @@ function FilteredTaskCard({ task, onSelect }: { task: Task; onSelect?: (t: Task)
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-tw-text-secondary">
         {assignee && (
           <span className="flex items-center gap-1">
-            <span className="w-5 h-5 rounded-full bg-tw-primary/10 text-tw-primary font-bold flex items-center justify-center text-[10px] flex-shrink-0">
+            <span className="w-5 h-5 rounded-full bg-tw-primary/10 text-tw-primary-text font-bold flex items-center justify-center text-[10px] flex-shrink-0">
               {assignee.name.charAt(0).toUpperCase()}
             </span>
             {assignee.name}
@@ -203,21 +208,21 @@ function CategoryModal({ initial, onSave, onClose }: CategoryModalProps) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-panel w-full max-w-md">
+    <div className="fixed inset-0 flex items-center justify-center z-50 p-4 bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in">
+      <div className="modal-panel w-full max-w-md">
         <div className="flex items-center justify-between px-5 py-4 border-b border-tw-border">
           <h3 className="font-semibold text-tw-text">{initial ? 'Edit Category' : 'New Category'}</h3>
-          <button onClick={onClose} className="text-tw-text-secondary hover:text-tw-text text-xl">×</button>
+          <button onClick={onClose} className="icon-btn w-8 h-8" aria-label="Close"><Icon name="x" className="w-4 h-4" /></button>
         </div>
         <div className="px-5 py-4 space-y-4">
-          {error && <div className="bg-red-50 border border-red-200 text-tw-danger text-sm px-3 py-2 rounded-lg">{error}</div>}
+          {error && <div className="alert-error">{error}</div>}
           <div>
-            <label className="block text-sm font-medium text-tw-text mb-1">Category Name</label>
+            <label className="label text-[13px] text-tw-text">Category Name</label>
             <input className="input" placeholder="e.g. Construction" value={form.name}
               onChange={e => setForm(f => ({ ...f, name: e.target.value }))} autoFocus />
           </div>
           <div>
-            <label className="block text-sm font-medium text-tw-text mb-1">Description (optional)</label>
+            <label className="label text-[13px] text-tw-text">Description (optional)</label>
             <textarea className="input resize-none" rows={2} placeholder="Brief description..." value={form.description}
               onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
           </div>
@@ -276,16 +281,16 @@ function ProjectModal({ initial, categories, onSave, onClose }: ProjectModalProp
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-panel w-full max-w-md">
+    <div className="fixed inset-0 flex items-center justify-center z-50 p-4 bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in">
+      <div className="modal-panel w-full max-w-md">
         <div className="flex items-center justify-between px-5 py-4 border-b border-tw-border">
           <h3 className="font-semibold text-tw-text">{initial ? 'Edit Project' : 'New Project'}</h3>
-          <button onClick={onClose} className="text-tw-text-secondary hover:text-tw-text text-xl">×</button>
+          <button onClick={onClose} className="icon-btn w-8 h-8" aria-label="Close"><Icon name="x" className="w-4 h-4" /></button>
         </div>
         <div className="px-5 py-4 space-y-4">
-          {error && <div className="bg-red-50 border border-red-200 text-tw-danger text-sm px-3 py-2 rounded-lg">{error}</div>}
+          {error && <div className="alert-error">{error}</div>}
           <div>
-            <label className="block text-sm font-medium text-tw-text mb-1">Category <span className="text-tw-danger">*</span></label>
+            <label className="label text-[13px] text-tw-text">Category <span className="text-tw-danger">*</span></label>
             <Select
               value={form.categoryId}
               onChange={v => setForm(f => ({ ...f, categoryId: v }))}
@@ -294,12 +299,12 @@ function ProjectModal({ initial, categories, onSave, onClose }: ProjectModalProp
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-tw-text mb-1">Project Name <span className="text-tw-danger">*</span></label>
+            <label className="label text-[13px] text-tw-text">Project Name <span className="text-tw-danger">*</span></label>
             <input className="input" placeholder="e.g. Website Redesign" value={form.name}
               onChange={e => setForm(f => ({ ...f, name: e.target.value }))} autoFocus />
           </div>
           <div>
-            <label className="block text-sm font-medium text-tw-text mb-1">Description (optional)</label>
+            <label className="label text-[13px] text-tw-text">Description (optional)</label>
             <textarea className="input resize-none" rows={2} placeholder="Brief description..." value={form.description}
               onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
           </div>
@@ -352,15 +357,17 @@ function CategorySection({
   const canEditCategory = isDirector && !category.isSystem && (!category.directorId || category.directorId === actorId)
 
   return (
-    <div className={`mb-3 rounded-xl border border-tw-border bg-white shadow-sm overflow-hidden ${isArchived ? 'opacity-70' : ''}`}>
+    <div className={`mb-3 card overflow-hidden ${isArchived ? 'opacity-70' : ''}`}>
       {/* Card header — always visible, click to expand */}
-      <div className="group flex items-center justify-between px-4 py-3 cursor-pointer select-none hover:bg-tw-hover transition-colors"
+      <div className="group flex items-center justify-between px-4 py-3.5 cursor-pointer select-none hover:bg-tw-hover transition-colors"
         onClick={() => setExpanded(e => !e)}>
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: category.color }} />
+          <span className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: category.color + '1f', color: category.color }}>
+            <Icon name="layers" className="w-4 h-4" />
+          </span>
           <span className="font-semibold text-tw-text text-sm">{category.name}</span>
           {isArchived && (
-            <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 flex-shrink-0">Archived</span>
+            <span className="badge badge-gray flex-shrink-0">Archived</span>
           )}
           <span className="text-xs text-tw-text-secondary font-normal flex-shrink-0">
             {totalProjects} project{totalProjects !== 1 ? 's' : ''}
@@ -371,25 +378,22 @@ function CategorySection({
             <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-all"
               onClick={e => e.stopPropagation()}>
               <button onClick={() => onEditCategory(category)}
-                className="text-xs font-medium px-2.5 py-1 rounded-md bg-tw-primary/10 text-tw-primary hover:bg-tw-primary hover:text-white transition-colors">Edit</button>
+                className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-tw-primary/10 text-tw-primary-text hover:bg-tw-primary hover:text-white transition-colors">Edit</button>
               {isArchived
                 ? <button onClick={() => onUnarchiveCategory(category)}
-                    className="text-xs font-medium px-2.5 py-1 rounded-md bg-gray-100 text-tw-text-secondary hover:bg-tw-primary hover:text-white transition-colors">Unarchive</button>
+                    className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-tw-hover text-tw-text-secondary hover:bg-tw-primary hover:text-white transition-colors">Unarchive</button>
                 : <button onClick={() => onArchiveCategory(category)}
-                    className="text-xs font-medium px-2.5 py-1 rounded-md bg-gray-100 text-tw-text-secondary hover:bg-tw-danger hover:text-white transition-colors">Archive</button>
+                    className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-tw-hover text-tw-text-secondary hover:bg-tw-danger hover:text-white transition-colors">Archive</button>
               }
             </div>
           )}
-          <svg className={`w-4 h-4 text-tw-text-secondary transition-transform flex-shrink-0 ${expanded ? '' : '-rotate-90'}`}
-            fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
+          <Icon name="chevronDown" className={`w-4 h-4 text-tw-text-secondary transition-transform flex-shrink-0 ${expanded ? '' : '-rotate-90'}`} />
         </div>
       </div>
 
       {/* Card body — projects */}
       {expanded && (
-        <div className="px-4 pb-4 pt-1 border-t border-tw-border/60">
+        <div className="px-4 pb-4 pt-1 border-t border-tw-border bg-tw-surface-2/50">
           {totalProjects === 0 ? (
             <p className="text-sm text-tw-text-secondary py-3">No projects in this category.</p>
           ) : (
@@ -403,7 +407,7 @@ function CategorySection({
               </div>
               {archivedProjects.length > 0 && (
                 <div className="mt-4">
-                  <h4 className="text-xs font-semibold text-tw-text-secondary uppercase tracking-wide mb-2">Archived</h4>
+                  <h4 className="section-label mb-2">Archived</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {archivedProjects.map(p => (
                       <div key={p.id} className="card p-4 opacity-60">
@@ -541,34 +545,27 @@ export default function ProjectManager({ onSelectProject, onSelectTask, filters,
     .filter(p => p.status === 'active').length
 
   return (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-xl font-bold text-tw-text">Projects</h1>
-          {filtersActive
-            ? <p className="text-sm text-tw-text-secondary mt-0.5">{loading ? '…' : filteredTasks.length} task{filteredTasks.length !== 1 ? 's' : ''} matched</p>
-            : <p className="text-sm text-tw-text-secondary mt-0.5">{totalActiveProjects} active project{totalActiveProjects !== 1 ? 's' : ''} across {activeCategories.length} categor{activeCategories.length !== 1 ? 'ies' : 'y'}</p>
-          }
-        </div>
-        {!filtersActive && isDirector && (
-          <div className="flex items-center gap-2">
-            <button onClick={() => setShowCategoryPanel(p => !p)}
-              className={`btn-secondary text-sm ${showCategoryPanel ? 'border-tw-primary text-tw-primary' : ''}`}>
-              Categories
-            </button>
-            <button onClick={() => setShowProjectModal(true)} className="btn-primary">+ New Project</button>
-          </div>
-        )}
-      </div>
+    <div className="page">
+      <PageHeader icon="project" tone="blue" title="Projects"
+        subtitle={filtersActive
+          ? <>{loading ? '…' : filteredTasks.length} task{filteredTasks.length !== 1 ? 's' : ''} matched</>
+          : <>{totalActiveProjects} active project{totalActiveProjects !== 1 ? 's' : ''} across {activeCategories.length} categor{activeCategories.length !== 1 ? 'ies' : 'y'}</>}
+        actions={!filtersActive && isDirector ? <>
+          <button onClick={() => setShowCategoryPanel(p => !p)}
+            className={`btn-secondary ${showCategoryPanel ? 'border-tw-primary/50 text-tw-primary-text' : ''}`}>
+            <Icon name="layers" className="w-4 h-4" /> Categories
+          </button>
+          <button onClick={() => setShowProjectModal(true)} className="btn-primary"><Icon name="plus" className="w-4 h-4" /> New Project</button>
+        </> : undefined} />
 
-      {error && <div className="mb-4 bg-red-50 border border-red-200 text-tw-danger text-sm px-3 py-2 rounded-lg">{error}</div>}
+      {error && <div className="mb-4 alert-error">{error}</div>}
 
       {/* Category management panel */}
       {showCategoryPanel && isDirector && (
         <div className="mb-6 card p-5">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold text-tw-text">Manage Categories</h3>
-            <button onClick={() => setShowCategoryModal(true)} className="btn-primary text-sm">+ New Category</button>
+            <button onClick={() => setShowCategoryModal(true)} className="btn-primary btn-sm"><Icon name="plus" className="w-3.5 h-3.5" /> New Category</button>
           </div>
           {categories.filter(c => !c.isSystem).length === 0 ? (
             <p className="text-sm text-tw-text-secondary">No categories yet. Create one to get started.</p>
@@ -577,7 +574,7 @@ export default function ProjectManager({ onSelectProject, onSelectTask, filters,
               {[...activeCategories, ...archivedCategories].map(cat => {
                 const canEditCat = !cat.directorId || cat.directorId === actorId
                 return (
-                <div key={cat.id} className={`flex items-center justify-between px-4 py-3 rounded-xl border border-tw-border bg-white shadow-sm hover:shadow-md transition-shadow ${cat.status === 'archived' ? 'opacity-60' : ''}`}>
+                <div key={cat.id} className={`flex items-center justify-between px-4 py-3 rounded-xl border border-tw-border bg-tw-surface-2 hover:border-tw-border-strong transition-colors ${cat.status === 'archived' ? 'opacity-60' : ''}`}>
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color }} />
                     <div className="min-w-0">
@@ -585,7 +582,7 @@ export default function ProjectManager({ onSelectProject, onSelectTask, filters,
                       {cat.description && <span className="text-xs text-tw-text-secondary ml-2">{cat.description}</span>}
                     </div>
                     {cat.status === 'archived' && (
-                      <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 flex-shrink-0">Archived</span>
+                      <span className="badge badge-gray flex-shrink-0">Archived</span>
                     )}
                     <span className="text-xs text-tw-text-secondary flex-shrink-0">
                       {(cat.projects ?? []).filter(p => p.status === 'active').length} project{(cat.projects ?? []).filter(p => p.status === 'active').length !== 1 ? 's' : ''}
@@ -594,12 +591,12 @@ export default function ProjectManager({ onSelectProject, onSelectTask, filters,
                   {canEditCat && (
                     <div className="flex items-center gap-1.5 flex-shrink-0 ml-4">
                       <button onClick={() => { setEditingCategory(cat); setShowCategoryModal(true) }}
-                        className="text-xs font-medium px-2.5 py-1 rounded-md bg-tw-primary/10 text-tw-primary hover:bg-tw-primary hover:text-white transition-colors">Edit</button>
+                        className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-tw-primary/10 text-tw-primary-text hover:bg-tw-primary hover:text-white transition-colors">Edit</button>
                       {cat.status === 'archived'
                         ? <button onClick={() => handleUnarchiveCategory(cat)}
-                            className="text-xs font-medium px-2.5 py-1 rounded-md bg-gray-100 text-tw-text-secondary hover:bg-tw-primary hover:text-white transition-colors">Unarchive</button>
+                            className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-tw-hover text-tw-text-secondary hover:bg-tw-primary hover:text-white transition-colors">Unarchive</button>
                         : <button onClick={() => handleArchiveCategory(cat)}
-                            className="text-xs font-medium px-2.5 py-1 rounded-md bg-gray-100 text-tw-text-secondary hover:bg-tw-danger hover:text-white transition-colors">Archive</button>
+                            className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-tw-hover text-tw-text-secondary hover:bg-tw-danger hover:text-white transition-colors">Archive</button>
                       }
                     </div>
                   )}
@@ -621,25 +618,19 @@ export default function ProjectManager({ onSelectProject, onSelectTask, filters,
       />
 
       {loading ? (
-        <div className="text-sm text-tw-text-secondary">Loading…</div>
+        <LoadingBlock />
       ) : filtersActive ? (
         filteredTasks.length === 0 ? (
-          <div className="card p-12 text-center">
-            <div className="text-3xl mb-3">🔍</div>
-            <p className="text-tw-text font-semibold mb-1">No tasks found</p>
-            <p className="text-tw-text-secondary text-sm">No tasks match the selected filters.</p>
-          </div>
+          <div className="card"><EmptyState icon="search" title="No tasks found" text="No tasks match the selected filters." /></div>
         ) : (
           <div className="space-y-3">
             {filteredTasks.map(t => <FilteredTaskCard key={t.id} task={t} onSelect={onSelectTask} />)}
           </div>
         )
       ) : allProjectsFlat.length === 0 ? (
-        <div className="card p-12 text-center">
-          <div className="text-4xl mb-4">📋</div>
-          <p className="text-tw-text font-semibold mb-1">No projects yet</p>
-          <p className="text-tw-text-secondary text-sm mb-4">Create a category and then add your first project.</p>
-          {isDirector && <button onClick={() => setShowProjectModal(true)} className="btn-primary">Create Project</button>}
+        <div className="card">
+          <EmptyState icon="project" tone="blue" title="No projects yet" text="Create a category and then add your first project."
+            action={isDirector ? <button onClick={() => setShowProjectModal(true)} className="btn-primary"><Icon name="plus" className="w-4 h-4" /> Create Project</button> : undefined} />
         </div>
       ) : (
         <>
