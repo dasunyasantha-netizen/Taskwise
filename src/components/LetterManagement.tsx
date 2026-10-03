@@ -924,7 +924,7 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
                     className={`w-full text-left rounded-xl border border-tw-border border-l-4 ${accent} bg-white px-4 py-2 hover:shadow-md transition-shadow`}
                   >
                     <div className={`hidden md:grid ${letterColumns} gap-3 items-center text-sm`}>
-                      <span className="font-mono text-xs font-semibold text-tw-primary truncate">{t.reference}</span>
+                      <span className="text-sm font-semibold tabular-nums text-tw-primary truncate">{t.reference}</span>
                       <span className="font-semibold truncate" title={t.subject}>{t.subject}</span>
                       <span className="text-tw-text-secondary truncate" title={t.sender}>{t.sender}</span>
                       <span className="truncate" title={t.assignedToName}>{t.assignedToName}</span>
@@ -948,7 +948,7 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
                         <span className={`shrink-0 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${badge}`}>{age}</span>
                       </div>
                       <div className="flex items-center gap-1 text-xs text-tw-text-secondary mt-0.5 min-w-0">
-                        <span className="font-mono text-tw-primary shrink-0">{t.reference}</span>
+                        <span className="font-semibold text-tw-primary tabular-nums shrink-0">{t.reference}</span>
                         <span className="truncate">· {t.sender} · {t.assignedToName}</span>
                       </div>
                     </div>
@@ -997,7 +997,7 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
         <>
           <section className={box}>
             <div className="flex flex-wrap justify-between gap-2">
-              <p className="font-mono text-sm text-tw-primary font-semibold">
+              <p className="text-sm tabular-nums text-tw-primary font-semibold">
                 {thread.reference}
               </p>
               <Status closed={thread.status === 'CLOSED'} />
