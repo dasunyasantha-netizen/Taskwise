@@ -1569,14 +1569,15 @@ export default function YsoPerformancePage({ user, onUserUpdate }: { user: AuthU
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           <DatePicker
             ariaLabel={tr("Reporting month")}
             mode="month"
             compact
+            clearable={false}
             minDate="2000-01-01"
             maxDate="2099-12-31"
-            className="min-w-[150px] flex-1 sm:flex-none [&>button]:min-h-10"
+            className="min-w-0 flex-1 sm:flex-none sm:min-w-[170px] [&>button]:min-h-10 [&>button]:px-3"
             value={period}
             onChange={(value) =>
               /^20\d{2}-(0[1-9]|1[0-2])$/.test(value) && setPeriod(value)
@@ -1584,7 +1585,7 @@ export default function YsoPerformancePage({ user, onUserUpdate }: { user: AuthU
           />
           <LanguageToggle user={user} onUserUpdate={onUserUpdate} />
           <button
-            className="icon-btn border-tw-border bg-tw-surface w-10 h-10"
+            className="icon-btn border-tw-border bg-tw-surface w-10 h-10 flex-shrink-0 hidden sm:inline-flex"
             title={tr("Refresh")}
             aria-label={tr("Refresh")}
             onClick={() => refresh().catch((e) => setError(e.message))}

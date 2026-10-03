@@ -6,6 +6,8 @@ interface Props {
   value: string        // "YYYY-MM-DD", or "YYYY-MM" in month mode
   onChange: (val: string) => void
   placeholder?: string
+  /** Show the × clear control when a value is set (default true) */
+  clearable?: boolean
   minDate?: string
   maxDate?: string
   className?: string
@@ -18,7 +20,7 @@ interface Props {
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 const DAYS   = ['Su','Mo','Tu','We','Th','Fr','Sa']
 
-export default function DatePicker({ value, onChange, placeholder = 'Select date', minDate, maxDate, className = '', triggerClassName, compact = false, mode = 'date', ariaLabel }: Props) {
+export default function DatePicker({ value, onChange, placeholder = 'Select date', minDate, maxDate, className = '', triggerClassName, compact = false, mode = 'date', ariaLabel, clearable = true }: Props) {
   const { t, locale, language } = useLanguage()
   const today = new Date()
   const parsed = value ? new Date(value + (mode === 'month' ? '-01' : '') + 'T00:00:00') : null
@@ -221,16 +223,16 @@ export default function DatePicker({ value, onChange, placeholder = 'Select date
         onKeyDown={e => { if (e.key === 'Escape' && open) { e.stopPropagation(); close() } }}
         aria-label={ariaLabel}
         aria-expanded={open}
-        className={triggerClassName ?? `w-full flex items-center justify-between border rounded-xl px-3.5 py-2.5 text-sm bg-tw-surface hover:border-tw-border-strong focus:outline-none focus:ring-4 focus:ring-tw-primary/15 focus:border-tw-primary/60 transition-all ${open ? 'border-tw-primary/60 ring-4 ring-tw-primary/15' : 'border-tw-border'}`}
+        className={triggerClassName ?? `w-full flex items-center justify-between gap-2 border rounded-xl px-3.5 py-2.5 text-sm bg-tw-surface hover:border-tw-border-strong focus:outline-none focus:ring-4 focus:ring-tw-primary/15 focus:border-tw-primary/60 transition-all ${open ? 'border-tw-primary/60 ring-4 ring-tw-primary/15' : 'border-tw-border'}`}
       >
         <div className="flex items-center gap-2 min-w-0">
           <svg className="w-4 h-4 text-tw-text-secondary flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
           </svg>
-          <span className={displayValue ? 'text-tw-text' : 'text-tw-text-secondary'}>{displayValue || t(placeholder)}</span>
+          <span className={`truncate whitespace-nowrap ${displayValue ? 'text-tw-text' : 'text-tw-text-secondary'}`}>{displayValue || t(placeholder)}</span>
         </div>
-        <div className="flex items-center gap-1">
-          {value && (
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {value && clearable && (
             <span onClick={clear} className="text-tw-text-secondary hover:text-tw-danger transition-colors p-0.5 rounded" title={t('Clear')}>
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />

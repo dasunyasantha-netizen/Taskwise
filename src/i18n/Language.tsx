@@ -138,9 +138,9 @@ export function LanguageToggle({ user, onUserUpdate }: { user: AuthUser; onUserU
     } catch { setError(t('Could not save language. Please retry.')) }
     finally { setSaving(false) }
   }
-  return <div className="flex flex-col items-end gap-1">
+  return <div className="flex flex-col items-end gap-1 flex-shrink-0">
     <div role="group" aria-label={t('Language')} title={user.impersonation ? t('Support access: changes the language for you only.') : undefined} className="seg">
-      {LANGUAGES.map(l => <button key={l.value} type="button" lang={l.value} disabled={saving} aria-pressed={language === l.value} onClick={() => select(l.value)} className={`seg-item min-h-8 ${language === l.value ? 'seg-item-active' : ''}`}>{l.label}</button>)}
+      {LANGUAGES.map(l => <button key={l.value} type="button" lang={l.value} disabled={saving} aria-pressed={language === l.value} onClick={() => select(l.value)} className={`seg-item min-h-8 px-2.5 sm:px-3 ${language === l.value ? 'seg-item-active' : ''}`}>{l.label}</button>)}
     </div>
     {error && <span role="alert" className="text-xs text-rose-700">{error}</span>}
   </div>
