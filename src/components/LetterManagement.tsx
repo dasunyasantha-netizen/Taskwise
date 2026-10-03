@@ -17,7 +17,7 @@ const secondary = 'btn-secondary min-h-11'
 const timestamp = (value: string, locale = 'en-GB') =>
   displayDate(value, locale === 'si-LK' ? 'si' : 'en', true)
 const letterColumns =
-  'grid-cols-[140px_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,0.8fr)_100px_64px_76px]'
+  'grid-cols-[170px_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,0.8fr)_110px_64px_76px]'
 const shortDate = (value: string, locale = 'en-GB') =>
   displayDate(value, locale === 'si-LK' ? 'si' : 'en')
 function Field({
@@ -924,11 +924,11 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
                     className={`w-full text-left rounded-xl border border-tw-border border-l-4 ${accent} bg-white px-4 py-2 hover:shadow-md transition-shadow`}
                   >
                     <div className={`hidden md:grid ${letterColumns} gap-3 items-center text-sm`}>
-                      <span className="text-sm font-semibold tabular-nums text-tw-primary truncate">{t.reference}</span>
+                      <span className="font-medium text-tw-primary whitespace-nowrap">{t.reference}</span>
                       <span className="font-semibold truncate" title={t.subject}>{t.subject}</span>
                       <span className="text-tw-text-secondary truncate" title={t.sender}>{t.sender}</span>
                       <span className="truncate" title={t.assignedToName}>{t.assignedToName}</span>
-                      <span className="text-xs whitespace-nowrap">
+                      <span className="whitespace-nowrap">
                         {shortDate(t.firstReceivedDate, locale)}
                         {late && (
                           <span
