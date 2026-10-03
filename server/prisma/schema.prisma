@@ -371,7 +371,9 @@ model YsoAttachment {
   submission   YsoSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
   name         String
   mime         String
-  bytes        Bytes
+  // The scan lives only in the workspace's Google Drive (Letters folder).
+  driveFileId  String
+  size         Int
 }
 
 model YsoAssessment {
@@ -1111,6 +1113,7 @@ model LetterCounter {
 model LetterSettings {
   workspaceId String @id
   folderId String?
+  ysoFolderId String?
   clientId String?
   encryptedSecret String?
   encryptedRefreshToken String?

@@ -145,6 +145,96 @@ function Modal({
     </div>
   )
 }
+// ─── Certificate scan upload (qualification tasks) ────────────────────────────
+// Scans are sent once with the submission and stored only in the workspace's
+// Google Drive; nothing is kept in the browser or on the TaskWise server.
+const CERT_MAX_BYTES = 10 * 1024 * 1024
+const CERT_TYPES = ['application/pdf', 'image/png', 'image/jpeg']
+const fileSize = (bytes: number) =>
+  bytes >= 1048576 ? `${(bytes / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`
+
+function CertificateUpload({ file, onChange, disabled }: {
+  file: File | null
+  onChange: (file: File | null) => void
+  disabled?: boolean
+}) {
+  const { t: tr } = useLanguage()
+  const [problem, setProblem] = useState('')
+  const [dragging, setDragging] = useState(false)
+  const [preview, setPreview] = useState('')
+  const pickRef = React.useRef<HTMLInputElement>(null)
+  const cameraRef = React.useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    if (!file || !file.type.startsWith('image/')) { setPreview(''); return }
+    const url = URL.createObjectURL(file)
+    setPreview(url)
+    return () => URL.revokeObjectURL(url)
+  }, [file])
+  const accept = (candidate?: File | null) => {
+    if (!candidate) return
+    if (!CERT_TYPES.includes(candidate.type)) {
+      setProblem(tr('Use a PDF, PNG or JPEG file.'))
+      return
+    }
+    if (candidate.size > CERT_MAX_BYTES) {
+      setProblem(`${tr('This file is')} ${fileSize(candidate.size)}. ${tr('The limit is 10 MB.')}`)
+      return
+    }
+    setProblem('')
+    onChange(candidate)
+  }
+  return (
+    <div>
+      <span className="label">{tr('Scanned copy of certificate')} <span className="text-tw-danger">*</span></span>
+      <input ref={pickRef} type="file" className="sr-only" tabIndex={-1} aria-hidden="true"
+        accept="application/pdf,image/png,image/jpeg"
+        onChange={(e) => { accept(e.target.files?.[0]); e.target.value = '' }} />
+      <input ref={cameraRef} type="file" className="sr-only" tabIndex={-1} aria-hidden="true"
+        accept="image/jpeg,image/png" capture="environment"
+        onChange={(e) => { accept(e.target.files?.[0]); e.target.value = '' }} />
+      {file ? (
+        <div className="flex items-center gap-3 rounded-xl border border-teal-200 bg-teal-50 p-3">
+          {preview
+            ? <img src={preview} alt="" className="w-14 h-14 rounded-lg object-cover ring-1 ring-teal-200 flex-shrink-0" />
+            : <span className="icon-tile tile-teal w-14 h-14 rounded-lg"><Icon name="file" className="w-6 h-6" /></span>}
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-tw-text truncate">{file.name}</p>
+            <p className="text-xs text-tw-text-secondary">{fileSize(file.size)} · {tr('Ready to upload')}</p>
+          </div>
+          <button type="button" className="btn-ghost btn-sm" disabled={disabled} onClick={() => pickRef.current?.click()}>
+            {tr('Replace')}</button>
+          <button type="button" className="icon-btn w-8 h-8 hover:text-tw-danger" disabled={disabled}
+            aria-label={tr('Remove file')} onClick={() => onChange(null)}>
+            <Icon name="x" className="w-4 h-4" />
+          </button>
+        </div>
+      ) : (
+        <div
+          onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={(e) => { e.preventDefault(); setDragging(false); accept(e.dataTransfer.files?.[0]) }}
+          className={`rounded-xl border-2 border-dashed px-4 py-6 text-center transition-colors ${dragging ? 'border-teal-500 bg-teal-50' : 'border-tw-border bg-tw-surface-2'}`}
+        >
+          <span className="icon-tile tile-teal w-11 h-11 rounded-xl mx-auto"><Icon name="upload" className="w-5 h-5" /></span>
+          <p className="text-sm font-semibold text-tw-text mt-2.5">{tr('Upload a scan or photo of your certificate')}</p>
+          <p className="text-xs text-tw-text-secondary mt-0.5">{tr('PDF, PNG or JPEG · up to 10 MB · drag a file here')}</p>
+          <div className="flex flex-wrap justify-center gap-2 mt-3.5">
+            <button type="button" className="btn-secondary btn-sm" disabled={disabled} onClick={() => pickRef.current?.click()}>
+              <Icon name="file" className="w-3.5 h-3.5" />{tr('Choose file')}</button>
+            <button type="button" className="btn-secondary btn-sm sm:hidden" disabled={disabled} onClick={() => cameraRef.current?.click()}>
+              <Icon name="image" className="w-3.5 h-3.5" />{tr('Take photo')}</button>
+          </div>
+        </div>
+      )}
+      {problem && <p role="alert" className="text-xs text-tw-danger mt-1.5">{problem}</p>}
+      <p className="text-xs text-tw-text-secondary mt-2 flex items-start gap-1.5">
+        <Icon name="cloud" className="w-3.5 h-3.5 flex-shrink-0 mt-px" />
+        {tr("Saved to your organisation's Google Drive (the Letters folder). It is not stored on the TaskWise server.")}
+      </p>
+    </div>
+  )
+}
+
 function EntryForm({
   task,
   dashboard,
@@ -207,8 +297,10 @@ function EntryForm({
       }
       let attachment
       if (task.id >= 12) {
-        if (!file || file.size > 1048576)
-          throw new Error('Choose a PDF, PNG or JPEG certificate up to 1 MB.')
+        if (!dashboard.driveConnected)
+          throw new Error(tr("Google Drive isn't connected yet. Ask your Director to connect it (Settings → Letter management)."))
+        if (!file || file.size > CERT_MAX_BYTES || !CERT_TYPES.includes(file.type))
+          throw new Error(tr('Add a scanned copy of your certificate (PDF, PNG or JPEG, up to 10 MB).'))
         const base64 = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader()
           reader.onload = () => resolve(String(reader.result).split(',')[1])
@@ -348,21 +440,13 @@ function EntryForm({
               </label>
             )
           })}
-        {task.id >= 12 && (
-          <label className="block text-sm font-medium">
-            <span className="label">{tr("Certificate (PDF, PNG or JPEG; maximum 1 MB)")}</span><input
-              className="sr-only peer"
-              type="file"
-              required
-              accept=".pdf,.png,.jpg,.jpeg"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-            />
-            <span className="flex flex-col items-center gap-1.5 rounded-xl border-2 border-dashed border-tw-border bg-tw-surface-2 px-4 py-5 text-center cursor-pointer hover:border-teal-500/60 transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-teal-600">
-              <Icon name="upload" className="w-5 h-5 text-teal-600" />
-              <span className="text-sm font-semibold text-tw-text">{tr('Choose file')}</span>
-              <span className="text-xs text-tw-text-secondary" aria-live="polite">{file?.name ?? tr('No file selected')}</span>
-            </span>
-          </label>
+        {task.id >= 12 && task.id < 15 && (
+          dashboard.driveConnected
+            ? <CertificateUpload file={file} onChange={setFile} disabled={busy} />
+            : <div className="alert-warning flex items-start gap-2">
+                <Icon name="cloud" className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                <span>{tr("Google Drive isn't connected yet. Ask your Director to connect it (Settings → Letter management) so you can upload your certificate.")}</span>
+              </div>
         )}
         <p className="text-xs text-tw-text-secondary flex items-start gap-1.5">
           <Icon name="clock" className="w-3.5 h-3.5 flex-shrink-0 mt-px" />{tr("Submission time is recorded by the server. Points remain zero until AD approval. Dates use Sri Lanka time.")}</p>
@@ -373,7 +457,7 @@ function EntryForm({
         )}
         <button className={primary + ' w-full sm:w-auto py-3 sm:py-2'} disabled={busy}>
           {busy
-            ? tr("Submitting…")
+            ? task.id >= 12 ? tr("Uploading to Google Drive…") : tr("Submitting…")
             : previous
               ? tr("Submit revised entry")
               : tr("Submit for AD approval")}
@@ -1269,14 +1353,18 @@ export default function YsoPerformancePage({ user, onUserUpdate }: { user: AuthU
             <div className="flex flex-wrap gap-2 mt-3">
               {e.attachment && (
                 <button
-                  className="btn-secondary btn-sm"
+                  className="btn-secondary btn-sm max-w-full"
+                  title={e.attachment.name}
                   onClick={() =>
                     ysoApi
                       .certificate(e.attachment!)
                       .catch((error) => setError(error.message))
                   }
                 >
-                  <Icon name="download" className="w-3.5 h-3.5" />{tr("Download certificate")}</button>
+                  <Icon name="cloud" className="w-3.5 h-3.5 text-teal-600 flex-shrink-0" />
+                  <span className="truncate">{tr("Certificate")}{e.attachment.size ? ` · ${fileSize(e.attachment.size)}` : ''}</span>
+                  <Icon name="download" className="w-3.5 h-3.5 flex-shrink-0" />
+                </button>
               )}
               {canReview && pending(e) && (
                 <>
@@ -1911,7 +1999,7 @@ export default function YsoPerformancePage({ user, onUserUpdate }: { user: AuthU
             footer={
               task.id === 15 ? (
                 <p className="text-sm text-tw-text-secondary text-center py-1">{tr("Recorded by your AD — no submission needed.")}</p>
-              ) : canSubmit ? (
+              ) : canSubmit && (task.id < 12 || d.driveConnected) ? (
                 <button className="btn w-full py-3 text-white bg-gradient-to-b from-teal-500 to-teal-600 shadow-[0_4px_14px_-4px_rgba(13,148,136,0.7)] hover:brightness-110"
                   onClick={() => setEntryForm({ task })}>
                   <Icon name="plus" className="w-4 h-4" />{tr("Submit entry")}
@@ -1921,7 +2009,7 @@ export default function YsoPerformancePage({ user, onUserUpdate }: { user: AuthU
                   <button className="btn-secondary w-full py-3" disabled>
                     <Icon name="lock" className="w-4 h-4" />{tr("Submit entry")}
                   </button>
-                  <p className="text-xs text-center text-tw-text-secondary">{tr("Ask your AD to activate reporting to submit.")}</p>
+                  <p className="text-xs text-center text-tw-text-secondary">{canSubmit ? tr("Waiting for Google Drive to be connected.") : tr("Ask your AD to activate reporting to submit.")}</p>
                 </div>
               )
             }
@@ -1949,6 +2037,19 @@ export default function YsoPerformancePage({ user, onUserUpdate }: { user: AuthU
                 <p className="text-sm text-teal-900 mt-0.5 leading-relaxed">{tr(task.rule)}</p>
               </div>
             </div>
+            {task.id >= 12 && task.id < 15 && (
+              <div className={`rounded-xl border p-3.5 flex items-start gap-2.5 ${d.driveConnected ? 'border-tw-border bg-tw-surface-2' : 'border-amber-200 bg-amber-50'}`}>
+                <Icon name="cloud" className={`w-4 h-4 flex-shrink-0 mt-0.5 ${d.driveConnected ? 'text-teal-600' : 'text-amber-700'}`} />
+                <div>
+                  <p className={`text-xs font-semibold ${d.driveConnected ? 'text-tw-text' : 'text-amber-900'}`}>{tr("Certificate scan required")}</p>
+                  <p className={`text-sm mt-0.5 leading-relaxed ${d.driveConnected ? 'text-tw-text-secondary' : 'text-amber-800'}`}>
+                    {d.driveConnected
+                      ? tr("Attach a scan or photo of your certificate when you submit. It is saved in your organisation's Google Drive, not on the TaskWise server.")
+                      : tr("Google Drive isn't connected yet. Ask your Director to connect it (Settings → Letter management) so you can upload your certificate.")}
+                  </p>
+                </div>
+              </div>
+            )}
             {task.id === 9 && weekly.expected > 0 && (
               <div>
                 <div className="flex items-center justify-between text-xs mb-1.5">

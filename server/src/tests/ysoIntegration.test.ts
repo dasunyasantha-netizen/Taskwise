@@ -17,6 +17,10 @@ if (!['localhost', '127.0.0.1', '[::1]'].includes(source.hostname))
 source.pathname = '/taskwise_yso_test'
 process.env.DATABASE_URL = source.toString()
 process.env.JWT_SECRET = 'isolated-yso-integration-test-secret'
+// Certificate scans go to a (mocked) Google Drive connection
+process.env.LETTER_ENCRYPTION_KEY = '11'.repeat(32)
+process.env.LETTER_GOOGLE_CLIENT_ID = 'test-client'
+process.env.LETTER_GOOGLE_CLIENT_SECRET = 'test-secret'
 let passed = 0
 async function main() {
   const adminUrl = new URL(source)
@@ -173,7 +177,8 @@ async function main() {
       'feature gate, role gate, director read-only and cross-workspace isolation',
       async () => {
         await call('doctor', '/dashboard', undefined, 403)
-        await call('cross', '/dashboard', undefined, 403)
+        // A token for another workspace is refused by the session check before YSO scoping
+        await call('cross', '/dashboard', undefined, 401)
         await call(
           'director',
           `/people/${yso.id}/activate`,
@@ -508,55 +513,100 @@ async function main() {
       }
     )
     await check(
-      'certificate validates format, access and repeat lifetime award',
+      'certificate scans go to Google Drive only, with access checks and rollback',
       async () => {
+        const { OAuth2Client } = await import('google-auth-library')
+        const { encrypt } = await import('../helpers/letters')
+        const originalToken = OAuth2Client.prototype.getAccessToken,
+          originalFetch = global.fetch
         const data = {
           date: today,
           qualification: 'Diploma',
           institution: 'Institute',
           hours: 1200,
         }
-        await call(
-          'yso',
-          '/submissions',
-          {
-            task: 12,
-            data,
-            attachment: {
-              name: 'bad.pdf',
-              base64: Buffer.from('<html>bad</html>').toString('base64'),
-            },
-          },
-          400
-        )
-        const e = await call(
-          'yso',
-          '/submissions',
-          {
-            task: 12,
-            data,
-            attachment: {
-              name: 'certificate.pdf',
-              base64: Buffer.from('%PDF-1.4\n%%EOF').toString('base64'),
-            },
-          },
-          201
-        )
-        await review(e.id)
-        assert.equal(await points(12), 15)
-        const file = await db.ysoAttachment.findUniqueOrThrow({
-          where: { submissionId: e.id },
+        const pdf = Buffer.from('%PDF-1.4\n%%EOF')
+        const scan = { name: 'certificate.pdf', base64: pdf.toString('base64') }
+        // Drive not connected: rejected before anything is created
+        const before = await db.ysoSubmission.count({ where: { workspaceId: workspace.id } })
+        await call('yso', '/submissions', { task: 12, data, attachment: scan }, 409)
+        assert.equal(await db.ysoSubmission.count({ where: { workspaceId: workspace.id } }), before)
+        await db.letterSettings.upsert({
+          where: { workspaceId: workspace.id },
+          create: { workspaceId: workspace.id, connected: true, folderId: 'letters-folder-0001', encryptedRefreshToken: encrypt('test-refresh') },
+          update: { connected: true, folderId: 'letters-folder-0001', encryptedRefreshToken: encrypt('test-refresh') },
         })
-        assert.equal(
-          (
-            await fetch(base + `/certificates/${file.id}`, {
-              headers: { Authorization: `Bearer ${tokens.ad}` },
-            })
-          ).status,
-          200
-        )
-        await call('ad2', `/certificates/${file.id}`, undefined, 404)
-        await call('yso', '/submissions', { task: 12, data }, 409)
+        const drive = { uploads: 0, folders: 0, deleted: [] as string[], parents: [] as string[] }
+        OAuth2Client.prototype.getAccessToken = (async () => ({ token: 'mock-token' })) as any
+        global.fetch = (async (input: any, init: any = {}) => {
+          const url = String(input)
+          if (!url.startsWith('https://www.googleapis.com/')) return originalFetch(input, init)
+          if (url.includes('uploadType=multipart')) {
+            drive.uploads++
+            const body = Buffer.from(init.body).toString('latin1')
+            assert.ok(body.includes('%PDF-1.4'))
+            drive.parents.push(JSON.parse(body.split('\r\n\r\n')[1].split('\r\n')[0]).parents[0])
+            return new Response(JSON.stringify({ id: 'drive-cert-' + drive.uploads }), { status: 200 })
+          }
+          if (init.method === 'DELETE') {
+            drive.deleted.push(url.split('/files/')[1].split('?')[0])
+            return new Response(null, { status: 204 })
+          }
+          if (init.method === 'POST' && url.includes('/drive/v3/files?')) {
+            drive.folders++
+            return new Response(JSON.stringify({ id: 'yso-cert-folder' }), { status: 200 })
+          }
+          if (url.includes('alt=media'))
+            return new Response(pdf, { status: 200 })
+          if (url.includes('/files/yso-cert-folder'))
+            return new Response(JSON.stringify({ id: 'yso-cert-folder', trashed: false }), { status: 200 })
+          return new Response('{}', { status: 404 })
+        }) as any
+        try {
+          await call(
+            'yso',
+            '/submissions',
+            {
+              task: 12,
+              data,
+              attachment: {
+                name: 'bad.pdf',
+                base64: Buffer.from('<html>bad</html>').toString('base64'),
+              },
+            },
+            400
+          )
+          assert.equal(drive.uploads, 0)
+          const e = await call('yso', '/submissions', { task: 12, data, attachment: scan }, 201)
+          assert.equal(drive.uploads, 1)
+          assert.equal(drive.folders, 1)
+          assert.deepEqual(drive.parents, ['yso-cert-folder'])
+          assert.equal(
+            (await db.letterSettings.findUniqueOrThrow({ where: { workspaceId: workspace.id } })).ysoFolderId,
+            'yso-cert-folder'
+          )
+          await review(e.id)
+          assert.equal(await points(12), 15)
+          const file = await db.ysoAttachment.findUniqueOrThrow({
+            where: { submissionId: e.id },
+          })
+          assert.equal(file.driveFileId, 'drive-cert-1')
+          assert.equal(file.size, pdf.length)
+          assert.ok(!('bytes' in file), 'certificate bytes must not be stored')
+          const download = await fetch(base + `/certificates/${file.id}`, {
+            headers: { Authorization: `Bearer ${tokens.ad}` },
+          })
+          assert.equal(download.status, 200)
+          assert.deepEqual(Buffer.from(await download.arrayBuffer()), pdf)
+          await call('ad2', `/certificates/${file.id}`, undefined, 404)
+          // Repeat lifetime award is refused and its freshly uploaded scan removed again
+          await call('yso', '/submissions', { task: 12, data, attachment: scan }, 409)
+          assert.deepEqual(drive.deleted, ['drive-cert-2'])
+          await call('yso', '/submissions', { task: 12, data }, 409)
+        } finally {
+          global.fetch = originalFetch
+          OAuth2Client.prototype.getAccessToken = originalToken
+        }
       }
     )
     await check(

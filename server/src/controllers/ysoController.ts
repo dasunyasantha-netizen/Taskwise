@@ -14,6 +14,15 @@ import {
   projectScores,
   RULE_VERSION,
 } from '../helpers/ysoRules'
+import {
+  CertificateError,
+  type CertificateFile,
+  parseCertificate,
+  uploadCertificate,
+  downloadCertificate,
+  deleteCertificate,
+  isDriveConnected,
+} from '../helpers/ysoDrive'
 
 type DB = Prisma.TransactionClient
 class HttpError extends Error {
@@ -231,7 +240,7 @@ function handler(fn: (req: Request, res: Response) => Promise<void>) {
     try {
       await fn(req, res)
     } catch (error) {
-      if (error instanceof HttpError) {
+      if (error instanceof HttpError || error instanceof CertificateError) {
         res.status(error.status).json({ error: error.message })
         return
       }
@@ -261,7 +270,7 @@ export const getYsoDashboard = handler(async (req, res) => {
       prisma.ysoSubmission.findMany({
         where: { workspaceId: actor.workspaceId, personnelId: { in: ids } },
         include: {
-          attachment: { select: { id: true, name: true, mime: true } },
+          attachment: { select: { id: true, name: true, mime: true, size: true } },
         },
         orderBy: { submittedAt: 'desc' },
       }),
@@ -328,6 +337,7 @@ export const getYsoDashboard = handler(async (req, res) => {
   res.json({
     role: s.role,
     today: localDate(),
+    driveConnected: await isDriveConnected(actor.workspaceId),
     tasks: TASKS,
     criteria: CRITERIA,
     ruleVersion: RULE_VERSION,
@@ -403,7 +413,30 @@ export const activateYso = handler(async (req, res) => {
 
 export const submitYso = handler(async (req, res) => {
   const actor = req.user!
-  const result = await mutation(actor, async (db) => {
+  // Qualification scans go straight to Google Drive; the database only keeps
+  // the Drive file ID. Upload happens outside the locked transaction.
+  let certificate: { file: CertificateFile; driveFileId: string } | null = null
+  const requestedTask = Number(req.body.task)
+  if (requestedTask >= 12 && req.body.attachment) {
+    if (actor.actorType !== 'personnel') return fail(403, 'Only YSOs submit certificates')
+    const file = parseCertificate(req.body.attachment)
+    const me = await prisma.personnel.findFirst({
+      where: { id: actor.actorId, workspaceId: actor.workspaceId },
+      select: { name: true },
+    })
+    if (!me) return fail(404, 'YSO not found')
+    certificate = {
+      file,
+      driveFileId: await uploadCertificate(actor.workspaceId, file, {
+        person: me.name,
+        task: TASKS.find((t) => t.id === requestedTask)?.title ?? `Task ${requestedTask}`,
+        date: localDate(),
+      }),
+    }
+  }
+  let result
+  try {
+  result = await mutation(actor, async (db) => {
     const person = await subject(db, actor, actor.actorId, 'YSO')
     if (!person.ysoProfile)
       return fail(
@@ -524,36 +557,15 @@ export const submitYso = handler(async (req, res) => {
       },
     })
     if (task >= 12) {
-      const upload = req.body.attachment
-      if (
-        !upload ||
-        typeof upload.base64 !== 'string' ||
-        upload.base64.length > 1400000 ||
-        !/^[A-Za-z0-9+/]*={0,2}$/.test(upload.base64)
-      )
-        return fail(400, 'Upload a PDF, PNG or JPEG certificate up to 1 MB')
-      const bytes = Buffer.from(upload.base64, 'base64')
-      const mime =
-        bytes.subarray(0, 5).toString() === '%PDF-'
-          ? 'application/pdf'
-          : bytes
-                .subarray(0, 8)
-                .equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
-            ? 'image/png'
-            : bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255
-              ? 'image/jpeg'
-              : ''
-      if (!mime || bytes.length > 1048576)
-        return fail(400, 'Unsupported certificate format or file exceeds 1 MB')
+      if (!certificate)
+        return fail(400, 'Upload a scanned copy of your certificate (PDF, PNG or JPEG, up to 10 MB)')
       await db.ysoAttachment.create({
         data: {
           submissionId: submitted.id,
-          name: text(upload.name, 'Certificate filename', 180).replace(
-            /[\r\n\\/]/g,
-            '_'
-          ),
-          mime,
-          bytes,
+          name: certificate.file.name,
+          mime: certificate.file.mime,
+          size: certificate.file.bytes.length,
+          driveFileId: certificate.driveFileId,
         },
       })
     }
@@ -590,6 +602,10 @@ export const submitYso = handler(async (req, res) => {
     // are reconciled only when reviewed, not when the YSO merely uploads a new version.
     return queued
   })
+  } catch (error) {
+    if (certificate) await deleteCertificate(actor.workspaceId, certificate.driveFileId)
+    throw error
+  }
   res.status(201).json(result)
 })
 
@@ -704,6 +720,7 @@ export const downloadYsoCertificate = handler(async (req, res) => {
     },
   })
   if (!file) return fail(404, 'Certificate not found')
+  const bytes = await downloadCertificate(req.user!.workspaceId, file.driveFileId)
   res.setHeader('Content-Type', file.mime)
   res.setHeader(
     'Content-Disposition',
@@ -711,7 +728,7 @@ export const downloadYsoCertificate = handler(async (req, res) => {
   )
   res.setHeader('X-Content-Type-Options', 'nosniff')
   res.setHeader('Cache-Control', 'private, no-store')
-  res.send(file.bytes)
+  res.send(bytes)
 })
 
 export const createYsoMeeting = handler(async (req, res) => {

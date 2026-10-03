@@ -35,6 +35,8 @@ app.use(cors({
 
 app.use('/api/letters', letterRoutes)
 
+// YSO certificate scans (up to 10 MB, sent base64) are forwarded to Google Drive
+app.use('/api/yso/submissions', express.json({ limit: '15mb' }))
 app.use(express.json({ limit: '2mb' }))  // allow avatar/logo base64 payloads up to ~1.5MB
 
 // Routes

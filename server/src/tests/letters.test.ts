@@ -523,8 +523,9 @@ async function main() {
           where: { id: assignee.id },
           data: { isActive: false },
         })
-        await call('assignee', '/' + id, undefined, 403)
-        await call('assignee', '/context', undefined, 403)
+        // The session check refuses deactivated roles before the letters routes run
+        await call('assignee', '/' + id, undefined, 401)
+        await call('assignee', '/context', undefined, 401)
         await db.personnel.update({
           where: { id: assignee.id },
           data: { isActive: true },

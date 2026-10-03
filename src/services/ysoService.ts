@@ -38,7 +38,7 @@ export type YsoEntry = {
   feedback?: string
   previousId?: string
   supersededAt?: string
-  attachment?: { id: string; name: string; mime: string }
+  attachment?: { id: string; name: string; mime: string; size?: number }
 }
 export type YsoMeeting = {
   id: string
@@ -62,6 +62,8 @@ export type YsoObligation = {
 export type YsoDashboard = {
   role: 'YSO' | 'AD' | 'DIRECTOR'
   today: string
+  /** Workspace Google Drive (Letters) is connected — required for certificate scans */
+  driveConnected?: boolean
   ruleVersion: string
   tasks: YsoTask[]
   criteria: { key: string; label: string; max: number }[]
