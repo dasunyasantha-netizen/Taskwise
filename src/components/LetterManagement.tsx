@@ -551,6 +551,10 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
     [q, setQ] = useState(''),
     [status, setStatus] = useState(''),
     [mine, setMine] = useState(false),
+    [overdue, setOverdue] = useState(false),
+    [sort, setSort] = useState(''),
+    [from, setFrom] = useState(''),
+    [to, setTo] = useState(''),
     [page, setPage] = useState(0),
     [kind, setKind] = useState(''),
     [preview, setPreview] = useState<LetterFile | null>(null),
@@ -569,6 +573,10 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
             q,
             status,
             mine: String(mine),
+            overdue: String(overdue),
+            sort,
+            from,
+            to,
             page: String(page),
           }).toString()
         ),
@@ -594,7 +602,7 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
       clearTimeout(timer)
       serial.current++
     }
-  }, [selected, q, status, mine, page])
+  }, [selected, q, status, mine, overdue, sort, from, to, page])
   useEffect(() => {
     const open = (event: Event) => {
       setThread(null)
@@ -686,21 +694,34 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
       )}
       {!selected && list && (
         <>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="flex flex-wrap items-center gap-2">
             {[
-              [tr("Open inquiries"), list.metrics.open],
-              [tr("Closed inquiries"), list.metrics.closed],
-              [tr("Assignee bottlenecks"), list.metrics.overdue],
-              [tr("Average entry delay"), `${list.metrics.averageEntryDays} ${tr('days')}`],
-            ].map(([label, value]) => (
-              <div className={box} key={label}>
-                <p className="text-xs text-tw-text-secondary">{tr(String(label))}</p>
-                <p className="text-2xl font-bold mt-2">{value}</p>
-              </div>
+              { key: 'all', label: tr("All"), value: list.metrics.open + list.metrics.closed, active: !status && !overdue, set: () => { setStatus(''); setOverdue(false) }, alert: false },
+              { key: 'open', label: tr("Open"), value: list.metrics.open, active: status === 'OPEN' && !overdue, set: () => { setStatus('OPEN'); setOverdue(false) }, alert: false },
+              { key: 'overdue', label: tr("Overdue"), value: list.metrics.overdue, active: overdue, set: () => { setStatus(''); setOverdue(true) }, alert: list.metrics.overdue > 0 },
+              { key: 'closed', label: tr("Closed"), value: list.metrics.closed, active: status === 'CLOSED' && !overdue, set: () => { setStatus('CLOSED'); setOverdue(false) }, alert: false },
+            ].map((c) => (
+              <button
+                key={c.key}
+                aria-pressed={c.active}
+                onClick={() => {
+                  c.set()
+                  setPage(0)
+                }}
+                className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm transition-colors ${c.active ? 'bg-tw-primary border-tw-primary text-white' : 'bg-white border-tw-border hover:bg-tw-hover'}`}
+              >
+                <span className={`font-bold ${!c.active && c.alert ? 'text-red-600' : ''}`}>{c.value}</span>
+                {c.label}
+              </button>
             ))}
+            <span className="text-xs text-tw-text-secondary ml-auto">
+              {tr("Avg entry delay")} <strong>{list.metrics.averageEntryDays}d</strong>
+              {' · '}
+              {list.metrics.lateEntries} {tr("late entries")}
+            </span>
           </div>
-          <div className={box + ' space-y-4'}>
-            <div className="flex flex-col sm:flex-row gap-3">
+          <div className={box + ' space-y-3 !p-3 sm:!p-4'}>
+            <div className="flex flex-col lg:flex-row gap-2">
               <input
                 aria-label={tr("Search letters")}
                 type="search"
@@ -712,22 +733,33 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
                   setPage(0)
                 }}
               />
-              <Select
-                ariaLabel={tr("Letter status")}
-                value={status}
-                onChange={(v) => {
-                  setStatus(v)
-                  setPage(0)
-                }}
-                options={[
-                  { value: '', label: tr("All statuses") },
-                  { value: 'OPEN', label: tr("Open") },
-                  { value: 'CLOSED', label: tr("Closed") },
-                ]}
-                className="sm:w-40 [&>button]:min-h-11"
-              />
+              <div className="flex gap-2 items-center">
+                <input
+                  type="date"
+                  aria-label={tr("Received from")}
+                  className="input w-full lg:w-40"
+                  value={from}
+                  max={to || undefined}
+                  onChange={(e) => {
+                    setFrom(e.target.value)
+                    setPage(0)
+                  }}
+                />
+                <span className="text-tw-text-secondary text-sm">–</span>
+                <input
+                  type="date"
+                  aria-label={tr("Received to")}
+                  className="input w-full lg:w-40"
+                  value={to}
+                  min={from || undefined}
+                  onChange={(e) => {
+                    setTo(e.target.value)
+                    setPage(0)
+                  }}
+                />
+              </div>
               <button
-                className={secondary}
+                className={secondary + ' whitespace-nowrap'}
                 aria-pressed={mine}
                 onClick={() => {
                   setMine((v) => !v)
@@ -737,55 +769,86 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
                 {mine ? tr("✓ Assigned to me") : tr("Assigned to me")}
               </button>
             </div>
-            <div className="flex justify-between text-xs text-tw-text-secondary">
-              <span>{list.total}  {tr("inquiries")}</span>
-              <span>
-                {list.metrics.lateEntries}  {tr("receipts logged after")}{' '}
-                {list.thresholds.entryDelayDays}{tr("+ days")}</span>
+            <div className="hidden md:grid grid-cols-[150px_minmax(0,1fr)_170px_110px_100px_80px] gap-3 px-4 pl-5 text-xs font-semibold uppercase tracking-wide text-tw-text-secondary">
+              {[
+                { label: tr("Reference"), key: 'reference' },
+                { label: tr("Subject / sender"), key: '' },
+                { label: tr("With"), key: '' },
+                { label: tr("Received"), key: 'received' },
+                { label: tr("Age"), key: 'age' },
+                { label: tr("Status"), key: '' },
+              ].map((h) =>
+                h.key ? (
+                  <button
+                    key={h.label}
+                    className={`text-left uppercase hover:text-tw-text ${sort === h.key ? 'text-tw-primary' : ''}`}
+                    onClick={() => {
+                      setSort((v) => (v === h.key ? '' : h.key))
+                      setPage(0)
+                    }}
+                  >
+                    {h.label}
+                    {sort === h.key ? ' ▾' : ''}
+                  </button>
+                ) : (
+                  <span key={h.label}>{h.label}</span>
+                )
+              )}
             </div>
-            <div className="space-y-2">
-              {list.items.map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => open(t.id)}
-                  className="w-full text-left rounded-xl border border-tw-border p-4 hover:bg-tw-hover transition-colors"
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="text-xs font-mono font-semibold text-tw-primary">
-                      {t.reference}
-                    </span>
-                    <Status closed={t.status === 'CLOSED'} />
-                  </div>
-                  <h2 className="font-semibold mt-2 break-words">
-                    {t.subject}
-                  </h2>
-                  <p className="text-sm text-tw-text-secondary mt-1 break-words">
-                    {t.sender}
-                  </p>
-                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs mt-3">
-                    <span>{tr("With")} {t.assignedToName}</span>
-                    <span>{tr("Received")} {shortDate(t.firstReceivedDate, locale)}</span>
-                    <span
-                      className={
-                        t.entryDelayDays >= list.thresholds.entryDelayDays
-                          ? 'text-amber-700 font-semibold'
-                          : ''
-                      }
-                    >
-                      {tr("Entry delay:")}{t.entryDelayDays} {tr("days")}</span>
-                    {t.status === 'OPEN' && (
-                      <span
-                        className={
-                          t.assigneeAgeDays >= list.thresholds.assigneeDays
-                            ? 'text-red-700 font-semibold'
-                            : ''
-                        }
-                      >
-                        {tr("With assignee:")}{t.assigneeAgeDays} {tr("days")}</span>
-                    )}
-                  </div>
-                </button>
-              ))}
+            <div className="space-y-1.5">
+              {list.items.map((t) => {
+                const closed = t.status === 'CLOSED',
+                  limit = list.thresholds.assigneeDays,
+                  tone: 'slate' | 'red' | 'amber' | 'green' = closed
+                    ? 'slate'
+                    : t.assigneeAgeDays >= limit
+                      ? 'red'
+                      : t.assigneeAgeDays >= Math.ceil(limit / 2)
+                        ? 'amber'
+                        : 'green',
+                  accent = { slate: 'border-l-slate-300', red: 'border-l-red-500', amber: 'border-l-amber-400', green: 'border-l-emerald-500' }[tone],
+                  badge = { slate: 'bg-slate-100 text-slate-500', red: 'bg-red-50 text-red-700', amber: 'bg-amber-50 text-amber-800', green: 'bg-emerald-50 text-emerald-700' }[tone],
+                  late = t.entryDelayDays >= list.thresholds.entryDelayDays,
+                  age = closed ? '—' : `${t.assigneeAgeDays}d`
+                return (
+                  <button
+                    key={t.id}
+                    onClick={() => open(t.id)}
+                    className={`w-full text-left rounded-xl border border-tw-border border-l-4 ${accent} bg-white px-4 py-2.5 hover:shadow-md transition-shadow`}
+                  >
+                    <div className="hidden md:grid grid-cols-[150px_minmax(0,1fr)_170px_110px_100px_80px] gap-3 items-center text-sm">
+                      <span className="font-mono text-xs font-semibold text-tw-primary truncate">{t.reference}</span>
+                      <span className="min-w-0">
+                        <span className="block font-semibold truncate">{t.subject}</span>
+                        <span className="block text-xs text-tw-text-secondary truncate">{t.sender}</span>
+                      </span>
+                      <span className="truncate">{t.assignedToName}</span>
+                      <span className="text-xs">
+                        {shortDate(t.firstReceivedDate, locale)}
+                        {late && (
+                          <span className="block text-amber-700 font-semibold">
+                            {tr("Late entry")} · {t.entryDelayDays}d
+                          </span>
+                        )}
+                      </span>
+                      <span>
+                        <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${badge}`}>{age}</span>
+                      </span>
+                      <span><Status closed={closed} /></span>
+                    </div>
+                    <div className="md:hidden">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-semibold text-sm truncate">{t.subject}</span>
+                        <span className={`shrink-0 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${badge}`}>{age}</span>
+                      </div>
+                      <div className="flex items-center gap-1 text-xs text-tw-text-secondary mt-0.5 min-w-0">
+                        <span className="font-mono text-tw-primary shrink-0">{t.reference}</span>
+                        <span className="truncate">· {t.sender} · {t.assignedToName}</span>
+                      </div>
+                    </div>
+                  </button>
+                )
+              })}
               {!list.items.length && (
                 <div className="text-center py-12">
                   <p className="text-3xl mb-3">✉</p>
@@ -798,19 +861,21 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
                 </div>
               )}
             </div>
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center pt-1">
               <button
                 className={secondary}
                 disabled={page === 0}
                 onClick={() => setPage((p) => p - 1)}
               >
                 {tr("Previous")}</button>
-              <span className="text-sm">
-                {tr("Page")}{page + 1}  {tr("of")} {Math.max(1, Math.ceil(list.total / 30))}
+              <span className="text-sm text-tw-text-secondary">
+                {list.total
+                  ? `${page * list.pageSize + 1}–${Math.min(list.total, (page + 1) * list.pageSize)} ${tr("of")} ${list.total}`
+                  : `0 ${tr("inquiries")}`}
               </span>
               <button
                 className={secondary}
-                disabled={(page + 1) * 30 >= list.total}
+                disabled={(page + 1) * list.pageSize >= list.total}
                 onClick={() => setPage((p) => p + 1)}
               >
                 {tr("Next")}</button>

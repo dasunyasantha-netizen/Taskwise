@@ -64,6 +64,7 @@ export type LetterList = {
   items: Letter[]
   total: number
   page: number
+  pageSize: number
   metrics: {
     open: number
     closed: number

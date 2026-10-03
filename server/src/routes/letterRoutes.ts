@@ -28,6 +28,7 @@ import {
   ensureFolder,
 } from '../helpers/letterDrive'
 const router = express.Router()
+const PAGE_SIZE = 50
 const safe =
   (fn: (req: Request, res: Response) => Promise<unknown>) =>
   async (req: Request, res: Response) => {
@@ -459,11 +460,38 @@ router.get(
       q = String(req.query.q || '').slice(0, 200),
       status = String(req.query.status || '')
     const page = Math.max(0, Math.min(100000, Number(req.query.page) || 0))
+    const config = await prisma.letterSettings.findUnique({
+      where: { workspaceId: a.workspaceId },
+    })
+    const dateNow = today(),
+      limit = config?.assigneeDays ?? 7,
+      entryLimit = config?.entryDelayDays ?? 2
+    const isDate = (v: unknown) =>
+      typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : ''
+    const from = isDate(req.query.from),
+      to = isDate(req.query.to)
+    // Overdue = open and with the current assignee for `limit`+ Sri Lanka days.
+    const overdueBefore = new Date(
+      Date.parse(dateNow + 'T00:00:00Z') - (limit - 1) * 86400000 - 19800000
+    )
+    const sorts: Record<string, Prisma.LetterThreadOrderByWithRelationInput[]> =
+      {
+        received: [{ firstReceivedDate: 'desc' }, { id: 'desc' }],
+        reference: [{ reference: 'desc' }],
+        age: [{ assignedAt: 'asc' }, { id: 'asc' }],
+        updated: [{ updatedAt: 'desc' }, { id: 'desc' }],
+      }
+    const orderBy = sorts[String(req.query.sort)] || sorts.updated
     const where: Prisma.LetterThreadWhereInput = {
       AND: [
         base,
         ...(['OPEN', 'CLOSED'].includes(status) ? [{ status }] : []),
         ...(req.query.mine === 'true' ? [{ assignedTo: s.key }] : []),
+        ...(req.query.overdue === 'true'
+          ? [{ status: 'OPEN', assignedAt: { lt: overdueBefore } }]
+          : []),
+        ...(from ? [{ firstReceivedDate: { gte: from } }] : []),
+        ...(to ? [{ firstReceivedDate: { lte: to } }] : []),
         ...(q
           ? [
               {
@@ -475,12 +503,12 @@ router.get(
           : []),
       ],
     }
-    const [items, total, all, incoming, config] = await Promise.all([
+    const [items, total, all, incoming] = await Promise.all([
       prisma.letterThread.findMany({
         where,
-        orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
-        skip: Math.floor(page) * 30,
-        take: 30,
+        orderBy,
+        skip: Math.floor(page) * PAGE_SIZE,
+        take: PAGE_SIZE,
         include: { _count: { select: { events: true } } },
       }),
       prisma.letterThread.count({ where }),
@@ -497,13 +525,7 @@ router.get(
         where: { kind: 'INCOMING', thread: base },
         select: { receivedDate: true, createdAt: true },
       }),
-      prisma.letterSettings.findUnique({
-        where: { workspaceId: a.workspaceId },
-      }),
     ])
-    const dateNow = today(),
-      limit = config?.assigneeDays ?? 7,
-      entryLimit = config?.entryDelayDays ?? 2
     const delays = incoming.map((e) =>
       days(e.receivedDate!, today(e.createdAt))
     )
@@ -532,6 +554,7 @@ router.get(
       })),
       total,
       page: Math.floor(page),
+      pageSize: PAGE_SIZE,
       metrics: {
         open: all.filter((t) => t.status === 'OPEN').length,
         closed: all.filter((t) => t.status === 'CLOSED').length,
