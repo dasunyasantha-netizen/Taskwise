@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { startAuthentication } from '@simplewebauthn/browser'
 import type { AuthUser, ImpersonationSession } from '../types'
-import { authApi, webAuthnApi } from '../services/apiService'
+import { authApi } from '../services/apiService'
 
 interface Props {
   user: AuthUser
@@ -17,6 +17,9 @@ interface AccessTarget {
   loginId: string
   workspaceId: string
   role: string
+  accessLabel: string
+  assignedPhone: string | null
+  assignedEmail: string | null
   companyName: string
   companyPrefix?: string | null
 }
@@ -37,7 +40,7 @@ export default function ImpersonationPage({ user, onSessionStarted }: Props) {
   useEffect(() => {
     authApi.listImpersonationTargets()
       .then(data => setTargets(data as AccessTarget[]))
-      .catch(err => setStartError(err instanceof Error ? err.message : 'Could not load accounts'))
+      .catch(err => setStartError(err instanceof Error ? err.message : 'Could not load roles'))
       .finally(() => setDirectoryLoading(false))
   }, [])
 
@@ -70,6 +73,8 @@ export default function ImpersonationPage({ user, onSessionStarted }: Props) {
       target.name,
       target.phone,
       target.email,
+      target.assignedPhone,
+      target.assignedEmail,
       target.loginId,
       target.role,
       target.companyName,
@@ -83,22 +88,16 @@ export default function ImpersonationPage({ user, onSessionStarted }: Props) {
     setStarting(true)
     setStartError('')
     try {
-      const loginId = user.loginId || user.phone
-      if (!loginId) throw new Error('Your administrator login ID is unavailable')
-
-      const optionsResponse = await webAuthnApi.getAuthOptions(loginId) as Record<string, unknown>
-      const actorId = optionsResponse._actorId as string
-      const actorType = optionsResponse._actorType as string
-      const { _actorId: _actorId, _actorType: _actorType, ...options } = optionsResponse
+      const options = await authApi.supportVerificationOptions()
       const credential = await startAuthentication({
         optionsJSON: options as unknown as Parameters<typeof startAuthentication>[0]['optionsJSON'],
       })
-      const verification = await webAuthnApi.verifyAuthentication(actorId, actorType, credential)
+      const verification = await authApi.supportVerificationVerify(credential)
       const result = await authApi.startImpersonation(
         selected.id,
         selected.actorType,
         reason.trim(),
-        verification.token,
+        verification.stepUpToken,
       )
       onSessionStarted(result.token, result.user as AuthUser)
     } catch (err: unknown) {
@@ -147,23 +146,23 @@ export default function ImpersonationPage({ user, onSessionStarted }: Props) {
       {activeTab === 'start' && (
         <div className="space-y-4">
           <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-900">
-            Use support access only for an approved support or administrative purpose. The target account,
+            Use support access only for an approved support or administrative purpose. The target role,
             reason, administrator, IP address, session times, and write actions are recorded.
           </div>
 
           <div className="card p-4 space-y-3">
-            <h2 className="font-semibold text-tw-text text-sm">1. Select an active account</h2>
+            <h2 className="font-semibold text-tw-text text-sm">1. Select an active role</h2>
             <input
               className="input w-full text-sm"
-              placeholder="Search name, login ID, company, role, phone, or email..."
+              placeholder="Search role, company, assigned phone, email, or role ID..."
               value={search}
               onChange={event => { setSearch(event.target.value); setSelected(null) }}
             />
             <div className="max-h-72 overflow-y-auto divide-y divide-tw-border border border-tw-border rounded-xl">
               {directoryLoading ? (
-                <div className="px-4 py-8 text-center text-sm text-tw-text-secondary">Loading accounts...</div>
+                <div className="px-4 py-8 text-center text-sm text-tw-text-secondary">Loading roles...</div>
               ) : filtered.length === 0 ? (
-                <div className="px-4 py-8 text-center text-sm text-tw-text-secondary">No accounts found</div>
+                <div className="px-4 py-8 text-center text-sm text-tw-text-secondary">No roles found</div>
               ) : filtered.map(target => (
                 <button
                   type="button"
@@ -182,11 +181,11 @@ export default function ImpersonationPage({ user, onSessionStarted }: Props) {
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-semibold text-tw-text truncate">{target.name}</span>
                       <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-tw-hover text-tw-text-secondary">
-                        {target.actorType}
+                        {target.accessLabel}
                       </span>
                     </div>
                     <div className="text-xs text-tw-text-secondary truncate">
-                      {target.companyName} · {target.role} · {target.loginId}
+                      {target.companyName} · {target.assignedPhone || 'No mobile number assigned'} · Role ID: {target.loginId}
                     </div>
                   </div>
                 </button>
@@ -200,7 +199,7 @@ export default function ImpersonationPage({ user, onSessionStarted }: Props) {
               <div className="bg-tw-hover rounded-xl px-4 py-3">
                 <div className="text-sm font-bold text-tw-text">{selected.name}</div>
                 <div className="text-xs text-tw-text-secondary">
-                  {selected.companyName} · {selected.role} · {selected.loginId}
+                  {selected.companyName} · {selected.assignedPhone || 'No mobile number assigned'} · Role ID: {selected.loginId}
                 </div>
               </div>
               <div>
@@ -248,7 +247,7 @@ export default function ImpersonationPage({ user, onSessionStarted }: Props) {
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
                       <span className="text-sm font-semibold text-tw-text">{session.targetName}</span>
-                      <span className="text-xs text-tw-text-secondary ml-2">({session.targetActorType})</span>
+                      <span className="text-xs text-tw-text-secondary ml-2">(role)</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${

@@ -165,7 +165,7 @@ export async function requireChairman(req: Request, res: Response, next: NextFun
 
 export async function requireSyswiseAdmin(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    if (req.user?.actorType !== 'director') {
+    if (req.user?.actorType !== 'director' || req.user.impersonationSessionId) {
       res.status(403).json({ error: 'System administrator access required' })
       return
     }

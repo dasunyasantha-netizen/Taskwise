@@ -97,7 +97,7 @@ export default function App() {
     }
     // A direct app/PWA launch also uses the shared platform account. Explicit
     // legacy access stays available to people completing the migration.
-    if (!launchUrl.searchParams.has('legacy') && localStorage.getItem('syswise_token')) {
+    if (!launchUrl.searchParams.has('legacy') && localStorage.getItem('syswise_token') && !localStorage.getItem(REAL_TOKEN_KEY)) {
       const origin = window.location.hostname === 'localhost' ? 'http://localhost:3100' : window.location.origin
       window.location.replace(`${origin}/sso/taskwise?source=${launchSource}`)
       return
@@ -116,14 +116,18 @@ export default function App() {
           const savedView = localStorage.getItem(VIEW_KEY) as ViewMode | null
           const defaultView = defaultViewFor(parsed)
           setView(savedView && savedView !== 'login' ? savedView : defaultView)
-          maybeShowSetup(parsed.actorId)
+          if (!parsed.impersonation) maybeShowSetup(parsed.actorId)
         }
         authApi.me().then(fresh => {
+          if (localStorage.getItem(TOKEN_KEY) !== token) return
           const updated = { ...parsed, ...(fresh as Partial<AuthUser>) }
           setUser(updated)
           localStorage.setItem(USER_KEY, JSON.stringify(updated))
           if (!updated.mustChangePassword && !updated.impersonation) checkMigrationContact()
         }).catch(() => {
+          // The API handler restores the admin after a support session expires.
+          // Do not overwrite that restored session with this stale request.
+          if (localStorage.getItem(TOKEN_KEY) !== token) return
           localStorage.removeItem(TOKEN_KEY)
           localStorage.removeItem(USER_KEY)
           setUser(null)
@@ -142,7 +146,7 @@ export default function App() {
     const handleSessionExpired = (event: Event) => {
       const realToken = localStorage.getItem(REAL_TOKEN_KEY)
       const realUser = localStorage.getItem(REAL_USER_KEY)
-      if (realToken && realUser) {
+      if ((event as CustomEvent).detail?.support && realToken && realUser) {
         try {
           const parsed = JSON.parse(realUser) as AuthUser
           localStorage.setItem(TOKEN_KEY, realToken)
@@ -150,7 +154,7 @@ export default function App() {
           localStorage.removeItem(REAL_TOKEN_KEY)
           localStorage.removeItem(REAL_USER_KEY)
           setUser(parsed)
-          setView('director_dashboard')
+          persistView('impersonation')
           return
         } catch { /* fall through to sign-out */ }
       }
@@ -165,6 +169,9 @@ export default function App() {
     }
     const handleSharedSignOut = (event: StorageEvent) => {
       if (event.newValue === null && (event.key === 'syswise_token' || event.key === TOKEN_KEY)) {
+        // Shared logout must never resurrect the saved administrator session.
+        localStorage.removeItem(REAL_TOKEN_KEY)
+        localStorage.removeItem(REAL_USER_KEY)
         handleSessionExpired(new CustomEvent('taskwise:session-expired', { detail: { syswise: true } }))
       }
     }
@@ -238,7 +245,7 @@ export default function App() {
     localStorage.setItem(TOKEN_KEY, token)
     localStorage.setItem(USER_KEY, JSON.stringify(impersonatedUser))
     setUser(impersonatedUser)
-    persistView('personnel_queue')
+    persistView(defaultViewFor(impersonatedUser))
   }
 
   // System Admin exits support access — restore the real session.

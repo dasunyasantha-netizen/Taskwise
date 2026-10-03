@@ -12,6 +12,7 @@ import {
 import { authenticateToken, requireSyswiseAdmin } from '../middleware/authMiddleware'
 import { getMigrationContact, saveMigrationContact, getManagedMigrationContacts, assignMigrationContact } from '../controllers/migrationContactController'
 import { exchangeSyswiseCode, selectSyswiseRole } from '../controllers/syswiseController'
+import { supportVerificationOptions, supportVerificationVerify } from '../controllers/supportVerificationController'
 
 const router = Router()
 router.post('/syswise/exchange', exchangeSyswiseCode)
@@ -51,6 +52,8 @@ router.post('/complete-forced-password-change', authenticateToken, completeForce
 // System Admin support access. The end route is called with the short-lived
 // impersonation token, while all discovery/start routes require the real admin token.
 router.get('/impersonation/users',      authenticateToken, requireSyswiseAdmin, listImpersonationTargets)
+router.post('/impersonation/verify/options', authenticateToken, requireSyswiseAdmin, supportVerificationOptions)
+router.post('/impersonation/verify', authenticateToken, requireSyswiseAdmin, supportVerificationVerify)
 router.post('/impersonate',             authenticateToken, requireSyswiseAdmin, startImpersonation)
 router.post('/impersonate/end',         authenticateToken, endImpersonation)
 router.get('/impersonation/sessions',   authenticateToken, requireSyswiseAdmin, listImpersonationSessions)

@@ -234,7 +234,7 @@ export async function authenticationVerify(req: Request, res: Response): Promise
     const credRecord = await prisma.webAuthnCredential.findUnique({
       where: { credentialId: response.id },
     })
-    if (!credRecord || credRecord.actorId !== actorId) {
+    if (!credRecord || credRecord.actorId !== actorId || credRecord.actorType !== actorType) {
       await clearChallenge(actorId, actorType)
       res.status(400).json({ error: 'Credential not found' }); return
     }

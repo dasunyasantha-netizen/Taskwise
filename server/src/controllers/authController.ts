@@ -5,6 +5,7 @@ import prisma from '../prisma'
 import { companyLoginPrefix, normalizeSriLankanPhone, resolveLoginLookup } from '../helpers/phone'
 import { getEnabledFeatures } from '../helpers/features'
 import { ysoRole } from '../helpers/ysoAccess'
+import { SUPPORT_PROOF_PREFIX, SUPPORT_PURPOSE } from './supportVerificationController'
 
 function signToken(
   actorId: string,
@@ -399,6 +400,13 @@ export async function listImpersonationTargets(req: Request, res: Response): Pro
       }),
     ])
 
+    const contacts = await prisma.migrationRoleContact.findMany({
+      where: { OR: [
+        { actorType: 'director', actorId: { in: directors.map(d => d.id) } },
+        { actorType: 'personnel', actorId: { in: personnel.map(p => p.id) } },
+      ] }, select: { actorType: true, actorId: true, phoneE164: true, email: true },
+    })
+    const contactByRole = new Map(contacts.map(c => [`${c.actorType}:${c.actorId}`, c]))
     const targets = [
       ...directors.filter(d => d.workspaceId).map(d => ({
         id: d.id,
@@ -408,7 +416,10 @@ export async function listImpersonationTargets(req: Request, res: Response): Pro
         email: d.email,
         loginId: d.loginId || d.phone,
         workspaceId: d.workspaceId!,
-        role: d.isCompanyAdmin ? 'Company administrator' : 'Director',
+        role: d.name,
+        accessLabel: d.isCompanyAdmin ? 'Company administrator' : 'Company management',
+        assignedPhone: contactByRole.get(`director:${d.id}`)?.phoneE164 || null,
+        assignedEmail: contactByRole.get(`director:${d.id}`)?.email || null,
         companyName: d.company?.displayName || d.company?.legalName || 'Legacy workspace',
         companyPrefix: d.company?.prefix || null,
       })),
@@ -420,7 +431,10 @@ export async function listImpersonationTargets(req: Request, res: Response): Pro
         email: p.email,
         loginId: p.loginId || p.phone,
         workspaceId: p.workspaceId,
-        role: p.department.name,
+        role: p.name,
+        accessLabel: 'Role',
+        assignedPhone: contactByRole.get(`personnel:${p.id}`)?.phoneE164 || null,
+        assignedEmail: contactByRole.get(`personnel:${p.id}`)?.email || null,
         companyName: p.company?.displayName || p.company?.legalName || 'Legacy workspace',
         companyPrefix: p.company?.prefix || null,
       })),
@@ -449,31 +463,31 @@ export async function startImpersonation(req: Request, res: Response): Promise<v
       stepUpToken?: string
     }
     if (!targetActorId || !['director', 'personnel'].includes(targetActorType || '')) {
-      res.status(400).json({ error: 'A valid target account is required' }); return
+      res.status(400).json({ error: 'A valid target role is required' }); return
     }
     const validatedTargetActorType = targetActorType as 'director' | 'personnel'
     if (!reason?.trim() || reason.trim().length < 5 || reason.trim().length > 500) {
       res.status(400).json({ error: 'Reason must be between 5 and 500 characters' }); return
     }
     if (!stepUpToken) {
-      res.status(401).json({ error: 'Passkey verification is required' }); return
+      res.status(403).json({ error: 'Passkey verification is required' }); return
     }
 
     let stepUp: jwt.JwtPayload
     try {
       stepUp = jwt.verify(stepUpToken, process.env.JWT_SECRET!) as jwt.JwtPayload
     } catch {
-      res.status(401).json({ error: 'Passkey verification expired. Verify again.' }); return
+      res.status(403).json({ error: 'Passkey verification expired. Verify again.' }); return
     }
     const stepUpAgeSeconds = Math.floor(Date.now() / 1000) - Number(stepUp.iat || 0)
     if (
-      stepUp.actorId !== adminId ||
-      stepUp.actorType !== 'director' ||
-      stepUp.authenticationMethod !== 'webauthn' ||
+      stepUp.adminId !== adminId ||
+      stepUp.purpose !== SUPPORT_PURPOSE ||
+      typeof stepUp.proofId !== 'string' ||
       stepUpAgeSeconds < 0 ||
       stepUpAgeSeconds > 300
     ) {
-      res.status(401).json({ error: 'A recent passkey verification for this administrator is required' }); return
+      res.status(403).json({ error: 'A recent passkey verification for this administrator is required' }); return
     }
 
     const target = validatedTargetActorType === 'director'
@@ -498,7 +512,15 @@ export async function startImpersonation(req: Request, res: Response): Promise<v
         })
 
     if (!target || !target.workspaceId) {
-      res.status(404).json({ error: 'Active target account not found' }); return
+      res.status(404).json({ error: 'Active target role not found' }); return
+    }
+
+    const consumed = await prisma.director.updateMany({
+      where: { id: adminId, isActive: true, isSyswiseAdmin: true, webAuthnChallenge: SUPPORT_PROOF_PREFIX + stepUp.proofId },
+      data: { webAuthnChallenge: null },
+    })
+    if (!consumed.count) {
+      res.status(403).json({ error: 'Passkey verification was already used or replaced. Verify again.' }); return
     }
 
     const ipAddress = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || null

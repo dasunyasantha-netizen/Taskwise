@@ -7,3 +7,6 @@ dist/
 Thumbs.db
 task_wise_project_list_2.xlsx
 Taskwise_logo.png
+.cache/
+test-results/
+playwright-report/

@@ -23,15 +23,24 @@ async function request<T>(
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: 'Request failed' }))
-    if (res.status === 401 && token) {
+    // A late response from a replaced support session must not clear the
+    // administrator session that has already been restored.
+    if (res.status === 401 && token && token === getToken()) {
       let sharedSession = err.code === 'syswise_signin_required'
-      try { sharedSession ||= !!JSON.parse(localStorage.getItem('taskwise_user') || '{}').syswiseUserId } catch { /* invalid cached session */ }
+      let supportSession = false
+      try {
+        const user = JSON.parse(localStorage.getItem('taskwise_user') || '{}')
+        sharedSession ||= !!user.syswiseUserId
+        supportSession = !!user.impersonation
+      } catch { /* invalid cached session */ }
       localStorage.removeItem('taskwise_token')
       localStorage.removeItem('taskwise_user')
       localStorage.removeItem('taskwise_view')
-      localStorage.removeItem('taskwise_real_token')
-      localStorage.removeItem('taskwise_real_user')
-      window.dispatchEvent(new CustomEvent('taskwise:session-expired', { detail: { syswise: sharedSession } }))
+      if (!supportSession) {
+        localStorage.removeItem('taskwise_real_token')
+        localStorage.removeItem('taskwise_real_user')
+      }
+      window.dispatchEvent(new CustomEvent('taskwise:session-expired', { detail: { syswise: sharedSession, support: supportSession } }))
     }
     throw new Error(err.error || `HTTP ${res.status}`)
   }
@@ -67,6 +76,8 @@ export const authApi = {
     api.post('/auth/complete-forced-password-change', { newPassword }),
   listImpersonationTargets: () =>
     api.get<unknown[]>('/auth/impersonation/users'),
+  supportVerificationOptions: () => api.post<unknown>('/auth/impersonation/verify/options'),
+  supportVerificationVerify: (response: unknown) => api.post<{ stepUpToken: string }>('/auth/impersonation/verify', { response }),
   startImpersonation: (targetActorId: string, targetActorType: 'director' | 'personnel', reason: string, stepUpToken: string) =>
     api.post<{ token: string; user: unknown; session: { id: string; startedAt: string; expiresAt: string } }>(
       '/auth/impersonate',
