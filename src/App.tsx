@@ -163,8 +163,17 @@ export default function App() {
       setView('login')
       if ((event as CustomEvent).detail?.syswise) window.location.replace(sharedIdentityUrl('login', launchSource))
     }
+    const handleSharedSignOut = (event: StorageEvent) => {
+      if (event.newValue === null && (event.key === 'syswise_token' || event.key === TOKEN_KEY)) {
+        handleSessionExpired(new CustomEvent('taskwise:session-expired', { detail: { syswise: true } }))
+      }
+    }
     window.addEventListener('taskwise:session-expired', handleSessionExpired)
-    return () => window.removeEventListener('taskwise:session-expired', handleSessionExpired)
+    window.addEventListener('storage', handleSharedSignOut)
+    return () => {
+      window.removeEventListener('taskwise:session-expired', handleSessionExpired)
+      window.removeEventListener('storage', handleSharedSignOut)
+    }
   }, [])
 
   const handleLogin = (token: string, userData: AuthUser) => {
