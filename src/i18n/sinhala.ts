@@ -28,6 +28,7 @@ export const si: Record<string, string> = {
   'Assignee': 'භාරකරු', 'Oldest': 'පැරණිතම', 'Overdue = open letters with the same person for': 'ප්‍රමාද වූ = එකම පුද්ගලයා සමඟ ඇති විවෘත ලිපි, දින',
   'Clear filters': 'පෙරහන් ඉවත් කරන්න', 'Filters': 'පෙරහන්',
   'Late entries': 'ප්‍රමාද ඇතුළත් කිරීම්', 'Average days between receiving a letter and logging it': 'ලිපියක් ලැබීම සහ එය ඇතුළත් කිරීම අතර සාමාන්‍ය දින ගණන', 'Letters logged': 'ඇතුළත් කළ ලිපි', 'days after they were received': 'ලැබී දින කිහිපයකට පසු',
+  'Incoming letter': 'ලැබුණු ලිපිය', 'Outgoing reply': 'යැවූ පිළිතුර', 'Responsibility transferred': 'වගකීම පවරා ඇත', 'Saved to Drive': 'Drive හි සුරැකිණි', 'Queued for Drive': 'Drive සඳහා පෝලිමේ', 'Uploading to Drive': 'Drive වෙත උඩුගත වෙමින්', 'Waiting for Drive': 'Drive සඳහා රැඳී සිටී', 'Drive upload failed': 'Drive උඩුගත කිරීම අසාර්ථකයි', 'Preview': 'පෙරදසුන', 'Download': 'බාගන්න', 'Digital': 'ඩිජිටල්', 'Physical': 'භෞතික', 'entries': 'සටහන්', 'by': 'විසින්', 'Entry delay': 'ඇතුළත් කිරීමේ ප්‍රමාදය', 'Held': 'තබා ගත්', 'Documents': 'ලේඛන', 'With assignee': 'භාරකරු සමඟ', 'No documents attached.': 'ලේඛන අමුණා නැත.', 'To': 'වෙත',
   'Open': 'විවෘත', 'Closed': 'වසා ඇත', 'All statuses': 'සියලු තත්ත්ව', 'Open inquiries': 'විවෘත විමසීම්',
   'Closed inquiries': 'වසා ඇති විමසීම්', 'Assignee bottlenecks': 'භාරකරුගේ ප්‍රමාදයන්',
   'Assignee workload & bottlenecks': 'භාරකරුවන්ගේ වැඩ සහ ප්‍රමාදයන්', 'Average entry delay': 'ඇතුළත් කිරීමේ සාමාන්‍ය ප්‍රමාදය',
