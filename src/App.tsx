@@ -12,7 +12,7 @@ import SyswiseCompanySelection from './components/SyswiseCompanySelection'
 import InsurancePolicyCompletionPrompt from './components/InsurancePolicyCompletionPrompt'
 import { authApi, noticeApi, type Notice } from './services/apiService'
 import { captureLaunchSource, sharedIdentityUrl, type LaunchSource } from './services/launchSource'
-import { LanguageProvider } from './i18n/Language'
+import { LanguageProvider, toLanguage } from './i18n/Language'
 import { Icon } from './components/ui/Icon'
 import { LoadingBlock } from './components/ui/Primitives'
 
@@ -296,7 +296,7 @@ export default function App() {
   if (user.actorType === 'director') {
     const requiresInsurancePolicyCompletion = user.features?.includes('insurance_management') === true && !user.impersonation
     return (
-      <LanguageProvider language={user.preferredLanguage === 'si' ? 'si' : 'en'}>
+      <LanguageProvider language={toLanguage(user.preferredLanguage)}>
         {showMigration && !user.impersonation && <MigrationContactModal currentPhone={user.phone} onSaved={() => setShowMigration(false)} />}
         {requiresInsurancePolicyCompletion && <InsurancePolicyCompletionPrompt />}
         {showSetup && !showMigration && !user.impersonation && (
@@ -328,7 +328,7 @@ export default function App() {
   }
 
   return (
-    <LanguageProvider language={user.preferredLanguage === 'si' ? 'si' : 'en'}>
+    <LanguageProvider language={toLanguage(user.preferredLanguage)}>
       {showMigration && !user.impersonation && <MigrationContactModal currentPhone={user.phone} onSaved={() => setShowMigration(false)} />}
       {showSetup && !showMigration && !user.impersonation && (
         <SetupPrompt actorId={user.actorId} onDone={() => setShowSetup(false)} />

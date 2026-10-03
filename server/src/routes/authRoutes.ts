@@ -28,7 +28,7 @@ router.post('/migration-contact',       authenticateToken, saveMigrationContact)
 router.put('/language', authenticateToken, async (req, res) => {
   const { actorId, actorType, workspaceId, impersonationSessionId } = req.user!
   const language = req.body?.language
-  if (language !== 'en' && language !== 'si') { res.status(400).json({ error: 'Choose English or Sinhala.' }); return }
+  if (language !== 'en' && language !== 'si' && language !== 'ta') { res.status(400).json({ error: 'Choose English, Sinhala or Tamil.' }); return }
   if (impersonationSessionId) { res.status(403).json({ error: 'Profile preferences cannot be changed during support access.' }); return }
   try {
     const result = actorType === 'director'

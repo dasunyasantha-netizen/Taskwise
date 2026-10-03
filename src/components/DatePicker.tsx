@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { useLanguage } from '../i18n/Language'
+import { useLanguage, MONTH_NAMES, WEEKDAY_INITIALS } from '../i18n/Language'
 
 interface Props {
   value: string        // "YYYY-MM-DD", or "YYYY-MM" in month mode
@@ -111,7 +111,7 @@ export default function DatePicker({ value, onChange, placeholder = 'Select date
   }
 
   const displayValue = parsed
-    ? language === 'si' ? `${parsed.getFullYear()} ${t(MONTHS[parsed.getMonth()])}${mode === 'date' ? ` ${parsed.getDate()}` : ''}` : parsed.toLocaleDateString(locale, { month: 'short', ...(mode === 'date' ? { day: 'numeric' as const } : {}), year: 'numeric' })
+    ? language !== 'en' ? `${parsed.getFullYear()} ${MONTH_NAMES[language][parsed.getMonth()]}${mode === 'date' ? ` ${parsed.getDate()}` : ''}` : parsed.toLocaleDateString(locale, { month: 'short', ...(mode === 'date' ? { day: 'numeric' as const } : {}), year: 'numeric' })
     : ''
 
   const yearRange = Array.from({ length: 12 }, (_, i) => viewYear - 5 + i)
@@ -165,7 +165,7 @@ export default function DatePicker({ value, onChange, placeholder = 'Select date
           {MONTHS.map((month, index) => (
             <button type="button" key={month} disabled={monthDisabled(index)} onClick={() => selectMonth(index)}
               className={`min-h-11 rounded-lg text-sm font-medium transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${parsed?.getFullYear() === viewYear && parsed?.getMonth() === index ? 'bg-tw-primary text-white' : 'text-tw-text hover:bg-tw-hover'}`}>
-              {language === 'si' ? t(month) : month.slice(0, 3)}
+              {language !== 'en' ? MONTH_NAMES[language][index] : month.slice(0, 3)}
             </button>
           ))}
         </div>
@@ -173,7 +173,7 @@ export default function DatePicker({ value, onChange, placeholder = 'Select date
       {!showYearPicker && mode === 'date' && (
         <>
           <div className={`grid grid-cols-7 ${compact ? 'px-2 pt-2 pb-0.5' : 'px-3 pt-3 pb-1'}`}>
-            {(language === 'si' ? ['ඉ', 'ස', 'අ', 'බ', 'බ්‍ර', 'සි', 'සෙ'] : DAYS).map(d => (
+            {(language !== 'en' ? WEEKDAY_INITIALS[language] : DAYS).map(d => (
               <div key={d} className="text-center text-xs font-semibold text-tw-text-secondary py-1">{d}</div>
             ))}
           </div>

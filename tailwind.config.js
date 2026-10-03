@@ -47,8 +47,8 @@ export default {
       fontFamily: {
         // var(--tw-font-sinhala) is the user's Sinhala typeface (src/hooks/useSinhalaFont.ts);
         // Latin fonts have no Sinhala glyphs, so Sinhala text falls through to it.
-        sans: ['Figtree', 'Inter', 'var(--tw-font-sinhala)', 'ui-sans-serif', 'system-ui', 'sans-serif'],
-        mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Consolas', 'var(--tw-font-sinhala)', 'monospace'],
+        sans: ['Figtree', 'Inter', 'var(--tw-font-sinhala)', 'Noto Sans Tamil', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Consolas', 'var(--tw-font-sinhala)', 'Noto Sans Tamil', 'monospace'],
       },
       fontSize: {
         'xs':   ['0.8rem',  { lineHeight: '1.2rem' }],

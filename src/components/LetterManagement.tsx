@@ -11,18 +11,18 @@ import DatePicker from './DatePicker'
 import Select from './Select'
 import LetterDocumentCard from './LetterDocumentCard'
 import type { AuthUser } from '../types'
-import { LanguageToggle, useLanguage, displayDate } from '../i18n/Language'
+import { LanguageToggle, useLanguage, displayDate, languageOf } from '../i18n/Language'
 import { EmptyState } from './ui/Primitives'
 import { Icon } from './ui/Icon'
 const box = 'card p-4 sm:p-5'
 const button = 'btn-primary min-h-[44px]'
 const secondary = 'btn-secondary min-h-[44px]'
 const timestamp = (value: string, locale = 'en-GB') =>
-  displayDate(value, locale === 'si-LK' ? 'si' : 'en', true)
+  displayDate(value, languageOf(locale), true)
 const letterColumns =
   'grid-cols-[170px_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,0.8fr)_110px_64px_76px]'
 const shortDate = (value: string, locale = 'en-GB') =>
-  displayDate(value, locale === 'si-LK' ? 'si' : 'en')
+  displayDate(value, languageOf(locale))
 function Field({
   label,
   children,
@@ -361,7 +361,7 @@ function LetterForm({
               />
             </Field>
             <p className="text-sm text-tw-text-secondary">
-              {tr("This stays under")}{thread?.reference}{tr(". A closed thread reopens with its existing assignee.")}</p>
+              {tr('This stays under {reference}. A closed thread reopens with its existing assignee.', { reference: thread?.reference ?? '' })}</p>
           </>
         )}
         {kind === 'OUTGOING' && (
@@ -533,7 +533,7 @@ function Preview({ file, onClose }: { file: LetterFile; onClose: () => void }) {
       </div>
       {(file.pageCount || 0) > file.previews.length && (
         <p className="text-sm mb-3">
-          {tr("Quick preview includes the first")}{file.previews.length} {tr("pages. Download the original for the complete document.")}</p>
+          {tr('Quick preview includes the first {count} pages. Download the original for the complete document.', { count: file.previews.length })}</p>
       )}
       {error ? (
         <p role="alert">{error}</p>
@@ -571,7 +571,7 @@ function Workload({ holders, limit }: { holders: Holder[]; limit: number }) {
       <summary className="font-semibold cursor-pointer px-1">
         {tr("Assignee workload & bottlenecks")}</summary>
       <p className="text-xs text-tw-text-secondary mt-1 px-1">
-        {tr("Overdue = open letters with the same person for")} {limit}+ {tr("days")}.</p>
+        {tr('Overdue = open letters with the same person for {days}+ days.', { days: limit })}</p>
       {rows.length ? (
         <div className="mt-3 space-y-1.5">
           <div className={`grid ${workloadColumns} gap-3 px-4 pl-5 text-xs font-semibold uppercase tracking-wide text-tw-text-secondary`}>
@@ -819,7 +819,7 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
                     key: 'late',
                     label: tr("Late entries"),
                     value: String(list.metrics.lateEntries),
-                    hint: `${tr("Letters logged")} ${list.thresholds.entryDelayDays}+ ${tr("days after they were received")}`,
+                    hint: tr('Letters logged {days}+ days after they were received', { days: list.thresholds.entryDelayDays }),
                     warn: list.metrics.lateEntries > 0,
                     icon: <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 4h.01M10.3 3.9L2.4 17.5A2 2 0 004.1 20.5h15.8a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z" />,
                   },
@@ -1013,7 +1013,7 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
                 {tr("Previous")}</button>
               <span className="text-sm text-tw-text-secondary">
                 {list.total
-                  ? `${page * list.pageSize + 1}–${Math.min(list.total, (page + 1) * list.pageSize)} ${tr("of")} ${list.total}`
+                  ? tr('{from}–{to} of {total}', { from: page * list.pageSize + 1, to: Math.min(list.total, (page + 1) * list.pageSize), total: list.total })
                   : `0 ${tr("inquiries")}`}
               </span>
               <button
@@ -1121,7 +1121,7 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
                             <time dateTime={event.createdAt} className="text-xs text-tw-text-secondary">{timestamp(event.createdAt, locale)}</time>
                           </div>
                           <p className="text-xs text-tw-text-secondary mt-0.5">
-                            {tr("by")} {event.actorName}
+                            {tr('by {name}', { name: event.actorName })}
                           </p>
                           {(event.receivedDate || event.correspondenceDate || event.kind === 'TRANSFER' || event.kind === 'SHARE') && (
                             <div className="flex flex-wrap gap-1.5 mt-2 text-xs">

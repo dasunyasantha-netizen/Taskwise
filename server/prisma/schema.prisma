@@ -14,7 +14,7 @@ datasource db {
 
 model Director {
   fixedRole WorkspaceRole?
-  preferredLanguage String     @default("en") // en | si
+  preferredLanguage String     @default("en") // en | si | ta
   id                String     @id @default(uuid())
   email             String?    @unique
   phone             String
@@ -234,7 +234,7 @@ model Department {
 
 model Personnel {
   fixedRole WorkspaceRole?
-  preferredLanguage String @default("en") // en | si
+  preferredLanguage String @default("en") // en | si | ta
   isLetterLogger Boolean @default(false)
   id                 String      @id @default(uuid())
   workspaceId        String

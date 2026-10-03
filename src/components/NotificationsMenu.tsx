@@ -3,6 +3,7 @@ import type { Notification } from '../types'
 import { notificationApi } from '../services/apiService'
 import type { IconName } from './ui/Icon'
 import { Icon } from './ui/Icon'
+import { useLanguage } from '../i18n/Language'
 
 type Props = {
   onOpenTask?: (taskId: string) => void | Promise<void>
@@ -12,6 +13,7 @@ type Props = {
 }
 
 export default function NotificationsMenu({ onOpenTask, onOpenCompanyRequests, onOpenYso, onOpenLetter }: Props) {
+  const { t } = useLanguage()
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -89,7 +91,7 @@ export default function NotificationsMenu({ onOpenTask, onOpenCompanyRequests, o
       <button
         onClick={() => setOpen(o => !o)}
         className={`relative icon-btn ${open ? 'bg-tw-hover text-tw-text' : ''}`}
-        aria-label="Notifications"
+        aria-label={t('Notifications')}
       >
         <Icon name="bell" className="w-[18px] h-[18px]" />
         {unread > 0 && (
@@ -102,10 +104,10 @@ export default function NotificationsMenu({ onOpenTask, onOpenCompanyRequests, o
       {open && (
         <div className="absolute right-0 top-11 w-[22rem] max-w-[calc(100vw-1.5rem)] bg-tw-surface rounded-2xl shadow-panel border border-tw-border z-50 overflow-hidden animate-pop-in">
           <div className="flex items-center justify-between px-4 py-3.5 border-b border-tw-border">
-            <span className="font-semibold text-tw-text text-sm inline-flex items-center gap-2">Notifications {unread > 0 && <span className="badge badge-primary">{unread} new</span>}</span>
+            <span className="font-semibold text-tw-text text-sm inline-flex items-center gap-2">{t('Notifications')} {unread > 0 && <span className="badge badge-primary">{t('{count} new', { count: unread })}</span>}</span>
             {unread > 0 && (
               <button onClick={markAll} className="text-xs font-semibold text-tw-primary-text hover:underline">
-                Mark all read
+                {t('Mark all read')}
               </button>
             )}
           </div>
@@ -113,7 +115,7 @@ export default function NotificationsMenu({ onOpenTask, onOpenCompanyRequests, o
             {notifications.length === 0 ? (
               <div className="px-4 py-10 text-center text-tw-text-secondary text-sm">
                 <span className="icon-tile tile-gray mx-auto mb-3"><Icon name="bell" className="w-5 h-5" /></span>
-                <div>No notifications yet</div>
+                <div>{t('No notifications yet')}</div>
               </div>
             ) : (
               notifications.map(n => (

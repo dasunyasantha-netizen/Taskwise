@@ -69,7 +69,7 @@ export const authApi = {
   migrationContact: () => api.get<{ required: boolean; contact: { country: string; phone: string; email: string | null; syncStatus: string } | null }>('/auth/migration-contact'),
   saveMigrationContact: (data: { country: string; phone: string; email?: string }) =>
     api.post<{ saved: boolean; syncStatus: 'PENDING' | 'SYNCED' }>('/auth/migration-contact', data),
-  language: (language: 'en' | 'si') => api.put<{ preferredLanguage: 'en' | 'si' }>('/auth/language', { language }),
+  language: (language: 'en' | 'si' | 'ta') => api.put<{ preferredLanguage: 'en' | 'si' | 'ta' }>('/auth/language', { language }),
   changePassword: (currentPassword: string, newPassword: string) =>
     api.post('/auth/change-password', { currentPassword, newPassword }),
   completeForcedPasswordChange: (newPassword: string) =>

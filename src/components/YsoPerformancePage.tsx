@@ -11,7 +11,7 @@ import {
 import type { AuthUser } from '../types'
 import DatePicker from './DatePicker'
 import Select from './Select'
-import { LanguageToggle, useLanguage, displayDate } from '../i18n/Language'
+import { LanguageToggle, useLanguage, displayDate, languageOf, monthYear } from '../i18n/Language'
 import { Icon, type IconName } from './ui/Icon'
 
 const panel = 'card p-5'
@@ -24,7 +24,7 @@ const secondary =
 const signed = (n: number) => (n > 0 ? `+${n}` : String(n))
 const pretty = (value: string) => value.replace(/_/g, ' ').toLowerCase()
 const when = (value: string, locale = 'en-GB') =>
-  displayDate(value, locale === 'si-LK' ? 'si' : 'en', true)
+  displayDate(value, languageOf(locale), true)
 const pending = (entry: YsoEntry) =>
   !entry.supersededAt && ['SUBMITTED', 'PENDING'].includes(entry.status)
 const addDays = (date: string, days: number) =>
@@ -177,7 +177,7 @@ function CertificateUpload({ file, onChange, disabled }: {
       return
     }
     if (candidate.size > CERT_MAX_BYTES) {
-      setProblem(`${tr('This file is')} ${fileSize(candidate.size)}. ${tr('The limit is 10 MB.')}`)
+      setProblem(tr('This file is {size}. The limit is 10 MB.', { size: fileSize(candidate.size) }))
       return
     }
     setProblem('')
@@ -577,7 +577,7 @@ function AssessmentForm({
             className="flex items-center justify-between gap-4 text-sm"
             key={c.key}
           >
-            {tr(c.label)}  {tr("(maximum")} {c.max})
+            {tr('{label} (maximum {max})', { label: tr(c.label), max: c.max })}
             <input
               className={input + ' !w-24'}
               type="number"
@@ -1400,8 +1400,7 @@ export default function YsoPerformancePage({ user, onUserUpdate }: { user: AuthU
       ))}
     </div>
   )
-  const [periodYear, periodMonth] = period.split('-').map(Number)
-  const monthLabel = new Date(Date.UTC(periodYear, periodMonth - 1, 1)).toLocaleDateString(locale === 'si-LK' ? 'si-LK' : 'en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' })
+  const monthLabel = monthYear(period, languageOf(locale))
   const monthMeetings = d.meetings.filter(
     (m) =>
       m.date.slice(0, 7) === period &&
@@ -1822,7 +1821,7 @@ export default function YsoPerformancePage({ user, onUserUpdate }: { user: AuthU
                         </dl>
                         <p className="px-4 py-2.5 border-t border-tw-border bg-tw-surface-2/60 text-xs text-tw-text-secondary">
                           {waiting.length
-                            ? `${tr('Oldest waiting')} ${Math.max(0, Math.floor((Date.now() - Math.min(...waiting.map((e) => Date.parse(e.submittedAt)))) / 86400000))} ${tr('days')}`
+                            ? tr('Oldest waiting {days} days', { days: Math.max(0, Math.floor((Date.now() - Math.min(...waiting.map((e) => Date.parse(e.submittedAt)))) / 86400000)) })
                             : tr("Queue clear")}
                         </p>
                       </button>
@@ -1943,7 +1942,7 @@ export default function YsoPerformancePage({ user, onUserUpdate }: { user: AuthU
           <div className="min-w-0">
             <h4 className="section-label mb-1">{tr("Score changes")}</h4>
             <p className="text-xs text-tw-text-secondary mb-3">
-              {tr("Awards and reversals for")} {monthLabel}{tr("; each adjustment preserves the original record.")}</p>
+              {tr('Awards and reversals for {month}; each adjustment preserves the original record.', { month: monthLabel })}</p>
             <ul className="max-h-80 overflow-auto divide-y divide-tw-border rounded-xl border border-tw-border">
               {ledger.map((l) => (
                 <li key={l.id} className="flex items-start gap-3 px-3 py-2.5">

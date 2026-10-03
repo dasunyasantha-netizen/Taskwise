@@ -244,6 +244,8 @@ async function main() {
       assert.equal((await auth('logger', '/me')).body.preferredLanguage, 'en')
       assert.equal((await auth('logger', '/language', 'PUT', 'si')).status, 200)
       assert.equal((await auth('logger', '/me')).body.preferredLanguage, 'si')
+      assert.equal((await auth('logger', '/language', 'PUT', 'ta')).status, 200)
+      assert.equal((await auth('logger', '/me')).body.preferredLanguage, 'ta')
       assert.equal((await auth('director', '/language', 'PUT', 'en')).status, 200)
       assert.equal((await auth('director', '/me')).body.preferredLanguage, 'en')
     })

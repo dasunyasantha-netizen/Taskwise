@@ -24,7 +24,7 @@ export interface AuthUser {
   email?: string
   nic?: string
   avatarUrl?: string
-  preferredLanguage?: 'en' | 'si'
+  preferredLanguage?: 'en' | 'si' | 'ta'
   layerNumber?: number
   departmentId?: string
   companyName?: string

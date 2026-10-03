@@ -123,14 +123,14 @@ export default function Select({ value, onChange, options, placeholder = 'Select
             value={query}
             onChange={e => setQuery(e.target.value)}
             onKeyDown={onSearchKeyDown}
-            placeholder={language === 'si' ? `විකල්ප ${options.length}ක් සොයන්න…` : `Search ${options.length} options…`}
+            placeholder={t('Search {count} options…', { count: options.length })}
             className="w-full border border-tw-border rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:border-tw-primary"
           />
         </div>
       )}
       <div className="max-h-56 overflow-y-auto py-1">
         {visible.length === 0 && (
-          <div className="px-3 py-4 text-sm text-tw-text-secondary text-center">{language === 'si' ? 'ගැළපෙන ප්‍රතිඵල නැත: ' : 'No matches for “'}{query.trim()}{language === 'si' ? '' : '”'}</div>
+          <div className="px-3 py-4 text-sm text-tw-text-secondary text-center">{t('No matches for “{query}”', { query: query.trim() })}</div>
         )}
         {ungrouped.map(opt => (
           <button key={opt.value} type="button"
