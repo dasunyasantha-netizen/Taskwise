@@ -9,11 +9,12 @@ import {
 } from '../services/letterService'
 import DatePicker from './DatePicker'
 import Select from './Select'
+import LetterDocumentCard from './LetterDocumentCard'
 import type { AuthUser } from '../types'
 import { LanguageToggle, useLanguage, displayDate } from '../i18n/Language'
 const box = 'rounded-2xl border border-tw-border bg-white shadow-sm p-4 sm:p-5'
-const button = 'btn-primary min-h-11'
-const secondary = 'btn-secondary min-h-11'
+const button = 'btn-primary min-h-[44px]'
+const secondary = 'btn-secondary min-h-[44px]'
 const timestamp = (value: string, locale = 'en-GB') =>
   displayDate(value, locale === 'si-LK' ? 'si' : 'en', true)
 const letterColumns =
@@ -618,6 +619,7 @@ function Workload({ holders, limit }: { holders: Holder[]; limit: number }) {
 
 export default function LetterManagement({ user, onUserUpdate }: { user: AuthUser; onUserUpdate: (value: Partial<AuthUser>) => void }) {
   const { t: tr, locale } = useLanguage()
+  const duration = (days: number | undefined) => `${days ?? 0} ${tr(days === 1 ? 'day' : 'days')}`
   const [context, setContext] = useState<LetterContext | null>(null),
     [list, setList] = useState<LetterList | null>(null),
     [thread, setThread] = useState<Letter | null>(null)
@@ -727,8 +729,8 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
     }
   }
   return (
-    <div className="p-4 md:p-6 space-y-5 max-w-7xl mx-auto">
-      <div className="flex flex-wrap justify-between gap-3">
+    <div className={`w-full p-4 md:p-6 lg:p-8 space-y-6 mx-auto ${selected ? 'max-w-[1440px]' : 'max-w-7xl'}`} data-letter-workspace>
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-widest text-tw-primary mb-2">
             {tr("Correspondence")}</p>
@@ -1037,76 +1039,31 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
           NOTE: { label: tr("Internal note"), dot: 'bg-slate-100 text-slate-600 ring-slate-200', icon: 'M4 20h4L19 9l-4-4L4 16v4z' },
           SHARE: { label: tr("Viewing access shared"), dot: 'bg-amber-50 text-amber-600 ring-amber-100', icon: 'M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zm10 3a3 3 0 100-6 3 3 0 000 6z' },
         }
-        const driveState = (f: LetterFile) =>
-          (({
-            READY: { label: tr("Saved to Drive"), cls: 'bg-emerald-500' },
-            PENDING: { label: tr("Queued for Drive"), cls: 'bg-amber-400' },
-            PROCESSING: { label: tr("Uploading to Drive"), cls: 'bg-amber-400 animate-pulse' },
-            BLOCKED: { label: tr("Waiting for Drive"), cls: 'bg-slate-400' },
-            FAILED: { label: tr("Drive upload failed"), cls: 'bg-red-500' },
-          }) as Record<string, { label: string; cls: string }>)[f.uploadState] || { label: f.uploadState, cls: 'bg-slate-400' }
-        const fileRow = (f: LetterFile) => {
-          const d = driveState(f)
-          return (
-            <div key={f.id} className="flex items-center gap-3 rounded-xl border border-tw-border bg-white px-3 py-2">
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-red-50 text-[10px] font-bold uppercase text-red-600">
-                {f.mime === 'application/pdf' ? 'PDF' : f.mime.split('/')[1]?.slice(0, 4)}
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-medium" title={f.name}>{f.name}</span>
-                <span className="flex items-center gap-1.5 text-xs text-tw-text-secondary">
-                  <span className={`h-1.5 w-1.5 rounded-full ${d.cls}`} />
-                  {d.label} · {f.size >= 1048576 ? `${(f.size / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(f.size / 1024))} KB`}
-                </span>
-                {(f.uploadError || f.previewError) && (
-                  <span className="block text-xs text-amber-800 truncate" title={f.uploadError || f.previewError}>{f.uploadError || f.previewError}</span>
-                )}
-              </span>
-              <span className="flex shrink-0 gap-1">
-                {f.previewState === 'READY' && (
-                  <button className="rounded-lg px-2.5 py-1.5 text-xs font-semibold text-tw-primary hover:bg-blue-50" onClick={() => setPreview(f)}>
-                    {tr("Preview")}</button>
-                )}
-                <button className="rounded-lg px-2.5 py-1.5 text-xs font-semibold text-tw-text-secondary hover:bg-tw-hover hover:text-tw-text" onClick={() => void download(f)}>
-                  {tr("Download")}</button>
-                {thread.permissions?.canManage && (['FAILED', 'BLOCKED'].includes(f.uploadState) || f.previewState === 'FAILED') && (
-                  <button
-                    className="rounded-lg px-2.5 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-50"
-                    onClick={async () => {
-                      try {
-                        await letters.retry(f.id)
-                        await refresh()
-                      } catch (e) {
-                        setError((e as Error).message)
-                      }
-                    }}
-                  >
-                    {tr("Retry")}</button>
-                )}
-              </span>
-            </div>
-          )
-        }
+        const fileRow = (f: LetterFile) => <LetterDocumentCard key={f.id} file={f}
+          onPreview={() => setPreview(f)} onDownload={() => void download(f)}
+          onRetry={thread.permissions?.canManage && (['FAILED', 'BLOCKED'].includes(f.uploadState) || f.previewState === 'FAILED')
+            ? async () => { try { await letters.retry(f.id); await refresh() } catch (e) { setError((e as Error).message) } }
+            : undefined} />
         return (
           <>
-            <section className={box + ' !p-4 sm:!p-5'}>
-              <div className="flex flex-col lg:flex-row lg:items-start gap-4">
+            <section className={box + ' !p-5 sm:!p-6'}>
+              <div className="flex flex-col xl:flex-row xl:items-center gap-5">
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-medium text-tw-primary whitespace-nowrap">{thread.reference}</span>
+                    <span className="text-sm font-semibold text-tw-primary [overflow-wrap:anywhere]">{thread.reference}</span>
                     <Status closed={closed} />
                     <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
                       {thread.channel === 'DIGITAL' ? tr("Digital") : tr("Physical")}
                     </span>
                   </div>
-                  <h2 className="text-xl sm:text-2xl font-bold mt-2 break-words">{thread.subject}</h2>
-                  <p className="text-sm text-tw-text-secondary mt-1 break-words">
+                  <h2 className="text-xl sm:text-2xl font-bold mt-3 [overflow-wrap:anywhere]">{thread.subject}</h2>
+                  <p className="text-sm text-tw-text-secondary mt-2 [overflow-wrap:anywhere]">
                     {tr("From")} <span className="font-medium text-tw-text">{thread.sender}</span>
                     {thread.senderContact ? ' · ' + thread.senderContact : ''}
                     {thread.externalReference ? ` · ${tr("Sender’s reference:")} ${thread.externalReference}` : ''}
                   </p>
                 </div>
-                <div className="flex flex-wrap gap-2 lg:justify-end lg:max-w-md">
+                <div className="flex flex-wrap gap-3 xl:shrink-0">
                   {thread.permissions?.canReply && (
                     <button className={button} onClick={() => setKind('OUTGOING')}>
                       {tr("Record reply & close")}</button>
@@ -1116,33 +1073,33 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
                       {closed ? tr("Incoming reply & reopen") : tr("Add incoming reply")}
                     </button>
                   )}
-                  {thread.permissions?.canManage && (
-                    <>
-                      {!closed && (
-                        <button className={secondary} onClick={() => setKind('TRANSFER')}>
-                          {tr("Reassign")}</button>
-                      )}
-                      <button className={secondary} onClick={() => setKind('NOTE')}>
-                        {tr("Add note")}</button>
-                      <button className={secondary} onClick={() => setKind('SHARE')}>
-                        {tr("Share view")}</button>
-                    </>
-                  )}
                 </div>
               </div>
+              {thread.permissions?.canManage && (
+                <div className="mt-5 flex flex-wrap gap-2 border-t border-tw-border pt-4">
+                  {!closed && (
+                    <button className={secondary} onClick={() => setKind('TRANSFER')}>
+                      {tr("Reassign")}</button>
+                  )}
+                  <button className={secondary} onClick={() => setKind('NOTE')}>
+                    {tr("Add note")}</button>
+                  <button className={secondary} onClick={() => setKind('SHARE')}>
+                    {tr("Share view")}</button>
+                </div>
+              )}
             </section>
-            <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px] items-start">
-              <section className={box + ' !p-4 sm:!p-5'} aria-label={tr("Correspondence timeline")}>
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="font-semibold">{tr("Correspondence timeline")}</h2>
-                  <span className="text-xs text-tw-text-secondary">{thread.events?.length || 0} {tr("entries")}</span>
+            <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px] items-start">
+              <section className={box + ' min-w-0 !p-5 sm:!p-6'} aria-label={tr("Correspondence timeline")}>
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-6 border-b border-tw-border pb-4">
+                  <h2 className="text-base font-bold">{tr("Correspondence timeline")}</h2>
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs text-tw-text-secondary">{thread.events?.length || 0} {tr("entries")}</span>
                 </div>
                 <ol className="relative">
                   {thread.events?.map((event, i) => {
                     const k = kinds[event.kind] || kinds.NOTE,
                       last = i === (thread.events?.length || 0) - 1
                     return (
-                      <li key={event.id} className="relative flex gap-4 pb-6 last:pb-0">
+                      <li key={event.id} className="relative flex gap-3 sm:gap-4 pb-8 last:pb-0">
                         {!last && <span className="absolute left-[17px] top-10 bottom-0 w-px bg-tw-border" aria-hidden="true" />}
                         <span className={`relative z-10 grid h-9 w-9 shrink-0 place-items-center rounded-full ring-4 ${k.dot}`}>
                           <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
@@ -1151,12 +1108,12 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
                         </span>
                         <div className="min-w-0 flex-1 pt-1">
                           <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
-                            <h3 className="font-semibold text-sm">
+                            <h3 className="font-semibold text-base">
                               {k.label}
                               {event.kind === 'OUTGOING' && <span className="ml-2 text-xs font-medium text-emerald-700">{tr("Closed")}</span>}
                               <span className="ml-2 text-xs font-normal text-tw-text-secondary">#{event.sequence}</span>
                             </h3>
-                            <time className="text-xs text-tw-text-secondary whitespace-nowrap">{timestamp(event.createdAt, locale)}</time>
+                            <time dateTime={event.createdAt} className="text-xs text-tw-text-secondary">{timestamp(event.createdAt, locale)}</time>
                           </div>
                           <p className="text-xs text-tw-text-secondary mt-0.5">
                             {tr("by")} {event.actorName}
@@ -1166,9 +1123,9 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
                               {event.receivedDate && (
                                 <>
                                   <span className="rounded-md bg-slate-100 px-2 py-1">{tr("Received")} {shortDate(event.receivedDate, locale)}</span>
-                                  <span className="rounded-md bg-slate-100 px-2 py-1">{tr("From")} {event.correspondent}</span>
+                                  <span className="rounded-md bg-slate-100 px-2 py-1 [overflow-wrap:anywhere]">{tr("From")} {event.correspondent}</span>
                                   <span className={`rounded-md px-2 py-1 ${(event.entryDelayDays || 0) >= context.entryDelayDays ? 'bg-amber-50 text-amber-800' : 'bg-slate-100'}`}>
-                                    {tr("Entry delay")} {event.entryDelayDays}d</span>
+                                    {tr("Entry delay")} {duration(event.entryDelayDays)}</span>
                                 </>
                               )}
                               {event.correspondenceDate && (
@@ -1179,8 +1136,8 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
                               )}
                               {event.kind === 'TRANSFER' && (
                                 <>
-                                  <span className="rounded-md bg-violet-50 text-violet-800 px-2 py-1">{event.fromAssigneeName} → {event.toAssigneeName}</span>
-                                  <span className="rounded-md bg-slate-100 px-2 py-1">{tr("Held")} {event.holdingDays}d</span>
+                                  <span className="rounded-md bg-violet-50 text-violet-800 px-2 py-1 [overflow-wrap:anywhere]">{event.fromAssigneeName} → {event.toAssigneeName}</span>
+                                  <span className="rounded-md bg-slate-100 px-2 py-1">{tr("Held")} {duration(event.holdingDays)}</span>
                                 </>
                               )}
                               {event.kind === 'SHARE' && (
@@ -1189,10 +1146,10 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
                             </div>
                           )}
                           {event.notes && (
-                            <p className="mt-2 rounded-xl bg-slate-50 px-3 py-2 text-sm whitespace-pre-wrap break-words">{event.notes}</p>
+                            <p className="mt-3 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm leading-6 whitespace-pre-wrap [overflow-wrap:anywhere]">{event.notes}</p>
                           )}
                           {event.attachments.length > 0 && (
-                            <div className="mt-2 space-y-1.5">{event.attachments.map(fileRow)}</div>
+                            <div className="mt-3 space-y-3">{event.attachments.map(fileRow)}</div>
                           )}
                         </div>
                       </li>
@@ -1200,34 +1157,34 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
                   })}
                 </ol>
               </section>
-              <aside className="space-y-5 lg:sticky lg:top-4">
-                <section className={box + ' !p-4'}>
-                  <h2 className="font-semibold mb-3">{tr("Details")}</h2>
+              <aside className="min-w-0 space-y-6 xl:sticky xl:top-6">
+                <section className={box + ' !p-5 sm:!p-6'} aria-label={tr("Details")}>
+                  <h2 className="text-base font-bold mb-4">{tr("Details")}</h2>
                   <dl className="divide-y divide-tw-border text-sm">
                     {[
                       [tr("Current assignee"), <span className="font-medium">{thread.assignedToName}</span>],
                       [closed ? tr("Closed") : tr("With assignee"), closed
                         ? <span>{timestamp(thread.closedAt!, locale)}</span>
-                        : <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${badge}`}>{thread.assigneeAgeDays}d</span>],
+                        : <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${badge}`}>{duration(thread.assigneeAgeDays)}</span>],
                       [tr("Received"), <span>{shortDate(thread.firstReceivedDate, locale)}</span>],
-                      [tr("Entry delay"), <span className={lateEntry ? 'font-semibold text-amber-700' : ''}>{thread.entryDelayDays}d</span>],
+                      [tr("Entry delay"), <span className={lateEntry ? 'font-semibold text-amber-700' : ''}>{duration(thread.entryDelayDays)}</span>],
                       [tr("System logged"), <span>{timestamp(thread.createdAt, locale)}</span>],
                       [tr("Entered by"), <span>{thread.createdByName}</span>],
                     ].map(([label, value], i) => (
-                      <div key={i} className="flex items-center justify-between gap-3 py-2">
+                      <div key={i} className="grid grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] items-start gap-4 py-3 leading-5">
                         <dt className="text-tw-text-secondary">{label}</dt>
-                        <dd className="text-right min-w-0 truncate">{value}</dd>
+                        <dd className="text-right min-w-0 font-medium [overflow-wrap:anywhere]">{value}</dd>
                       </div>
                     ))}
                   </dl>
                 </section>
-                <section className={box + ' !p-4'}>
-                  <div className="flex items-center justify-between mb-3">
-                    <h2 className="font-semibold">{tr("Documents")}</h2>
+                <section className={box + ' min-w-0 !p-5 sm:!p-6'} aria-label={tr("Documents")}>
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-base font-bold">{tr("Documents")}</h2>
                     <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{documents.length}</span>
                   </div>
                   {documents.length ? (
-                    <div className="space-y-1.5">{documents.map(({ f }) => fileRow(f))}</div>
+                    <div className="space-y-3">{documents.map(({ f }) => fileRow(f))}</div>
                   ) : (
                     <p className="text-sm text-tw-text-secondary">{tr("No documents attached.")}</p>
                   )}

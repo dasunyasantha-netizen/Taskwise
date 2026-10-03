@@ -898,10 +898,10 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
     <div className="min-h-screen bg-tw-bg flex relative overflow-hidden">
 
       {/* ── Watermark ───────────────────────────────────────────────────── */}
-      <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
+      {currentView !== 'letters' && <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
         <img src="/taskwise/watermark.jpeg" alt="" className="absolute bottom-0 select-none"
           style={{ opacity: 0.13, mixBlendMode: 'multiply' as const, width: '100%', maxWidth: '480px', left: '50%', transform: 'translateX(-50%)' }} />
-      </div>
+      </div>}
 
       {/* ── Desktop Sidebar ──────────────────────────────────────────────── */}
       <aside className="hidden md:flex w-60 bg-[#1f2d3d] flex-col flex-shrink-0 relative z-10">

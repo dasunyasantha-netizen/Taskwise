@@ -289,7 +289,7 @@ export default function App() {
 
   const isImpersonating = !!user.impersonation
   // Add top padding when impersonation banner is shown
-  const bannerPad = isImpersonating ? 'pt-11' : ''
+  const bannerPad = isImpersonating ? 'pt-[56px]' : ''
 
   if (user.actorType === 'director') {
     const requiresInsurancePolicyCompletion = user.features?.includes('insurance_management') === true && !user.impersonation

@@ -42,7 +42,7 @@ export const si: Record<string, string> = {
   'Loading correspondence…': 'ලිපි හුවමාරුව පූරණය වෙමින්…', 'Loading letter…': 'ලිපිය පූරණය වෙමින්…',
   'Loading preview…': 'පෙරදසුන පූරණය වෙමින්…', 'Page': 'පිටුව', 'Previous': 'පෙර', 'Next': 'ඊළඟ',
   'Refresh': 'නැවුම් කරන්න', 'Cancel': 'අවලංගු කරන්න', 'Close dialog': 'කවුළුව වසන්න',
-  '← Register': '← ලේඛනය', 'Search': 'සොයන්න', 'of': 'න්', 'days': 'දින', 'calendar days': 'දින දර්ශන දින',
+  '← Register': '← ලේඛනය', 'Search': 'සොයන්න', 'of': 'න්', 'day': 'දින', 'days': 'දින', 'calendar days': 'දින දර්ශන දින',
   'inquiries': 'විමසීම්', 'open ·': 'විවෘත ·', 'flagged · oldest': 'ප්‍රමාද · පැරණිම',
   'receipts logged after': 'ප්‍රමාද වී ඇතුළත් කළ ලිපි', 'needs attention': 'අවධානය අවශ්‍යයි',
   'awaiting setup': 'සැකසුම බලාපොරොත්තුවෙන්', 'queued': 'පෝලිමේ', 'uploading': 'උඩුගත වෙමින්', 'saved': 'සුරැකී ඇත',
