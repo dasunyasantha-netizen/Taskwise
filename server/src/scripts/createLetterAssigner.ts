@@ -31,7 +31,7 @@ async function main() {
   if (!process.argv.includes('--apply')) { console.log(JSON.stringify({ dryRun: true, ...plan })); return }
   const password = await bcrypt.hash(randomBytes(32).toString('base64url'), 12)
   const result = await prisma.$transaction(async tx => {
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${workspaceId + ':letter-assigner'}))`
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${workspaceId + ':letter-assigner'}))`
     const existing = await tx.workspaceRole.findMany({ where: { workspaceId,
       personnel: { name: { equals: 'Letter Assigner', mode: 'insensitive' } } }, include: { personnel: true } })
     assert.ok(existing.length <= 1, 'Multiple Letter Assigner roles exist; review before provisioning')
