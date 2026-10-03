@@ -209,6 +209,25 @@ async function main() {
     )
   }
   try {
+    await check(
+      'documents are refused and never stored while Drive is disconnected',
+      async () => {
+        await db.letterSettings.upsert({
+          where: { workspaceId: ws.id },
+          create: { workspaceId: ws.id, connected: false },
+          update: { connected: false },
+        })
+        const before = await db.letterAttachment.count()
+        const r = await call('director', '/', incoming(), 409)
+        assert.match(r.error, /contact your administrator/i)
+        assert.equal(await db.letterAttachment.count(), before)
+        await call('director', '/', incoming({ files: [] }), 201)
+        await db.letterSettings.update({
+          where: { workspaceId: ws.id },
+          data: { connected: true },
+        })
+      }
+    )
     await check('profile language is validated, scoped, and returned in later sessions', async () => {
       const auth = async (who: keyof typeof tokens, route: string, method = 'GET', language?: string) => {
         const response = await fetch(base.replace('/letters', '/auth') + route, {

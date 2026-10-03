@@ -418,7 +418,11 @@ function LetterForm({
             onChange={(e) => set('notes', e.target.value)}
           />
         </Field>
-        {!['TRANSFER', 'SHARE'].includes(kind) && (
+        {!['TRANSFER', 'SHARE'].includes(kind) && !context.driveConnected && (
+          <p role="alert" className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm text-amber-900">
+            {tr("Google Drive is not connected. Contact your administrator to connect Google Drive before uploading documents.")}</p>
+        )}
+        {!['TRANSFER', 'SHARE'].includes(kind) && context.driveConnected && (
           <Field
             label={
               kind === 'OUTGOING'
@@ -441,7 +445,7 @@ function LetterForm({
               {selectedFiles.length ? selectedFiles.map(file => file.name).join(', ') : tr('No files selected')}
             </span>
             <span className="block text-xs text-tw-text-secondary">
-              {tr("PDF, PNG or JPG · up to 4 files · 4 MB each / 8 MB total. Originals are preserved; preview and Drive upload run in the background.")}</span>
+              {tr("PDF, PNG or JPG · up to 4 files · 4 MB each / 8 MB total. Saved to Google Drive in the background.")}</span>
           </Field>
         )}
         <p className="text-xs text-tw-text-secondary">
@@ -690,7 +694,7 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
       {!context && busy && <p role="status">{tr("Loading correspondence…")}</p>}
       {context && !context.driveConnected && (
         <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm text-amber-900">
-          {tr("Google Drive is not connected. Documents are saved securely in Taskwise and queued until the Director connects Drive in Settings.")}</div>
+          {tr("Google Drive is not connected. Contact your administrator to connect Google Drive before uploading documents.")}</div>
       )}
       {!selected && list && (
         <>

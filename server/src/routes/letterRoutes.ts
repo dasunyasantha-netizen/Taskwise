@@ -29,6 +29,20 @@ import {
 } from '../helpers/letterDrive'
 const router = express.Router()
 const PAGE_SIZE = 50
+// Documents are only accepted while Drive is connected; nothing is kept
+// on the server for a workspace without Drive.
+const requireDrive = async (workspaceId: string, count: number) => {
+  if (!count) return
+  const config = await prisma.letterSettings.findUnique({
+    where: { workspaceId },
+    select: { connected: true },
+  })
+  ensure(
+    config?.connected,
+    409,
+    'Google Drive is not connected. Contact your administrator to connect Google Drive before uploading documents.'
+  )
+}
 const safe =
   (fn: (req: Request, res: Response) => Promise<unknown>) =>
   async (req: Request, res: Response) => {
@@ -592,6 +606,7 @@ router.post(
       'Choose Physical or Digital'
     )
     const attachments = files(b.files || [])
+    await requireDrive(a.workspaceId, attachments.length)
     const result = await prisma.$transaction(
       async (db) => {
         const live = await scope(db, a)
@@ -724,6 +739,7 @@ router.post(
         kind === 'NOTE' || kind === 'TRANSFER'
       ),
       attachments = files(b.files || [])
+    await requireDrive(a.workspaceId, attachments.length)
     ensure(
       !['TRANSFER', 'SHARE'].includes(kind) || attachments.length === 0,
       400,
