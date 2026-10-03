@@ -3,8 +3,9 @@ import type { AuthUser } from '../types'
 import { authApi, workspaceApi, webAuthnApi } from '../services/apiService'
 import { startRegistration } from '@simplewebauthn/browser'
 import RoleAssignments from './RoleAssignments'
-import { PageHeader, ThemeToggle } from './ui/Primitives'
+import { PageHeader, ThemeToggle, SinhalaFontPicker } from './ui/Primitives'
 import { Icon } from './ui/Icon'
+import { useLanguage } from '../i18n/Language'
 
 interface Props {
   user: AuthUser
@@ -62,6 +63,7 @@ interface WebAuthnCred {
 }
 
 export default function ProfilePage({ user, onUserUpdate }: Props) {
+  const { t } = useLanguage()
   const [name, setName]       = useState(user.name)
   const [phone, setPhone]     = useState(user.phone || '')
   const [email, setEmail]     = useState(user.email || '')
@@ -248,10 +250,15 @@ export default function ProfilePage({ user, onUserUpdate }: Props) {
       <div className="card p-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h2 className="text-base font-semibold tracking-tight text-tw-text">Appearance</h2>
-            <p className="text-xs text-tw-text-secondary mt-1">Choose light or dark, or follow your device setting. Saved on this device.</p>
+            <h2 className="text-base font-semibold tracking-tight text-tw-text">{t('Appearance')}</h2>
+            <p className="text-xs text-tw-text-secondary mt-1">{t('Choose light or dark, or follow your device setting. Saved on this device.')}</p>
           </div>
           <ThemeToggle className="sm:w-80" />
+        </div>
+        <div className="border-t border-tw-border mt-5 pt-5">
+          <h3 className="text-sm font-semibold text-tw-text">{t('Sinhala font')}</h3>
+          <p className="text-xs text-tw-text-secondary mt-1 mb-3">{t('Used for all Sinhala text across TaskWise, including what you type into fields. Saved on this device.')}</p>
+          <SinhalaFontPicker />
         </div>
       </div>
 

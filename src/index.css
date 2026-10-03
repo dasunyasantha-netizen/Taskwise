@@ -75,6 +75,11 @@ html.dark {
   --shadow-panel: 0 24px 48px -12px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.04);
 }
 
+/* ─── Sinhala typeface (user preference; default Noto Sans Sinhala) ───────── */
+:root { --tw-font-sinhala: 'Noto Sans Sinhala'; }
+html[data-si-font="noto-serif"] { --tw-font-sinhala: 'Noto Serif Sinhala'; }
+html[data-si-font="maname"]     { --tw-font-sinhala: 'Maname'; }
+
 /* Legacy `white` surfaces follow the theme (text-white on coloured fills stays white). */
 html.dark .bg-white,
 html.dark .hover\:bg-white:hover,
@@ -120,6 +125,10 @@ html.dark img.dark-invert { filter: invert(1) hue-rotate(180deg); }
   /* Native form controls without explicit styling still follow the theme */
   input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']),
   select, textarea { background-color: rgb(var(--tw-surface)); color: rgb(var(--tw-text)); }
+
+  /* Form controls and SVG text use the same stack, so typed Sinhala matches the page */
+  input, select, textarea, button, option, optgroup, svg text { font-family: theme('fontFamily.sans'); }
+  input::placeholder, textarea::placeholder { font-family: inherit; }
   input::placeholder, textarea::placeholder { color: rgb(var(--tw-text-muted)); }
 }
 

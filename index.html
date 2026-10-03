@@ -6,9 +6,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#f4f6fa" />
     <script>
-      // Apply saved light/dark theme before first paint (see src/hooks/useTheme.ts)
+      // Apply saved light/dark theme and Sinhala font before first paint (src/hooks/useTheme.ts, useSinhalaFont.ts)
       (function () {
         try {
+          var f = localStorage.getItem('tw_si_font');
+          if (f === 'noto-serif' || f === 'maname') document.documentElement.setAttribute('data-si-font', f);
           var p = localStorage.getItem('tw_theme');
           var dark = p === 'dark' || (p !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
           if (dark) { document.documentElement.classList.add('dark'); document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0b1017'); }
@@ -20,7 +22,7 @@
     <link rel="canonical" href="https://syswise.lk/taskwise/" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Noto+Sans+Sinhala:wght@400;500;600;700&family=Noto+Serif+Sinhala:wght@400;500;600;700&family=Maname&display=swap" rel="stylesheet" />
     <style>
       .seo-page-heading {
         position: absolute;

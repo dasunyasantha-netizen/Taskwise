@@ -45,7 +45,10 @@ export default {
         'tw-hover':          v('tw-hover'),
       },
       fontFamily: {
-        sans: ['Figtree', 'Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        // var(--tw-font-sinhala) is the user's Sinhala typeface (src/hooks/useSinhalaFont.ts);
+        // Latin fonts have no Sinhala glyphs, so Sinhala text falls through to it.
+        sans: ['Figtree', 'Inter', 'var(--tw-font-sinhala)', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Consolas', 'var(--tw-font-sinhala)', 'monospace'],
       },
       fontSize: {
         'xs':   ['0.8rem',  { lineHeight: '1.2rem' }],

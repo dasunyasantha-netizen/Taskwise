@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { Icon, type IconName } from './Icon'
 import { useTheme, type ThemePref } from '../../hooks/useTheme'
+import { useSinhalaFont, SINHALA_FONTS } from '../../hooks/useSinhalaFont'
 import { useLanguage } from '../../i18n/Language'
 
 export type Tone = 'blue' | 'purple' | 'red' | 'green' | 'amber' | 'teal' | 'indigo' | 'gray'
@@ -110,6 +111,38 @@ export function ThemeToggle({ compact = false, className = '' }: { compact?: boo
           {t(o.label)}
         </button>
       ))}
+    </div>
+  )
+}
+
+// ─── Sinhala font picker ──────────────────────────────────────────────────────
+const SINHALA_SAMPLE = 'ශ්‍රී ලංකා ජාතික තරුණ සේවා සභාව'
+
+/** Lets the user choose the typeface used for all Sinhala text (incl. inputs). */
+export function SinhalaFontPicker({ className = '' }: { className?: string }) {
+  const { t } = useLanguage()
+  const { font, setFont } = useSinhalaFont()
+  return (
+    <div className={`grid gap-2 sm:grid-cols-3 ${className}`} role="radiogroup" aria-label={t('Sinhala font')}>
+      {SINHALA_FONTS.map(f => {
+        const active = font === f.value
+        return (
+          <button key={f.value} type="button" role="radio" aria-checked={active} onClick={() => setFont(f.value)}
+            className={`text-left rounded-xl border px-3.5 py-3 transition-all ${active
+              ? 'border-tw-primary/50 bg-tw-primary/[0.07] ring-1 ring-tw-primary/30'
+              : 'border-tw-border bg-tw-surface hover:border-tw-border-strong hover:bg-tw-hover'}`}>
+            <div className="flex items-center justify-between gap-2">
+              <span className={`text-xs font-semibold ${active ? 'text-tw-primary-text' : 'text-tw-text-secondary'}`}>
+                {f.label}{f.value === 'noto-sans' && <span className="font-normal text-tw-text-muted"> · {t('Default')}</span>}
+              </span>
+              {active && <Icon name="check" className="w-4 h-4 text-tw-primary-text flex-shrink-0" />}
+            </div>
+            <p lang="si" className="mt-1.5 text-[15px] leading-relaxed text-tw-text" style={{ fontFamily: `${f.family}, sans-serif` }}>
+              {SINHALA_SAMPLE}
+            </p>
+          </button>
+        )
+      })}
     </div>
   )
 }

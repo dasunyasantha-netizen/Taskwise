@@ -293,5 +293,8 @@ export const si: Record<string, string> = {
   "See who's earning points — daily logins, task updates, on-time submissions & more": 'ලකුණු උපයන්නේ කවුදැයි බලන්න — දෛනික පිවිසීම්, කාර්ය යාවත්කාලීන, නියමිත වේලාවට ඉදිරිපත් කිරීම් සහ තවත්',
   'Overdue · Due soon · Pending approvals · Sitting longest · By officer · By department & more': 'ප්‍රමාද වූ · ළඟදීම නියමිත · අනුමැතිය බලාපොරොත්තුවෙන් · දිගුම කාලයක් · නිලධාරී අනුව · අංශය අනුව සහ තවත්',
   'Leaderboard': 'ප්‍රමුඛ පුවරුව',
+  'Choose light or dark, or follow your device setting. Saved on this device.': 'ආලෝක හෝ අඳුරු තෝරන්න, නැතහොත් ඔබගේ උපාංග සැකසුම අනුගමනය කරන්න. මෙම උපාංගයේ සුරැකේ.',
+  'Sinhala font': 'සිංහල අකුරු', 'Default': 'පෙරනිමි', 'Appearance': 'පෙනුම',
+  'Used for all Sinhala text across TaskWise, including what you type into fields. Saved on this device.': 'TaskWise හි සියලු සිංහල පෙළ සඳහා, ඔබ ක්ෂේත්‍රවල ටයිප් කරන දේ ද ඇතුළුව භාවිත වේ. මෙම උපාංගයේ සුරැකේ.',
   'Collapse sidebar': 'පැති තීරුව හකුළන්න', 'Expand sidebar': 'පැති තීරුව විහිදන්න',
 }
