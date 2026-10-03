@@ -6,6 +6,7 @@ import { companyLoginPrefix, normalizeSriLankanPhone, resolveLoginLookup } from 
 import { getEnabledFeatures } from '../helpers/features'
 import { ysoRole } from '../helpers/ysoAccess'
 import { SUPPORT_PROOF_PREFIX, SUPPORT_PURPOSE } from './supportVerificationController'
+import { usesFixedRoles, fixedRoleMetadata, isRoleAlias } from '../helpers/fixedRoles'
 
 function signToken(
   actorId: string,
@@ -79,7 +80,7 @@ export async function unifiedLogin(req: Request, res: Response): Promise<void> {
         invalid(); return
       }
       const assignment = await prisma.migrationRoleContact.findUnique({ where: { actorType_actorId: { actorType: 'director', actorId: director.id } } })
-      if (assignment?.syswiseUserId || assignment?.legacyAccessRevokedAt) {
+      if (assignment?.syswiseUserId || assignment?.legacyAccessRevokedAt || await usesFixedRoles(director.workspaceId)) {
         res.status(401).json({ error: 'This account has migrated. Sign in through Syswise.', code: 'syswise_signin_required' }); return
       }
       const token = signToken(director.id, 'director', director.workspaceId!)
@@ -143,7 +144,7 @@ export async function unifiedLogin(req: Request, res: Response): Promise<void> {
         invalid(); return
       }
       const assignment = await prisma.migrationRoleContact.findUnique({ where: { actorType_actorId: { actorType: 'personnel', actorId: personnel.id } } })
-      if (assignment?.syswiseUserId || assignment?.legacyAccessRevokedAt) {
+      if (assignment?.syswiseUserId || assignment?.legacyAccessRevokedAt || await usesFixedRoles(personnel.workspaceId)) {
         res.status(401).json({ error: 'This account has migrated. Sign in through Syswise.', code: 'syswise_signin_required' }); return
       }
       const layerNumber = personnel.department.layer.number
@@ -336,7 +337,7 @@ export async function getMe(req: Request, res: Response): Promise<void> {
     const features = await getEnabledFeatures(workspaceId)
     const assignedContact = req.user!.authenticationMethod === 'syswise'
       ? await prisma.migrationRoleContact.findUnique({ where: { actorType_actorId: { actorType, actorId } } }) : null
-    const identityContact = assignedContact ? { syswiseUserId: req.user!.syswiseUserId, phone: assignedContact.phoneE164, email: assignedContact.email, mustChangePassword: false } : {}
+    const identityContact = { ...await fixedRoleMetadata(actorType, actorId, workspaceId), ...(assignedContact ? { syswiseUserId: req.user!.syswiseUserId, phone: assignedContact.phoneE164, email: assignedContact.email, mustChangePassword: false } : {}) }
     if (actorType === 'director') {
       const director = await prisma.director.findUnique({
         where: { id: actorId },
@@ -390,6 +391,7 @@ export async function listImpersonationTargets(req: Request, res: Response): Pro
         where: {
           isActive: true,
           deletedAt: null,
+          NOT: { fixedRole: { is: { directorId: { not: null }, workspace: { roleBasedIdentity: true } } } },
           OR: [{ company: null }, { company: { status: 'ACTIVE' } }],
         },
         select: {
@@ -466,6 +468,9 @@ export async function startImpersonation(req: Request, res: Response): Promise<v
       res.status(400).json({ error: 'A valid target role is required' }); return
     }
     const validatedTargetActorType = targetActorType as 'director' | 'personnel'
+    if (await isRoleAlias(validatedTargetActorType, targetActorId)) {
+      res.status(409).json({ error: 'Select the unified Chairman management role.' }); return
+    }
     if (!reason?.trim() || reason.trim().length < 5 || reason.trim().length > 500) {
       res.status(400).json({ error: 'Reason must be between 5 and 500 characters' }); return
     }
@@ -588,6 +593,7 @@ export async function startImpersonation(req: Request, res: Response): Promise<v
       token,
       session: { id: session.id, startedAt: session.startedAt, expiresAt },
       user: {
+        ...await fixedRoleMetadata(validatedTargetActorType, target.id, target.workspaceId),
         actorId: target.id,
         actorType: validatedTargetActorType,
         workspaceId: target.workspaceId,

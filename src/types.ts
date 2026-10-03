@@ -12,6 +12,9 @@ export interface ImpersonationInfo {
 }
 
 export interface AuthUser {
+  roleBasedIdentity?: boolean
+  roleId?: string
+  personnelRoleId?: string
   actorId: string
   actorType: ActorType
   workspaceId: string
@@ -158,6 +161,7 @@ export interface Layer {
 }
 
 export interface Department {
+  layer?: { number: number; name: string }
   id: string
   layerId: string
   workspaceId: string

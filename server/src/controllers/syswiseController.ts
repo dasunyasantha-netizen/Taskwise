@@ -4,11 +4,13 @@ import prisma from '../prisma'
 import { getEnabledFeatures } from '../helpers/features'
 import { ysoRole } from '../helpers/ysoAccess'
 import { checkPublicThrottle } from '../helpers/publicThrottle'
+import { fixedRoleMetadata, isRoleAlias } from '../helpers/fixedRoles'
 
 type Assignment = { actorType: 'director' | 'personnel'; actorId: string; workspaceId: string; assignmentVersion: number }
 type Choice = jwt.JwtPayload & { purpose: string; syswiseUserId: number; assignments: Assignment[] }
 
 async function availableRole(a: Assignment) {
+  if (await isRoleAlias(a.actorType, a.actorId)) return null
   const contact = await prisma.migrationRoleContact.findUnique({ where: { actorType_actorId: { actorType: a.actorType, actorId: a.actorId } } })
   if (!contact || contact.assignmentVersion !== a.assignmentVersion || contact.workspaceId !== a.workspaceId) return null
   const actor = a.actorType === 'director'
@@ -51,7 +53,7 @@ export async function exchangeSyswiseCode(req: Request, res: Response): Promise<
       assignments.push(a)
       roles.push({ contactId: role.contact.id, companyId: role.actor.companyId || role.workspace.id,
         companyName: role.actor.company?.displayName || role.actor.company?.legalName || role.workspace.companyName || role.workspace.name,
-        roleName: a.actorType === 'director' ? 'Director' : 'department' in role.actor ? role.actor.department.name : 'Personnel' })
+        roleName: role.workspace.roleBasedIdentity ? role.actor.name : a.actorType === 'director' ? 'Director' : 'department' in role.actor ? role.actor.department.name : 'Personnel' })
     }
     if (!roles.length) { res.status(403).json({ error: 'No active company role is assigned to your verified account. Contact your director.' }); return }
     const selectionToken = jwt.sign({ purpose: 'taskwise-role-choice', syswiseUserId: identity.user.id, assignments }, process.env.JWT_SECRET!, { expiresIn: '5m' })
@@ -72,6 +74,7 @@ export async function selectSyswiseRole(req: Request, res: Response): Promise<vo
     const { actor, workspace } = role
     const personnel = 'department' in actor ? actor : null
     const features = await getEnabledFeatures(workspace.id)
+    const roleMetadata = await fixedRoleMetadata(a.actorType, actor.id, workspace.id)
     const token = jwt.sign({ actorId: actor.id, actorType: a.actorType, workspaceId: workspace.id,
       authenticationMethod: 'syswise', syswiseUserId: proof.syswiseUserId,
       assignmentVersion: a.assignmentVersion,
@@ -80,7 +83,7 @@ export async function selectSyswiseRole(req: Request, res: Response): Promise<vo
       actorName: actor.name, ipAddress: req.ip, userAgent: req.headers['user-agent'] } })
     res.setHeader('Cache-Control', 'no-store')
     res.json({ token, user: { actorId: actor.id, actorType: a.actorType, workspaceId: workspace.id,
-      syswiseUserId: proof.syswiseUserId, name: actor.name, phone: role.contact.phoneE164, email: role.contact.email,
+      ...roleMetadata, syswiseUserId: proof.syswiseUserId, name: actor.name, phone: role.contact.phoneE164, email: role.contact.email,
       avatarUrl: actor.avatarUrl, preferredLanguage: actor.preferredLanguage,
       companyId: actor.companyId, companyPrefix: actor.company?.prefix,
       companyName: actor.company?.displayName || actor.company?.legalName || workspace.companyName || workspace.name,

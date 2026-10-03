@@ -25,6 +25,7 @@ import { DEFAULT_REPORTS_STATE } from './ReportsPage'
 import ImpersonationPage from './ImpersonationPage'
 import UserAnalyticsPage from './UserAnalyticsPage'
 import ChairmanUserManagementPage from './ChairmanUserManagementPage'
+import FixedRoleManagement from './FixedRoleManagement'
 import LeaderboardPage from './LeaderboardPage'
 import CompanyRequestsPage from './CompanyRequestsPage'
 import CompanyFeaturesPage from './CompanyFeaturesPage'
@@ -1084,7 +1085,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
                   : currentView === 'reports' ? 'Reports'
                   : currentView === 'impersonation' ? 'Support Access'
                   : currentView === 'user_analytics' ? 'User Analytics'
-                  : currentView === 'user_management' ? 'User Management'
+                  : currentView === 'user_management' ? (user.roleBasedIdentity ? 'Role Management' : 'User Management')
                   : currentView === 'leaderboard' ? 'Leaderboard'
                   : currentView === 'insurance_management' ? 'Insurance Management'
                   : currentView === 'letters' ? t('Letters')
@@ -1389,7 +1390,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
 
           {/* USER MANAGEMENT — Chairman only */}
           {currentView === 'user_management' && user.isChairman && (
-            <ChairmanUserManagementPage />
+            user.roleBasedIdentity ? <div className="p-6"><FixedRoleManagement user={user} /></div> : <ChairmanUserManagementPage />
           )}
 
           {/* LEADERBOARD */}

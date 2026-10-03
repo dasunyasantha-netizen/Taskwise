@@ -7,7 +7,8 @@
     "dev": "vite --port 3500",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "test:support": "playwright test --config playwright.support.config.ts"
+    "test:support": "playwright test --config playwright.support.config.ts",
+    "test:roles": "playwright test --config playwright.roles.config.ts"
   },
   "dependencies": {
     "@simplewebauthn/browser": "^13.3.0",

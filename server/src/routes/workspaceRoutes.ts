@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { authenticateToken, requireChairman, requireDirector } from '../middleware/authMiddleware'
+import { listFixedRoles, saveFixedRole } from '../controllers/fixedRoleController'
 import {
   getWorkspace, updateWorkspace, updateProfile, getLayers, updateLayer, uploadAvatar,
   getDepartments, createDepartment, updateDepartment, deleteDepartment,
@@ -9,6 +10,9 @@ import {
 
 const router = Router()
 router.use(authenticateToken)
+router.get('/roles', listFixedRoles)
+router.post('/roles', requireDirector, saveFixedRole)
+router.put('/roles/:id', requireDirector, saveFixedRole)
 
 router.get('/',                                    getWorkspace)
 router.put('/',                                    requireDirector, updateWorkspace)

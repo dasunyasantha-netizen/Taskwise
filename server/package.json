@@ -12,6 +12,7 @@
     "test": "tsx src/tests/companyHelpers.test.ts && tsx src/tests/taskFilters.test.ts && tsx src/tests/deduction.test.ts && tsx src/tests/companyOnboarding.test.ts && tsx src/tests/fourLevelHierarchy.test.ts",
     "test:helpers": "tsx src/tests/companyHelpers.test.ts",
     "test:support": "tsx src/tests/supportAccess.test.ts",
+    "test:roles": "tsx src/tests/fixedRoles.test.ts",
     "test:integration": "tsx src/tests/companyOnboarding.test.ts",
     "test:hierarchy": "tsx src/tests/fourLevelHierarchy.test.ts",
     "test:yso": "tsx --test src/tests/ysoRules.test.ts",

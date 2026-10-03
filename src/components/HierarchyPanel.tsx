@@ -6,11 +6,13 @@ import {
   needsManager, officeCategoryLabel, tierWord,
 } from '../hierarchy'
 import Select from './Select'
+import FixedRoleManagement from './FixedRoleManagement'
 
 export default function HierarchyPanel({ user }: { user: AuthUser }) {
   const [layers, setLayers] = useState<Layer[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'structure' | 'personnel'>('structure')
+  const [roleCreateRequest, setRoleCreateRequest] = useState(0)
 
   // Modals
   const [showDeptModal, setShowDeptModal] = useState(false)
@@ -48,8 +50,8 @@ export default function HierarchyPanel({ user }: { user: AuthUser }) {
   const [saving, setSaving] = useState(false)
   const [personnelSearch, setPersonnelSearch] = useState('')
 
-  const load = async () => {
-    setLoading(true)
+  const load = async (quiet = false) => {
+    if (!quiet) setLoading(true)
     try {
       const [l, p] = await Promise.all([
         workspaceApi.getLayers() as Promise<Layer[]>,
@@ -331,13 +333,13 @@ export default function HierarchyPanel({ user }: { user: AuthUser }) {
     <div className="p-6">
       <div className="mb-6">
         <h1 className="text-xl font-bold text-tw-text">Team Hierarchy</h1>
-        <p className="text-sm text-tw-text-secondary mt-0.5 mb-4">Manage {word.toLowerCase()}s, departments and personnel</p>
+        <p className="text-sm text-tw-text-secondary mt-0.5 mb-4">Manage {word.toLowerCase()}s, departments and {user.roleBasedIdentity ? 'roles' : 'personnel'}</p>
         <div className="flex gap-2">
           <button onClick={() => setShowDeptModal(true)} className="flex-1 btn-secondary text-xs py-2.5 flex items-center justify-center gap-1">
             <span className="text-base leading-none">+</span> Department
           </button>
-          <button onClick={() => setShowPersonnelModal(true)} className="flex-1 btn-secondary text-xs py-2.5 flex items-center justify-center gap-1">
-            <span className="text-base leading-none">+</span> Personnel
+          <button onClick={() => { if (user.roleBasedIdentity) { setActiveTab('personnel'); setRoleCreateRequest(n => n + 1) } else setShowPersonnelModal(true) }} className="flex-1 btn-secondary text-xs py-2.5 flex items-center justify-center gap-1">
+            <span className="text-base leading-none">+</span> {user.roleBasedIdentity ? 'Role' : 'Personnel'}
           </button>
         </div>
       </div>
@@ -357,7 +359,7 @@ export default function HierarchyPanel({ user }: { user: AuthUser }) {
         {(['structure', 'personnel'] as const).map(tab => (
           <button key={tab} onClick={() => setActiveTab(tab)}
             className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors capitalize ${activeTab === tab ? 'bg-white text-tw-primary shadow-card' : 'text-tw-text-secondary hover:text-tw-text'}`}>
-            {tab}
+            {tab === 'personnel' && user.roleBasedIdentity ? 'Roles' : tab}
           </button>
         ))}
       </div>
@@ -411,7 +413,7 @@ export default function HierarchyPanel({ user }: { user: AuthUser }) {
                                 <div className="flex items-center gap-2">
                                   <div className="w-2 h-2 rounded-full bg-tw-primary" />
                                   <span className="font-medium text-sm text-tw-text">{dept.name}</span>
-                                  <span className="badge badge-gray">{deptPersonnel.length} people</span>
+                                  <span className="badge badge-gray">{deptPersonnel.length} {user.roleBasedIdentity ? 'roles' : 'people'}</span>
                                   {fourLevel && levelTakesCategory(layer.number) && !dept.officeCategory && (
                                     <span className="badge bg-amber-100 text-amber-800">Not categorised</span>
                                   )}
@@ -451,7 +453,8 @@ export default function HierarchyPanel({ user }: { user: AuthUser }) {
       )}
 
       {/* PERSONNEL TAB */}
-      {activeTab === 'personnel' && (
+      {activeTab === 'personnel' && user.roleBasedIdentity && <FixedRoleManagement user={user} createRequest={roleCreateRequest} onChanged={() => { void load(true) }} />}
+      {activeTab === 'personnel' && !user.roleBasedIdentity && (
         <PersonnelTab
           allPersonnel={allPersonnel}
           layers={layers}

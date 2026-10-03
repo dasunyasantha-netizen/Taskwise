@@ -14,6 +14,7 @@ import prisma from '../prisma'
 import { resolveLoginLookup } from '../helpers/phone'
 import { getEnabledFeatures } from '../helpers/features'
 import { ysoRole } from '../helpers/ysoAccess'
+import { usesFixedRoles } from '../helpers/fixedRoles'
 
 const RP_NAME = 'TaskWise'
 // On production this must be the actual domain; locally it's localhost
@@ -180,7 +181,8 @@ export async function authenticationOptions(req: Request, res: Response): Promis
     }
 
     const assignment = await prisma.migrationRoleContact.findUnique({ where: { actorType_actorId: { actorType, actorId } } })
-    if (assignment?.syswiseUserId || assignment?.legacyAccessRevokedAt) {
+    const identified = await getActor(actorId, actorType)
+    if (assignment?.syswiseUserId || assignment?.legacyAccessRevokedAt || await usesFixedRoles(identified?.workspaceId)) {
       res.status(401).json({ error: 'Sign in through Syswise to open this role.', code: 'syswise_signin_required' }); return
     }
     const creds = await prisma.webAuthnCredential.findMany({
@@ -224,7 +226,7 @@ export async function authenticationVerify(req: Request, res: Response): Promise
     const actor = await getActor(actorId, actorType) as Record<string, unknown> | null
     if (!actor) { res.status(404).json({ error: 'User not found' }); return }
     const assignment = await prisma.migrationRoleContact.findUnique({ where: { actorType_actorId: { actorType, actorId } } })
-    if (assignment?.syswiseUserId || assignment?.legacyAccessRevokedAt || !actor.isActive || actor.deletedAt) {
+    if (assignment?.syswiseUserId || assignment?.legacyAccessRevokedAt || !actor.isActive || actor.deletedAt || await usesFixedRoles(actor.workspaceId as string)) {
       res.status(401).json({ error: 'Sign in through Syswise to open this role.', code: 'syswise_signin_required' }); return
     }
 

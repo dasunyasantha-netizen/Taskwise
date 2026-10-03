@@ -243,7 +243,7 @@ export default function ProfilePage({ user, onUserUpdate }: Props) {
       </div>
 
       {/* Profile info */}
-      <div className="card p-6">
+      {user.roleBasedIdentity ? <div className="card p-6"><h2 className="font-semibold">Your role</h2><p className="mt-2">{user.name}</p><p className="text-sm text-tw-text-secondary mt-2">The Director manages this position and its phone assignment. Manage your personal details in Syswise.</p></div> : <div className="card p-6">
         <h2 className="text-base font-semibold text-tw-text mb-4">Personal Information</h2>
         <form onSubmit={handleProfileSave} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
@@ -280,9 +280,10 @@ export default function ProfilePage({ user, onUserUpdate }: Props) {
         </form>
       </div>
 
-      {user.syswiseUserId && <div className="card p-6"><h2 className="font-semibold mb-2">Syswise account</h2><p className="text-sm text-tw-text-secondary mb-3">Manage your personal phone number, password and passkeys in Syswise. Ask your supervisor to correct a role assignment.</p><a className="btn-primary inline-block" href={`${window.location.hostname === 'localhost' ? 'http://localhost:3100' : window.location.origin}/pickiti/account`}>Manage account</a></div>}
+      }
+      {user.syswiseUserId && <div className="card p-6"><h2 className="font-semibold mb-2">Syswise account</h2><p className="text-sm text-tw-text-secondary mb-3">Manage your personal phone number, password and passkeys in Syswise. Ask your Director to correct a role assignment.</p><a className="btn-primary inline-block" href={`${window.location.hostname === 'localhost' ? 'http://localhost:3100' : window.location.origin}/pickiti/account`}>Manage account</a></div>}
       {/* Change password */}
-      {!user.syswiseUserId && <div className="card p-6">
+      {!user.syswiseUserId && !user.roleBasedIdentity && <div className="card p-6">
         <h2 className="text-base font-semibold text-tw-text mb-4">Change Password</h2>
         <form onSubmit={handlePasswordSave} className="space-y-4">
           <div>
@@ -311,7 +312,7 @@ export default function ProfilePage({ user, onUserUpdate }: Props) {
       </div>}
 
       {/* Biometric / Passkey login */}
-      {webAuthnSupported && !user.syswiseUserId && (
+      {webAuthnSupported && !user.syswiseUserId && !user.roleBasedIdentity && (
         <div className="card p-6">
           <h2 className="text-base font-semibold text-tw-text mb-1">Biometric Login</h2>
           <p className="text-xs text-tw-text-secondary mb-4">Use your fingerprint or Face ID to sign in without a password.</p>
@@ -372,13 +373,13 @@ export default function ProfilePage({ user, onUserUpdate }: Props) {
       )}
 
       {/* Role info */}
-      <RoleAssignments />
+      {(!user.roleBasedIdentity || user.actorType === 'director') && !user.impersonation && <RoleAssignments />}
       <div className="card p-4 flex items-center gap-3">
         <div className="w-8 h-8 rounded-lg bg-tw-primary/10 flex items-center justify-center flex-shrink-0">
           <span className="text-tw-primary text-sm font-bold">{user.actorType === 'director' ? 'D' : 'P'}</span>
         </div>
         <div>
-          <p className="text-sm font-medium text-tw-text capitalize">{user.actorType}</p>
+          <p className="text-sm font-medium text-tw-text capitalize">{user.roleBasedIdentity ? `Role: ${user.name}` : user.actorType}</p>
           <p className="text-xs text-tw-text-secondary">Workspace ID: {user.workspaceId}</p>
         </div>
       </div>

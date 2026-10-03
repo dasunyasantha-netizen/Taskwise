@@ -1,5 +1,12 @@
 import { Request, Response } from 'express'
 import prisma from '../prisma'
+import type { AuthPayload } from '../middleware/authMiddleware'
+
+function notificationOwner(user: AuthPayload) {
+  return user.actorType === 'director'
+    ? { OR: [{ recipientDirectorId: user.actorId }, ...(user.personnelRoleId ? [{ recipientPersonnelId: user.personnelRoleId }] : [])] }
+    : { recipientPersonnelId: user.actorId }
+}
 
 // GET /api/notifications/vapid-public-key
 export async function getVapidKey(_req: Request, res: Response): Promise<void> {
@@ -34,9 +41,7 @@ export async function removePushSubscription(req: Request, res: Response): Promi
 export async function listNotifications(req: Request, res: Response): Promise<void> {
   try {
     const { actorId, actorType, workspaceId } = req.user!
-    const where = actorType === 'director'
-      ? { recipientDirectorId: actorId, workspaceId }
-      : { recipientPersonnelId: actorId, workspaceId }
+    const where = { workspaceId, ...notificationOwner(req.user!) }
 
     const notifications = await prisma.notification.findMany({
       where,
@@ -64,7 +69,8 @@ export async function listNotifications(req: Request, res: Response): Promise<vo
     const visible = notifications.filter(notification => {
       if (notification.type === 'task_submitted_for_approval') {
         const task = notification.task
-        const isCurrentApprover = task?.approvalById === actorId && task?.approvalByType === actorType
+        const isCurrentApprover = (task?.approvalById === actorId && task?.approvalByType === actorType) ||
+          (task?.approvalById === req.user!.personnelRoleId && task?.approvalByType === 'personnel')
         const isActionable = !!task && task.status === 'SUBMITTED' && isCurrentApprover
         if (!isActionable) staleIds.push(notification.id)
         return isActionable
@@ -103,9 +109,7 @@ export async function markRead(req: Request, res: Response): Promise<void> {
   try {
     const { actorId, actorType, workspaceId } = req.user!
     // Only mark read if the notification actually belongs to this actor
-    const ownerFilter = actorType === 'director'
-      ? { recipientDirectorId: actorId }
-      : { recipientPersonnelId: actorId }
+    const ownerFilter = notificationOwner(req.user!)
 
     const result = await prisma.notification.updateMany({
       where: { id: req.params.id, workspaceId, ...ownerFilter, isRead: false },
@@ -124,9 +128,7 @@ export async function markRead(req: Request, res: Response): Promise<void> {
 export async function markAllRead(req: Request, res: Response): Promise<void> {
   try {
     const { actorId, actorType, workspaceId } = req.user!
-    const where = actorType === 'director'
-      ? { recipientDirectorId: actorId, workspaceId, isRead: false }
-      : { recipientPersonnelId: actorId, workspaceId, isRead: false }
+    const where = { workspaceId, isRead: false, ...notificationOwner(req.user!) }
     await prisma.notification.updateMany({ where, data: { isRead: true, readAt: new Date() } })
     res.json({ success: true })
   } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }

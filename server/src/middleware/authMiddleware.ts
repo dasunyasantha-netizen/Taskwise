@@ -1,8 +1,12 @@
 import { Request, Response, NextFunction } from 'express'
 import jwt from 'jsonwebtoken'
 import prisma from '../prisma'
+import { fixedRoleMetadata, usesFixedRoles, isRoleAlias } from '../helpers/fixedRoles'
 
 export interface AuthPayload {
+  roleBasedIdentity?: boolean
+  roleId?: string
+  personnelRoleId?: string
   actorId: string
   actorType: 'director' | 'personnel'
   workspaceId: string
@@ -64,12 +68,15 @@ export async function authenticateToken(req: Request, res: Response, next: NextF
       res.status(401).json({ error: 'This role is no longer active.' }); return
     }
     const contact = await prisma.migrationRoleContact.findUnique({ where: { actorType_actorId: { actorType: payload.actorType, actorId: payload.actorId } } })
+    if (await isRoleAlias(payload.actorType, payload.actorId)) {
+      res.status(401).json({ error: 'Open the unified Chairman role through Syswise.', code: 'syswise_signin_required' }); return
+    }
     if (payload.authenticationMethod === 'syswise') {
       if (!contact || contact.workspaceId !== payload.workspaceId || contact.assignmentVersion !== payload.assignmentVersion ||
           !payload.syswiseUserId || contact.syswiseUserId !== payload.syswiseUserId) {
         res.status(401).json({ error: 'Your role assignment changed. Open Taskwise from Syswise again.' }); return
       }
-    } else if (!payload.impersonationSessionId && (contact?.syswiseUserId || contact?.legacyAccessRevokedAt)) {
+    } else if (!payload.impersonationSessionId && (contact?.syswiseUserId || contact?.legacyAccessRevokedAt || await usesFixedRoles(payload.workspaceId))) {
       res.status(401).json({ error: 'Sign in through Syswise to open this role.', code: 'syswise_signin_required' }); return
     }
     if (payload.impersonationSessionId) {
@@ -121,7 +128,7 @@ export async function authenticateToken(req: Request, res: Response, next: NextF
         })
       }
     }
-    req.user = payload
+    req.user = { ...payload, ...await fixedRoleMetadata(payload.actorType, payload.actorId, payload.workspaceId) }
     next()
   } catch {
     res.status(401).json({ error: 'Invalid or expired token' })

@@ -1,6 +1,7 @@
 import { Request, Response } from 'express'
 import { isSupportedCountry, parsePhoneNumberFromString, type CountryCode } from 'libphonenumber-js/max'
 import prisma from '../prisma'
+import { usesFixedRoles, isRoleAlias } from '../helpers/fixedRoles'
 
 type RoleContact = { id: string; actorType: string; actorId: string; workspaceId: string; companyId: string | null; country: string; phoneE164: string; email: string | null; assignmentVersion: number }
 
@@ -13,7 +14,8 @@ export async function syncMigrationContact(contact: RoleContact): Promise<boolea
       ? await prisma.director.findUnique({ where: { id: contact.actorId }, include: { company: true } })
       : await prisma.personnel.findUnique({ where: { id: contact.actorId }, include: { company: true, department: true } })
     const workspace = await prisma.workspace.findUnique({ where: { id: contact.workspaceId } })
-    const active = Boolean(actor?.isActive && actor.workspaceId === contact.workspaceId &&
+    const fixedRoles = await usesFixedRoles(contact.workspaceId)
+    const active = Boolean(!await isRoleAlias(contact.actorType, contact.actorId) && actor?.isActive && actor.workspaceId === contact.workspaceId &&
       (!('deletedAt' in actor) || !actor.deletedAt) && (!actor.company || actor.company.status === 'ACTIVE'))
     const response = await fetch(`${base}/api/auth/internal/taskwise-role-contact/`, {
       method: 'PUT',
@@ -24,7 +26,7 @@ export async function syncMigrationContact(contact: RoleContact): Promise<boolea
         country: contact.country, phone: contact.phoneE164, email: contact.email || '',
         assignmentVersion: contact.assignmentVersion, active,
         companyName: actor?.company?.displayName || actor?.company?.legalName || workspace?.companyName || workspace?.name || 'Company',
-        roleName: contact.actorType === 'director' ? 'Director' : actor && 'department' in actor ? actor.department.name : 'Personnel',
+        roleName: fixedRoles && actor ? actor.name : contact.actorType === 'director' ? 'Director' : actor && 'department' in actor ? actor.department.name : 'Personnel',
       }),
       signal: AbortSignal.timeout(8000),
     })
@@ -51,6 +53,7 @@ export async function retryPendingMigrationContacts(): Promise<void> {
 }
 
 export async function getMigrationContact(req: Request, res: Response): Promise<void> {
+  if (await usesFixedRoles(req.user!.workspaceId)) { res.json({ required: false }); return }
   if (req.user?.impersonationSessionId) {
     res.json({ required: false }); return
   }
@@ -68,6 +71,7 @@ export async function getMigrationContact(req: Request, res: Response): Promise<
 }
 
 export async function saveMigrationContact(req: Request, res: Response): Promise<void> {
+  if (await usesFixedRoles(req.user!.workspaceId)) { res.status(403).json({ error: 'Only the Director can assign a mobile number to this role.' }); return }
   if (req.user?.impersonationSessionId) {
     res.status(403).json({ error: 'Cannot change role contacts during support access.' }); return
   }
@@ -133,8 +137,11 @@ export async function saveMigrationContact(req: Request, res: Response): Promise
 export async function getManagedMigrationContacts(req: Request, res: Response): Promise<void> {
   if (req.user?.impersonationSessionId) { res.status(403).json({ error: 'Unavailable during support access.' }); return }
   const { actorType, actorId, workspaceId } = req.user!
+  const fixedRoles = await usesFixedRoles(workspaceId)
+  if (fixedRoles && actorType !== 'director') { res.status(403).json({ error: 'Only the Director can manage role assignments.' }); return }
   const people = await prisma.personnel.findMany({
     where: { workspaceId, isActive: true, deletedAt: null,
+      ...(fixedRoles ? { fixedRole: { is: { directorId: null } } } : {}),
       ...(actorType === 'personnel' ? { supervisorId: actorId } : {}) },
     include: { department: true }, orderBy: { name: 'asc' },
   })
@@ -147,17 +154,19 @@ export async function getManagedMigrationContacts(req: Request, res: Response): 
   const lookup = new Map(contacts.map(contact => [`${contact.actorType}:${contact.actorId}`, contact]))
   res.json([
     ...directors.map(director => ({ actorType: 'director', actorId: director.id,
-      name: director.name, roleName: 'Director', contact: lookup.get(`director:${director.id}`) || null })),
+      name: director.name, roleName: fixedRoles ? director.name : 'Director', contact: lookup.get(`director:${director.id}`) || null })),
     ...people.map(person => ({ actorType: 'personnel', actorId: person.id,
-      name: person.name, roleName: person.department.name, contact: lookup.get(`personnel:${person.id}`) || null })),
+      name: person.name, roleName: fixedRoles ? person.name : person.department.name, contact: lookup.get(`personnel:${person.id}`) || null })),
   ])
 }
 
 export async function assignMigrationContact(req: Request, res: Response): Promise<void> {
   if (req.user?.impersonationSessionId) { res.status(403).json({ error: 'Unavailable during support access.' }); return }
   const { actorType: managerType, actorId: managerId, workspaceId } = req.user!
+  if (await usesFixedRoles(workspaceId) && managerType !== 'director') { res.status(403).json({ error: 'Only the Director can assign phone numbers.' }); return }
   const targetType = req.params.actorType
   const targetId = req.params.actorId
+  if (await isRoleAlias(targetType, targetId)) { res.status(409).json({ error: 'This position is part of the unified Chairman role. Assign its management role.' }); return }
   if (!['director', 'personnel'].includes(targetType)) { res.status(400).json({ error: 'Invalid role.' }); return }
   const target = targetType === 'director'
     ? await prisma.director.findFirst({ where: { id: targetId, workspaceId, isActive: true } })

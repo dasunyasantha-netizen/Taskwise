@@ -4,6 +4,8 @@ import { randomBytes } from 'crypto'
 import prisma from '../prisma'
 import { makeLoginId, normalizeSriLankanPhone, companyLoginPrefix } from '../helpers/phone'
 import { isFourLevelWorkspace, resolveDepartmentCategory, resolveSupervisor } from '../helpers/hierarchy'
+import { usesFixedRoles } from '../helpers/fixedRoles'
+import { saveFixedRole } from './fixedRoleController'
 
 // GET /api/workspace
 export async function getWorkspace(req: Request, res: Response): Promise<void> {
@@ -182,6 +184,7 @@ export async function getManagedUsers(req: Request, res: Response): Promise<void
 
 // POST /api/workspace/managed-users/:id/reset-password — Chairman only
 export async function resetManagedUserPassword(req: Request, res: Response): Promise<void> {
+  if (await usesFixedRoles(req.user!.workspaceId)) { res.status(403).json({ error: 'Passwords belong to Syswise accounts. Assign a mobile number to the role instead.' }); return }
   try {
     const { workspaceId, actorId } = req.user!
     const person = await prisma.personnel.findFirst({
@@ -224,6 +227,7 @@ export async function resetManagedUserPassword(req: Request, res: Response): Pro
 
 // POST /api/workspace/personnel
 export async function createPersonnel(req: Request, res: Response): Promise<void> {
+  if (await usesFixedRoles(req.user!.workspaceId)) { await saveFixedRole(req, res); return }
   try {
     const { name, phone, email, nic, departmentId, password, mustChangePassword, isActive, supervisorId } = req.body
     if (!name || !phone || !departmentId) { res.status(400).json({ error: 'name, phone, departmentId required' }); return }
@@ -304,6 +308,7 @@ export async function createPersonnel(req: Request, res: Response): Promise<void
 
 // PUT /api/workspace/profile  — update own profile (works for both directors and personnel)
 export async function updateProfile(req: Request, res: Response): Promise<void> {
+  if (await usesFixedRoles(req.user!.workspaceId)) { res.status(403).json({ error: 'Manage personal details in Syswise. Only the Director can edit a fixed role.' }); return }
   try {
     const { actorId, actorType } = req.user!
     const { name, phone, nic, email } = req.body
@@ -379,6 +384,9 @@ export async function uploadAvatar(req: Request, res: Response): Promise<void> {
 // PUT /api/workspace/personnel/:id
 // Directors can update anyone; personnel can only update their own profile
 export async function updatePersonnel(req: Request, res: Response): Promise<void> {
+  if (await usesFixedRoles(req.user!.workspaceId)) {
+    res.status(403).json({ error: 'Use role management to edit this position. Phone assignments can only be changed by the Director.' }); return
+  }
   try {
     const { actorId, actorType, workspaceId } = req.user!
     if (actorType === 'personnel' && actorId !== req.params.id) {
@@ -605,6 +613,7 @@ export async function movePersonnel(req: Request, res: Response): Promise<void> 
 export async function deletePersonnel(req: Request, res: Response): Promise<void> {
   try {
     if (req.user!.actorType !== 'director') { res.status(403).json({ error: 'Director only' }); return }
+    if (await usesFixedRoles(req.user!.workspaceId)) { res.status(403).json({ error: 'Fixed roles and their history cannot be deleted through the legacy personnel endpoint.' }); return }
     const person = await prisma.personnel.findFirst({ where: { id: req.params.id, workspaceId: req.user!.workspaceId, deletedAt: null } })
     if (!person) { res.status(404).json({ error: 'Personnel not found' }); return }
     await prisma.personnel.update({ where: { id: req.params.id }, data: { deletedAt: new Date() } })

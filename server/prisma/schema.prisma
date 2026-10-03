@@ -13,6 +13,7 @@ datasource db {
 // ─────────────────────────────────────────────────────────────────────────────
 
 model Director {
+  fixedRole WorkspaceRole?
   preferredLanguage String     @default("en") // en | si
   id                String     @id @default(uuid())
   email             String?    @unique
@@ -73,6 +74,8 @@ model ImpersonationSession {
 }
 
 model Workspace {
+  roleBasedIdentity Boolean @default(false)
+  fixedRoles WorkspaceRole[]
   letterThreads LetterThread[]
   id          String   @id @default(uuid())
   name        String
@@ -230,6 +233,7 @@ model Department {
 }
 
 model Personnel {
+  fixedRole WorkspaceRole?
   preferredLanguage String @default("en") // en | si
   isLetterLogger Boolean @default(false)
   id                 String      @id @default(uuid())
@@ -272,6 +276,21 @@ model Personnel {
   @@index([normalizedPhone])
   @@index([departmentId])
   @@index([supervisorId])
+}
+
+// One permanent position. Existing actor rows retain all task/history FKs.
+// A management role can unite a Director and Personnel record without deleting
+// either history or breaking the personnel reporting tree.
+model WorkspaceRole {
+  id String @id @default(uuid())
+  workspaceId String
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  personnelId String? @unique
+  personnel Personnel? @relation(fields: [personnelId], references: [id], onDelete: Restrict)
+  directorId String? @unique
+  director Director? @relation(fields: [directorId], references: [id], onDelete: Restrict)
+  createdAt DateTime @default(now())
+  @@index([workspaceId])
 }
 
 // Contact collection for the existing login seat. A pending row can be synced to
