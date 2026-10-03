@@ -300,6 +300,26 @@ async function main() {
       }
     )
     await check(
+      'logger can assign a new letter to someone else on entry',
+      async () => {
+        const r = await call(
+          'logger',
+          '/',
+          incoming({ subject: 'Assigned on entry', personKey: 'personnel:' + assignee.id }),
+          201
+        )
+        const t = await call('assignee', '/' + r.id)
+        assert.equal(t.assignedTo, 'personnel:' + assignee.id)
+        assert.equal(t.createdBy, 'personnel:' + logger.id)
+        assert.ok(
+          await db.notification.findFirst({
+            where: { recipientPersonnelId: assignee.id, payload: { path: ['threadId'], equals: r.id } },
+          })
+        )
+        await call('logger', '/', incoming({ personKey: 'personnel:not-real' }), 400)
+      }
+    )
+    await check(
       'concurrent registrations receive distinct references',
       async () => {
         const rows = await Promise.all(

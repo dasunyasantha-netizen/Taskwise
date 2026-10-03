@@ -173,7 +173,7 @@ function LetterForm({
     correspondenceDate: context.today,
     correspondent: thread?.sender || '',
     notes: '',
-    personKey: '',
+    personKey: kind === 'NEW' ? context.me.key : '',
   })
   const [selectedFiles, setFiles] = useState<File[]>([]),
     [busy, setBusy] = useState(false),
@@ -209,7 +209,7 @@ function LetterForm({
           ? 'Receive reply & reopen'
           : 'Add incoming correspondence',
       OUTGOING: 'Record outgoing reply & close',
-      TRANSFER: 'Transfer responsibility',
+      TRANSFER: 'Assign letter',
       SHARE: 'Share for viewing',
       NOTE: 'Add internal note',
     } as Record<string, string>
@@ -260,7 +260,7 @@ function LetterForm({
         {kind === 'NEW' && (
           <>
             <div className="rounded-xl bg-blue-50 p-3 text-sm text-blue-900">
-              {tr("A reference number is generated on save. You become the initial assignee and remain the recorded letter enterer.")}</div>
+              {tr("A reference number is generated on save. You remain the recorded letter enterer.")}</div>
             <Field label="Sender">
               <input
                 required
@@ -388,17 +388,20 @@ function LetterForm({
             </Field>
           </>
         )}
-        {['TRANSFER', 'SHARE'].includes(kind) && (
-          <Field label={kind === 'TRANSFER' ? tr("New assignee") : tr("Staff member")}>
+        {['NEW', 'TRANSFER', 'SHARE'].includes(kind) && (
+          <Field label={kind === 'SHARE' ? tr("Staff member") : tr("Assign to")}>
             <Select
-              ariaLabel={kind === 'TRANSFER' ? tr("New assignee") : tr("Staff member")}
+              ariaLabel={kind === 'SHARE' ? tr("Staff member") : tr("Assign to")}
               value={form.personKey}
               onChange={(v) => set('personKey', v)}
               options={context.people
                 .filter(
                   (p) => kind !== 'TRANSFER' || p.key !== thread?.assignedTo
                 )
-                .map((p) => ({ value: p.key, label: p.name }))}
+                .map((p) => ({
+                  value: p.key,
+                  label: p.key === context.me.key ? `${p.name} (${tr("me")})` : p.name,
+                }))}
               className="[&>button]:min-h-11"
             />
           </Field>
@@ -1079,7 +1082,7 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
                 <div className="mt-5 flex flex-wrap gap-2 border-t border-tw-border pt-4">
                   {!closed && (
                     <button className={secondary} onClick={() => setKind('TRANSFER')}>
-                      {tr("Reassign")}</button>
+                      {tr("Assign")}</button>
                   )}
                   <button className={secondary} onClick={() => setKind('NOTE')}>
                     {tr("Add note")}</button>

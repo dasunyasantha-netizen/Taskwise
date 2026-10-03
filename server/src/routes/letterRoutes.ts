@@ -637,6 +637,10 @@ router.post(
           )
           return { id: existing.threadId }
         }
+        // The logger may hand the letter straight to someone else.
+        const assignee = b.personKey
+          ? await memberByKey(db, a.workspaceId, text(b.personKey, 'Assignee', 100))
+          : { key: live.key, name: live.name }
         const year = Number(today().slice(0, 4)),
           counter = await db.letterCounter.upsert({
             where: { workspaceId_year: { workspaceId: a.workspaceId, year } },
@@ -659,11 +663,15 @@ router.post(
             channel,
             createdBy: live.key,
             createdByName: live.name,
-            assignedTo: live.key,
-            assignedToName: live.name,
+            assignedTo: assignee.key,
+            assignedToName: assignee.name,
             firstReceivedDate: received,
             latestReceivedDate: received,
-            access: { create: { actorKey: live.key } },
+            access: {
+              create: [...new Set([live.key, assignee.key])].map((actorKey) => ({
+                actorKey,
+              })),
+            },
             events: {
               create: {
                 workspaceId: a.workspaceId,
@@ -681,6 +689,15 @@ router.post(
             },
           },
         })
+        if (assignee.key !== live.key)
+          await notify(
+            db,
+            a.workspaceId,
+            assignee.key,
+            thread.id,
+            thread.reference,
+            'This letter has been assigned to you.'
+          )
         return { id: thread.id, reference: thread.reference }
       },
       { timeout: 20000 }
