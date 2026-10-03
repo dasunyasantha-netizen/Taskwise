@@ -27,6 +27,7 @@ export const si: Record<string, string> = {
   'From date': 'ආරම්භක දිනය', 'To date': 'අවසාන දිනය',
   'Assignee': 'භාරකරු', 'Oldest': 'පැරණිතම', 'Overdue = open letters with the same person for': 'ප්‍රමාද වූ = එකම පුද්ගලයා සමඟ ඇති විවෘත ලිපි, දින',
   'Clear filters': 'පෙරහන් ඉවත් කරන්න', 'Filters': 'පෙරහන්',
+  'Late entries': 'ප්‍රමාද ඇතුළත් කිරීම්', 'Average days between receiving a letter and logging it': 'ලිපියක් ලැබීම සහ එය ඇතුළත් කිරීම අතර සාමාන්‍ය දින ගණන', 'Letters logged': 'ඇතුළත් කළ ලිපි', 'days after they were received': 'ලැබී දින කිහිපයකට පසු',
   'Open': 'විවෘත', 'Closed': 'වසා ඇත', 'All statuses': 'සියලු තත්ත්ව', 'Open inquiries': 'විවෘත විමසීම්',
   'Closed inquiries': 'වසා ඇති විමසීම්', 'Assignee bottlenecks': 'භාරකරුගේ ප්‍රමාදයන්',
   'Assignee workload & bottlenecks': 'භාරකරුවන්ගේ වැඩ සහ ප්‍රමාදයන්', 'Average entry delay': 'ඇතුළත් කිරීමේ සාමාන්‍ය ප්‍රමාදය',

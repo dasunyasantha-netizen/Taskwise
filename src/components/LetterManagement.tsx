@@ -798,9 +798,39 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
                   </button>
                 ))}
               </div>
-              <div className="flex gap-4 sm:ml-auto text-xs text-tw-text-secondary">
-                <span>{tr("Avg entry delay")} <strong className="text-tw-text">{list.metrics.averageEntryDays}d</strong></span>
-                <span><strong className={list.metrics.lateEntries ? 'text-amber-700' : 'text-tw-text'}>{list.metrics.lateEntries}</strong> {tr("late entries")}</span>
+              <div className="flex gap-2 sm:ml-auto">
+                {[
+                  {
+                    key: 'delay',
+                    label: tr("Avg entry delay"),
+                    value: `${list.metrics.averageEntryDays}d`,
+                    hint: tr("Average days between receiving a letter and logging it"),
+                    warn: list.metrics.averageEntryDays >= list.thresholds.entryDelayDays,
+                    icon: <path strokeLinecap="round" strokeLinejoin="round" d="M12 7v5l3 2m6-2a9 9 0 11-18 0 9 9 0 0118 0z" />,
+                  },
+                  {
+                    key: 'late',
+                    label: tr("Late entries"),
+                    value: String(list.metrics.lateEntries),
+                    hint: `${tr("Letters logged")} ${list.thresholds.entryDelayDays}+ ${tr("days after they were received")}`,
+                    warn: list.metrics.lateEntries > 0,
+                    icon: <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 4h.01M10.3 3.9L2.4 17.5A2 2 0 004.1 20.5h15.8a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z" />,
+                  },
+                ].map((m) => (
+                  <div
+                    key={m.key}
+                    title={m.hint}
+                    className={`flex items-center gap-2.5 rounded-xl border px-3 py-1.5 ${m.warn ? 'border-amber-200 bg-amber-50' : 'border-tw-border bg-white'}`}
+                  >
+                    <span className={`grid h-7 w-7 place-items-center rounded-lg ${m.warn ? 'bg-amber-100 text-amber-700' : 'bg-emerald-50 text-emerald-600'}`}>
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">{m.icon}</svg>
+                    </span>
+                    <span className="leading-tight">
+                      <span className="block text-[11px] text-tw-text-secondary">{m.label}</span>
+                      <span className={`block text-sm font-semibold tabular-nums ${m.warn ? 'text-amber-800' : 'text-tw-text'}`}>{m.value}</span>
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
             <div className="flex flex-col lg:flex-row gap-2">
