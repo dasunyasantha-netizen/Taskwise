@@ -544,6 +544,78 @@ function Preview({ file, onClose }: { file: LetterFile; onClose: () => void }) {
   )
 }
 
+type Holder = { name: string; open: number; overdue: number; maxDays: number }
+const workloadColumns = 'grid-cols-[minmax(0,1fr)_90px_90px_110px]'
+function Workload({ holders, limit }: { holders: Holder[]; limit: number }) {
+  const { t: tr } = useLanguage()
+  const [sort, setSort] = useState<{ key: keyof Holder; dir: 'asc' | 'desc' }>({ key: 'maxDays', dir: 'desc' })
+  const rows = [...holders].sort((a, b) => {
+    const x = a[sort.key], y = b[sort.key]
+    const c = typeof x === 'string' ? x.localeCompare(String(y)) : Number(x) - Number(y)
+    return sort.dir === 'asc' ? c : -c
+  })
+  const columns: { label: string; key: keyof Holder; first: 'asc' | 'desc' }[] = [
+    { label: tr("Assignee"), key: 'name', first: 'asc' },
+    { label: tr("Open"), key: 'open', first: 'desc' },
+    { label: tr("Overdue"), key: 'overdue', first: 'desc' },
+    { label: tr("Oldest"), key: 'maxDays', first: 'desc' },
+  ]
+  return (
+    <details className={box + ' !p-3 sm:!p-4'}>
+      <summary className="font-semibold cursor-pointer px-1">
+        {tr("Assignee workload & bottlenecks")}</summary>
+      <p className="text-xs text-tw-text-secondary mt-1 px-1">
+        {tr("Overdue = open letters with the same person for")} {limit}+ {tr("days")}.</p>
+      {rows.length ? (
+        <div className="mt-3 space-y-1.5">
+          <div className={`grid ${workloadColumns} gap-3 px-4 pl-5 text-xs font-semibold uppercase tracking-wide text-tw-text-secondary`}>
+            {columns.map((h) => {
+              const active = sort.key === h.key
+              return (
+                <button
+                  key={h.key}
+                  aria-sort={active ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+                  className={`group flex items-center gap-1 text-left uppercase hover:text-tw-text ${active ? 'text-tw-primary' : ''}`}
+                  onClick={() =>
+                    setSort((s) =>
+                      s.key === h.key ? { key: h.key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key: h.key, dir: h.first }
+                    )
+                  }
+                >
+                  <span className="truncate">{h.label}</span>
+                  <span className={active ? '' : 'opacity-0 group-hover:opacity-50'}>
+                    {active && sort.dir === 'asc' ? '▲' : '▼'}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+          {rows.map((h, i) => {
+            const tone = h.overdue > 0 ? 'red' : h.maxDays >= Math.ceil(limit / 2) ? 'amber' : 'green'
+            const accent = { red: 'border-l-red-500', amber: 'border-l-amber-400', green: 'border-l-emerald-500' }[tone]
+            const badge = { red: 'bg-red-50 text-red-700', amber: 'bg-amber-50 text-amber-800', green: 'bg-emerald-50 text-emerald-700' }[tone]
+            return (
+              <div
+                key={i}
+                className={`grid ${workloadColumns} gap-3 items-center rounded-xl border border-tw-border border-l-4 ${accent} bg-white px-4 py-2 text-sm`}
+              >
+                <span className="font-semibold truncate" title={h.name}>{h.name}</span>
+                <span>{h.open}</span>
+                <span className={h.overdue ? 'font-semibold text-red-700' : 'text-tw-text-secondary'}>{h.overdue}</span>
+                <span>
+                  <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${badge}`}>{h.maxDays}d</span>
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      ) : (
+        <p className="text-sm mt-3 px-1">{tr("No open assignments.")}</p>
+      )}
+    </details>
+  )
+}
+
 export default function LetterManagement({ user, onUserUpdate }: { user: AuthUser; onUserUpdate: (value: Partial<AuthUser>) => void }) {
   const { t: tr, locale } = useLanguage()
   const [context, setContext] = useState<LetterContext | null>(null),
@@ -898,26 +970,7 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
             </div>
           </div>
           {context?.me.director && (
-            <details className={box}>
-              <summary className="font-semibold cursor-pointer">
-                {tr("Assignee workload & bottlenecks")}</summary>
-              <p className="text-sm text-tw-text-secondary mt-2">
-                {tr("Flagged after")}{list.thresholds.assigneeDays} {tr("calendar days with the current assignee. Closed inquiries stop aging.")}</p>
-              <div className="mt-4 space-y-3">
-                {list.metrics.holders.map((h, i) => (
-                  <div
-                    key={i}
-                    className="flex flex-wrap justify-between gap-2 border-b border-tw-border pb-3 text-sm"
-                  >
-                    <strong>{h.name}</strong>
-                    <span>
-                      {h.open}  {tr("open ·")} {h.overdue}  {tr("flagged · oldest")} {h.maxDays}{' '}
-                      {tr("days")}</span>
-                  </div>
-                ))}
-                {!list.metrics.holders.length && <p>{tr("No open assignments.")}</p>}
-              </div>
-            </details>
+            <Workload holders={list.metrics.holders} limit={list.thresholds.assigneeDays} />
           )}
         </>
       )}

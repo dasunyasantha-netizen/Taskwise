@@ -25,6 +25,7 @@ export const si: Record<string, string> = {
   'Original documents': 'මුල් ලේඛන', 'Copy of outgoing letter (required)': 'යැවූ ලිපියේ පිටපත (අනිවාර්යයි)',
   'All': 'සියල්ල', 'Overdue': 'ප්‍රමාද වූ', 'Avg entry delay': 'සාමාන්‍ය ඇතුළත් කිරීමේ ප්‍රමාදය', 'late entries': 'ප්‍රමාද ඇතුළත් කිරීම්', 'Late entry': 'ප්‍රමාද ඇතුළත් කිරීම', 'Received from': 'ලැබුණේ සිට', 'Received to': 'ලැබුණේ දක්වා', 'Reference': 'යොමුව', 'Subject / sender': 'මාතෘකාව / යවන්නා', 'Age': 'කාලය', 'Status': 'තත්ත්වය',
   'From date': 'ආරම්භක දිනය', 'To date': 'අවසාන දිනය',
+  'Assignee': 'භාරකරු', 'Oldest': 'පැරණිතම', 'Overdue = open letters with the same person for': 'ප්‍රමාද වූ = එකම පුද්ගලයා සමඟ ඇති විවෘත ලිපි, දින',
   'Open': 'විවෘත', 'Closed': 'වසා ඇත', 'All statuses': 'සියලු තත්ත්ව', 'Open inquiries': 'විවෘත විමසීම්',
   'Closed inquiries': 'වසා ඇති විමසීම්', 'Assignee bottlenecks': 'භාරකරුගේ ප්‍රමාදයන්',
   'Assignee workload & bottlenecks': 'භාරකරුවන්ගේ වැඩ සහ ප්‍රමාදයන්', 'Average entry delay': 'ඇතුළත් කිරීමේ සාමාන්‍ය ප්‍රමාදය',
