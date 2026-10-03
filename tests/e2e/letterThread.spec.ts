@@ -80,7 +80,7 @@ test('document preview, download and letter actions remain available', async ({ 
   const downloaded = page.waitForEvent('download')
   await documents.getByRole('button', { name: `Download ${file.name}`, exact: true }).click()
   expect((await downloaded).suggestedFilename()).toBe(file.name)
-  for (const [action, title] of [['Record reply & close', 'Record outgoing reply & close'], ['Assign', 'Transfer responsibility'], ['Add note', 'Add internal note'], ['Share view', 'Share for viewing']]) {
+  for (const [action, title] of [['Record reply & close', 'Record outgoing reply & close'], ['Assign', 'Assign letter'], ['Add note', 'Add internal note'], ['Share view', 'Share for viewing']]) {
     await page.getByRole('button', { name: action, exact: true }).click()
     await expect(page.getByRole('dialog').getByRole('heading', { name: title, exact: true })).toBeVisible()
     await page.keyboard.press('Escape')
