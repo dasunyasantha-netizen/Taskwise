@@ -887,7 +887,7 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
       />
 
       {/* ── Main ────────────────────────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col min-w-0 relative z-10">
+      <div className="flex-1 flex flex-col min-w-0 relative">
         {/* Top bar */}
         <header className={`sticky z-20 ${user.impersonation ? 'top-[56px] md:top-[68px]' : 'top-0 md:top-3'} bg-tw-surface/85 backdrop-blur-xl border-b border-tw-border md:border md:rounded-2xl md:mx-3 md:mt-3 md:shadow-card px-3 md:px-4 py-2.5 flex items-center justify-between gap-2`}>
           <div className="flex items-center gap-2 min-w-0">
@@ -925,7 +925,7 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
                   : currentView === 'project_board' ? (selectedProject ? selectedProject.name : 'Projects')
                   : currentView === 'insurance_management' ? 'Insurance Management'
                   : currentView === 'letters' ? t('Letters')
-                  : currentView === 'yso_performance' ? t('YSO Performance')
+                  : currentView === 'yso_performance' ? t(user.ysoRole === 'YSO' ? 'YSO Task Hub' : 'YSO Performance')
                   : 'My Profile'}
                 </span>
               </div>

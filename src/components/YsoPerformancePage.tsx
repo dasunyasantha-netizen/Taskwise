@@ -12,7 +12,7 @@ import type { AuthUser } from '../types'
 import DatePicker from './DatePicker'
 import Select from './Select'
 import { LanguageToggle, useLanguage, displayDate } from '../i18n/Language'
-import { Icon } from './ui/Icon'
+import { Icon, type IconName } from './ui/Icon'
 
 const panel = 'card p-5'
 const input =
@@ -62,7 +62,7 @@ function Status({ value }: { value: string }) {
   const { t: tr, locale } = useLanguage()
   return (
     <span
-      className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${value === 'APPROVED' ? 'bg-emerald-50 text-emerald-800' : value === 'REJECTED' ? 'bg-rose-50 text-rose-800' : 'bg-amber-50 text-amber-900'}`}
+      className={`badge flex-shrink-0 capitalize ${value === 'APPROVED' ? 'badge-success' : value === 'REJECTED' ? 'badge-danger' : 'badge-warning'}`}
     >
       {tr(value === 'APPROVED_LEAVE' ? 'APPROVED LEAVE' : pretty(value))}
     </span>
@@ -117,7 +117,7 @@ function Modal({
   }, [])
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-3 bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in"
+      className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center sm:p-3 bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in"
       role="presentation"
     >
       <div
@@ -126,7 +126,7 @@ function Modal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={headingId}
-        className="modal-panel w-full max-w-2xl max-h-[90dvh] overflow-y-auto overscroll-contain p-4 sm:p-6"
+        className="modal-panel w-full max-w-2xl max-h-[92dvh] overflow-y-auto overscroll-contain px-5 pt-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:p-6 rounded-b-none sm:rounded-3xl animate-slide-up sm:animate-pop-in"
       >
         <div className="flex justify-between items-start gap-3 mb-5">
           <h2 id={headingId} className="text-xl font-bold tracking-tight text-tw-text">
@@ -236,11 +236,15 @@ function EntryForm({
       title={`${tr('Task')} ${String(task.id).padStart(2, '0')} · ${tr(task.title)}`}
       onClose={onClose}
     >
-      <p className="rounded-lg bg-teal-50 text-teal-900 p-3 text-sm mb-5">
-        {tr(task.rule)}
-      </p>
+      <div className="rounded-xl border border-teal-200 bg-teal-50 p-3.5 mb-5 flex items-start gap-2.5">
+        <Icon name="info" className="w-4 h-4 text-teal-700 flex-shrink-0 mt-0.5" />
+        <div>
+          <p className="text-xs font-semibold text-teal-800">{tr("How points work")}</p>
+          <p className="text-sm text-teal-900 mt-0.5 leading-relaxed">{tr(task.rule)}</p>
+        </div>
+      </div>
       {previous && (
-        <p className="text-sm text-amber-800 mb-4">
+        <p className="alert-warning mb-4">
           {tr("This creates a new submission version and timestamp. Existing approved points stay in place until the AD approves the correction. Keep the activity reference unchanged.")}</p>
       )}
       <form onSubmit={save} className="space-y-4">
@@ -269,13 +273,13 @@ function EntryForm({
             return (
               <label
                 key={f.key}
-                className="block text-sm font-medium text-slate-700"
+                className="block text-sm font-medium text-tw-text"
               >
                 {f.type !== 'checkbox' && (
-                  <span className="block mb-1">{tr(f.label)}</span>
+                  <span className="label">{tr(f.label)}</span>
                 )}
                 {f.type === 'checkbox' ? (
-                  <span className="flex items-center gap-2">
+                  <span className="flex items-center gap-2.5 rounded-xl border border-tw-border bg-tw-surface-2 px-3.5 py-3 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={!!values[f.key]}
@@ -346,25 +350,28 @@ function EntryForm({
           })}
         {task.id >= 12 && (
           <label className="block text-sm font-medium">
-            {tr("Certificate (PDF, PNG or JPEG; maximum 1 MB)")}<input
+            <span className="label">{tr("Certificate (PDF, PNG or JPEG; maximum 1 MB)")}</span><input
               className="sr-only peer"
               type="file"
               required
               accept=".pdf,.png,.jpg,.jpeg"
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
             />
-            <span className="mt-2 inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium cursor-pointer peer-focus-visible:ring-2 peer-focus-visible:ring-teal-700">{tr('Choose file')}</span>
-            <span className="block text-xs text-slate-500" aria-live="polite">{file?.name ?? tr('No file selected')}</span>
+            <span className="flex flex-col items-center gap-1.5 rounded-xl border-2 border-dashed border-tw-border bg-tw-surface-2 px-4 py-5 text-center cursor-pointer hover:border-teal-500/60 transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-teal-600">
+              <Icon name="upload" className="w-5 h-5 text-teal-600" />
+              <span className="text-sm font-semibold text-tw-text">{tr('Choose file')}</span>
+              <span className="text-xs text-tw-text-secondary" aria-live="polite">{file?.name ?? tr('No file selected')}</span>
+            </span>
           </label>
         )}
-        <p className="text-xs text-slate-500">
-          {tr("Submission time is recorded by the server. Points remain zero until AD approval. Dates use Sri Lanka time.")}</p>
+        <p className="text-xs text-tw-text-secondary flex items-start gap-1.5">
+          <Icon name="clock" className="w-3.5 h-3.5 flex-shrink-0 mt-px" />{tr("Submission time is recorded by the server. Points remain zero until AD approval. Dates use Sri Lanka time.")}</p>
         {error && (
-          <p role="alert" className="text-rose-700 text-sm">
+          <p role="alert" className="alert-error">
             {error}
           </p>
         )}
-        <button className={primary} disabled={busy}>
+        <button className={primary + ' w-full sm:w-auto py-3 sm:py-2'} disabled={busy}>
           {busy
             ? tr("Submitting…")
             : previous
@@ -832,7 +839,7 @@ function Analytics({
         <p className="text-xs text-slate-500 mb-4">
           {tr("Compare criterion averages and the number evaluated. A missing evaluation is not a zero score.")}</p>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
+          <table className="table-modern">
             <thead>
               <tr>
                 <th className="p-2">{tr("Grading AD")}</th>
@@ -885,6 +892,105 @@ function Analytics({
         </div>
       </section>
     </div>
+  )
+}
+
+// ─── Task Hub layout helpers ──────────────────────────────────────────────────
+// Tasks are grouped so the YSO scans a short, labelled list instead of a wall
+// of identical cards. Unknown task ids fall into "Other tasks".
+const TASK_GROUPS: Array<{ key: string; title: string; icon: IconName; ids: number[] }> = [
+  { key: 'reporting', title: 'Monthly reporting', icon: 'calendar', ids: [2, 3, 4, 9] },
+  { key: 'community', title: 'Community & programs', icon: 'users', ids: [1, 7, 8, 11] },
+  { key: 'funds', title: 'Funds', icon: 'briefcase', ids: [5, 6, 10] },
+  { key: 'qualifications', title: 'Qualifications', icon: 'award', ids: [12, 13, 14] },
+  { key: 'evaluation', title: 'Evaluation', icon: 'star', ids: [15] },
+]
+const taskNo = (id: number) => String(id).padStart(2, '0')
+
+function TaskNumber({ id, size = 'md' }: { id: number; size?: 'sm' | 'md' }) {
+  return (
+    <span className={`${size === 'sm' ? 'w-8 h-8 rounded-lg text-xs' : 'w-10 h-10 rounded-xl text-sm'} flex-shrink-0 inline-flex items-center justify-center font-bold tabular-nums bg-teal-50 text-teal-700 ring-1 ring-inset ring-teal-100`}>
+      {taskNo(id)}
+    </span>
+  )
+}
+
+function PointsPill({ value }: { value: number }) {
+  const cls = value > 0
+    ? 'bg-emerald-50 text-emerald-700 ring-emerald-200/70'
+    : value < 0
+      ? 'bg-rose-50 text-rose-700 ring-rose-200/70'
+      : 'bg-tw-surface-2 text-tw-text-secondary ring-tw-border'
+  return (
+    <span className={`inline-flex items-center justify-center min-w-[3.25rem] px-2 py-1 rounded-lg text-xs font-bold tabular-nums ring-1 ring-inset ${cls}`}>
+      {signed(value)}
+    </span>
+  )
+}
+
+/** Side panel on desktop, bottom sheet on phones. */
+function Sheet({ title, overline, lead, onClose, footer, children }: {
+  title: React.ReactNode
+  overline?: React.ReactNode
+  lead?: React.ReactNode
+  onClose: () => void
+  footer?: React.ReactNode
+  children: React.ReactNode
+}) {
+  const { t: tr } = useLanguage()
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      // Let open pickers and dialogs stacked above handle Escape first
+      if (e.key !== 'Escape' || document.querySelector('[data-system-picker], [role="dialog"][aria-modal="true"]')) return
+      onClose()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
+  return (
+    <div className="fixed inset-0 z-[90] flex items-end sm:items-stretch justify-end">
+      <div className="absolute inset-0 bg-[#0b1220]/45 backdrop-blur-[2px] animate-fade-in" onClick={onClose} />
+      <section role="dialog" aria-label={typeof title === 'string' ? title : undefined}
+        className="relative w-full sm:max-w-lg max-h-[88dvh] sm:max-h-none sm:m-3 flex flex-col bg-tw-surface border border-tw-border shadow-panel rounded-t-3xl sm:rounded-3xl animate-slide-up sm:animate-slide-in overflow-hidden">
+        <div className="sm:hidden w-10 h-1 bg-tw-border-strong rounded-full mx-auto mt-3" />
+        <header className="flex items-start gap-3 px-5 pt-4 pb-4 border-b border-tw-border bg-gradient-to-br from-teal-50/70 via-tw-surface to-tw-surface">
+          {lead}
+          <div className="flex-1 min-w-0">
+            {overline && <p className="section-label text-teal-600">{overline}</p>}
+            <h2 className="text-lg font-bold tracking-tight text-tw-text leading-snug">{title}</h2>
+          </div>
+          <button onClick={onClose} className="icon-btn border-tw-border bg-tw-surface flex-shrink-0" aria-label={tr('Close dialog')} autoFocus>
+            <Icon name="x" className="w-4 h-4" />
+          </button>
+        </header>
+        <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-5 space-y-5">{children}</div>
+        {footer && (
+          <footer className="px-5 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] border-t border-tw-border bg-tw-surface-2/70">{footer}</footer>
+        )}
+      </section>
+    </div>
+  )
+}
+
+/** Card with a consistent header row; body content sits flush or padded. */
+function SectionCard({ title, icon, meta, action, flush = false, children }: {
+  title: React.ReactNode
+  icon?: IconName
+  meta?: React.ReactNode
+  action?: React.ReactNode
+  flush?: boolean
+  children: React.ReactNode
+}) {
+  return (
+    <section className="card overflow-hidden">
+      <header className="flex items-center gap-2.5 px-4 sm:px-5 py-3 border-b border-tw-border bg-tw-surface-2/60">
+        {icon && <span className="icon-tile tile-teal w-8 h-8 rounded-lg"><Icon name={icon} className="w-4 h-4" /></span>}
+        <h2 className="flex-1 min-w-0 font-semibold text-sm text-tw-text truncate">{title}</h2>
+        {meta && <span className="text-xs text-tw-text-secondary flex-shrink-0">{meta}</span>}
+        {action}
+      </header>
+      <div className={flush ? '' : 'p-4 sm:p-5'}>{children}</div>
+    </section>
   )
 }
 
@@ -1069,205 +1175,302 @@ export default function YsoPerformancePage({ user, onUserUpdate }: { user: AuthU
           ysoApi.penalty(o.personnelId, { key: o.key, outcome, reason })
         ),
     })
+  const taskTitle = (id: number) => tr(d.tasks.find((t) => t.id === id)?.title ?? '')
   const entryList = (entries: YsoEntry[], canReview: boolean) => (
     <div className="space-y-3">
       {entries.length === 0 && (
-        <p className="text-sm text-slate-500 py-5">{tr("No entries to show.")}</p>
+        <p className="text-sm text-tw-text-secondary py-6 text-center">{tr("No entries to show.")}</p>
       )}
       {entries.map((e) => (
-        <article className="rounded-xl border border-slate-200 p-4" key={e.id}>
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h4 className="font-semibold text-sm">
-                {!isYso && `${personName(e.personnelId)} · `}{tr("Task")} {e.task}:{' '}
-                {tr(d.tasks.find((t) => t.id === e.task)?.title ?? '')}
+        <article className="rounded-2xl border border-tw-border bg-tw-surface p-4" key={e.id}>
+          <div className="flex items-start gap-3">
+            <TaskNumber id={e.task} size="sm" />
+            <div className="flex-1 min-w-0">
+              <h4 className="font-semibold text-sm text-tw-text">
+                {!isYso && `${personName(e.personnelId)} · `}{taskTitle(e.task)}
               </h4>
-              <p className="text-xs text-slate-500 mt-1">
-                {e.period}  {tr("· Submitted")} {when(e.submittedAt, locale)}
+              <p className="text-xs text-tw-text-secondary mt-0.5">
+                {e.period} · {tr("Submitted")} {when(e.submittedAt, locale)}
                 {e.supersededAt ? tr(' · Superseded version') : ''}
               </p>
             </div>
             <Status value={e.status} />
           </div>
-          <dl className="grid sm:grid-cols-2 gap-2 mt-3 text-sm">
-            {Object.entries(e.data).map(([key, value]) => (
-              <div key={key}>
-                <dt className="text-xs text-slate-500">
-                  {tr(d.tasks
-                    .find((t) => t.id === e.task)
-                    ?.fields.find((f) => f.key === key)?.label ?? key)}
-                </dt>
-                <dd className="whitespace-pre-wrap break-words">
-                  {typeof value === 'boolean'
-                    ? value
-                      ? tr('Yes')
-                      : tr('No')
-                    : key === 'meetingId'
-                      ? (d.meetings.find((m) => m.id === value)?.title ?? value)
-                      : key === 'advanceId'
-                        ? (d.entries.find((a) => a.id === value)?.data
-                            .reference ?? value)
-                        : ['ATTENDED', 'ABSENT', 'APPROVED_LEAVE', 'ADVANCE', 'SETTLEMENT'].includes(String(value))
-                          ? tr(String(value).replace('_', ' '))
-                          : String(value)}
-                </dd>
-              </div>
-            ))}
-          </dl>
+          {Object.keys(e.data).length > 0 && (
+            <dl className="grid sm:grid-cols-2 gap-x-5 gap-y-3 mt-3 pt-3 border-t border-tw-border text-sm">
+              {Object.entries(e.data).map(([key, value]) => (
+                <div key={key} className="min-w-0">
+                  <dt className="text-xs text-tw-text-secondary">
+                    {tr(d.tasks
+                      .find((t) => t.id === e.task)
+                      ?.fields.find((f) => f.key === key)?.label ?? key)}
+                  </dt>
+                  <dd className="mt-0.5 text-tw-text whitespace-pre-wrap break-words">
+                    {typeof value === 'boolean'
+                      ? value
+                        ? tr('Yes')
+                        : tr('No')
+                      : key === 'meetingId'
+                        ? (d.meetings.find((m) => m.id === value)?.title ?? value)
+                        : key === 'advanceId'
+                          ? (d.entries.find((a) => a.id === value)?.data
+                              .reference ?? value)
+                          : ['ATTENDED', 'ABSENT', 'APPROVED_LEAVE', 'ADVANCE', 'SETTLEMENT'].includes(String(value))
+                            ? tr(String(value).replace('_', ' '))
+                            : String(value)}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          )}
           {e.feedback && (
-            <p className="mt-3 bg-amber-50 p-2 rounded text-sm">
-              {tr("AD feedback:")}{e.feedback}
+            <p className="mt-3 alert-warning flex items-start gap-2">
+              <Icon name="message" className="w-4 h-4 flex-shrink-0 mt-0.5" />
+              <span><span className="font-semibold">{tr("AD feedback:")}</span> {e.feedback}</span>
             </p>
           )}
-          <div className="flex flex-wrap gap-2 mt-3">
-            {e.attachment && (
-              <button
-                className={secondary}
-                onClick={() =>
-                  ysoApi
-                    .certificate(e.attachment!)
-                    .catch((error) => setError(error.message))
-                }
-              >
-                {tr("Download certificate")}</button>
-            )}
-            {canReview && pending(e) && (
-              <>
+          {(e.attachment || (canReview && (pending(e) || (e.status === 'APPROVED' && !e.supersededAt))) || (isYso && !e.supersededAt && ['REJECTED', 'APPROVED'].includes(e.status))) && (
+            <div className="flex flex-wrap gap-2 mt-3">
+              {e.attachment && (
                 <button
-                  className={primary}
-                  onClick={() => review(e, 'APPROVE')}
-                >
-                  {tr("Approve")}</button>
-                <button
-                  className={secondary}
-                  onClick={() => review(e, 'REJECT')}
-                >
-                  {tr("Reject")}</button>
-              </>
-            )}
-            {canReview && e.status === 'APPROVED' && !e.supersededAt && (
-              <button className={secondary} onClick={() => review(e, 'REVOKE')}>
-                {tr("Revoke approval")}</button>
-            )}
-            {isYso &&
-              !e.supersededAt &&
-              ['REJECTED', 'APPROVED'].includes(e.status) && (
-                <button
-                  className={secondary}
+                  className="btn-secondary btn-sm"
                   onClick={() =>
-                    setEntryForm({
-                      task: d.tasks.find((t) => t.id === e.task)!,
-                      previous: e,
-                    })
+                    ysoApi
+                      .certificate(e.attachment!)
+                      .catch((error) => setError(error.message))
                   }
                 >
-                  {e.status === 'REJECTED' ? tr("Resubmit") : tr("Correct entry")}
-                </button>
+                  <Icon name="download" className="w-3.5 h-3.5" />{tr("Download certificate")}</button>
               )}
-          </div>
+              {canReview && pending(e) && (
+                <>
+                  <button className="btn-success btn-sm" onClick={() => review(e, 'APPROVE')}>
+                    <Icon name="check" className="w-3.5 h-3.5" />{tr("Approve")}</button>
+                  <button className="btn-outline-danger btn-sm" onClick={() => review(e, 'REJECT')}>
+                    <Icon name="sendBack" className="w-3.5 h-3.5" />{tr("Reject")}</button>
+                </>
+              )}
+              {canReview && e.status === 'APPROVED' && !e.supersededAt && (
+                <button className="btn-secondary btn-sm" onClick={() => review(e, 'REVOKE')}>
+                  <Icon name="undo" className="w-3.5 h-3.5" />{tr("Revoke approval")}</button>
+              )}
+              {isYso &&
+                !e.supersededAt &&
+                ['REJECTED', 'APPROVED'].includes(e.status) && (
+                  <button
+                    className="btn-secondary btn-sm"
+                    onClick={() =>
+                      setEntryForm({
+                        task: d.tasks.find((t) => t.id === e.task)!,
+                        previous: e,
+                      })
+                    }
+                  >
+                    <Icon name="edit" className="w-3.5 h-3.5" />
+                    {e.status === 'REJECTED' ? tr("Resubmit") : tr("Correct entry")}
+                  </button>
+                )}
+            </div>
+          )}
         </article>
       ))}
     </div>
   )
-  const calendar = (
-    <section className={panel}>
-      <div className="flex justify-between items-center gap-3 mb-4">
-        <h3 className="font-bold">{tr("District meeting calendar")}</h3>
-        {isAd && (
-          <button className={secondary} onClick={() => setMeetingForm(true)}>
-            {tr("Schedule meeting")}</button>
-        )}
-      </div>
-      <div className="space-y-3">
-        {d.meetings
-          .filter(
-            (m) =>
-              m.date.slice(0, 7) === period &&
-              (!selectedAd || m.adId === selectedAd) &&
-              (!selectedPerson || m.invitees.includes(selectedPerson))
-          )
-          .map((m) => (
-            <div
-              className="flex items-start justify-between gap-4 border-t pt-3"
-              key={m.id}
-            >
-              <div>
-                <p className="text-sm font-semibold">
-                  {m.date} · {m.title}
-                </p>
-                <p className="text-xs text-slate-500">
-                  {m.location} · {meetingState(m)}
-                </p>
-              </div>
-              {isAd && m.adId === user.actorId && !m.cancelled && (
-                <button
-                  className={secondary}
-                  onClick={() =>
-                    setDecision({
-                      title: tr("Cancel meeting"),
-                      description:
-                        tr("Attendance awards and related absence deductions will be reversed."),
-                      label: tr("Cancel meeting"),
-                      save: (reason) =>
-                        mutate(() => ysoApi.cancelMeeting(m.id, reason)),
-                    })
-                  }
-                >
-                  {tr("Cancel")}</button>
-              )}
-            </div>
-          ))}
-        {!d.meetings.some((m) => m.date.slice(0, 7) === period) && (
-          <p className="text-sm text-slate-500">
-            {tr("No meetings scheduled for this month.")}</p>
-        )}
-      </div>
-    </section>
+  const [periodYear, periodMonth] = period.split('-').map(Number)
+  const monthLabel = new Date(Date.UTC(periodYear, periodMonth - 1, 1)).toLocaleDateString(locale === 'si-LK' ? 'si-LK' : 'en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' })
+  const monthMeetings = d.meetings.filter(
+    (m) =>
+      m.date.slice(0, 7) === period &&
+      (!selectedAd || m.adId === selectedAd) &&
+      (!selectedPerson || m.invitees.includes(selectedPerson))
   )
+  const calendar = (
+    <SectionCard
+      title={tr("District meeting calendar")}
+      icon="calendar"
+      meta={monthMeetings.length ? `${monthMeetings.length}` : undefined}
+      action={isAd ? (
+        <button className="btn-secondary btn-sm" onClick={() => setMeetingForm(true)}>
+          <Icon name="plus" className="w-3.5 h-3.5" />{tr("Schedule")}</button>
+      ) : undefined}
+      flush
+    >
+      {monthMeetings.length === 0 ? (
+        <p className="px-5 py-8 text-center text-sm text-tw-text-secondary">
+          {tr("No meetings scheduled for this month.")}</p>
+      ) : (
+        <ul className="divide-y divide-tw-border">
+          {monthMeetings.map((m) => {
+            const date = new Date(m.date + 'T00:00:00Z')
+            return (
+              <li className="flex items-center gap-3 px-4 sm:px-5 py-3" key={m.id}>
+                <div className={`w-11 flex-shrink-0 text-center rounded-xl border py-1 ${m.cancelled ? 'border-tw-border bg-tw-surface-2 opacity-60' : 'border-teal-200 bg-teal-50'}`}>
+                  <div className="text-[10px] font-semibold uppercase text-teal-700 leading-tight">{date.toLocaleDateString('en-GB', { month: 'short', timeZone: 'UTC' })}</div>
+                  <div className="text-base font-bold leading-tight text-tw-text tabular-nums">{date.getUTCDate()}</div>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className={`text-sm font-semibold text-tw-text truncate ${m.cancelled ? 'line-through opacity-60' : ''}`}>{m.title}</p>
+                  <p className="text-xs text-tw-text-secondary truncate inline-flex items-center gap-1 max-w-full">
+                    <Icon name="target" className="w-3 h-3 flex-shrink-0" /><span className="truncate">{m.location}</span>
+                  </p>
+                  <p className="text-xs text-tw-text-secondary mt-0.5">{meetingState(m)}</p>
+                </div>
+                {isAd && m.adId === user.actorId && !m.cancelled && (
+                  <button
+                    className="btn-ghost btn-sm text-tw-danger hover:text-tw-danger flex-shrink-0"
+                    onClick={() =>
+                      setDecision({
+                        title: tr("Cancel meeting"),
+                        description:
+                          tr("Attendance awards and related absence deductions will be reversed."),
+                        label: tr("Cancel meeting"),
+                        save: (reason) =>
+                          mutate(() => ysoApi.cancelMeeting(m.id, reason)),
+                      })
+                    }
+                  >
+                    {tr("Cancel")}</button>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </SectionCard>
+  )
+  const requirements = (
+    <SectionCard title={tr("Requirements & penalty review")} icon="alert" meta={obligationQueue.length ? `${obligationQueue.length}` : undefined} flush>
+      <p className="px-4 sm:px-5 pt-3 text-xs text-tw-text-secondary">
+        {tr("Unmarked meeting invitations become absent after month-end. Missing reports, weeks and unsettled advances require an AD decision. A pending submission holds a new penalty for review.")}</p>
+      {obligationQueue.length ? (
+        <ul className="divide-y divide-tw-border mt-3">
+          {obligationQueue.map((o) => {
+            const decisionReason = d.decisions.find((x) => x.personnelId === o.personnelId && x.key === o.key)?.reason
+            const stateLabel = o.blocked
+              ? tr("Awaiting submission review")
+              : o.outcome === 'EXEMPT'
+                ? tr("Exempted by AD")
+                : o.outcome === 'DEDUCT'
+                  ? tr("Deduction confirmed")
+                  : tr("Awaiting AD decision")
+            return (
+              <li className="px-4 sm:px-5 py-3" key={`${o.personnelId}/${o.key}`}>
+                <div className="flex items-start gap-3">
+                  <TaskNumber id={o.task} size="sm" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-sm font-semibold text-tw-text">
+                        {!isYso && `${personName(o.personnelId)} · `}{taskTitle(o.task)}
+                      </p>
+                      <PointsPill value={o.points} />
+                    </div>
+                    <p className="text-sm text-tw-text-secondary mt-0.5">{tr(o.reason)}</p>
+                    <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                      <span className={`badge ${o.outcome === 'EXEMPT' ? 'badge-success' : o.outcome === 'DEDUCT' ? 'badge-danger' : 'badge-warning'}`}>{stateLabel}</span>
+                      <span className="text-xs text-tw-text-muted">{o.period}</span>
+                    </div>
+                    {decisionReason && <p className="text-xs text-tw-text-secondary mt-1.5">{decisionReason}</p>}
+                    {isAd && !o.blocked && (
+                      <div className="flex gap-2 mt-3">
+                        <button className="btn-outline-danger btn-sm" onClick={() => penalty(o, 'DEDUCT')}>
+                          {tr("Confirm deduction")}</button>
+                        <button className="btn-secondary btn-sm" onClick={() => penalty(o, 'EXEMPT')}>
+                          {tr("Exempt")}</button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+      ) : (
+        <p className="px-5 pt-4 pb-6 text-center text-sm text-tw-text-secondary">
+          {tr("No overdue requirements awaiting a decision.")}</p>
+      )}
+    </SectionCard>
+  )
+  // ── YSO task hub data ──
+  const me = d.people[0]
+  const canSubmit = !!(me?.startDate && me.managerValid)
+  const statsFor = (taskId: number) => {
+    const list = monthEntries.filter((e) => e.task === taskId)
+    return {
+      approved: list.filter((e) => e.status === 'APPROVED').length,
+      waiting: list.filter(pending).length,
+      rejected: list.filter((e) => e.status === 'REJECTED').length,
+      points: ledger.filter((l) => l.task === taskId).reduce((a, b) => a + b.points, 0),
+    }
+  }
+  const monthAssessment = d.assessments.find((a) => a.period === period)
+  const evaluationTotal = monthAssessment ? Object.values(monthAssessment.scores).reduce((a, b) => a + Number(b || 0), 0) : null
+  const groups = [
+    ...TASK_GROUPS.map((g) => ({ ...g, tasks: d.tasks.filter((t) => g.ids.includes(t.id)) })),
+    { key: 'other', title: 'Other tasks', icon: 'tasks' as IconName, ids: [], tasks: d.tasks.filter((t) => !TASK_GROUPS.some((g) => g.ids.includes(t.id))) },
+  ].filter((g) => g.tasks.length > 0)
+  const statusPills = (task: YsoTask) => {
+    if (task.id === 15)
+      return evaluationTotal === null
+        ? <span className="text-xs text-tw-text-muted">{tr("Not evaluated yet")}</span>
+        : <span className="badge badge-success">{tr("Evaluated")} · {evaluationTotal} / 25</span>
+    const s = statsFor(task.id)
+    const pills = [
+      task.id === 9 && weekly.expected > 0 && (
+        <span key="w" className={`badge ${weekly.covered === weekly.expected ? 'badge-success' : 'badge-warning'}`}>
+          {weekly.covered}/{weekly.expected} {tr("weeks")}
+        </span>
+      ),
+      s.waiting > 0 && <span key="p" className="badge badge-warning">{s.waiting} {tr("pending")}</span>,
+      s.approved > 0 && <span key="a" className="badge badge-success">{s.approved} {tr("approved")}</span>,
+      s.rejected > 0 && <span key="r" className="badge badge-danger">{s.rejected} {tr("rejected")}</span>,
+    ].filter(Boolean)
+    return pills.length ? pills : <span className="text-xs text-tw-text-muted">{tr("No entries")}</span>
+  }
+  const openTaskDef = selectedTask ? d.tasks.find((t) => t.id === selectedTask) : undefined
+  const recentMonthEntries = [...monthEntries].sort((a, b) => Date.parse(b.submittedAt) - Date.parse(a.submittedAt))
   return (
-    <div className="page space-y-6 pb-10 text-tw-text">
-      <header className="flex flex-wrap justify-between items-start gap-4">
-        <div>
-          <p className="section-label text-teal-600 mb-2 inline-flex items-center gap-1.5"><Icon name="sprout" className="w-3.5 h-3.5" />
-            {tr("Youth services ·")}{' '}
-            {isYso
-              ? tr("My performance")
-              : isAd
-                ? tr("AD workspace")
-                : tr("Director overview")}
-          </p>
-          <h1 className="page-title">
-            {isYso ? tr("YSO Task Hub") : tr("YSO Performance")}
-          </h1>
-          <p className="text-sm text-slate-500 mt-2">
-            {isYso
-              ? tr("Record your work, follow approvals and understand your score.")
-              : isAd
-                ? tr("Monitor your YSOs, review submissions and assess monthly performance.")
-                : tr("Read-only oversight of Provincial AD teams and grading. Historical points retain their original AD attribution.")}
-          </p>
+    <div className="page space-y-5 pb-10 text-tw-text">
+      {/* ── Header ───────────────────────────────────────────────────────── */}
+      <header className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="icon-tile tile-teal w-11 h-11 hidden sm:inline-flex"><Icon name="sprout" className="w-5 h-5" /></span>
+          <div className="min-w-0">
+            <p className="section-label text-teal-600">
+              {tr("Youth services ·")}{' '}
+              {isYso ? tr("My performance") : isAd ? tr("AD workspace") : tr("Director overview")}
+            </p>
+            <h1 className="page-title">{isYso ? tr("YSO Task Hub") : tr("YSO Performance")}</h1>
+            <p className="page-subtitle">
+              {isYso
+                ? tr("Record your work, follow approvals and understand your score.")
+                : isAd
+                  ? tr("Monitor your YSOs, review submissions and assess monthly performance.")
+                  : tr("Read-only oversight of Provincial AD teams and grading. Historical points retain their original AD attribution.")}
+            </p>
+          </div>
         </div>
-        <div className="flex flex-wrap gap-2 items-end">
+        <div className="flex items-center gap-2 flex-wrap">
+          <DatePicker
+            ariaLabel={tr("Reporting month")}
+            mode="month"
+            compact
+            minDate="2000-01-01"
+            maxDate="2099-12-31"
+            className="min-w-[150px] flex-1 sm:flex-none [&>button]:min-h-10"
+            value={period}
+            onChange={(value) =>
+              /^20\d{2}-(0[1-9]|1[0-2])$/.test(value) && setPeriod(value)
+            }
+          />
           <LanguageToggle user={user} onUserUpdate={onUserUpdate} />
-          <label className="text-xs text-slate-500">
-            {tr("Reporting month")}<DatePicker
-              ariaLabel={tr("Reporting month")}
-              mode="month"
-              compact
-              minDate="2000-01-01"
-              maxDate="2099-12-31"
-              className="mt-1 min-w-40 [&>button]:min-h-11"
-              value={period}
-              onChange={(value) =>
-                /^20\d{2}-(0[1-9]|1[0-2])$/.test(value) && setPeriod(value)
-              }
-            />
-          </label>
           <button
-            className={secondary}
+            className="icon-btn border-tw-border bg-tw-surface w-10 h-10"
+            title={tr("Refresh")}
+            aria-label={tr("Refresh")}
             onClick={() => refresh().catch((e) => setError(e.message))}
           >
-            <Icon name="refresh" className="w-4 h-4" />{tr("Refresh")}</button>
+            <Icon name="refresh" className="w-4 h-4" />
+          </button>
         </div>
       </header>
       {error && (
@@ -1276,245 +1479,176 @@ export default function YsoPerformancePage({ user, onUserUpdate }: { user: AuthU
         </div>
       )}
       {notice && (
-        <div
-          role="status"
-          className="bg-teal-50 border border-teal-200 text-teal-800 rounded-xl px-3.5 py-2.5 text-sm flex justify-between gap-3"
-        >
-          {notice}
-          <button
-            aria-label={tr("Dismiss notification")}
-            onClick={() => setNotice('')}
-          >
+        <div role="status" className="alert-success flex items-center justify-between gap-3">
+          <span className="inline-flex items-center gap-2"><Icon name="approve" className="w-4 h-4 flex-shrink-0" />{notice}</span>
+          <button aria-label={tr("Dismiss notification")} onClick={() => setNotice('')}>
             <Icon name="x" className="w-4 h-4" />
           </button>
         </div>
       )}
       {!isYso && (
-        <div className="flex flex-wrap gap-3">
+        <div className="card p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+          <span className="section-label inline-flex items-center gap-1.5"><Icon name="filter" className="w-3.5 h-3.5" />{tr("Filter")}</span>
           {d.role === 'DIRECTOR' && (
-            <label className="text-xs">
-              {tr("Provincial AD")}<Select
-                ariaLabel={tr("Provincial AD")}
-                className="mt-1 min-w-44 [&>button]:min-h-11"
-                value={selectedAd}
-                onChange={(value) => {
-                  setSelectedAd(value)
-                  setSelectedPerson('')
-                }}
-                options={[
-                  { value: '', label: tr("All ADs") },
-                  ...d.ads.map((ad) => ({ value: ad.id, label: ad.name })),
-                ]}
-              />
-            </label>
-          )}
-          <label className="text-xs">
-            {tr("YSO")}<Select
-              ariaLabel={tr("YSO")}
-              className="mt-1 min-w-44 [&>button]:min-h-11"
-              value={selectedPerson}
-              onChange={setSelectedPerson}
+            <Select
+              ariaLabel={tr("Provincial AD")}
+              className="sm:w-56 [&>button]:min-h-10"
+              value={selectedAd}
+              onChange={(value) => {
+                setSelectedAd(value)
+                setSelectedPerson('')
+              }}
               options={[
-                { value: '', label: tr("All YSOs") },
-                ...d.people
-                  .filter((p) => !selectedAd || p.adId === selectedAd)
-                  .map((p) => ({ value: p.id, label: p.name })),
+                { value: '', label: tr("All ADs") },
+                ...d.ads.map((ad) => ({ value: ad.id, label: ad.name })),
               ]}
             />
-          </label>
+          )}
+          <Select
+            ariaLabel={tr("YSO")}
+            className="sm:w-56 [&>button]:min-h-10"
+            value={selectedPerson}
+            onChange={setSelectedPerson}
+            options={[
+              { value: '', label: tr("All YSOs") },
+              ...d.people
+                .filter((p) => !selectedAd || p.adId === selectedAd)
+                .map((p) => ({ value: p.id, label: p.name })),
+            ]}
+          />
         </div>
       )}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {[
-          { label: tr("Official monthly score"), value: signed(total) },
-          {
-            label: tr("Operational points"),
-            value: signed(total - qualifications - evaluation),
-          },
-          { label: tr("Qualification awards"), value: signed(qualifications) },
-          {
-            label: tr("AD evaluation"),
-            value: `${evaluation}${people.length === 1 ? ' / 25' : ''}`,
-          },
-        ].map((s) => (
-          <div className={panel} key={s.label}>
-            <p className="text-xs text-slate-500">{s.label}</p>
-            <p className="text-2xl font-bold tracking-tight mt-2">{s.value}</p>
+
+      {/* ── Score summary ────────────────────────────────────────────────── */}
+      <section className="card overflow-hidden">
+        <div className="grid grid-cols-3 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
+          <div className="col-span-3 md:col-span-1 p-5 bg-gradient-to-br from-teal-50 to-tw-surface border-b md:border-b-0 md:border-r border-tw-border">
+            <p className="text-xs font-medium text-teal-700">{tr("Official monthly score")} · {monthLabel}</p>
+            <p className={`text-4xl font-bold tracking-tight mt-1.5 tabular-nums ${total < 0 ? 'text-tw-danger' : 'text-tw-text'}`}>{signed(total)}</p>
+            <p className="text-xs text-tw-text-secondary mt-1.5">{tr("Approved submissions and confirmed penalties only.")}</p>
           </div>
-        ))}
-      </div>
-      <p className="text-xs text-slate-500">
-        {tr("Official scores include approved submissions and confirmed penalties only. Negative task balances:")}{' '}
-        {signed(
-          Object.values(deductions)
-            .filter((v) => v < 0)
-            .reduce((a, b) => a + b, 0)
-        )}
-        . {queue.length} {tr(queue.length === 1 ? 'submission' : 'submissions')} {tr("awaiting AD review across all months.")}</p>
+          {[
+            { label: tr("Operational points"), value: signed(total - qualifications - evaluation), icon: 'activity' as IconName },
+            { label: tr("Qualification awards"), value: signed(qualifications), icon: 'award' as IconName },
+            { label: tr("AD evaluation"), value: `${evaluation}${people.length === 1 ? ' / 25' : ''}`, icon: 'star' as IconName },
+          ].map((s, i) => (
+            <div key={s.label} className={`p-4 md:p-5 min-w-0 ${i > 0 ? 'border-l border-tw-border' : ''}`}>
+              <p className="text-[11px] sm:text-xs text-tw-text-secondary inline-flex items-center gap-1.5">
+                <Icon name={s.icon} className="w-3.5 h-3.5 hidden sm:block flex-shrink-0" />{s.label}
+              </p>
+              <p className="text-xl sm:text-2xl font-bold tracking-tight mt-1.5 tabular-nums">{s.value}</p>
+            </div>
+          ))}
+        </div>
+        <div className="flex flex-wrap items-center gap-2 px-4 sm:px-5 py-2.5 border-t border-tw-border bg-tw-surface-2/60">
+          <span className={`badge ${queue.length ? 'badge-warning' : 'badge-gray'}`}>
+            <Icon name="hourglass" className="w-3 h-3" />{queue.length} {tr(queue.length === 1 ? 'submission' : 'submissions')} {tr("awaiting AD review")}
+          </span>
+          {Object.values(deductions).some((v) => v < 0) && (
+            <span className="badge badge-danger">
+              {tr("Negative task balances:")} {signed(Object.values(deductions).filter((v) => v < 0).reduce((a, b) => a + b, 0))}
+            </span>
+          )}
+        </div>
+      </section>
+
       {isYso ? (
         <>
-          {!d.people[0]?.startDate && (
-            <div className="bg-amber-50 rounded-xl p-4 text-amber-900 text-sm">
-              {tr("Your AD needs to activate reporting before you can submit.")}{' '}
-              {d.people[0]?.managerValid
-                ? `${tr('Assigned AD:')} ${d.people[0].adName}.`
-                : tr("An active Level 3 Provincial AD must be assigned.")}
+          {!canSubmit && (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 sm:p-5 flex items-start gap-3.5">
+              <span className="icon-tile tile-amber bg-tw-surface"><Icon name="lock" className="w-5 h-5" /></span>
+              <div className="min-w-0">
+                <p className="font-semibold text-amber-900">{tr("Reporting isn't active yet")}</p>
+                <p className="text-sm text-amber-800 mt-0.5">
+                  {me?.managerValid
+                    ? `${tr("Your AD needs to activate reporting before you can submit.")} ${tr('Assigned AD:')} ${me.adName}.`
+                    : tr("An active Level 3 Provincial AD must be assigned.")}
+                </p>
+                <p className="text-xs text-amber-700 mt-1.5">{tr("You can still open any task to see how its points work.")}</p>
+              </div>
             </div>
           )}
-          <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
-            {d.tasks.map((task) => {
-              const taskEntries = monthEntries.filter(
-                  (e) => e.task === task.id
-                ),
-                waiting = taskEntries.filter(pending).length,
-                approved = taskEntries.filter(
-                  (e) => e.status === 'APPROVED'
-                ).length,
-                points = ledger
-                  .filter((l) => l.task === task.id)
-                  .reduce((a, b) => a + b.points, 0)
-              return (
-                <button
-                  key={task.id}
-                  onClick={() => {
-                    setSelectedTask(task.id)
-                    if (
-                      task.id < 15 &&
-                      d.people[0]?.startDate &&
-                      d.people[0].managerValid
-                    )
-                      setEntryForm({ task })
-                  }}
-                  className={`${panel} text-left hover:border-teal-500 transition-colors flex flex-col min-h-[176px] ${selectedTask === task.id ? 'ring-2 ring-teal-600' : ''}`}
-                >
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs font-bold text-teal-700">
-                      {tr("TASK")}{String(task.id).padStart(2, '0')}
-                    </span>
-                    <span className="font-bold">{signed(points)}</span>
-                  </div>
-                  <h3 className="font-semibold mt-3 mb-4">{tr(task.title)}</h3>
-                  {task.id === 9 && (
-                    <p
-                      className={`text-xs mb-3 ${weekly.covered === weekly.expected ? 'text-emerald-700' : 'text-amber-800'}`}
-                    >
-                      {weekly.covered} / {weekly.expected} {tr("required weeks covered")}</p>
-                  )}
-                  <div className="mt-auto text-xs text-slate-500 flex flex-wrap gap-2">
-                    {task.id === 15 ? (
-                      <span>{tr("AD assessment · View details")}</span>
-                    ) : (
-                      <>
-                        <span className={approved ? 'text-emerald-700' : ''}>
-                          {approved ? <Icon name="check" className="inline w-3 h-3 mr-0.5" /> : ''}
-                          {approved} {tr("approved")}</span>
-                        <span>{waiting}  {tr("pending")}</span>
-                        <span>
-                          {
-                            taskEntries.filter((e) => e.status === 'REJECTED')
-                              .length
-                          }{' '}
-                          {tr("rejected")}</span>
-                      </>
-                    )}
-                  </div>
-                </button>
-              )
-            })}
+          <div className="grid lg:grid-cols-[minmax(0,1fr)_360px] gap-5 items-start">
+            {/* Task list, grouped */}
+            <div className="space-y-5 min-w-0">
+              {groups.map((g) => {
+                const groupPoints = ledger.filter((l) => g.tasks.some((t) => t.id === l.task)).reduce((a, b) => a + b.points, 0)
+                return (
+                  <SectionCard key={g.key} title={tr(g.title)} icon={g.icon} meta={<PointsPill value={groupPoints} />} flush>
+                    <ul className="divide-y divide-tw-border">
+                      {g.tasks.map((task) => {
+                        const s = statsFor(task.id)
+                        return (
+                          <li key={task.id}>
+                            <button
+                              onClick={() => setSelectedTask(task.id)}
+                              className="w-full text-left flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-3.5 hover:bg-tw-hover active:bg-tw-hover transition-colors group"
+                            >
+                              <TaskNumber id={task.id} />
+                              <div className="flex-1 min-w-0">
+                                <p className="font-semibold text-sm text-tw-text truncate">{tr(task.title)}</p>
+                                <p className="text-xs text-tw-text-secondary truncate mt-0.5">{tr(task.rule)}</p>
+                                <div className="flex flex-wrap items-center gap-1.5 mt-2 sm:hidden">{statusPills(task)}</div>
+                              </div>
+                              <div className="hidden sm:flex flex-wrap justify-end items-center gap-1.5 max-w-[45%]">{statusPills(task)}</div>
+                              <PointsPill value={task.id === 15 ? evaluation : s.points} />
+                              <Icon name="chevronRight" className="w-4 h-4 text-tw-text-muted group-hover:text-tw-text group-hover:translate-x-0.5 transition-all flex-shrink-0" />
+                            </button>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  </SectionCard>
+                )
+              })}
+            </div>
+
+            {/* Side column */}
+            <aside className="space-y-5 min-w-0">
+              <SectionCard title={tr("This month's submissions")} icon="inbox" meta={`${recentMonthEntries.length}`} flush>
+                {recentMonthEntries.length === 0 ? (
+                  <p className="px-5 py-8 text-center text-sm text-tw-text-secondary">{tr("Nothing submitted this month.")}</p>
+                ) : (
+                  <ul className="divide-y divide-tw-border">
+                    {recentMonthEntries.slice(0, 8).map((e) => (
+                      <li key={e.id}>
+                        <button onClick={() => setSelectedTask(e.task)} className="w-full text-left flex items-center gap-3 px-4 sm:px-5 py-3 hover:bg-tw-hover transition-colors">
+                          <TaskNumber id={e.task} size="sm" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-tw-text truncate">{taskTitle(e.task)}</p>
+                            <p className="text-xs text-tw-text-secondary">{when(e.submittedAt, locale)}</p>
+                          </div>
+                          <Status value={e.status} />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </SectionCard>
+              {calendar}
+              {requirements}
+            </aside>
           </div>
-          {selectedTask === 15 && (
-            <section className={panel}>
-              <h3 className="font-bold mb-3">{tr("Monthly AD evaluation")}</h3>
-              {d.assessments
-                .filter((a) => a.period === period)
-                .map((a) => (
-                  <div key={a.id}>
-                    <dl className="space-y-2">
-                      {d.criteria.map((c) => (
-                        <div
-                          className="flex justify-between text-sm"
-                          key={c.key}
-                        >
-                          <dt>{tr(c.label)}</dt>
-                          <dd>
-                            {a.scores[c.key]} / {c.max}
-                          </dd>
-                        </div>
-                      ))}
-                    </dl>
-                    <p className="text-sm mt-4">{a.rationale}</p>
-                  </div>
-                ))}
-              {!d.assessments.some((a) => a.period === period) && (
-                <p className="text-sm text-slate-500">
-                  {tr("Your AD has not recorded this month’s evaluation.")}</p>
-              )}
-            </section>
-          )}
-          <section className={panel}>
-            <div className="flex justify-between mb-4">
-              <h3 className="font-bold">
-                {tr("Submission history")}{' '}
-                {selectedTask && selectedTask < 15
-                  ? `${tr('· Task')} ${selectedTask}`
-                  : ''}
-              </h3>
-              {selectedTask && (
-                <button
-                  className={secondary}
-                  onClick={() => setSelectedTask(null)}
-                >
-                  {tr("All tasks")}</button>
-              )}
-            </div>
-            {entryList(
-              scopedEntries.filter(
-                (e) =>
-                  (!selectedTask ||
-                    selectedTask === 15 ||
-                    e.task === selectedTask) &&
-                  (e.period === period || !!selectedTask)
-              ),
-              false
-            )}
-          </section>
-          {calendar}
         </>
       ) : (
         <>
-          <nav
-            className={`grid ${isAd ? 'grid-cols-3' : 'grid-cols-2'} gap-1 rounded-2xl border border-tw-border bg-tw-hover p-1`}
-            aria-label={tr("YSO workspace tabs")}
-          >
+          <nav className="seg w-full sm:w-auto" aria-label={tr("YSO workspace tabs")}>
             {[
-              { key: 'monitor', label: tr("Overview") },
-              ...(isAd
-                ? [
-                    {
-                      key: 'approvals',
-                      label: tr("Approvals"),
-                    },
-                  ]
-                : []),
-              { key: 'analytics', label: tr("Analytics") },
+              { key: 'monitor', label: tr("Overview"), icon: 'grid' as IconName },
+              ...(isAd ? [{ key: 'approvals', label: tr("Approvals"), icon: 'approve' as IconName }] : []),
+              { key: 'analytics', label: tr("Analytics"), icon: 'analytics' as IconName },
             ].map((t) => (
               <button
-                className={`min-w-0 min-h-12 flex items-center justify-center gap-1 rounded-xl px-1 py-3 text-xs sm:text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2 ${tab === t.key ? 'bg-tw-surface text-teal-600 shadow-card' : 'text-tw-text-secondary hover:text-tw-text'}`}
-                aria-label={
-                  t.key === 'approvals'
-                    ? `Approvals (${queue.length} pending)`
-                    : t.label
-                }
+                className={`seg-item flex-1 sm:flex-none min-h-10 px-4 inline-flex items-center justify-center gap-1.5 text-sm ${tab === t.key ? 'seg-item-active' : ''}`}
+                aria-label={t.key === 'approvals' ? `Approvals (${queue.length} pending)` : t.label}
                 aria-pressed={tab === t.key}
                 key={t.key}
                 onClick={() => setTab(t.key)}
               >
+                <Icon name={t.icon} className="w-4 h-4 hidden sm:block" />
                 {t.label}
                 {t.key === 'approvals' && queue.length > 0 && (
-                  <span
-                    aria-hidden="true"
-                    className={`inline-flex min-w-4 h-4 items-center justify-center rounded-full px-1 text-[10px] tabular-nums ${tab === t.key ? 'bg-teal-600 text-white' : 'bg-teal-100 text-teal-800'}`}
-                  >
+                  <span aria-hidden="true" className="inline-flex min-w-[18px] h-[18px] items-center justify-center rounded-full px-1 text-[10px] font-bold tabular-nums bg-tw-danger text-white">
                     {queue.length > 99 ? '99+' : queue.length}
                   </span>
                 )}
@@ -1535,170 +1669,135 @@ export default function YsoPerformancePage({ user, onUserUpdate }: { user: AuthU
                       waiting = d.entries.filter(
                         (e) => teamIds.includes(e.personnelId) && pending(e)
                       )
+                    const avg = teamScore / Math.max(1, new Set([...teamIds, ...d.ledger.filter((l) => l.period === period && l.adId === ad).map((l) => l.personnelId)]).size)
                     return (
                       <button
-                        className={panel + ' text-left hover:border-teal-500'}
+                        className="card card-hover p-0 text-left overflow-hidden group"
                         key={ad}
                         onClick={() => {
                           setSelectedAd(ad)
                           setTab('analytics')
                         }}
                       >
-                        <h3 className="font-bold">{adInfo.name}</h3>
-                        <p className="text-xs text-slate-500 mt-1">
-                          {adInfo.district}
-                        </p>
-                        <dl className="grid grid-cols-3 gap-2 mt-5 text-sm">
-                          <div>
-                            <dt className="text-xs text-slate-500">{tr("YSOs")}</dt>
-                            <dd className="font-bold">{team.length}</dd>
+                        <div className="flex items-center gap-3 px-4 py-3.5 border-b border-tw-border">
+                          <span className="icon-tile tile-teal w-9 h-9"><Icon name="user" className="w-4 h-4" /></span>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-sm text-tw-text truncate">{adInfo.name}</p>
+                            <p className="text-xs text-tw-text-secondary truncate">{adInfo.district}</p>
                           </div>
-                          <div>
-                            <dt className="text-xs text-slate-500">
-                              {tr("Avg score")}</dt>
-                            <dd className="font-bold">
-                              {(
-                                teamScore /
-                                Math.max(
-                                  1,
-                                  new Set([
-                                    ...teamIds,
-                                    ...d.ledger
-                                      .filter(
-                                        (l) =>
-                                          l.period === period && l.adId === ad
-                                      )
-                                      .map((l) => l.personnelId),
-                                  ]).size
-                                )
-                              ).toFixed(1)}
-                            </dd>
-                          </div>
-                          <div>
-                            <dt className="text-xs text-slate-500">{tr("Pending")}</dt>
-                            <dd className="font-bold">{waiting.length}</dd>
-                          </div>
+                          <Icon name="chevronRight" className="w-4 h-4 text-tw-text-muted group-hover:translate-x-0.5 transition-transform" />
+                        </div>
+                        <dl className="grid grid-cols-3 divide-x divide-tw-border">
+                          {[
+                            [tr("YSOs"), String(team.length)],
+                            [tr("Avg score"), avg.toFixed(1)],
+                            [tr("Pending"), String(waiting.length)],
+                          ].map(([label, value]) => (
+                            <div key={label} className="px-4 py-3">
+                              <dt className="text-xs text-tw-text-secondary">{label}</dt>
+                              <dd className="text-lg font-bold tabular-nums mt-0.5">{value}</dd>
+                            </div>
+                          ))}
                         </dl>
-                        <p className="text-xs text-slate-500 mt-3">
+                        <p className="px-4 py-2.5 border-t border-tw-border bg-tw-surface-2/60 text-xs text-tw-text-secondary">
                           {waiting.length
                             ? `${tr('Oldest waiting')} ${Math.max(0, Math.floor((Date.now() - Math.min(...waiting.map((e) => Date.parse(e.submittedAt)))) / 86400000))} ${tr('days')}`
-                            : tr("Queue clear")}{' '}
-                          {tr("· View analytics →")}</p>
+                            : tr("Queue clear")}
+                        </p>
                       </button>
                     )
                   })}
                 </div>
               )}
-              <section className={panel}>
-                <h3 className="font-semibold tracking-tight mb-4">{tr("YSO directory")}</h3>
-                <div className="space-y-3">
-                  {people.map((p) => (
-                    <div
-                      className="border-t pt-3 flex flex-wrap items-center justify-between gap-3"
-                      key={p.id}
-                    >
-                      <div>
-                        <p className="font-semibold text-sm">
-                          {p.name}
-                          {!p.active && ' · Inactive'}
-                        </p>
-                        <p className="text-xs text-slate-500">
-                          {p.startDate
-                            ? `${tr('Reporting since')} ${p.startDate}`
-                            : tr("Reporting not activated")}{' '}
-                          · {p.adName ?? tr("AD not assigned")}
-                        </p>
-                        {!p.managerValid && (
-                          <p className="text-xs text-rose-700">
-                            {tr("Active Provincial AD assignment required")}</p>
-                        )}
-                      </div>
-                      <div className="flex gap-2 items-center flex-wrap">
-                        <span className="text-sm font-bold">
-                          {signed(
-                            d.ledger
-                              .filter(
-                                (l) =>
-                                  l.personnelId === p.id && l.period === period
-                              )
-                              .reduce((a, b) => a + b.points, 0)
-                          )}{' '}
-                          {tr("points")}</span>
-                        <span className="text-xs rounded-full bg-amber-50 px-2 py-1">
-                          {
-                            d.entries.filter(
-                              (e) => e.personnelId === p.id && pending(e)
-                            ).length
-                          }{' '}
-                          {tr("pending")}</span>
-                        <button
-                          className={secondary}
-                          onClick={() => {
-                            setSelectedPerson(p.id)
-                            setTab('analytics')
-                          }}
-                        >
-                          {tr("View performance")}</button>
-                        {isAd && !p.startDate && p.managerValid && p.active && (
-                          <button
-                            className={primary}
-                            onClick={() => {
-                              setActivation(p)
-                              setActivationDate(d.today)
-                            }}
-                          >
-                            {tr("Activate reporting")}</button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                  {!people.length && (
-                    <p className="text-sm text-slate-500">
-                      {tr("No YSOs assigned to this team.")}</p>
+              <div className="grid lg:grid-cols-[minmax(0,1fr)_360px] gap-5 items-start">
+                <SectionCard title={tr("YSO directory")} icon="users" meta={`${people.length}`} flush>
+                  {!people.length ? (
+                    <p className="px-5 py-8 text-center text-sm text-tw-text-secondary">{tr("No YSOs assigned to this team.")}</p>
+                  ) : (
+                    <ul className="divide-y divide-tw-border">
+                      {people.map((p) => {
+                        const pts = d.ledger.filter((l) => l.personnelId === p.id && l.period === period).reduce((a, b) => a + b.points, 0)
+                        const waitingCount = d.entries.filter((e) => e.personnelId === p.id && pending(e)).length
+                        return (
+                          <li className="px-4 sm:px-5 py-3.5 flex flex-col sm:flex-row sm:items-center gap-3" key={p.id}>
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                              <span className="w-9 h-9 rounded-full bg-gradient-to-br from-teal-500 to-emerald-500 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">
+                                {p.name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase()}
+                              </span>
+                              <div className="min-w-0">
+                                <p className="font-semibold text-sm text-tw-text truncate">
+                                  {p.name}{!p.active && <span className="badge badge-gray ml-2">{tr("Inactive")}</span>}
+                                </p>
+                                <p className="text-xs text-tw-text-secondary truncate">
+                                  {p.startDate ? `${tr('Reporting since')} ${p.startDate}` : tr("Reporting not activated")} · {p.adName ?? tr("AD not assigned")}
+                                </p>
+                                {!p.managerValid && (
+                                  <p className="text-xs text-rose-600 mt-0.5">{tr("Active Provincial AD assignment required")}</p>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 flex-wrap sm:justify-end">
+                              <PointsPill value={pts} />
+                              {waitingCount > 0 && <span className="badge badge-warning">{waitingCount} {tr("pending")}</span>}
+                              <button className="btn-secondary btn-sm" onClick={() => { setSelectedPerson(p.id); setTab('analytics') }}>
+                                {tr("View performance")}</button>
+                              {isAd && !p.startDate && p.managerValid && p.active && (
+                                <button
+                                  className="btn btn-sm text-white bg-gradient-to-b from-teal-500 to-teal-600 hover:brightness-110"
+                                  onClick={() => {
+                                    setActivation(p)
+                                    setActivationDate(d.today)
+                                  }}
+                                >
+                                  {tr("Activate reporting")}</button>
+                              )}
+                            </div>
+                          </li>
+                        )
+                      })}
+                    </ul>
                   )}
-                </div>
-              </section>
-              {calendar}
+                </SectionCard>
+                <aside className="space-y-5 min-w-0">
+                  {calendar}
+                </aside>
+              </div>
+              {requirements}
             </>
           )}
           {tab === 'approvals' && isAd && (
             <>
-              <section className={panel}>
-                <h3 className="font-bold mb-1">{tr("Pending submissions")}</h3>
-                <p className="text-xs text-slate-500 mb-4">
+              <SectionCard title={tr("Pending submissions")} icon="hourglass" meta={`${queue.length}`}>
+                <p className="text-xs text-tw-text-secondary mb-4">
                   {tr("All reporting months · Review the evidence before approving. Approval time does not change deadline points.")}</p>
                 {entryList(queue, true)}
-              </section>
-              <section className={panel}>
-                <h3 className="font-semibold tracking-tight mb-4">
-                  {tr("Task 15 · Monthly performance evaluation")}</h3>
+              </SectionCard>
+              <SectionCard title={tr("Task 15 · Monthly performance evaluation")} icon="star">
                 <div className="flex flex-wrap gap-2">
                   {people
                     .filter((p) => p.active && p.startDate)
-                    .map((p) => (
-                      <button
-                        className={secondary}
-                        key={p.id}
-                        onClick={() => setAssessment(p)}
-                      >
-                        {p.name} ·{' '}
-                        {d.assessments.some(
-                          (a) => a.personnelId === p.id && a.period === period
-                        )
-                          ? tr("Revise")
-                          : tr("Evaluate")}
-                      </button>
-                    ))}
+                    .map((p) => {
+                      const done = d.assessments.some((a) => a.personnelId === p.id && a.period === period)
+                      return (
+                        <button className={done ? 'btn-secondary btn-sm' : 'btn-primary btn-sm'} key={p.id} onClick={() => setAssessment(p)}>
+                          <Icon name={done ? 'edit' : 'star'} className="w-3.5 h-3.5" />
+                          {p.name} · {done ? tr("Revise") : tr("Evaluate")}
+                        </button>
+                      )
+                    })}
+                  {!people.some((p) => p.active && p.startDate) && (
+                    <p className="text-sm text-tw-text-secondary">{tr("No YSOs with active reporting.")}</p>
+                  )}
                 </div>
-              </section>
-              <section className={panel}>
-                <h3 className="font-semibold tracking-tight mb-4">{tr("Reviewed entries ·")} {period}</h3>
+              </SectionCard>
+              <SectionCard title={<>{tr("Reviewed entries ·")} {monthLabel}</>} icon="approve">
                 {entryList(
                   monthEntries.filter((e) => !pending(e)),
                   true
                 )}
-              </section>
+              </SectionCard>
               {calendar}
+              {requirements}
             </>
           )}
           {tab === 'analytics' && (
@@ -1711,99 +1810,147 @@ export default function YsoPerformancePage({ user, onUserUpdate }: { user: AuthU
           )}
         </>
       )}
-      <section className={panel}>
-        <h3 className="font-bold mb-1">{tr("Requirements & penalty review")}</h3>
-        <p className="text-xs text-slate-500 mb-4">
-          {tr("Unmarked meeting invitations become absent after month-end. Missing reports, weeks and unsettled advances require an AD decision. A pending submission holds a new penalty for review.")}</p>
-        {obligationQueue.length ? (
-          <div className="space-y-4">
-            {obligationQueue.map((o) => (
-              <div className="border-t pt-3" key={`${o.personnelId}/${o.key}`}>
-                <div className="flex flex-wrap justify-between gap-2">
-                  <div>
-                    <p className="text-sm font-semibold">
-                      {!isYso && `${personName(o.personnelId)} · `}
-                      {o.period}  {tr("· Task")} {o.task} · {o.points} {tr("points")}</p>
-                    <p className="text-sm text-slate-600 mt-1">{tr(o.reason)}</p>
-                    <p className="text-xs text-slate-500 mt-1">
-                      {o.blocked
-                        ? tr("Awaiting submission review")
-                        : o.outcome === 'EXEMPT'
-                          ? tr("Exempted by AD")
-                          : o.outcome === 'DEDUCT'
-                            ? tr("Deduction confirmed")
-                            : tr("Awaiting AD decision")}
-                      {d.decisions.find(
-                        (x) =>
-                          x.personnelId === o.personnelId && x.key === o.key
-                      )?.reason &&
-                        ` · ${d.decisions.find((x) => x.personnelId === o.personnelId && x.key === o.key)!.reason}`}
-                    </p>
+
+      {/* ── Score history & audit trail ─────────────────────────────────── */}
+      <details className="card overflow-hidden group">
+        <summary className="list-none [&::-webkit-details-marker]:hidden cursor-pointer flex items-center gap-2.5 px-4 sm:px-5 py-3.5 hover:bg-tw-hover transition-colors">
+          <span className="icon-tile tile-gray w-8 h-8 rounded-lg"><Icon name="history" className="w-4 h-4" /></span>
+          <span className="flex-1 font-semibold text-sm">{tr("Score history & audit trail")}</span>
+          <Icon name="chevronDown" className="w-4 h-4 text-tw-text-secondary group-open:rotate-180 transition-transform" />
+        </summary>
+        <div className="border-t border-tw-border px-4 sm:px-5 py-4 grid lg:grid-cols-2 gap-6">
+          <div className="min-w-0">
+            <h4 className="section-label mb-1">{tr("Score changes")}</h4>
+            <p className="text-xs text-tw-text-secondary mb-3">
+              {tr("Awards and reversals for")} {monthLabel}{tr("; each adjustment preserves the original record.")}</p>
+            <ul className="max-h-80 overflow-auto divide-y divide-tw-border rounded-xl border border-tw-border">
+              {ledger.map((l) => (
+                <li key={l.id} className="flex items-start gap-3 px-3 py-2.5">
+                  <PointsPill value={l.points} />
+                  <div className="min-w-0 text-sm">
+                    <p className="font-medium text-tw-text truncate">{taskTitle(l.task)} · {personName(l.personnelId)}</p>
+                    <p className="text-xs text-tw-text-secondary">{when(l.createdAt, locale)} · {tr(l.reason)}</p>
                   </div>
-                  {isAd && !o.blocked && (
-                    <div className="flex gap-2 items-start">
-                      <button
-                        className={secondary}
-                        onClick={() => penalty(o, 'DEDUCT')}
-                      >
-                        {tr("Confirm deduction")}</button>
-                      <button
-                        className={secondary}
-                        onClick={() => penalty(o, 'EXEMPT')}
-                      >
-                        {tr("Exempt")}</button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
+                </li>
+              ))}
+              {!ledger.length && (
+                <li className="px-3 py-6 text-center text-sm text-tw-text-secondary">{tr("No score changes for this month.")}</li>
+              )}
+            </ul>
           </div>
-        ) : (
-          <p className="text-sm text-slate-500">
-            {tr("No overdue requirements awaiting a decision.")}</p>
-        )}
-      </section>
-      <details className={panel}>
-        <summary className="font-bold cursor-pointer">
-          {tr("Score history & audit trail")}</summary>
-        <p className="text-xs text-slate-500 mt-3 mb-4">
-          {tr("Awards and reversals for")}{period}{tr("; each adjustment preserves the original record.")}</p>
-        <div className="max-h-80 overflow-auto space-y-2">
-          {ledger.map((l) => (
-            <div key={l.id} className="text-sm border-t pt-2">
-              <strong>
-                {signed(l.points)}  {tr("· Task")} {l.task}
-              </strong>{' '}
-              · {personName(l.personnelId)}
-              <p className="text-xs text-slate-500">
-                {when(l.createdAt, locale)} · {tr(l.reason)}
-              </p>
-            </div>
-          ))}
-          {!ledger.length && (
-            <p className="text-sm text-slate-500">
-              {tr("No score changes for this month.")}</p>
-          )}
-        </div>
-        <h4 className="font-semibold text-sm mt-5 mb-2">
-          {tr("Recent review events")}</h4>
-        <div className="max-h-64 overflow-auto space-y-2">
-          {d.events
-            .filter((e) => e.personnelId && ids.includes(e.personnelId))
-            .map((e) => (
-              <div className="text-xs border-t pt-2" key={e.id}>
-                {when(e.createdAt, locale)} · {pretty(e.event)} ·{' '}
-                {personName(e.personnelId!)}
-                <p className="text-slate-500">
-                  {e.data.feedback ??
-                    e.data.rationale ??
-                    e.data.reason ??
-                    (e.data.submissionId ? `Entry ${e.data.submissionId}` : '')}
-                </p>
-              </div>
-            ))}
+          <div className="min-w-0">
+            <h4 className="section-label mb-3">{tr("Recent review events")}</h4>
+            <ul className="max-h-80 overflow-auto divide-y divide-tw-border rounded-xl border border-tw-border">
+              {d.events
+                .filter((e) => e.personnelId && ids.includes(e.personnelId))
+                .map((e) => (
+                  <li className="px-3 py-2.5 text-xs" key={e.id}>
+                    <p className="text-tw-text"><span className="font-semibold capitalize">{pretty(e.event)}</span> · {personName(e.personnelId!)}</p>
+                    <p className="text-tw-text-secondary mt-0.5">
+                      {when(e.createdAt, locale)}
+                      {(e.data.feedback ?? e.data.rationale ?? e.data.reason ?? (e.data.submissionId ? `Entry ${e.data.submissionId}` : ''))
+                        ? ` · ${e.data.feedback ?? e.data.rationale ?? e.data.reason ?? `Entry ${e.data.submissionId}`}`
+                        : ''}
+                    </p>
+                  </li>
+                ))}
+              {!d.events.some((e) => e.personnelId && ids.includes(e.personnelId)) && (
+                <li className="px-3 py-6 text-center text-sm text-tw-text-secondary">{tr("No review events yet.")}</li>
+              )}
+            </ul>
+          </div>
         </div>
       </details>
+
+      {/* ── Task detail (YSO) ───────────────────────────────────────────── */}
+      {isYso && openTaskDef && (() => {
+        const task = openTaskDef
+        const s = statsFor(task.id)
+        const history = scopedEntries
+          .filter((e) => e.task === task.id)
+          .sort((a, b) => Date.parse(b.submittedAt) - Date.parse(a.submittedAt))
+        return (
+          <Sheet
+            onClose={() => setSelectedTask(null)}
+            lead={<TaskNumber id={task.id} />}
+            overline={`${tr("Task")} ${taskNo(task.id)}`}
+            title={tr(task.title)}
+            footer={
+              task.id === 15 ? (
+                <p className="text-sm text-tw-text-secondary text-center py-1">{tr("Recorded by your AD — no submission needed.")}</p>
+              ) : canSubmit ? (
+                <button className="btn w-full py-3 text-white bg-gradient-to-b from-teal-500 to-teal-600 shadow-[0_4px_14px_-4px_rgba(13,148,136,0.7)] hover:brightness-110"
+                  onClick={() => setEntryForm({ task })}>
+                  <Icon name="plus" className="w-4 h-4" />{tr("Submit entry")}
+                </button>
+              ) : (
+                <div className="space-y-2">
+                  <button className="btn-secondary w-full py-3" disabled>
+                    <Icon name="lock" className="w-4 h-4" />{tr("Submit entry")}
+                  </button>
+                  <p className="text-xs text-center text-tw-text-secondary">{tr("Ask your AD to activate reporting to submit.")}</p>
+                </div>
+              )
+            }
+          >
+            <h3 className="section-label -mb-3">{tr("This month")} · {monthLabel}</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {[
+                [tr("Points"), signed(task.id === 15 ? evaluation : s.points)],
+                [tr("Approved"), String(s.approved)],
+                [tr("Pending"), String(s.waiting)],
+                [tr("Rejected"), String(s.rejected)],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-xl border border-tw-border bg-tw-surface-2 px-3 py-2.5">
+                  <p className="text-[11px] text-tw-text-secondary">{label}</p>
+                  <p className="text-lg font-bold tabular-nums">{value}</p>
+                </div>
+              ))}
+            </div>
+            <div className="rounded-xl border border-teal-200 bg-teal-50 p-3.5 flex items-start gap-2.5">
+              <Icon name="info" className="w-4 h-4 text-teal-700 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-xs font-semibold text-teal-800">{tr("How points work")}</p>
+                <p className="text-sm text-teal-900 mt-0.5 leading-relaxed">{tr(task.rule)}</p>
+              </div>
+            </div>
+            {task.id === 9 && weekly.expected > 0 && (
+              <div>
+                <div className="flex items-center justify-between text-xs mb-1.5">
+                  <span className="font-semibold text-tw-text-secondary">{tr("required weeks covered")}</span>
+                  <span className="font-bold tabular-nums">{weekly.covered} / {weekly.expected}</span>
+                </div>
+                <div className="h-2 rounded-full bg-tw-hover overflow-hidden">
+                  <div className={`h-full rounded-full ${weekly.covered === weekly.expected ? 'bg-tw-success' : 'bg-tw-warning'}`} style={{ width: `${Math.round((weekly.covered / weekly.expected) * 100)}%` }} />
+                </div>
+              </div>
+            )}
+            {task.id === 15 ? (
+              <div>
+                <h3 className="section-label mb-2">{tr("Monthly AD evaluation")}</h3>
+                {monthAssessment ? (
+                  <div className="rounded-xl border border-tw-border divide-y divide-tw-border">
+                    {d.criteria.map((c) => (
+                      <div className="flex justify-between gap-3 px-3.5 py-2.5 text-sm" key={c.key}>
+                        <span className="text-tw-text-secondary">{tr(c.label)}</span>
+                        <span className="font-semibold tabular-nums">{monthAssessment.scores[c.key]} / {c.max}</span>
+                      </div>
+                    ))}
+                    {monthAssessment.rationale && <p className="px-3.5 py-3 text-sm text-tw-text">{monthAssessment.rationale}</p>}
+                  </div>
+                ) : (
+                  <p className="text-sm text-tw-text-secondary">{tr("Your AD has not recorded this month’s evaluation.")}</p>
+                )}
+              </div>
+            ) : (
+              <div>
+                <h3 className="section-label mb-2">{tr("Your submissions for this task")}</h3>
+                {entryList(history, false)}
+              </div>
+            )}
+          </Sheet>
+        )
+      })()}
       {entryForm && (
         <EntryForm
           task={entryForm.task}
