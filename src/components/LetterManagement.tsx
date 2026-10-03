@@ -773,36 +773,36 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
       )}
       {!selected && list && (
         <>
-          <div className="flex flex-wrap items-end gap-x-4 border-b border-tw-border">
-            <div role="tablist" className="flex gap-1 -mb-px overflow-x-auto">
-              {[
-                { key: 'all', label: tr("All"), value: list.metrics.open + list.metrics.closed, active: !status && !overdue, set: () => { setStatus(''); setOverdue(false) }, alert: false },
-                { key: 'open', label: tr("Open"), value: list.metrics.open, active: status === 'OPEN' && !overdue, set: () => { setStatus('OPEN'); setOverdue(false) }, alert: false },
-                { key: 'overdue', label: tr("Overdue"), value: list.metrics.overdue, active: overdue, set: () => { setStatus(''); setOverdue(true) }, alert: list.metrics.overdue > 0 },
-                { key: 'closed', label: tr("Closed"), value: list.metrics.closed, active: status === 'CLOSED' && !overdue, set: () => { setStatus('CLOSED'); setOverdue(false) }, alert: false },
-              ].map((c) => (
-                <button
-                  key={c.key}
-                  role="tab"
-                  aria-selected={c.active}
-                  onClick={() => {
-                    c.set()
-                    setPage(0)
-                  }}
-                  className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${c.active ? 'border-tw-primary text-tw-primary' : 'border-transparent text-tw-text-secondary hover:text-tw-text'}`}
-                >
-                  {c.label}
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${c.alert ? 'bg-red-50 text-red-700' : c.active ? 'bg-blue-50 text-tw-primary' : 'bg-slate-100 text-slate-600'}`}>{c.value}</span>
-                </button>
-              ))}
+          <section className={box + ' space-y-4 !p-3 sm:!p-4'} aria-label={tr("Filters")}>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+              <div role="tablist" className="inline-flex w-full sm:w-auto rounded-xl bg-slate-100 p-1 gap-1 overflow-x-auto">
+                {[
+                  { key: 'all', label: tr("All"), value: list.metrics.open + list.metrics.closed, active: !status && !overdue, set: () => { setStatus(''); setOverdue(false) }, dot: '' },
+                  { key: 'open', label: tr("Open"), value: list.metrics.open, active: status === 'OPEN' && !overdue, set: () => { setStatus('OPEN'); setOverdue(false) }, dot: 'bg-blue-500' },
+                  { key: 'overdue', label: tr("Overdue"), value: list.metrics.overdue, active: overdue, set: () => { setStatus(''); setOverdue(true) }, dot: 'bg-red-500' },
+                  { key: 'closed', label: tr("Closed"), value: list.metrics.closed, active: status === 'CLOSED' && !overdue, set: () => { setStatus('CLOSED'); setOverdue(false) }, dot: 'bg-slate-400' },
+                ].map((c) => (
+                  <button
+                    key={c.key}
+                    role="tab"
+                    aria-selected={c.active}
+                    onClick={() => {
+                      c.set()
+                      setPage(0)
+                    }}
+                    className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm whitespace-nowrap transition-all ${c.active ? 'bg-white text-tw-text font-semibold shadow-sm' : 'text-tw-text-secondary hover:text-tw-text hover:bg-white/60'}`}
+                  >
+                    {c.dot && <span className={`h-2 w-2 rounded-full ${c.dot}`} />}
+                    {c.label}
+                    <span className={`min-w-6 rounded-full px-1.5 py-0.5 text-xs font-semibold tabular-nums ${c.key === 'overdue' && c.value > 0 ? 'bg-red-100 text-red-700' : c.active ? 'bg-blue-50 text-tw-primary' : 'bg-white/80 text-slate-500'}`}>{c.value}</span>
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-4 sm:ml-auto text-xs text-tw-text-secondary">
+                <span>{tr("Avg entry delay")} <strong className="text-tw-text">{list.metrics.averageEntryDays}d</strong></span>
+                <span><strong className={list.metrics.lateEntries ? 'text-amber-700' : 'text-tw-text'}>{list.metrics.lateEntries}</strong> {tr("late entries")}</span>
+              </div>
             </div>
-            <span className="text-xs text-tw-text-secondary ml-auto pb-2.5">
-              {tr("Avg entry delay")} <strong>{list.metrics.averageEntryDays}d</strong>
-              {' · '}
-              {list.metrics.lateEntries} {tr("late entries")}
-            </span>
-          </div>
-          <div className={box + ' space-y-3 !p-3 sm:!p-4'}>
             <div className="flex flex-col lg:flex-row gap-2">
               <input
                 aria-label={tr("Search letters")}
@@ -850,7 +850,25 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
               >
                 {mine ? tr("✓ Assigned to me") : tr("Assigned to me")}
               </button>
+              {(q || from || to || mine || status || overdue) && (
+                <button
+                  className="text-sm font-medium text-tw-primary hover:underline whitespace-nowrap px-2"
+                  onClick={() => {
+                    setQ('')
+                    setFrom('')
+                    setTo('')
+                    setMine(false)
+                    setStatus('')
+                    setOverdue(false)
+                    setPage(0)
+                  }}
+                >
+                  {tr("Clear filters")}
+                </button>
+              )}
             </div>
+          </section>
+          <section className={box + ' space-y-3 !p-3 sm:!p-4'} aria-label={tr("Letters")}>
             <div className={`hidden md:grid ${letterColumns} gap-3 px-4 pl-5 text-xs font-semibold uppercase tracking-wide text-tw-text-secondary`}>
               {[
                 { label: tr("Reference"), key: 'reference', first: 'desc' },
@@ -968,7 +986,7 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
               >
                 {tr("Next")}</button>
             </div>
-          </div>
+          </section>
           {context?.me.director && (
             <Workload holders={list.metrics.holders} limit={list.thresholds.assigneeDays} />
           )}
