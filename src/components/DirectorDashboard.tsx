@@ -5,6 +5,7 @@ import { projectApi, taskApi, auditApi, workspaceApi, taskGroupApi } from '../se
 import DatePicker from './DatePicker'
 import Select from './Select'
 import NotificationsMenu from './NotificationsMenu'
+import Sidebar, { type SidebarSection } from './Sidebar'
 import { usePWA } from '../hooks/usePWA'
 import { useLanguage } from '../i18n/Language'
 import HierarchyPanel from './HierarchyPanel'
@@ -921,33 +922,41 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
     navigate('project_board')
   }
 
-  const navItems = [
-    { label: 'Letters', view: 'letters' as ViewMode, icon: '✉' },
-    ...(ysoEnabled ? [{ label: 'YSO Performance', view: 'yso_performance' as ViewMode, icon: '🌱' }] : []),
-    ...(insuranceEnabled ? [{ label: 'Insurance', view: 'insurance_management' as ViewMode, icon: '🛡️' }] : []),
-    { label: 'Dashboard',      view: 'director_dashboard' as ViewMode, icon: '⊞' },
-    { label: 'Projects',       view: 'project_board'      as ViewMode, icon: '📋' },
-    { label: 'Tasks',          view: 'tasks'              as ViewMode, icon: '🗂️' },
-    { label: 'Approval Queue', view: 'approval_queue'     as ViewMode, icon: '✅', badge: stats.pending_approval },
-    { label: 'Overdue Tasks',   view: 'overdue'          as ViewMode, icon: '⏰', badge: stats.overdue },
-    { label: 'Recent Updates',  view: 'recent_updates'   as ViewMode, icon: '🕐' },
-    { label: 'Broadcasts',      view: 'broadcasts'       as ViewMode, icon: '📢' },
-    { label: 'Group Tasks',     view: 'group_tasks'      as ViewMode, icon: '🫂' },
-    { label: 'Reports',         view: 'reports'           as ViewMode, icon: '📊' },
-    { label: 'Team Hierarchy',  view: 'hierarchy_manager' as ViewMode, icon: '👥' },
-    { label: 'Audit Log',       view: 'audit_log'       as ViewMode, icon: '📜' },
-    { label: 'User Analytics',  view: 'user_analytics'  as ViewMode, icon: '📈' },
-    ...(user.isSyswiseAdmin ? [{ label: 'Support Access', view: 'impersonation' as ViewMode, icon: '🔐' }] : []),
-    { label: 'Settings',       view: 'settings'           as ViewMode, icon: '⚙️' },
-    ...(user.isSyswiseAdmin ? [{ label: 'Company Requests', view: 'company_requests' as ViewMode, icon: 'C' }] : []),
-    ...(user.isSyswiseAdmin ? [{ label: 'Company Features', view: 'company_features' as ViewMode, icon: '🧩' }] : []),
-    { label: 'My Profile',     view: 'profile'            as ViewMode, icon: '👤' },
+  const sidebarSections: SidebarSection[] = [
+    { title: 'Overview', items: [
+      { label: 'Dashboard',      view: 'director_dashboard', icon: 'dashboard' },
+      { label: 'Recent Updates', view: 'recent_updates',     icon: 'updates' },
+      { label: 'Broadcasts',     view: 'broadcasts',         icon: 'broadcast' },
+    ] },
+    { title: 'Work', items: [
+      { label: 'Letters',     view: 'letters',       icon: 'letter' },
+      { label: 'Projects',    view: 'project_board', icon: 'project' },
+      { label: 'Tasks',       view: 'tasks',         icon: 'tasks' },
+      { label: 'Group Tasks', view: 'group_tasks',   icon: 'group' },
+      ...(insuranceEnabled ? [{ label: 'Insurance', view: 'insurance_management' as ViewMode, icon: 'shield' as const }] : []),
+    ] },
+    { title: 'Review', items: [
+      { label: 'Approval Queue', view: 'approval_queue', icon: 'approve', badge: stats.pending_approval },
+      { label: 'Overdue Tasks',  view: 'overdue',        icon: 'overdue', badge: stats.overdue },
+    ] },
+    { title: 'Insights', items: [
+      { label: 'Reports',        view: 'reports',        icon: 'reports' },
+      ...(ysoEnabled ? [{ label: 'YSO Performance', view: 'yso_performance' as ViewMode, icon: 'sprout' as const }] : []),
+      { label: 'User Analytics', view: 'user_analytics', icon: 'analytics' },
+      { label: 'Audit Log',      view: 'audit_log',      icon: 'audit' },
+    ] },
+    { title: 'Manage', items: [
+      { label: 'Team Hierarchy', view: 'hierarchy_manager', icon: 'hierarchy' },
+      { label: 'Settings',       view: 'settings',          icon: 'settings' },
+    ] },
+    ...(user.isSyswiseAdmin ? [{ title: 'SysWise Admin', items: [
+      { label: 'Support Access',   view: 'impersonation'    as ViewMode, icon: 'lock' as const },
+      { label: 'Company Requests', view: 'company_requests' as ViewMode, icon: 'building' as const },
+      { label: 'Company Features', view: 'company_features' as ViewMode, icon: 'puzzle' as const },
+    ] }] : []),
   ]
 
   const activeView = currentView === 'project_board' && !selectedProject ? 'project_board' : currentView
-
-  // Avatar/initials for sidebar
-  const initials = user.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
 
   const { canInstall, isIOS, installApp, pushEnabled, enablePush } = usePWA()
   const [showIOSGuide, setShowIOSGuide] = useState(false)
@@ -980,7 +989,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
   ]
 
   return (
-    <div className="min-h-screen bg-tw-bg flex relative overflow-hidden">
+    <div className="min-h-screen bg-tw-bg flex relative overflow-x-clip">
 
       {/* ── Watermark ───────────────────────────────────────────────────── */}
       {currentView !== 'letters' && <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
@@ -989,53 +998,19 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
       </div>}
 
       {/* ── Desktop Sidebar ──────────────────────────────────────────────── */}
-      <aside className="hidden md:flex w-60 bg-[#1f2d3d] flex-col flex-shrink-0 relative z-10">
-        <div className="px-5 py-4 border-b border-white/10">
-          {user.companyLogo ? (
-            <div className="flex items-center gap-2.5">
-              <img src={user.companyLogo} alt="Logo" className="w-8 h-8 rounded object-contain" />
-              <span className="font-bold text-white text-base truncate">{user.companyName || 'TaskWise'}</span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 bg-tw-primary rounded-lg flex items-center justify-center flex-shrink-0">
-                <span className="text-white font-bold text-sm">T</span>
-              </div>
-              <span className="font-bold text-white text-base">{user.companyName || 'TaskWise'}</span>
-            </div>
-          )}
-        </div>
-
-        <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
-          {navItems.map(item => (
-            <button key={item.view}
-              onClick={() => { if (item.view === 'project_board') setSelectedProject(null); navigate(item.view) }}
-              className={`w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2.5
-                ${activeView === item.view ? 'bg-tw-primary text-white shadow-sm' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}>
-              <span className="text-base flex-shrink-0">{item.icon}</span>
-              <span className="flex-1">{t(item.label)}</span>
-              {item.badge ? <span className="bg-tw-danger text-white text-xs rounded-full px-1.5 py-0.5 font-bold leading-none">{item.badge}</span> : null}
-            </button>
-          ))}
-        </nav>
-
-        <div className="px-3 py-3 border-t border-white/10">
-          <button onClick={() => setView('profile' as ViewMode)}
-            className="flex items-center gap-2.5 px-2 py-2 mb-1 w-full rounded-lg hover:bg-white/10 transition-colors">
-            {user.avatarUrl ? (
-              <img src={user.avatarUrl} alt="Avatar" className="w-8 h-8 rounded-full object-cover" />
-            ) : (
-              <div className="w-8 h-8 rounded-full bg-tw-primary flex items-center justify-center text-white text-sm font-bold flex-shrink-0">{initials}</div>
-            )}
-            <div className="min-w-0 text-left">
-              <div className="text-sm font-semibold text-white truncate">{user.name}</div>
-              <div className="text-xs text-white/50">Director</div>
-            </div>
-          </button>
-          <button onClick={onLogout} className="w-full text-left px-2 py-1 text-xs text-white/40 hover:text-tw-danger transition-colors rounded">{t('Sign out')}</button>
-          <p className="text-center text-xs text-white/25 mt-2">Created by SysWise</p>
-        </div>
-      </aside>
+      <Sidebar
+        user={user}
+        roleLabel="Director"
+        sections={sidebarSections}
+        activeView={activeView}
+        onSelect={v => { if (v === 'project_board') setSelectedProject(null); navigate(v) }}
+        onLogout={onLogout}
+        highlight={stats.pending_approval > 0 && activeView !== 'approval_queue' ? {
+          title: `${stats.pending_approval} ${t(stats.pending_approval === 1 ? 'task is awaiting your approval' : 'tasks are awaiting your approval')}`,
+          cta: t('Review now'),
+          onClick: () => navigate('approval_queue'),
+        } : undefined}
+      />
 
       {/* ── Main ────────────────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-w-0 relative z-10">

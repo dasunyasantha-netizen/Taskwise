@@ -276,4 +276,10 @@ export const si: Record<string, string> = {
   'Profile': 'පැතිකඩ',
   'Sign out': 'ඉවත් වන්න', 'Personnel': 'කාර්ය මණ්ඩලය',
   'Back to Pickiti': 'Pickiti වෙත ආපසු',
+  'Work': 'වැඩ', 'Review': 'සමාලෝචනය', 'Insights': 'විශ්ලේෂණ', 'Manage': 'කළමනාකරණය',
+  'SysWise Admin': 'SysWise පරිපාලක', 'My Work': 'මගේ වැඩ', 'Workspace': 'වැඩබිම',
+  'Director': 'අධ්‍යක්ෂ', 'Review now': 'දැන් සමාලෝචනය කරන්න',
+  'task is awaiting your approval': 'කාර්යයක් ඔබගේ අනුමැතිය බලාපොරොත්තුවෙන්',
+  'tasks are awaiting your approval': 'කාර්යයන් ඔබගේ අනුමැතිය බලාපොරොත්තුවෙන්',
+  'Collapse sidebar': 'පැති තීරුව හකුළන්න', 'Expand sidebar': 'පැති තීරුව විහිදන්න',
 }

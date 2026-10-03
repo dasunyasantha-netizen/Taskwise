@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import type { AuthUser, ViewMode, Task, Project, Personnel, TaskProgressLog } from '../types'
 import { taskApi, projectApi, workspaceApi } from '../services/apiService'
 import NotificationsMenu from './NotificationsMenu'
+import Sidebar, { type SidebarSection } from './Sidebar'
 import PersonnelTaskModal from './PersonnelTaskModal'
 import BoardView from './BoardView'
 import ProfilePage from './ProfilePage'
@@ -876,6 +877,20 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
 
   const [approvalTasks, setApprovalTasks] = useState<Task[]>([])
 
+  const sidebarSections: SidebarSection[] = [
+    { title: 'My Work', items: [
+      { label: 'My Queue',       view: 'personnel_queue',          icon: 'queue', badge: queue.length, badgeTone: 'warning' },
+      { label: 'Approval Queue', view: 'personnel_approval_queue', icon: 'approve', badge: approvalTasks.length, badgeTone: 'warning' },
+      { label: 'Board View',     view: 'project_board',            icon: 'board' },
+    ] },
+    { title: 'Workspace', items: [
+      { label: 'Letters', view: 'letters', icon: 'letter' },
+      ...(ysoEnabled ? [{ label: user.ysoRole === 'YSO' ? 'YSO Task Hub' : 'YSO Performance', view: 'yso_performance' as ViewMode, icon: 'sprout' as const }] : []),
+      ...(insuranceEnabled ? [{ label: 'Insurance', view: 'insurance_management' as ViewMode, icon: 'shield' as const }] : []),
+    ] },
+  ]
+
+  // Mobile bottom tab bar
   const navItems = [
     { label: 'Letters', view: 'letters' as ViewMode, icon: '✉' },
     ...(ysoEnabled ? [{ label: user.ysoRole === 'YSO' ? 'YSO Task Hub' : 'YSO Performance', view: 'yso_performance' as ViewMode, icon: '🌱' }] : []),
@@ -885,8 +900,6 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
     { label: 'Board View',     view: 'project_board'            as ViewMode, icon: '⊞' },
     { label: 'My Profile',     view: 'profile'                  as ViewMode, icon: '👤' },
   ]
-
-  const initials = user.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
   const pendingAccept = queue.filter(t =>
     t.assignments?.some(a => a.departmentId === user.departmentId) &&
     !t.assignments?.some(a => a.personnelId)
@@ -895,7 +908,7 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
   const COL_COUNT = 8   // total <th> columns including the expand chevron
 
   return (
-    <div className="min-h-screen bg-tw-bg flex relative overflow-hidden">
+    <div className="min-h-screen bg-tw-bg flex relative overflow-x-clip">
 
       {/* ── Watermark ───────────────────────────────────────────────────── */}
       {currentView !== 'letters' && <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
@@ -904,60 +917,19 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
       </div>}
 
       {/* ── Desktop Sidebar ──────────────────────────────────────────────── */}
-      <aside className="hidden md:flex w-60 bg-[#1f2d3d] flex-col flex-shrink-0 relative z-10">
-        <div className="px-5 py-4 border-b border-white/10">
-          {user.companyLogo ? (
-            <div className="flex items-center gap-2.5">
-              <img src={user.companyLogo} alt="Logo" className="w-8 h-8 rounded object-contain" />
-              <span className="font-bold text-white text-base truncate">{user.companyName || 'TaskWise'}</span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 bg-tw-primary rounded-lg flex items-center justify-center flex-shrink-0">
-                <span className="text-white font-bold text-sm">T</span>
-              </div>
-              <span className="font-bold text-white text-base">{user.companyName || 'TaskWise'}</span>
-            </div>
-          )}
-        </div>
-
-        <nav className="flex-1 px-3 py-3 space-y-0.5">
-          {navItems.map(item => (
-            <button key={item.view} onClick={() => { navigate(item.view); setSelectedProject(null) }}
-              className={`w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2.5
-                ${currentView === item.view
-                  ? 'bg-tw-primary text-white shadow-sm'
-                  : 'text-white/70 hover:bg-white/10 hover:text-white'}`}>
-              <span className="text-base">{item.icon}</span>{t(item.label)}
-              {item.view === 'personnel_queue' && queue.length > 0 && (
-                <span className="ml-auto bg-tw-warning text-white text-xs rounded-full px-1.5 py-0.5 font-bold">{queue.length}</span>
-              )}
-              {item.badge !== undefined && item.badge > 0 && (
-                <span className="ml-auto bg-tw-warning text-white text-xs rounded-full px-1.5 py-0.5 font-bold">{item.badge}</span>
-              )}
-            </button>
-          ))}
-        </nav>
-
-        <div className="px-3 py-3 border-t border-white/10">
-          <button onClick={() => navigate('profile' as ViewMode)}
-            className="flex items-center gap-2.5 px-2 py-2 mb-1 w-full rounded-lg hover:bg-white/10 transition-colors">
-            {user.avatarUrl ? (
-              <img src={user.avatarUrl} alt="Avatar" className="w-8 h-8 rounded-full object-cover" />
-            ) : (
-              <div className="w-8 h-8 rounded-full bg-tw-primary flex items-center justify-center text-white text-sm font-bold flex-shrink-0">{initials}</div>
-            )}
-            <div className="min-w-0 text-left">
-              <div className="text-sm font-semibold text-white truncate">{user.name}</div>
-              <div className="text-xs text-white/50">{t('Personnel')}</div>
-            </div>
-          </button>
-          <button onClick={onLogout} className="w-full text-left px-2 py-1 text-xs text-white/40 hover:text-tw-danger transition-colors rounded">
-            {t('Sign out')}
-          </button>
-          <p className="text-center text-xs text-white/25 mt-2">Created by SysWise</p>
-        </div>
-      </aside>
+      <Sidebar
+        user={user}
+        roleLabel="Personnel"
+        sections={sidebarSections}
+        activeView={currentView}
+        onSelect={v => { navigate(v); setSelectedProject(null) }}
+        onLogout={onLogout}
+        highlight={approvalTasks.length > 0 && currentView !== 'personnel_approval_queue' ? {
+          title: `${approvalTasks.length} ${t(approvalTasks.length === 1 ? 'task is awaiting your approval' : 'tasks are awaiting your approval')}`,
+          cta: t('Review now'),
+          onClick: () => navigate('personnel_approval_queue'),
+        } : undefined}
+      />
 
       {/* ── Main ────────────────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-w-0 relative z-10">
