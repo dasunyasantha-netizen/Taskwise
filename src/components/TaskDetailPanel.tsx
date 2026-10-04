@@ -5,6 +5,7 @@ import DatePicker from './DatePicker'
 import Select from './Select'
 import ProgressUpdateSheet from './ProgressUpdateSheet'
 import { Icon } from './ui/Icon'
+import { useConfirm } from './ConfirmDialog'
 
 interface Props {
   task: Task
@@ -68,6 +69,7 @@ const emptyNextTask = (): NextTaskForm => ({
 })
 
 export default function TaskDetailPanel({ task, isDirector, actorId, layers, personnel, onClose, onRefresh }: Props) {
+  const { confirm, dialog } = useConfirm()
   const [tab, setTab] = useState<'details' | 'subtasks' | 'updates' | 'history' | 'chain'>('details')
   const [comments, setComments] = useState<TaskComment[]>([])
   const [history, setHistory] = useState<AuditLog[]>([])
@@ -353,6 +355,7 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
 
   return (
     <div className="fixed inset-0 z-40 flex justify-end">
+      {dialog}
       <div className="absolute inset-0 bg-[#0b1220]/40 backdrop-blur-[2px] animate-fade-in" onClick={onClose} />
       <div className="relative w-full max-w-xl bg-tw-surface border-l border-tw-border shadow-panel flex flex-col h-full overflow-hidden animate-slide-in sm:m-3 sm:h-[calc(100%-1.5rem)] sm:rounded-3xl sm:border">
 
@@ -443,7 +446,7 @@ export default function TaskDetailPanel({ task, isDirector, actorId, layers, per
           {/* Action buttons */}
           <div className="flex flex-wrap gap-2 mt-3">
             {canSubmit    && <button disabled={actionLoading} onClick={() => doAction(() => taskApi.submit(task.id))} className="btn-primary btn-sm"><Icon name="send" className="w-3.5 h-3.5" /> Submit for Approval</button>}
-            {canApprove   && <button disabled={actionLoading} onClick={() => { if (confirm(`Approve "${task.title}"?\n\nThis marks the task as approved.`)) doAction(() => taskApi.approve(task.id)) }} className="btn-success btn-sm"><Icon name="check" className="w-3.5 h-3.5" /> Approve</button>}
+            {canApprove   && <button disabled={actionLoading} onClick={async () => { if (await confirm({ title: 'Approve “{title}”?', message: 'This marks the task as approved.', confirmLabel: 'Approve', tone: 'success', vars: { title: task.title } })) doAction(() => taskApi.approve(task.id)) }} className="btn-success btn-sm"><Icon name="check" className="w-3.5 h-3.5" /> Approve</button>}
             {canHandOver  && <button disabled={actionLoading} onClick={openAssignNext} className="btn-primary btn-sm"><Icon name="chain" className="w-3.5 h-3.5" /> Approve &amp; Assign Next</button>}
             {canReject    && <button disabled={actionLoading} onClick={() => setShowReasonModal('reject')} className="btn-outline-danger btn-sm"><Icon name="sendBack" className="w-3.5 h-3.5" /> Send Back</button>}
             {canReopen    && <button disabled={actionLoading} onClick={() => doAction(() => taskApi.reopen(task.id))} className="btn-secondary btn-sm"><Icon name="refresh" className="w-3.5 h-3.5" /> Reopen</button>}

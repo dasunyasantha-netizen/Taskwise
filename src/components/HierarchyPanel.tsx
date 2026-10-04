@@ -9,8 +9,10 @@ import Select from './Select'
 import FixedRoleManagement from './FixedRoleManagement'
 import { Icon } from './ui/Icon'
 import { PageHeader, LoadingBlock } from './ui/Primitives'
+import { useConfirm } from './ConfirmDialog'
 
 export default function HierarchyPanel({ user }: { user: AuthUser }) {
+  const { confirm, dialog } = useConfirm()
   const [layers, setLayers] = useState<Layer[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'structure' | 'personnel'>('structure')
@@ -182,7 +184,11 @@ export default function HierarchyPanel({ user }: { user: AuthUser }) {
     const affected = allPersonnel.filter(p => p.departmentId === editingDept.id).length
     if (takesCategory && deptEditForm.officeCategory !== (editingDept.officeCategory || '') && affected > 0) {
       const to = officeCategoryLabel(deptEditForm.officeCategory)
-      if (!confirm(`Move ${editingDept.name} and its ${affected} ${affected === 1 ? 'member' : 'members'} to ${to}?`)) return
+      if (!(await confirm({
+        title: 'Move {name} to {to}?',
+        message: affected === 1 ? 'Its {count} member moves with it.' : 'Its {count} members move with it.',
+        confirmLabel: 'Move', vars: { name: editingDept.name, to: to ?? deptEditForm.officeCategory, count: affected },
+      }))) return
     }
     setSaving(true)
     try {
@@ -196,7 +202,7 @@ export default function HierarchyPanel({ user }: { user: AuthUser }) {
   }
 
   const deleteDept = async (id: string) => {
-    if (!confirm('Delete this department? All personnel will be unassigned.')) return
+    if (!(await confirm({ title: 'Delete this department?', message: 'All personnel will be unassigned.', confirmLabel: 'Delete', tone: 'danger' }))) return
     await workspaceApi.deleteDepartment(id); await load()
   }
 
@@ -257,7 +263,7 @@ export default function HierarchyPanel({ user }: { user: AuthUser }) {
   }
 
   const deletePersonnel = async (id: string) => {
-    if (!confirm('Remove this personnel member?')) return
+    if (!(await confirm({ title: 'Remove this personnel member?', confirmLabel: 'Remove', tone: 'danger' }))) return
     await workspaceApi.deletePersonnel(id); await load()
   }
 
@@ -333,6 +339,7 @@ export default function HierarchyPanel({ user }: { user: AuthUser }) {
 
   return (
     <div className="page">
+      {dialog}
       <PageHeader icon="hierarchy" tone="indigo" title="Team Hierarchy"
         subtitle={`Manage ${word.toLowerCase()}s, departments and ${user.roleBasedIdentity ? 'roles' : 'personnel'}`}
         actions={<>

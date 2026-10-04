@@ -4,6 +4,7 @@ import {
   type CountryCode,
 } from 'libphonenumber-js/max'
 import { authApi } from '../services/apiService'
+import Select from './Select'
 
 type Props = {
   currentPhone?: string
@@ -67,11 +68,9 @@ export default function MigrationContactModal({ currentPhone, onSaved }: Props) 
           Please enter your mobile number for our upcoming system migration. This will help us keep your account connected. We’ll let you know when the update is ready.
         </p>
         <form onSubmit={submit} className="mt-6 space-y-4">
-          <label className="block text-sm font-semibold text-slate-800" htmlFor="migration-country">Country</label>
-          <select id="migration-country" value={country} onChange={event => setCountry(event.target.value as CountryCode)}
-            className="input">
-            {countries.map(item => <option key={item.code} value={item.code}>{item.label} (+{item.callingCode})</option>)}
-          </select>
+          <span className="block text-sm font-semibold text-slate-800" id="migration-country-label">Country</span>
+          <Select ariaLabel="Country" value={country} onChange={value => setCountry(value as CountryCode)}
+            options={countries.map(item => ({ value: item.code, label: `${item.label} (+${item.callingCode})` }))} />
           <label className="block text-sm font-semibold text-slate-800" htmlFor="migration-phone">Mobile number</label>
           <div className="flex overflow-hidden rounded-xl border border-tw-border bg-tw-surface focus-within:border-tw-primary/60 focus-within:ring-4 focus-within:ring-tw-primary/15">
             <span className="flex items-center border-r border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-600">+{selected?.callingCode}</span>

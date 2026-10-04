@@ -6,6 +6,7 @@ import Select from './Select'
 import DatePicker from './DatePicker'
 import { Icon } from './ui/Icon'
 import { PageHeader, EmptyState, LoadingBlock } from './ui/Primitives'
+import { useConfirm } from './ConfirmDialog'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1418,6 +1419,7 @@ function CreateProjectModal({ group, onClose, onCreated }: { group: TaskGroup; o
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function GroupWiseTasksPage() {
+  const { confirm, dialog } = useConfirm()
   const [viewMode, setViewMode] = useState<'group' | 'project'>('group')
   const [groups, setGroups] = useState<TaskGroup[]>([])
   const [groupProjects, setGroupProjects] = useState<unknown[]>([])
@@ -1434,7 +1436,7 @@ export default function GroupWiseTasksPage() {
   const [editTarget, setEditTarget] = useState<TaskGroup | null>(null)
 
   const handleDeleteGroup = async (group: TaskGroup) => {
-    if (!confirm(`Delete "${group.name}"? This cannot be undone.`)) return
+    if (!(await confirm({ title: 'Delete “{name}”?', message: 'This cannot be undone.', confirmLabel: 'Delete', tone: 'danger', vars: { name: group.name } }))) return
     try {
       await taskGroupApi.delete(group.id)
       load()
@@ -1472,7 +1474,7 @@ export default function GroupWiseTasksPage() {
   }, [viewMode, loadProjectView])
 
   const handleCloseGroupTask = async (taskId: string) => {
-    if (!confirm('Mark this group task as complete?')) return
+    if (!(await confirm({ title: 'Mark this group task as complete?', confirmLabel: 'Mark complete', tone: 'success' }))) return
     try {
       await taskGroupApi.closeGroupTask(taskId)
       load()
@@ -1487,6 +1489,7 @@ export default function GroupWiseTasksPage() {
 
   return (
     <div className="page">
+      {dialog}
       <PageHeader icon="group" tone="teal" title="Group-wise Tasks"
         subtitle="Create cross-department groups, assign tasks to all members, and monitor progress."
         actions={<>

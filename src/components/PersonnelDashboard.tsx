@@ -20,6 +20,7 @@ import InsuranceManagementPage from './InsuranceManagementPage'
 import YsoPerformancePage from './YsoPerformancePage'
 import LetterManagement from './LetterManagement'
 import { launcherHomeUrl, type LaunchSource } from '../services/launchSource'
+import { useConfirm } from './ConfirmDialog'
 
 interface Props {
   user: AuthUser
@@ -378,6 +379,7 @@ function ExpandedRow({ task, colSpan, actorId, departmentId, onOpen, onSubtaskCl
 
 // ── Personnel Approval Row ────────────────────────────────────────────────────
 function PersonnelApprovalRow({ task, onRefresh, onOpen }: { task: Task; onRefresh: () => void; onOpen: () => void }) {
+  const { confirm, dialog } = useConfirm()
   const [loading, setLoading]       = useState(false)
   const [error, setError]           = useState('')
   const [showReject, setShowReject] = useState(false)
@@ -394,6 +396,7 @@ function PersonnelApprovalRow({ task, onRefresh, onOpen }: { task: Task; onRefre
 
   return (
     <>
+      {dialog}
       <tr className="hover:bg-tw-hover transition-colors">
         <td className="pl-3 pr-0 py-3.5">
           <div className={`w-1.5 h-9 rounded-full ${priorityBar[task.priority]}`} />
@@ -412,7 +415,7 @@ function PersonnelApprovalRow({ task, onRefresh, onOpen }: { task: Task; onRefre
         </td>
         <td className="px-4 py-3.5">
           <div className="flex items-center gap-2">
-            <button disabled={loading} onClick={() => { if (confirm(`Approve "${task.title}"?\n\nThis marks the task as approved.`)) doAction(() => taskApi.approve(task.id)) }}
+            <button disabled={loading} onClick={async () => { if (await confirm({ title: 'Approve “{title}”?', message: 'This marks the task as approved.', confirmLabel: 'Approve', tone: 'success', vars: { title: task.title } })) doAction(() => taskApi.approve(task.id)) }}
               className="btn-success btn-sm">
               <Icon name="check" className="w-3.5 h-3.5" /> Approve
             </button>
@@ -659,6 +662,7 @@ function MobileExpandedCard({ task, actorId, departmentId, onOpen, onSubtaskClic
 
 // ── Mobile approval card ──────────────────────────────────────────────────────
 function MobileApprovalCard({ task, onRefresh, onOpen }: { task: Task; onRefresh: () => void; onOpen: () => void }) {
+  const { confirm, dialog } = useConfirm()
   const [expanded, setExpanded]     = useState(false)
   const [loading, setLoading]       = useState(false)
   const [error, setError]           = useState('')
@@ -677,6 +681,7 @@ function MobileApprovalCard({ task, onRefresh, onOpen }: { task: Task; onRefresh
 
   return (
     <div className="card overflow-hidden">
+      {dialog}
       {/* Header row — always visible, tap to expand */}
       <div className="flex items-center gap-3 px-4 py-3 cursor-pointer select-none" onClick={() => setExpanded(e => !e)}>
         <div className={`w-1 h-10 rounded-full flex-shrink-0 ${priorityBar[task.priority] || 'bg-gray-300'}`} />
@@ -705,7 +710,7 @@ function MobileApprovalCard({ task, onRefresh, onOpen }: { task: Task; onRefresh
           </div>
           {error && <div className="text-xs text-tw-danger">{error}</div>}
           <div className="grid grid-cols-3 gap-2 pt-1">
-            <button disabled={loading} onClick={() => { if (confirm(`Approve "${task.title}"?\n\nThis marks the task as approved.`)) doAction(() => taskApi.approve(task.id)) }}
+            <button disabled={loading} onClick={async () => { if (await confirm({ title: 'Approve “{title}”?', message: 'This marks the task as approved.', confirmLabel: 'Approve', tone: 'success', vars: { title: task.title } })) doAction(() => taskApi.approve(task.id)) }}
               className="btn-success btn-sm py-2.5">
               <Icon name="check" className="w-3.5 h-3.5" /> Approve
             </button>

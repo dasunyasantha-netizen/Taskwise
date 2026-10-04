@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { AuthUser, Department } from '../types'
 import { workspaceApi, type FixedRole } from '../services/apiService'
 import RoleAssignments from './RoleAssignments'
+import Select from './Select'
 import { Icon } from './ui/Icon'
 
 export default function FixedRoleManagement({ user, createRequest = 0, onChanged }: { user: AuthUser; createRequest?: number; onChanged?: () => void }) {
@@ -21,7 +22,11 @@ export default function FixedRoleManagement({ user, createRequest = 0, onChanged
   const level = department?.layer?.number
   const managers = roles.filter(r => r.personnelId && r.id !== editing && r.layerNumber === (level || 0) - 1)
   const save = async (event: React.FormEvent) => {
-    event.preventDefault(); setBusy(true); setError('')
+    event.preventDefault()
+    // The custom dropdowns have no native `required`, so check them here.
+    if (!form.departmentId) { setError('Select a department.'); return }
+    if (!!level && level > 1 && !form.supervisorId) { setError('Select a reporting role.'); return }
+    setBusy(true); setError('')
     try {
       const original = roles.find(r => r.id === editing)
       const body = original?.departmentId === form.departmentId && (original.supervisorId || '') === form.supervisorId
@@ -41,12 +46,12 @@ export default function FixedRoleManagement({ user, createRequest = 0, onChanged
     {editing !== null && writable && <form onSubmit={save} className="card p-5 space-y-4">
       <h3 className="font-semibold">{editing === 'new' ? 'Create role' : 'Edit role'}</h3>
       <label className="block text-sm">Role name<input className="input mt-1" required maxLength={150} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></label>
-      <label htmlFor="role-department" className="block text-sm">Department</label><select id="role-department" className="input mt-1" required value={form.departmentId} onChange={e => setForm(f => ({ ...f, departmentId: e.target.value, supervisorId: '' }))}>
-        <option value="">Select department</option>{departments.map(d => <option key={d.id} value={d.id}>{d.layer?.name} — {d.name}</option>)}
-      </select>
-      {!!level && level > 1 && <label className="block text-sm">Reporting role<select className="input mt-1" required value={form.supervisorId} onChange={e => setForm(f => ({ ...f, supervisorId: e.target.value }))}>
-        <option value="">Select reporting role</option>{managers.map(r => <option key={r.id} value={r.personnelId!}>{r.name} — {r.departmentName}</option>)}
-      </select></label>}
+      <div className="block text-sm">Department<Select className="mt-1" ariaLabel="Department" placeholder="Select department" value={form.departmentId}
+        options={departments.map(d => ({ value: d.id, label: `${d.layer?.name ?? ''} — ${d.name}` }))}
+        onChange={value => setForm(f => ({ ...f, departmentId: value, supervisorId: '' }))} /></div>
+      {!!level && level > 1 && <div className="block text-sm">Reporting role<Select className="mt-1" ariaLabel="Reporting role" placeholder="Select reporting role" value={form.supervisorId}
+        options={managers.map(r => ({ value: r.personnelId!, label: `${r.name} — ${r.departmentName}` }))}
+        onChange={value => setForm(f => ({ ...f, supervisorId: value }))} /></div>}
       <label className="flex items-start gap-3 rounded-lg border border-tw-border p-3 text-sm">
         <input type="checkbox" className="mt-1" checked={form.isLetterAssigner} onChange={e => setForm(f => ({ ...f, isLetterAssigner: e.target.checked }))} />
         <span><span className="block font-medium">Manage company letters</span><span className="block text-tw-text-secondary mt-1">Log and assign letters, record replies in existing chains and reopen threads when new correspondence arrives.</span></span>

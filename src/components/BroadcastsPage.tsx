@@ -6,6 +6,7 @@ import Select from './Select'
 import DatePicker from './DatePicker'
 import { PageHeader, EmptyState, LoadingBlock } from './ui/Primitives'
 import { Icon } from './ui/Icon'
+import { useConfirm } from './ConfirmDialog'
 
 const AUDIENCE_LABELS: Record<string, string> = {
   ALL: 'Everyone',
@@ -13,6 +14,7 @@ const AUDIENCE_LABELS: Record<string, string> = {
 }
 
 export default function BroadcastsPage({ user }: { user: AuthUser }) {
+  const { confirm, dialog } = useConfirm()
   const [notices, setNotices]     = useState<Notice[]>([])
   const [layers, setLayers]       = useState<Layer[]>([])
   const [loading, setLoading]     = useState(true)
@@ -57,7 +59,7 @@ export default function BroadcastsPage({ user }: { user: AuthUser }) {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this notice? It will disappear for all users.')) return
+    if (!(await confirm({ title: 'Delete this notice?', message: 'It will disappear for all users.', confirmLabel: 'Delete', tone: 'danger' }))) return
     try { await noticeApi.delete(id); await load() } catch { /* silent */ }
   }
 
@@ -75,6 +77,7 @@ export default function BroadcastsPage({ user }: { user: AuthUser }) {
 
   return (
     <div className="page max-w-4xl">
+      {dialog}
       <PageHeader icon="broadcast" tone="amber" title="Broadcasts" subtitle="Send banner notices to all or selected staff levels."
         actions={<button onClick={() => setShowForm(s => !s)}
           className={showForm ? 'btn-secondary' : 'btn-primary'}>
