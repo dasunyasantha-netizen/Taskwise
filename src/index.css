@@ -264,23 +264,26 @@ html.dark .tw-watermark { opacity: 0.07; mix-blend-mode: screen; filter: invert(
   .yso-score-grid { grid-template-columns: minmax(0, 1fr); gap: 4px; padding-bottom: 8px; }
   .yso-score-total {
     grid-column: 1 / -1;
-    display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 6px 12px;
-    padding: 12px 14px;
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 3px 16px;
+    padding: 14px 20px 10px;
     border: 0;
     background: linear-gradient(135deg, rgb(var(--tw-success) / 0.06), rgb(var(--tw-surface)) 85%);
   }
   .yso-score-heading {
-    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
-    grid-column: 1 / -1; gap: 6px 10px; color: #0f766e; font-size: 12px; font-weight: 600; line-height: 18px;
+    display: contents; color: #0f766e; font-size: 12px; font-weight: 600; line-height: 18px;
   }
+  .yso-score-heading > span:first-child { grid-column: 1; grid-row: 1; }
   .yso-score-separator { display: none; }
   .yso-score-month {
-    padding: 3px 9px; border: 1px solid rgb(var(--tw-border)); border-radius: 999px;
-    background: rgb(var(--tw-surface)); color: rgb(var(--tw-text-secondary));
+    grid-column: 1; grid-row: 2; padding: 0; border: 0;
+    background: transparent; color: rgb(var(--tw-text-secondary));
     font-size: 11px; font-weight: 500; line-height: 16px;
   }
-  .yso-score-value { grid-column: 2; grid-row: 2; margin: 0; font-size: 30px; line-height: 1.1; letter-spacing: -0.04em; }
-  .yso-score-description { grid-column: 1; grid-row: 2; margin: 0; font-size: 11px; line-height: 16px; }
+  .yso-score-value { grid-column: 2; grid-row: 1 / span 2; margin: 0; font-size: 34px; line-height: 1.1; letter-spacing: -0.04em; }
+  .yso-score-description {
+    grid-column: 1 / -1; grid-row: 3; margin: 5px 0 0; padding-top: 8px;
+    border-top: 1px solid rgb(var(--tw-border) / 0.7); font-size: 11px; line-height: 16px;
+  }
   .yso-score-metric {
     display: flex; align-items: center; justify-content: space-between; gap: 14px;
     min-height: 36px; margin: 0 10px; padding: 5px 10px; border: 0; border-radius: 10px;
