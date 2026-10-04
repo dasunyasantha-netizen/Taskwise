@@ -12,8 +12,13 @@ import {
   assessYso,
   decideYsoPenalty,
 } from '../controllers/ysoController'
+import { getYsoCalendar, createYsoCalendarEntry, updateYsoCalendarEntry, deleteYsoCalendarEntry } from '../controllers/ysoCalendarController'
 const router = Router()
 router.use(authenticateToken, requireFeature(FEATURES.FOUR_LEVEL_HIERARCHY))
+router.get('/calendar', getYsoCalendar)
+router.post('/calendar/entries', createYsoCalendarEntry)
+router.put('/calendar/entries/:id', updateYsoCalendarEntry)
+router.delete('/calendar/entries/:id', deleteYsoCalendarEntry)
 router.get('/dashboard', getYsoDashboard)
 router.post('/people/:id/activate', activateYso)
 router.post('/submissions', submitYso)

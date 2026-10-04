@@ -25,7 +25,7 @@ import {
 } from '../helpers/ysoDrive'
 
 type DB = Prisma.TransactionClient
-class HttpError extends Error {
+export class HttpError extends Error {
   constructor(
     public status: number,
     message: string
@@ -37,7 +37,7 @@ const fail = (status: number, message: string): never => {
   throw new HttpError(status, message)
 }
 const department = { include: { layer: true } } as const
-async function scope(db: DB, actor: AuthPayload) {
+export async function ysoScope(db: DB, actor: AuthPayload) {
   const where = {
     workspaceId: actor.workspaceId,
     department: {
@@ -100,7 +100,7 @@ async function subject(
   id: string,
   role: 'AD' | 'YSO'
 ) {
-  const s = await scope(db, actor)
+  const s = await ysoScope(db, actor)
   if (s.role !== role)
     return fail(
       403,
@@ -263,7 +263,7 @@ function period(value: unknown): string {
 
 export const getYsoDashboard = handler(async (req, res) => {
   const actor = req.user!,
-    s = await scope(prisma, actor),
+    s = await ysoScope(prisma, actor),
     ids = s.people.map((p) => p.id)
   const [entries, meetings, decisions, assessments, ledger, events, ads] =
     await Promise.all([
@@ -709,7 +709,7 @@ export const reviewYso = handler(async (req, res) => {
 })
 
 export const downloadYsoCertificate = handler(async (req, res) => {
-  const s = await scope(prisma, req.user!)
+  const s = await ysoScope(prisma, req.user!)
   const file = await prisma.ysoAttachment.findFirst({
     where: {
       id: req.params.id,
@@ -734,7 +734,7 @@ export const downloadYsoCertificate = handler(async (req, res) => {
 export const createYsoMeeting = handler(async (req, res) => {
   const actor = req.user!
   const result = await mutation(actor, async (db) => {
-    const s = await scope(db, actor)
+    const s = await ysoScope(db, actor)
     if (s.role !== 'AD')
       return fail(403, 'Only Provincial ADs schedule meetings')
     const date = req.body.date
@@ -788,7 +788,7 @@ export const createYsoMeeting = handler(async (req, res) => {
 export const cancelYsoMeeting = handler(async (req, res) => {
   const actor = req.user!
   await mutation(actor, async (db) => {
-    const s = await scope(db, actor)
+    const s = await ysoScope(db, actor)
     if (s.role !== 'AD') return fail(403, 'AD access required')
     const meeting = await db.ysoMeeting.findFirst({
       where: {

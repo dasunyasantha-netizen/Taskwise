@@ -76,6 +76,7 @@ model ImpersonationSession {
 model Workspace {
   roleBasedIdentity Boolean @default(false)
   fixedRoles WorkspaceRole[]
+  ysoCalendarEntries YsoCalendarEntry[]
   letterThreads LetterThread[]
   id          String   @id @default(uuid())
   name        String
@@ -270,6 +271,7 @@ model Personnel {
   progressLogs          TaskProgressLog[]                  @relation("ProgressLogAuthor")
   cancellationPenalties TaskCancellationPenaltyRecipient[]
   ysoProfile            YsoProfile?
+  ysoCalendarEntries    YsoCalendarEntry[]
 
   @@unique([companyId, normalizedPhone])
   @@index([workspaceId])
@@ -328,6 +330,23 @@ model YsoProfile {
   startDate   String
   createdAt   DateTime @default(now())
   @@index([workspaceId])
+}
+
+// Calendar notes belong to the permanent YSO role, independently of scoring.
+model YsoCalendarEntry {
+  id          String @id @default(uuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  personnelId String
+  personnel   Personnel @relation(fields: [personnelId], references: [id], onDelete: Restrict)
+  title       String
+  date        String
+  startTime   String?
+  endTime     String?
+  notes       String @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  @@index([workspaceId, personnelId, date])
 }
 
 model YsoMeeting {

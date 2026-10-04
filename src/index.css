@@ -261,16 +261,17 @@ html.dark .tw-watermark { opacity: 0.07; mix-blend-mode: screen; filter: invert(
 /* The score summary keeps its existing tablet/desktop layout. */
 @media (max-width: 639px) {
   .yso-score-summary { border-radius: 22px; }
-  .yso-score-grid { grid-template-columns: minmax(0, 1fr); gap: 6px; padding-bottom: 14px; }
+  .yso-score-grid { grid-template-columns: minmax(0, 1fr); gap: 4px; padding-bottom: 8px; }
   .yso-score-total {
     grid-column: 1 / -1;
-    padding: 18px 18px 16px;
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 6px 12px;
+    padding: 12px 14px;
     border: 0;
     background: linear-gradient(135deg, rgb(var(--tw-success) / 0.06), rgb(var(--tw-surface)) 85%);
   }
   .yso-score-heading {
     display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
-    gap: 8px 12px; color: #0f766e; font-size: 13px; font-weight: 600; line-height: 20px;
+    grid-column: 1 / -1; gap: 6px 10px; color: #0f766e; font-size: 12px; font-weight: 600; line-height: 18px;
   }
   .yso-score-separator { display: none; }
   .yso-score-month {
@@ -278,24 +279,42 @@ html.dark .tw-watermark { opacity: 0.07; mix-blend-mode: screen; filter: invert(
     background: rgb(var(--tw-surface)); color: rgb(var(--tw-text-secondary));
     font-size: 11px; font-weight: 500; line-height: 16px;
   }
-  .yso-score-value { margin-top: 10px; font-size: 44px; line-height: 1.1; letter-spacing: -0.04em; }
-  .yso-score-description { margin-top: 6px; font-size: 12px; line-height: 18px; }
+  .yso-score-value { grid-column: 2; grid-row: 2; margin: 0; font-size: 30px; line-height: 1.1; letter-spacing: -0.04em; }
+  .yso-score-description { grid-column: 1; grid-row: 2; margin: 0; font-size: 11px; line-height: 16px; }
   .yso-score-metric {
     display: flex; align-items: center; justify-content: space-between; gap: 14px;
-    min-height: 50px; margin: 0 14px; padding: 9px 12px; border: 0; border-radius: 12px;
+    min-height: 36px; margin: 0 10px; padding: 5px 10px; border: 0; border-radius: 10px;
     background: rgb(var(--tw-surface-2));
   }
-  .yso-score-metric-label { min-width: 0; gap: 10px; font-size: 12px; font-weight: 500; line-height: 18px; }
+  .yso-score-metric-label { min-width: 0; gap: 8px; font-size: 11px; font-weight: 500; line-height: 16px; }
   .yso-score-icon {
     display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
-    width: 30px; height: 30px; border-radius: 9px;
+    width: 24px; height: 24px; border-radius: 7px;
     background: rgb(var(--tw-primary-light)); color: rgb(var(--tw-primary-text));
   }
-  .yso-score-icon svg { display: block; width: 16px; height: 16px; }
+  .yso-score-icon svg { display: block; width: 13px; height: 13px; }
   .yso-score-metric:nth-child(3) .yso-score-icon { background: rgb(var(--tw-purple-light)); color: rgb(var(--tw-purple)); }
   .yso-score-metric:nth-child(4) .yso-score-icon { background: rgb(var(--tw-warning-light)); color: rgb(var(--tw-warning)); }
-  .yso-score-metric-value { flex-shrink: 0; margin: 0; font-size: 19px; line-height: 26px; }
-  .yso-score-status { padding: 12px 18px; background: rgb(var(--tw-surface)); }
+  .yso-score-metric-value { flex-shrink: 0; margin: 0; font-size: 17px; line-height: 24px; }
+  .yso-score-status { padding: 8px 14px; background: rgb(var(--tw-surface)); }
   .yso-score-status .badge { max-width: 100%; white-space: normal; line-height: 18px; }
   html.dark .yso-score-heading { color: #7dd3c8; }
 }
+
+.yso-calendar-day {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 5px; min-height: 44px; padding: 5px 0; border-radius: 12px;
+  color: rgb(var(--tw-text)); font-size: 12px; font-weight: 500;
+  border: 1px solid transparent; transition: background-color 150ms;
+}
+.yso-calendar-day:hover { background: rgb(var(--tw-hover)); }
+.yso-calendar-day.is-outside { color: rgb(var(--tw-text-muted)); }
+.yso-calendar-day.is-today { border-color: rgb(var(--tw-success) / 0.45); color: rgb(var(--tw-success)); font-weight: 700; }
+.yso-calendar-day.is-selected { background: rgb(var(--tw-primary-light)); color: rgb(var(--tw-primary-text)); }
+.yso-calendar-dot { display: inline-block; flex-shrink: 0; width: 4px; height: 4px; border-radius: 50%; background: var(--calendar-color); }
+.yso-calendar-task { --calendar-color: rgb(var(--tw-primary-text)); }
+.yso-calendar-letter { --calendar-color: rgb(var(--tw-warning)); }
+.yso-calendar-meeting { --calendar-color: rgb(var(--tw-purple)); }
+.yso-calendar-reporting { --calendar-color: rgb(var(--tw-success)); }
+.yso-calendar-personal { --calendar-color: rgb(var(--tw-text-secondary)); }
+.yso-calendar-event { border: 1px solid rgb(var(--tw-border)); border-left: 3px solid var(--calendar-color); border-radius: 10px; padding: 8px 10px; background: rgb(var(--tw-surface-2)); }

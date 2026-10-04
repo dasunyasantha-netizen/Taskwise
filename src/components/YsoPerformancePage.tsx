@@ -10,6 +10,7 @@ import {
 } from '../services/ysoService'
 import type { AuthUser } from '../types'
 import DatePicker from './DatePicker'
+import YsoCalendar from './YsoCalendar'
 import Select from './Select'
 import { useLanguage, displayDate, languageOf, monthYear } from '../i18n/Language'
 import { useRefreshListener } from '../hooks/useRefresh'
@@ -1634,6 +1635,7 @@ export default function YsoPerformancePage({ user, onUserUpdate }: { user: AuthU
       )}
 
       {/* ── Score summary ────────────────────────────────────────────────── */}
+      {isYso && <YsoCalendar period={period} onMonthChange={setPeriod} Dialog={Modal} refreshKey={dashboard} />}
       <section className="card overflow-hidden yso-score-summary" aria-label={tr("Official monthly score")}>
         <div className="grid grid-cols-3 md:grid-cols-[1.4fr_1fr_1fr_1fr] yso-score-grid">
           <div className="col-span-3 md:col-span-1 p-5 bg-gradient-to-br from-teal-50 to-tw-surface border-b md:border-b-0 md:border-r border-tw-border yso-score-total">

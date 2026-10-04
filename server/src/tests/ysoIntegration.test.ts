@@ -200,6 +200,56 @@ async function main() {
         })
       }
     )
+    await check('calendar persistence, ownership, visibility, dates and audit', async () => {
+      const calendar = `/calendar?period=${today.slice(0, 7)}`
+      await call('doctor', calendar, undefined, 403)
+      await call('ad', calendar, undefined, 403)
+      await call('director', calendar, undefined, 403)
+      await call('yso', '/calendar?period=invalid', undefined, 400)
+      const data = { title: 'Private calendar visit', date: today, startTime: '09:30', endTime: '10:15', notes: 'Saved notes' }
+      await call('yso', '/calendar/entries', { ...data, date: '2026-02-30' }, 400)
+      await call('yso', '/calendar/entries', { ...data, endTime: '08:00' }, 400)
+      await call('yso', '/calendar/entries', { ...data, startTime: '24:00' }, 400)
+      await call('yso', '/calendar/entries', { ...data, startTime: null }, 400)
+      const saved = await call('yso', '/calendar/entries', { ...data, personnelId: other.id, workspaceId: 'wrong-workspace' }, 201)
+      assert.equal(saved.personnelId, yso.id)
+      assert.equal(saved.workspaceId, workspace.id)
+      const project = await db.project.create({ data: { workspaceId: workspace.id, directorId: director.id, name: 'Calendar project' } })
+      const task = await db.task.create({ data: { workspaceId: workspace.id, projectId: project.id, title: 'Visible deadline',
+        deadline: new Date(today + 'T23:00:00+05:30'), assignments: { create: { personnelId: yso.id } } } })
+      await db.task.create({ data: { workspaceId: workspace.id, projectId: project.id, title: 'Hidden task', deadline: new Date(today + 'T12:00:00+05:30'), assignments: { create: { personnelId: other.id } } } })
+      await db.task.create({ data: { workspaceId: workspace.id, projectId: project.id, title: 'Cancelled task', status: 'CANCELLED', deadline: new Date(today + 'T12:00:00+05:30'), assignments: { create: { personnelId: yso.id } } } })
+      const meeting = await db.ysoMeeting.create({ data: { workspaceId: workspace.id, adId: ad.id, title: 'Invited meeting', date: today, location: 'District hall', invitees: [yso.id] } })
+      await db.ysoMeeting.create({ data: { workspaceId: workspace.id, adId: ad2.id, title: 'Hidden meeting', date: today, location: 'Other hall', invitees: [other.id] } })
+      const letter = await db.letterThread.create({ data: { workspaceId: workspace.id, reference: 'CAL-' + runId, subject: 'Visible letter', sender: 'Test', channel: 'PHYSICAL',
+        createdBy: 'director:' + director.id, createdByName: 'Director', assignedTo: 'personnel:' + yso.id, assignedToName: yso.name, firstReceivedDate: today, latestReceivedDate: today } })
+      await db.letterEvent.create({ data: { workspaceId: workspace.id, threadId: letter.id, requestId: 'calendar-' + runId, requestHash: 'test', sequence: 1, kind: 'INCOMING',
+        actorKey: 'director:' + director.id, actorName: 'Director', notes: '', receivedDate: today, correspondenceDate: addDays(today, -1) } })
+      const hiddenLetter = await db.letterThread.create({ data: { workspaceId: workspace.id, reference: 'HIDDEN-' + runId, subject: 'Hidden letter', sender: 'Test', channel: 'PHYSICAL',
+        createdBy: 'personnel:' + other.id, createdByName: 'Other', assignedTo: 'personnel:' + other.id, assignedToName: 'Other', firstReceivedDate: today, latestReceivedDate: today } })
+      await db.letterEvent.create({ data: { workspaceId: workspace.id, threadId: hiddenLetter.id, requestId: 'hidden-calendar-' + runId, requestHash: 'test', sequence: 1, kind: 'INCOMING', actorKey: 'personnel:' + other.id, actorName: 'Other', notes: '', receivedDate: today } })
+      const view = await call('yso', calendar)
+      assert.ok(view.events.some((e: any) => e.sourceId === saved.id && e.startTime === '09:30'))
+      assert.ok(view.events.some((e: any) => e.sourceId === task.id && e.date === today && e.project === project.name))
+      assert.ok(view.events.some((e: any) => e.id === 'meeting:' + meeting.id))
+      assert.ok(view.events.some((e: any) => e.sourceId === letter.id))
+      assert.ok(view.events.some((e: any) => e.sourceId === letter.id && e.date === addDays(today, -1) && e.detail === 'Letter dated'))
+      assert.equal(view.events.some((e: any) => /Hidden|Cancelled/.test(e.title)), false)
+      assert.equal(new Set(view.events.map((e: any) => e.id)).size, view.events.length)
+      const otherToken = token(other.id)
+      const edit = async (who: string, method: string, body?: unknown, expected = 200) => {
+        const response = await fetch(base + '/calendar/entries/' + saved.id, { method, headers: { Authorization: 'Bearer ' + who, 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) })
+        const result = await response.json(); assert.equal(response.status, expected, JSON.stringify(result)); return result
+      }
+      await edit(otherToken, 'PUT', data, 404)
+      await edit(otherToken, 'DELETE', undefined, 404)
+      assert.equal((await call('yso', calendar)).events.some((e: any) => e.sourceId === saved.id), true)
+      await edit(tokens.yso, 'PUT', { ...data, title: 'Updated visit', startTime: null, endTime: null })
+      assert.ok((await call('yso', calendar)).events.some((e: any) => e.title === 'Updated visit' && !e.startTime))
+      await edit(tokens.yso, 'DELETE')
+      assert.equal((await call('yso', calendar)).events.some((e: any) => e.sourceId === saved.id), false)
+      assert.equal(await db.ysoAuditEvent.count({ where: { workspaceId: workspace.id, personnelId: yso.id, event: { startsWith: 'CALENDAR_ENTRY_' } } }), 3)
+    })
     await check(
       'YSOs require a Provincial AD and cannot choose their own approver',
       async () => {
