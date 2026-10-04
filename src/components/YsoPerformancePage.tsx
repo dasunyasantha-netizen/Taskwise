@@ -1572,7 +1572,7 @@ export default function YsoPerformancePage({ user, onUserUpdate }: { user: AuthU
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2 w-full sm:w-auto">
+        {!isYso && <div className="flex items-center gap-2 w-full sm:w-auto">
           <DatePicker
             ariaLabel={tr("Reporting month")}
             mode="month"
@@ -1586,7 +1586,7 @@ export default function YsoPerformancePage({ user, onUserUpdate }: { user: AuthU
               /^20\d{2}-(0[1-9]|1[0-2])$/.test(value) && setPeriod(value)
             }
           />
-        </div>
+        </div>}
       </header>
       {error && (
         <div role="alert" className="alert-error">

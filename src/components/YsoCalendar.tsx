@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { useLanguage, monthYear, languageOf } from '../i18n/Language'
+import { useLanguage } from '../i18n/Language'
 import { Icon, type IconName } from './ui/Icon'
 import DatePicker from './DatePicker'
 import { ysoCalendarApi, type CalendarEvent, type CalendarEntry } from '../services/ysoCalendarService'
@@ -7,10 +7,6 @@ import { ysoCalendarApi, type CalendarEvent, type CalendarEntry } from '../servi
 type DialogProps = { title: string; children: React.ReactNode; onClose: () => void }
 const sourceLabels = { task: 'Task', letter: 'Letter', meeting: 'Meeting', reporting: 'YSO reporting', personal: 'Personal entry' }
 const icons: Record<CalendarEvent['source'], IconName> = { task: 'tasks', letter: 'letter', meeting: 'group', reporting: 'sprout', personal: 'calendar' }
-const shiftMonth = (period: string, shift: number) => {
-  const [year, month] = period.split('-').map(Number)
-  return new Date(Date.UTC(year, month - 1 + shift, 1)).toISOString().slice(0, 7)
-}
 const today = () => new Date(Date.now() + 19800000).toISOString().slice(0, 10)
 const emptyEntry = (date: string): CalendarEntry => ({ title: '', date, startTime: '09:00', endTime: '10:00', notes: '' })
 
@@ -84,14 +80,19 @@ export default function YsoCalendar({ period, onMonthChange, Dialog, refreshKey 
   )
   return <>
     <section className="card overflow-hidden yso-calendar" aria-label={t('Your calendar')}>
-      <div className="flex items-center justify-between gap-2 px-4 pt-4">
-        <div><h2 className="font-semibold text-sm flex items-center gap-2"><span className="icon-tile tile-teal w-8 h-8 rounded-xl"><Icon name="calendar" className="w-4 h-4" /></span>{t('Your calendar')}</h2></div>
-        <div className="flex items-center gap-1"><button className="icon-btn w-9 h-9" aria-label={t('Refresh calendar')} disabled={loading} onClick={() => void load()}><Icon name="refresh" className="w-3.5 h-3.5" /></button><button className="chip text-[11px] min-h-9" onClick={() => { onMonthChange(today().slice(0, 7)); openDay(today()) }}>{t('Today')}</button></div>
-      </div>
-      <div className="flex items-center justify-between gap-2 px-4 py-3">
-        <button className="icon-btn w-9 h-9" disabled={period === '2000-01'} aria-label={t('Previous month')} onClick={() => onMonthChange(shiftMonth(period, -1))}><Icon name="chevronLeft" className="w-4 h-4" /></button>
-        <h3 className="text-sm font-semibold text-center">{monthYear(period, languageOf(locale))}</h3>
-        <button className="icon-btn w-9 h-9" disabled={period === '2099-12'} aria-label={t('Next month')} onClick={() => onMonthChange(shiftMonth(period, 1))}><Icon name="chevronRight" className="w-4 h-4" /></button>
+      <div className="flex items-center justify-between gap-2 px-3 sm:px-4 py-3">
+        <DatePicker
+          ariaLabel={t('Reporting month')}
+          mode="month"
+          compact
+          clearable={false}
+          minDate="2000-01-01"
+          maxDate="2099-12-31"
+          className={`min-w-0 flex-1 sm:flex-none sm:min-w-[170px] [&>button]:min-h-10 [&>button]:px-3 [&>button]:font-semibold ${locale !== 'en-GB' ? '[&>button]:text-xs sm:[&>button]:text-sm [&>button>div:first-child>svg]:hidden sm:[&>button>div:first-child>svg]:block' : ''}`}
+          value={period}
+          onChange={value => /^20\d{2}-(0[1-9]|1[0-2])$/.test(value) && onMonthChange(value)}
+        />
+        <div className="flex items-center gap-1 flex-shrink-0"><button className="icon-btn w-9 h-9" aria-label={t('Refresh calendar')} disabled={loading} onClick={() => void load()}><Icon name="refresh" className="w-3.5 h-3.5" /></button><button className="chip text-[11px] min-h-9" onClick={() => { onMonthChange(today().slice(0, 7)); openDay(today()) }}>{t('Today')}</button></div>
       </div>
       <div className="px-3 pb-3">
         <div className="grid grid-cols-7 mb-1" aria-hidden="true">{Array.from({ length: 7 }, (_, i) => <span key={i} className="text-[10px] font-medium text-tw-text-muted text-center py-1">{new Date(Date.UTC(2026, 9, 5 + i)).toLocaleDateString(locale, { weekday: 'short', timeZone: 'UTC' })}</span>)}</div>
