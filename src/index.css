@@ -136,7 +136,7 @@ html.dark img.dark-invert { filter: invert(1) hue-rotate(180deg); }
 @layer components {
   /* Buttons */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 font-semibold px-4 py-2 rounded-xl text-sm transition-all
+    @apply inline-flex items-center justify-center gap-2 font-semibold px-4 py-2 rounded-xl text-sm transition-all border border-transparent
            disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] select-none;
   }
   .btn-primary {

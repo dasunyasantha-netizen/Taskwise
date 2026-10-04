@@ -64,6 +64,7 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
 
   // ── Edit mode
   const [editMode, setEditMode] = useState(false)
+  const [titleExpanded, setTitleExpanded] = useState(false)
   const [editForm, setEditForm] = useState({ title: task.title, description: task.description || '', deadline: task.deadline ? new Date(task.deadline).toISOString().slice(0, 10) : '' })
 
   // Modals / overlays
@@ -391,8 +392,8 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in">
-      <div className="modal-panel w-full max-w-2xl max-h-[92vh] flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 pt-[calc(var(--tw-banner-h,0px)+0.75rem)] sm:pt-[calc(var(--tw-banner-h,0px)+1rem)] bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in">
+      <div className="modal-panel w-full max-w-2xl max-h-[calc(100dvh-var(--tw-banner-h,0px)-1.5rem)] sm:max-h-[calc(100dvh-var(--tw-banner-h,0px)-2rem)] flex flex-col overflow-y-auto overscroll-contain">
 
         {/* ── Return-from-chairman banner ───────────────────────────────── */}
         {showReturnBanner && (
@@ -420,7 +421,7 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
         )}
 
         {/* ── Header ───────────────────────────────────────────────────── */}
-        <div className="px-6 py-5 border-b border-tw-border bg-gradient-to-br from-tw-primary/[0.07] via-tw-surface to-tw-purple/[0.06]">
+        <div className="flex-shrink-0 px-4 sm:px-6 py-4 sm:py-5 border-b border-tw-border bg-gradient-to-br from-tw-primary/[0.07] via-tw-surface to-tw-purple/[0.06]">
           {onBack && parentTask && (
             <button onClick={onBack}
               className="flex items-center gap-1.5 text-xs text-tw-text-secondary hover:text-tw-primary mb-3 transition-colors group">
@@ -440,7 +441,14 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
                 <input className="input text-base font-bold w-full" autoFocus
                   value={editForm.title} onChange={e => setEditForm(f => ({ ...f, title: e.target.value }))} />
               ) : (
-                <h2 className="text-lg font-bold text-tw-text leading-snug tracking-tight">{task.title}</h2>
+                <>
+                  <h2 className={`text-base sm:text-lg font-bold text-tw-text leading-snug tracking-tight break-words ${titleExpanded ? '' : 'line-clamp-4'}`}>{task.title}</h2>
+                  {task.title.length > 120 && (
+                    <button onClick={() => setTitleExpanded(v => !v)} className="mt-1 text-xs font-semibold text-tw-primary-text hover:underline">
+                      {titleExpanded ? 'Show less' : 'Show more'}
+                    </button>
+                  )}
+                </>
               )}
             </div>
             <div className="flex items-center gap-1 flex-shrink-0">
@@ -480,7 +488,7 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
           )}
 
           {/* ── Primary action buttons ─────────────────────────────────── */}
-          <div className="flex flex-wrap gap-2 mt-4">
+          <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 mt-4 [&>button]:w-full sm:[&>button]:w-auto">
             {canAccept && !canSelfAssign && (
               <button disabled={loading} onClick={handleAccept}
                 className="btn-primary">
@@ -533,7 +541,7 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
         </div>
 
         {/* ── Tabs ─────────────────────────────────────────────────────── */}
-        <div className="flex gap-1 border-b border-tw-border px-5 overflow-x-auto">
+        <div className="sticky top-0 z-10 flex-shrink-0 flex gap-1 border-b border-tw-border px-3 sm:px-5 overflow-x-auto bg-tw-surface">
           {(['details', 'updates', 'subtasks', 'history'] as TabKey[]).map(t => (
             <button key={t} onClick={() => setTab(t)}
               className={`py-3 px-3 text-sm font-medium border-b-2 -mb-px transition-colors capitalize whitespace-nowrap
@@ -546,7 +554,7 @@ export default function PersonnelTaskModal({ task, actorId, departmentId, mySupe
         </div>
 
         {/* ── Tab content ──────────────────────────────────────────────── */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="p-4 sm:p-6">
 
           {/* DETAILS */}
           {tab === 'details' && (

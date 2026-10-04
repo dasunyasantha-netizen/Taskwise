@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import type { ImpersonationInfo } from '../types'
 import { authApi } from '../services/apiService'
 
@@ -10,6 +10,12 @@ interface Props {
 
 export default function ImpersonationBanner({ impersonation, targetName, onExit }: Props) {
   const [exiting, setExiting] = useState(false)
+
+  // Expose the banner height so fixed overlays (modals) can sit below it
+  useEffect(() => {
+    document.documentElement.style.setProperty('--tw-banner-h', '56px')
+    return () => { document.documentElement.style.removeProperty('--tw-banner-h') }
+  }, [])
 
   const handleExit = async () => {
     if (exiting) return
