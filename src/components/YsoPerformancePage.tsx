@@ -11,7 +11,8 @@ import {
 import type { AuthUser } from '../types'
 import DatePicker from './DatePicker'
 import Select from './Select'
-import { LanguageToggle, useLanguage, displayDate, languageOf, monthYear } from '../i18n/Language'
+import { useLanguage, displayDate, languageOf, monthYear } from '../i18n/Language'
+import { useRefreshListener } from '../hooks/useRefresh'
 import { Icon, type IconName } from './ui/Icon'
 
 const panel = 'card p-5'
@@ -1166,6 +1167,7 @@ export default function YsoPerformancePage({ user, onUserUpdate }: { user: AuthU
       cancelled = true
     }
   }, [user.actorId])
+  useRefreshListener(() => refresh().catch((e) => setError(e.message)))
   const refresh = async () => {
     await load()
   }
@@ -1583,15 +1585,6 @@ export default function YsoPerformancePage({ user, onUserUpdate }: { user: AuthU
               /^20\d{2}-(0[1-9]|1[0-2])$/.test(value) && setPeriod(value)
             }
           />
-          <LanguageToggle user={user} onUserUpdate={onUserUpdate} />
-          <button
-            className="icon-btn border-tw-border bg-tw-surface w-10 h-10 flex-shrink-0 hidden sm:inline-flex"
-            title={tr("Refresh")}
-            aria-label={tr("Refresh")}
-            onClick={() => refresh().catch((e) => setError(e.message))}
-          >
-            <Icon name="refresh" className="w-4 h-4" />
-          </button>
         </div>
       </header>
       {error && (

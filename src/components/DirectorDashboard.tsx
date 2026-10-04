@@ -6,6 +6,7 @@ import DatePicker from './DatePicker'
 import Select from './Select'
 import NotificationsMenu from './NotificationsMenu'
 import MobileUserMenu from './MobileUserMenu'
+import { requestRefresh } from '../hooks/useRefresh'
 import Sidebar, { type SidebarSection } from './Sidebar'
 import MobileNav, { type MobileNavItem } from './MobileNav'
 import { Icon } from './ui/Icon'
@@ -899,7 +900,8 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
 
   const activeView = currentView === 'project_board' && !selectedProject ? 'project_board' : currentView
 
-  const { canInstall, isIOS, installApp, pushEnabled, enablePush } = usePWA()
+  const { canInstall, isIOS, installApp, pushState, enablePush } = usePWA({ autoPush: !user.impersonation })
+  const refreshAll = () => { void loadDashboard(); requestRefresh() }
   const [showIOSGuide, setShowIOSGuide] = useState(false)
 
   // Mobile: four primary destinations in the floating bar, the rest in "More"
@@ -1024,15 +1026,6 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
                 </button>
               </div>
             )}
-            {/* Install App button — mobile only, show when not installed */}
-            {canInstall && (
-              <button onClick={isIOS ? () => setShowIOSGuide(true) : installApp}
-                className="md:hidden chip py-1.5 px-2.5"
-                title="Install App">
-                <Icon name="download" className="w-3.5 h-3.5" />
-                <span>Install</span>
-              </button>
-            )}
             {showIOSGuide && (
               <div className="fixed inset-0 z-50 flex items-end justify-center p-4 bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in" onClick={() => setShowIOSGuide(false)}>
                 <div className="modal-panel w-full max-w-sm p-5" onClick={e => e.stopPropagation()}>
@@ -1057,21 +1050,15 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
                 </div>
               </div>
             )}
-            {/* Push notifications button — mobile only */}
-            {!pushEnabled && (
-              <button onClick={enablePush}
-                className="md:hidden chip py-1.5 px-2.5"
-                title="Enable Notifications">
-                <Icon name="bell" className="w-3.5 h-3.5" />
-                <span className="hidden xs:inline">Notify</span>
-              </button>
-            )}
+            <button onClick={refreshAll} title={t('Refresh')} aria-label={t('Refresh')} className="icon-btn hidden md:inline-flex">
+              <Icon name="refresh" className="w-[18px] h-[18px]" />
+            </button>
             <ThemeToggle compact className="hidden md:inline-flex" />
             <a
               href={launcherHomeUrl(launchSource)}
               title={t(`Back to ${launcherName(launchSource)}`)}
               aria-label={t(`Back to ${launcherName(launchSource)}`)}
-              className="icon-btn"
+              className="icon-btn hidden md:inline-flex"
             >
               <Icon name="grid" className="w-[18px] h-[18px]" />
             </a>
@@ -1088,7 +1075,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
               onOpenCompanyRequests={() => navigate('company_requests')}
             />
             {/* Mobile user menu */}
-            <MobileUserMenu user={user} roleLabel="Director" onProfile={() => setView('profile' as ViewMode)} onSettings={() => setView('settings' as ViewMode)} onLogout={onLogout} />
+            <MobileUserMenu user={user} roleLabel="Director" onProfile={() => setView('profile' as ViewMode)} onSettings={() => setView('settings' as ViewMode)} onLogout={onLogout} onRefresh={refreshAll} launcher={{ href: launcherHomeUrl(launchSource), label: `Back to ${launcherName(launchSource)}` }} onInstall={canInstall ? (isIOS ? () => setShowIOSGuide(true) : installApp) : undefined} push={pushState} onEnablePush={enablePush} />
           </div>
         </header>
 
@@ -1100,7 +1087,6 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
               <PageHeader
                 title={<>{t('Welcome back')}, {user.name.split(' ')[0]}</>}
                 subtitle={t("Here's what's happening across your workspace.")}
-                actions={<button onClick={loadDashboard} className="btn-secondary btn-sm"><Icon name="refresh" className="w-3.5 h-3.5" />{t('Refresh')}</button>}
               />
 
               {statsLoading ? <LoadingBlock /> : (

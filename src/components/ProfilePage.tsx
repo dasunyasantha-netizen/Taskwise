@@ -5,7 +5,7 @@ import { startRegistration } from '@simplewebauthn/browser'
 import RoleAssignments from './RoleAssignments'
 import { PageHeader, ThemeToggle, SinhalaFontPicker } from './ui/Primitives'
 import { Icon } from './ui/Icon'
-import { useLanguage } from '../i18n/Language'
+import { useLanguage, LanguageToggle } from '../i18n/Language'
 
 interface Props {
   user: AuthUser
@@ -254,6 +254,13 @@ export default function ProfilePage({ user, onUserUpdate }: Props) {
             <p className="text-xs text-tw-text-secondary mt-1">{t('Choose light or dark, or follow your device setting. Saved on this device.')}</p>
           </div>
           <ThemeToggle className="sm:w-80" />
+        </div>
+        <div className="border-t border-tw-border mt-5 pt-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold text-tw-text">{t('Language')}</h3>
+            <p className="text-xs text-tw-text-secondary mt-1">{user.impersonation ? t('Support access: changes the language for you only.') : t('Used across TaskWise and saved to your account.')}</p>
+          </div>
+          <div className="[&>div]:items-start sm:[&>div]:items-end"><LanguageToggle user={user} onUserUpdate={onUserUpdate} /></div>
         </div>
         <div className="border-t border-tw-border mt-5 pt-5">
           <h3 className="text-sm font-semibold text-tw-text">{t('Sinhala font')}</h3>

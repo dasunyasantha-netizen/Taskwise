@@ -351,5 +351,11 @@ export const si: Record<string, string> = {
   'This file is {size}. The limit is 10 MB.': 'මෙම ගොනුව {size}. උපරිමය 10 MB.',
   'Low': 'අඩු', 'Medium': 'මධ්‍යම', 'High': 'ඉහළ', 'Critical': 'ඉතා හදිසි',
   'Support access: changes the language for you only.': 'සහාය ප්‍රවේශය: භාෂාව වෙනස් වන්නේ ඔබට පමණි.',
+  'Push notifications': 'පුෂ් දැනුම්දීම්',
+  'On': 'සක්‍රියයි',
+  'Turn on': 'සක්‍රිය කරන්න',
+  'Blocked in browser settings': 'බ්‍රවුසර සැකසුම්වල අවහිර කර ඇත',
+  'Install app': 'යෙදුම ස්ථාපනය කරන්න',
+  'Used across TaskWise and saved to your account.': 'TaskWise පුරා භාවිත වන අතර ඔබගේ ගිණුමේ සුරැකේ.',
   'Collapse sidebar': 'පැති තීරුව හකුළන්න', 'Expand sidebar': 'පැති තීරුව විහිදන්න',
 }

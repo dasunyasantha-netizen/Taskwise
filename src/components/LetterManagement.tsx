@@ -11,7 +11,8 @@ import DatePicker from './DatePicker'
 import Select from './Select'
 import LetterDocumentCard from './LetterDocumentCard'
 import type { AuthUser } from '../types'
-import { LanguageToggle, useLanguage, displayDate, languageOf } from '../i18n/Language'
+import { useLanguage, displayDate, languageOf } from '../i18n/Language'
+import { useRefreshListener } from '../hooks/useRefresh'
 import { EmptyState } from './ui/Primitives'
 import { Icon } from './ui/Icon'
 const box = 'card p-4 sm:p-5'
@@ -733,6 +734,7 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
       setError((e as Error).message)
     }
   }
+  useRefreshListener(() => refresh())
   const statusTabs = list ? [
     { key: 'all', label: tr("All"), value: list.metrics.open + list.metrics.closed, active: !status && !overdue, set: () => { setStatus(''); setOverdue(false) }, dot: '' },
     { key: 'open', label: tr("Open"), value: list.metrics.open, active: status === 'OPEN' && !overdue, set: () => { setStatus('OPEN'); setOverdue(false) }, dot: 'bg-blue-500' },
@@ -757,17 +759,10 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
           </p>
         </div>
         <div className="flex flex-wrap gap-2 items-start">
-          <LanguageToggle user={user} onUserUpdate={onUserUpdate} />
           {selected && (
             <button className={secondary} onClick={() => open('')}>
               <Icon name="arrowLeft" className="w-4 h-4" />{tr("Register")}</button>
           )}
-          <button
-            className={secondary}
-            disabled={busy}
-            onClick={() => void refresh()}
-          >
-            <Icon name="refresh" className="w-4 h-4" />{tr("Refresh")}</button>
           {context?.me.logger && !selected && (
             <button className={button} onClick={() => setKind('NEW')}>
               <Icon name="plus" className="w-4 h-4" />{tr("Log letter")}</button>

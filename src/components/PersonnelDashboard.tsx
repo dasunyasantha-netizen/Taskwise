@@ -3,6 +3,7 @@ import type { AuthUser, ViewMode, Task, Project, Personnel, TaskProgressLog } fr
 import { taskApi, projectApi, workspaceApi } from '../services/apiService'
 import NotificationsMenu from './NotificationsMenu'
 import MobileUserMenu from './MobileUserMenu'
+import { requestRefresh } from '../hooks/useRefresh'
 import MobileNav, { type MobileNavItem } from './MobileNav'
 import { Icon } from './ui/Icon'
 import { PageHeader, EmptyState, LoadingBlock, ThemeToggle } from './ui/Primitives'
@@ -748,7 +749,8 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
   const { t } = useLanguage()
   const insuranceEnabled = user.features?.includes('insurance_management') === true
   const ysoEnabled = user.features?.includes('four_level_hierarchy') === true && !!user.ysoRole
-  const { canInstall, isIOS, installApp, pushEnabled, enablePush } = usePWA()
+  const { canInstall, isIOS, installApp, pushState, enablePush } = usePWA({ autoPush: !user.impersonation })
+  const refreshAll = () => { void load(); requestRefresh() }
   const [showIOSGuide, setShowIOSGuide] = useState(false)
   const [queue, setQueue]               = useState<Task[]>([])
   const [projects, setProjects]         = useState<Project[]>([])
@@ -935,18 +937,9 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
             </div>
           </div>
           <div className="flex items-center gap-1.5">
-            <button onClick={load} title={t('Refresh')} className="icon-btn">
+            <button onClick={refreshAll} title={t('Refresh')} aria-label={t('Refresh')} className="icon-btn hidden md:inline-flex">
               <Icon name="refresh" className="w-[18px] h-[18px]" />
             </button>
-            {/* Install App button — mobile only */}
-            {canInstall && (
-              <button onClick={isIOS ? () => setShowIOSGuide(true) : installApp}
-                className="md:hidden chip py-1.5 px-2.5"
-                title="Install App">
-                <Icon name="download" className="w-3.5 h-3.5" />
-                <span>Install</span>
-              </button>
-            )}
             {showIOSGuide && (
               <div className="fixed inset-0 z-50 flex items-end justify-center p-4 bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in" onClick={() => setShowIOSGuide(false)}>
                 <div className="modal-panel w-full max-w-sm p-5" onClick={e => e.stopPropagation()}>
@@ -971,21 +964,12 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
                 </div>
               </div>
             )}
-            {/* Push notifications button — mobile only */}
-            {!pushEnabled && (
-              <button onClick={enablePush}
-                className="md:hidden chip py-1.5 px-2.5"
-                title="Enable Notifications">
-                <Icon name="bell" className="w-3.5 h-3.5" />
-                <span className="hidden xs:inline">Notify</span>
-              </button>
-            )}
             <ThemeToggle compact className="hidden md:inline-flex" />
             <a
               href={launcherHomeUrl(launchSource)}
               title={t(`Back to ${launcherName(launchSource)}`)}
               aria-label={t(`Back to ${launcherName(launchSource)}`)}
-              className="icon-btn"
+              className="icon-btn hidden md:inline-flex"
             >
               <Icon name="grid" className="w-[18px] h-[18px]" />
             </a>
@@ -1001,7 +985,7 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
                 }
               }}
             />
-            <MobileUserMenu user={user} roleLabel="Personnel" onProfile={() => navigate('profile' as ViewMode)} onLogout={onLogout} />
+            <MobileUserMenu user={user} roleLabel="Personnel" onProfile={() => navigate('profile' as ViewMode)} onLogout={onLogout} onRefresh={refreshAll} launcher={{ href: launcherHomeUrl(launchSource), label: `Back to ${launcherName(launchSource)}` }} onInstall={canInstall ? (isIOS ? () => setShowIOSGuide(true) : installApp) : undefined} push={pushState} onEnablePush={enablePush} />
           </div>
         </header>
 

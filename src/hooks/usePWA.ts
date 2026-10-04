@@ -13,10 +13,23 @@ window.addEventListener('beforeinstallprompt', (e: Event) => {
   _cachedPrompt = e as BeforeInstallPromptEvent
 })
 
-export function usePWA() {
+export type PushState = 'on' | 'off' | 'blocked' | 'unsupported'
+
+const pushSupported = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window
+const PROMPTED_KEY = 'tw_push_prompted'
+
+/**
+ * Push notifications are on by default: if the browser already allows them the
+ * device is (re)subscribed silently on every visit; otherwise permission is
+ * requested once, on the user's first tap. Never during support access, so an
+ * admin's device is not subscribed to the viewed user's notifications.
+ */
+export function usePWA({ autoPush = true }: { autoPush?: boolean } = {}) {
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(_cachedPrompt)
   const [isInstalled, setIsInstalled]     = useState(false)
   const [pushEnabled, setPushEnabled]     = useState(false)
+  const [pushState, setPushState]         = useState<PushState>(() =>
+    !pushSupported() ? 'unsupported' : Notification.permission === 'denied' ? 'blocked' : 'off')
 
   // iOS Safari never fires beforeinstallprompt — detect it separately
   const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) ||
@@ -38,10 +51,6 @@ export function usePWA() {
     return () => window.removeEventListener('beforeinstallprompt', handler)
   }, [])
 
-  useEffect(() => {
-    if (!('Notification' in window)) return
-    if (Notification.permission === 'granted') setPushEnabled(true)
-  }, [])
 
   const installApp = async () => {
     if (!installPrompt) return
@@ -52,23 +61,32 @@ export function usePWA() {
     setInstallPrompt(null)
   }
 
-  const enablePush = async () => {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return false
-    try {
-      const permission = await Notification.requestPermission()
-      if (permission !== 'granted') return false
-
-      const reg = await navigator.serviceWorker.ready
+  const subscribe = async () => {
+    const reg = await navigator.serviceWorker.ready
+    let sub = await reg.pushManager.getSubscription()
+    if (!sub) {
       const vapidRes = await notificationApi.getVapidKey()
       const publicKey = (vapidRes as { publicKey: string }).publicKey
-
-      const sub = await reg.pushManager.subscribe({
+      sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(publicKey),
       })
+    }
+    // Upsert by endpoint: also moves this device to whoever is signed in now.
+    await notificationApi.savePushSubscription(sub.toJSON())
+    setPushEnabled(true)
+    setPushState('on')
+  }
 
-      await notificationApi.savePushSubscription(sub.toJSON())
-      setPushEnabled(true)
+  const enablePush = async () => {
+    if (!pushSupported() || !autoPush) return false
+    try {
+      const permission = await Notification.requestPermission()
+      if (permission !== 'granted') {
+        setPushState(permission === 'denied' ? 'blocked' : 'off')
+        return false
+      }
+      await subscribe()
       return true
     } catch (e) {
       console.error('Push subscription failed', e)
@@ -76,9 +94,26 @@ export function usePWA() {
     }
   }
 
+  useEffect(() => {
+    if (!pushSupported() || !autoPush) return
+    if (Notification.permission === 'granted') {
+      subscribe().catch(e => console.error('Push subscription failed', e))
+      return
+    }
+    if (Notification.permission !== 'default') return
+    try { if (localStorage.getItem(PROMPTED_KEY)) return } catch { /* storage unavailable */ }
+    // Browsers only show the permission prompt in response to a user gesture.
+    const onFirstTap = () => {
+      try { localStorage.setItem(PROMPTED_KEY, '1') } catch { /* storage unavailable */ }
+      void enablePush()
+    }
+    window.addEventListener('pointerup', onFirstTap, { once: true })
+    return () => window.removeEventListener('pointerup', onFirstTap)
+  }, [autoPush]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const canInstall = !isInstalled && (installPrompt !== null || isIOS)
 
-  return { installPrompt, isInstalled, isIOS, canInstall, installApp, pushEnabled, enablePush }
+  return { installPrompt, isInstalled, isIOS, canInstall, installApp, pushEnabled, pushState, enablePush }
 }
 
 function urlBase64ToUint8Array(base64String: string): ArrayBuffer {

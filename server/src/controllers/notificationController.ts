@@ -16,7 +16,9 @@ export async function getVapidKey(_req: Request, res: Response): Promise<void> {
 // POST /api/notifications/push-subscribe
 export async function savePushSubscription(req: Request, res: Response): Promise<void> {
   try {
-    const { actorId, actorType, workspaceId } = req.user!
+    const { actorId, actorType, workspaceId, impersonationSessionId } = req.user!
+    // Support access must not route the viewed user's notifications to the admin's device.
+    if (impersonationSessionId) { res.status(403).json({ error: 'Push notifications cannot be enabled during support access.' }); return }
     const { endpoint, keys } = req.body
     if (!endpoint || !keys?.p256dh || !keys?.auth) { res.status(400).json({ error: 'Invalid subscription' }); return }
     await prisma.pushSubscription.upsert({
