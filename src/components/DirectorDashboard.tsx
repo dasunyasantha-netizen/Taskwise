@@ -5,7 +5,7 @@ import { projectApi, taskApi, auditApi, workspaceApi, taskGroupApi } from '../se
 import DatePicker from './DatePicker'
 import Select from './Select'
 import NotificationsMenu from './NotificationsMenu'
-import MobilePickitiLink from './MobilePickitiLink'
+import PickitiHomeLink from './PickitiHomeLink'
 import MobileUserMenu from './MobileUserMenu'
 import { requestRefresh } from '../hooks/useRefresh'
 import Sidebar, { type SidebarSection } from './Sidebar'
@@ -39,7 +39,7 @@ import CompanyFeaturesPage from './CompanyFeaturesPage'
 import InsuranceManagementPage from './InsuranceManagementPage'
 import YsoPerformancePage from './YsoPerformancePage'
 import LetterManagement from './LetterManagement'
-import { launcherHomeUrl, launcherName, type LaunchSource } from '../services/launchSource'
+import { launcherHomeUrl, type LaunchSource } from '../services/launchSource'
 
 interface Props {
   user: AuthUser
@@ -739,7 +739,7 @@ const byDeadlineAsc = (a: Task, b: Task) =>
 
 
 // ─── Director Dashboard ───────────────────────────────────────────────────────
-export default function DirectorDashboard({ user, currentView, setView, onLogout, onUserUpdate, onImpersonationStart, launchSource }: Props) {
+export default function DirectorDashboard({ user, currentView, setView, onLogout, onUserUpdate, onImpersonationStart }: Props) {
   const { t } = useLanguage()
   const insuranceEnabled = user.features?.includes('insurance_management') === true
   const ysoEnabled = user.features?.includes('four_level_hierarchy') === true
@@ -1063,15 +1063,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
               <Icon name="refresh" className="w-[18px] h-[18px]" />
             </button>
             <ThemeToggle compact className="hidden md:inline-flex" />
-            <MobilePickitiLink />
-            <a
-              href={launcherHomeUrl(launchSource)}
-              title={t(`Back to ${launcherName(launchSource)}`)}
-              aria-label={t(`Back to ${launcherName(launchSource)}`)}
-              className="icon-btn hidden md:inline-flex"
-            >
-              <Icon name="grid" className="w-[18px] h-[18px]" />
-            </a>
+            <PickitiHomeLink />
             <NotificationsMenu
               onOpenYso={() => navigate('yso_performance')}
               onOpenLetter={(id) => { sessionStorage.setItem('taskwise_letter_open', id); navigate('letters'); window.dispatchEvent(new CustomEvent('taskwise:open-letter', { detail: id })) }}
@@ -1085,7 +1077,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
               onOpenCompanyRequests={() => navigate('company_requests')}
             />
             {/* Mobile user menu */}
-            <MobileUserMenu user={user} roleLabel="Director" onProfile={() => setView('profile' as ViewMode)} onSettings={() => setView('settings' as ViewMode)} onLogout={onLogout} onUserUpdate={onUserUpdate} onRefresh={refreshAll} launcher={{ href: launcherHomeUrl(launchSource), label: `Back to ${launcherName(launchSource)}` }} onInstall={canInstall ? (isIOS ? () => setShowIOSGuide(true) : installApp) : undefined} push={pushState} onEnablePush={enablePush} />
+            <MobileUserMenu user={user} roleLabel="Director" onProfile={() => setView('profile' as ViewMode)} onSettings={() => setView('settings' as ViewMode)} onLogout={onLogout} onUserUpdate={onUserUpdate} onRefresh={refreshAll} launcher={{ href: launcherHomeUrl('pickiti'), label: 'Back to Pickiti' }} onInstall={canInstall ? (isIOS ? () => setShowIOSGuide(true) : installApp) : undefined} push={pushState} onEnablePush={enablePush} />
           </div>
         </header>
 
