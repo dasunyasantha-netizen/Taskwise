@@ -40,6 +40,7 @@ import InsuranceManagementPage from './InsuranceManagementPage'
 import YsoPerformancePage from './YsoPerformancePage'
 import LetterManagement from './LetterManagement'
 import { launcherHomeUrl, type LaunchSource } from '../services/launchSource'
+import { useConfirm } from './ConfirmDialog'
 
 interface Props {
   user: AuthUser
@@ -84,6 +85,7 @@ const subtaskStatusDot: Record<string, string> = {
 function ApprovalTaskRow({
   task, actorId, onRefresh,
 }: { task: Task; actorId: string; onRefresh: () => void }) {
+  const { confirm, dialog } = useConfirm()
   const [expanded,  setExpanded]  = useState(false)
   const [subtasks,  setSubtasks]  = useState<Task[]>([])
   const [comments,  setComments]  = useState<TaskComment[]>([])
@@ -119,7 +121,7 @@ function ApprovalTaskRow({
   }
 
   const doApprove = async () => {
-    if (!confirm(`Approve "${task.title}"?\n\nThis marks the task as approved.`)) return
+    if (!(await confirm({ title: 'Approve “{title}”?', message: 'This marks the task as approved.', confirmLabel: 'Approve', tone: 'success', vars: { title: task.title } }))) return
     setActionLoading(true); setActionError('')
     try { await taskApi.approve(task.id); onRefresh() }
     catch (e: unknown) { setActionError(e instanceof Error ? e.message : 'Failed') }
@@ -180,6 +182,7 @@ function ApprovalTaskRow({
 
   return (
     <>
+      {dialog}
       {/* ── Summary row ── */}
       <tr onClick={toggle}
         className={`cursor-pointer transition-colors border-b border-tw-border

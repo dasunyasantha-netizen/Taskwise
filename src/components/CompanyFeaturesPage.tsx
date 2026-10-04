@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { adminFeatureApi, type CompanyFeatureRow, type FeatureCatalogEntry } from '../services/apiService'
 import { Icon } from './ui/Icon'
 import { PageHeader, LoadingBlock } from './ui/Primitives'
+import { useConfirm } from './ConfirmDialog'
 
 /**
  * System Administrator screen for granting and revoking company features.
@@ -10,6 +11,7 @@ import { PageHeader, LoadingBlock } from './ui/Primitives'
  * on that company's next request — no redeploy, no migration.
  */
 export default function CompanyFeaturesPage() {
+  const { confirm, dialog } = useConfirm()
   const [catalog, setCatalog] = useState<FeatureCatalogEntry[]>([])
   const [companies, setCompanies] = useState<CompanyFeatureRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -38,7 +40,10 @@ export default function CompanyFeaturesPage() {
 
   const toggle = async (company: CompanyFeatureRow, feature: FeatureCatalogEntry) => {
     const next = !company.features[feature.key]?.enabled
-    if (!next && !confirm(`Turn off ${feature.name} for ${company.name}? Anyone using it loses access immediately.`)) return
+    if (!next && !(await confirm({
+      title: 'Turn off {feature} for {company}?', message: 'Anyone using it loses access immediately.',
+      confirmLabel: 'Turn off', tone: 'danger', vars: { feature: feature.name, company: company.name },
+    }))) return
     const token = `${company.id}:${feature.key}`
     setPending(token); setError('')
     // Optimistic: the row flips straight away and is rolled back if the call fails.
@@ -59,6 +64,7 @@ export default function CompanyFeaturesPage() {
 
   return (
     <div className="page space-y-5">
+      {dialog}
       <PageHeader icon="puzzle" tone="purple" title="Company Features" className="!mb-0"
         subtitle="Grant optional modules to individual companies. Changes apply on the company's next request." />
 

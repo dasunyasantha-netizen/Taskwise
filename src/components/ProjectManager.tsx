@@ -6,6 +6,7 @@ import type { ActiveFilters, AvailableOptions } from './FilterBar'
 import Select from './Select'
 import { PageHeader, EmptyState, LoadingBlock } from './ui/Primitives'
 import { Icon } from './ui/Icon'
+import { useConfirm } from './ConfirmDialog'
 
 interface Props {
   onSelectProject: (project: Project) => void
@@ -431,6 +432,7 @@ function CategorySection({
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function ProjectManager({ onSelectProject, onSelectTask, filters, onFiltersChange, allTasks, onAllTasksLoaded, isDirector, actorId }: Props) {
+  const { confirm, dialog } = useConfirm()
   const [categories, setCategories] = useState<ProjectCategory[]>([])
   const [loading, setLoading] = useState(allTasks.length === 0)
   const [layers, setLayers] = useState<Layer[]>([])
@@ -499,7 +501,7 @@ export default function ProjectManager({ onSelectProject, onSelectTask, filters,
 
   const handleArchiveProject = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation()
-    if (!confirm('Archive this project?')) return
+    if (!(await confirm({ title: 'Archive this project?', confirmLabel: 'Archive' }))) return
     await projectApi.update(id, { status: 'archived' })
     await load()
   }
@@ -524,7 +526,11 @@ export default function ProjectManager({ onSelectProject, onSelectTask, filters,
   }
 
   const handleArchiveCategory = async (cat: ProjectCategory) => {
-    if (!confirm(`Archive category "${cat.name}"? Projects in this category will remain accessible but cannot be assigned to archived categories.`)) return
+    if (!(await confirm({
+      title: 'Archive category “{name}”?',
+      message: 'Projects in this category will remain accessible but cannot be assigned to archived categories.',
+      confirmLabel: 'Archive', vars: { name: cat.name },
+    }))) return
     await projectCategoryApi.update(cat.id, { status: 'archived' })
     await load()
   }
@@ -546,6 +552,7 @@ export default function ProjectManager({ onSelectProject, onSelectTask, filters,
 
   return (
     <div className="page">
+      {dialog}
       <PageHeader icon="project" tone="blue" title="Projects"
         subtitle={filtersActive
           ? <>{loading ? '…' : filteredTasks.length} task{filteredTasks.length !== 1 ? 's' : ''} matched</>
