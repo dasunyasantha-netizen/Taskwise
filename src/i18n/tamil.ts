@@ -39,7 +39,7 @@ export const ta: Record<string, string> = {
   'No active tasks have a deadline in the next 7 days.': 'அடுத்த 7 நாட்களில் கெடு உள்ள செயலில் உள்ள பணிகள் இல்லை.',
   'Unassigned': 'ஒதுக்கப்படவில்லை', 'Tomorrow': 'நாளை', 'Sitting longest': 'நீண்ட காலமாக நிலுவையில்',
   'Active tasks assigned the longest time ago': 'மிக நீண்ட காலத்திற்கு முன் ஒதுக்கப்பட்ட செயலில் உள்ள பணிகள்',
-  'Theme': 'தோற்றம்', 'Light': 'ஒளி', 'Dark': 'இருள்', 'System': 'சாதனத்தின்படி', 'Account': 'கணக்கு',
+  'Theme': 'தோற்றம்', 'Light': 'ஒளி', 'Dark': 'இருள்', 'System': 'சாதனம்', 'Account': 'கணக்கு',
   'Latest progress notes and comments across all tasks': 'அனைத்துப் பணிகளிலும் அண்மைய முன்னேற்றக் குறிப்புகளும் கருத்துகளும்',
   "See who's earning points — daily logins, task updates, on-time submissions & more": 'யார் புள்ளிகள் பெறுகிறார்கள் என்பதைப் பாருங்கள் — தினசரி உள்நுழைவுகள், பணிப் புதுப்பிப்புகள், உரிய நேரச் சமர்ப்பிப்புகள் மற்றும் பல',
   'Overdue · Due soon · Pending approvals · Sitting longest · By officer · By department & more': 'தாமதம் · விரைவில் கெடு · நிலுவை அங்கீகாரங்கள் · நீண்ட நிலுவை · அலுவலர் வாரியாக · பிரிவு வாரியாக மற்றும் பல',

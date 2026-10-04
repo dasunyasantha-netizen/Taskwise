@@ -1,6 +1,7 @@
 import React, { createContext, useContext } from 'react'
 import type { AuthUser } from '../types'
 import { authApi } from '../services/apiService'
+import { SEG_ITEM } from '../components/ui/seg'
 import { si } from './sinhala'
 import { ta } from './tamil'
 
@@ -139,8 +140,8 @@ export function LanguageToggle({ user, onUserUpdate, full = false }: { user: Aut
     finally { setSaving(false) }
   }
   return <div className={`flex flex-col gap-1 flex-shrink-0 ${full ? 'items-stretch' : 'items-end'}`}>
-    <div role="group" aria-label={t('Language')} title={user.impersonation ? t('Support access: changes the language for you only.') : undefined} className={`seg ${full ? 'w-full' : ''}`}>
-      {LANGUAGES.map(l => <button key={l.value} type="button" lang={l.value} disabled={saving} aria-pressed={language === l.value} onClick={() => select(l.value)} className={`seg-item min-h-8 px-2.5 sm:px-3 ${full ? 'flex-1' : ''} ${language === l.value ? 'seg-item-active' : ''}`}>{l.label}</button>)}
+    <div role="group" aria-label={t('Language')} title={user.impersonation ? t('Support access: changes the language for you only.') : undefined} className={`seg ${full ? 'flex w-full' : ''}`}>
+      {LANGUAGES.map(l => <button key={l.value} type="button" lang={l.value} disabled={saving} aria-pressed={language === l.value} onClick={() => select(l.value)} className={`${full ? SEG_ITEM : 'seg-item min-h-8 px-2.5 sm:px-3'} ${language === l.value ? 'seg-item-active' : ''}`}>{l.label}</button>)}
     </div>
     {error && <span role="alert" className="text-xs text-rose-700">{error}</span>}
   </div>

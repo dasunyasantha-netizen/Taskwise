@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
+import { SEG_ITEM } from './seg'
 import { Icon, type IconName } from './Icon'
 import { useTheme, type ThemePref } from '../../hooks/useTheme'
 import { useSinhalaFont, SINHALA_FONTS } from '../../hooks/useSinhalaFont'
@@ -101,14 +102,13 @@ export function ThemeToggle({ compact = false, className = '' }: { compact?: boo
     )
   }
   return (
-    <div className={`flex items-center p-1 rounded-xl bg-tw-hover border border-tw-border ${className}`} role="radiogroup" aria-label={t('Theme')}>
+    <div className={`seg flex w-full ${className}`} role="radiogroup" aria-label={t('Theme')}>
       {THEME_OPTS.map(o => (
-        <button key={o.value} role="radio" aria-checked={pref === o.value} onClick={() => setPref(o.value)}
+        <button key={o.value} type="button" role="radio" aria-checked={pref === o.value} onClick={() => setPref(o.value)}
           title={t(o.label)}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[11px] font-semibold transition-all
-            ${pref === o.value ? 'bg-tw-surface text-tw-text shadow-card' : 'text-tw-text-secondary hover:text-tw-text'}`}>
-          <Icon name={o.icon} className="w-3.5 h-3.5" />
-          {t(o.label)}
+          className={`${SEG_ITEM} ${pref === o.value ? 'seg-item-active' : ''}`}>
+          <Icon name={o.icon} className="w-3.5 h-3.5 flex-shrink-0" />
+          <span className="truncate">{t(o.label)}</span>
         </button>
       ))}
     </div>
@@ -122,18 +122,7 @@ const SINHALA_SAMPLE = 'ශ්‍රී ලංකා ජාතික තරු�
 export function SinhalaFontPicker({ className = '', compact = false }: { className?: string; compact?: boolean }) {
   const { t } = useLanguage()
   const { font, setFont } = useSinhalaFont()
-  if (compact) return (
-    <div className={`seg w-full ${className}`} role="radiogroup" aria-label={t('Sinhala font')}>
-      {SINHALA_FONTS.map(f => (
-        <button key={f.value} type="button" role="radio" aria-checked={font === f.value} title={f.label} aria-label={f.label}
-          onClick={() => setFont(f.value)}
-          className={`seg-item flex-1 flex flex-col items-center gap-0.5 py-1.5 ${font === f.value ? 'seg-item-active' : ''}`}>
-          <span lang="si" className="text-[15px] leading-tight" style={{ fontFamily: `${f.family}, sans-serif` }}>සිංහල</span>
-          <span className="text-[9.5px] font-medium opacity-70 leading-none">{f.label.replace(' Sinhala', '').replace('Noto ', '')}</span>
-        </button>
-      ))}
-    </div>
-  )
+  if (compact) return <SinhalaFontMenu className={className} />
   return (
     <div className={`grid gap-2 sm:grid-cols-3 ${className}`} role="radiogroup" aria-label={t('Sinhala font')}>
       {SINHALA_FONTS.map(f => {
@@ -155,6 +144,46 @@ export function SinhalaFontPicker({ className = '', compact = false }: { classNa
           </button>
         )
       })}
+    </div>
+  )
+}
+
+/** Menu row showing the current Sinhala font; opens a short list to pick another. */
+function SinhalaFontMenu({ className = '' }: { className?: string }) {
+  const { t } = useLanguage()
+  const { font, setFont } = useSinhalaFont()
+  const [open, setOpen] = useState(false)
+  const current = SINHALA_FONTS.find(f => f.value === font)!
+  return (
+    <div className={className}>
+      <button type="button" onClick={() => setOpen(o => !o)} aria-expanded={open}
+        className="w-full flex items-center gap-3 rounded-xl border border-tw-border bg-tw-surface px-3 min-h-10 text-left hover:bg-tw-hover transition-colors">
+        <span className="flex-1 min-w-0">
+          <span className="block text-xs font-semibold text-tw-text truncate">{current.label}</span>
+        </span>
+        <span lang="si" className="text-sm text-tw-text-secondary" style={{ fontFamily: `${current.family}, sans-serif` }}>අකුරු</span>
+        <Icon name="chevronDown" className={`w-4 h-4 text-tw-text-secondary transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div role="radiogroup" aria-label={t('Sinhala font')} className="mt-1.5 rounded-xl border border-tw-border bg-tw-surface overflow-hidden animate-pop-in">
+          {SINHALA_FONTS.map(f => {
+            const active = f.value === font
+            return (
+              <button key={f.value} type="button" role="radio" aria-checked={active}
+                onClick={() => { setFont(f.value); setOpen(false) }}
+                className={`w-full flex items-center gap-3 px-3 py-2 text-left transition-colors ${active ? 'bg-tw-primary/[0.07]' : 'hover:bg-tw-hover'}`}>
+                <span className="flex-1 min-w-0">
+                  <span className={`block text-xs font-semibold ${active ? 'text-tw-primary-text' : 'text-tw-text'}`}>
+                    {f.label}{f.value === 'noto-sans' && <span className="font-normal text-tw-text-muted"> · {t('Default')}</span>}
+                  </span>
+                  <span lang="si" className="block text-[15px] leading-snug text-tw-text-secondary" style={{ fontFamily: `${f.family}, sans-serif` }}>{SINHALA_SAMPLE}</span>
+                </span>
+                {active && <Icon name="check" className="w-4 h-4 text-tw-primary-text flex-shrink-0" />}
+              </button>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

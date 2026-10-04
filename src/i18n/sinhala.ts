@@ -289,7 +289,7 @@ export const si: Record<string, string> = {
   'No active tasks have a deadline in the next 7 days.': 'ඉදිරි දින 7 තුළ අවසන් දිනයක් ඇති සක්‍රිය කාර්යයන් නැත.',
   'Unassigned': 'පවරා නැත', 'Tomorrow': 'හෙට', 'Sitting longest': 'දිගු කලක් පොරොත්තුවෙන්',
   'Active tasks assigned the longest time ago': 'වැඩිම කාලයකට පෙර පවරන ලද සක්‍රිය කාර්යයන්',
-  'Theme': 'තේමාව', 'Light': 'ආලෝකමත්', 'Dark': 'අඳුරු', 'System': 'උපාංගය අනුව', 'Account': 'ගිණුම',
+  'Theme': 'තේමාව', 'Light': 'ආලෝක', 'Dark': 'අඳුරු', 'System': 'උපාංගය', 'Account': 'ගිණුම',
   'Latest progress notes and comments across all tasks': 'සියලු කාර්යයන්හි නවතම ප්‍රගති සටහන් සහ අදහස්',
   "See who's earning points — daily logins, task updates, on-time submissions & more": 'ලකුණු උපයන්නේ කවුදැයි බලන්න — දෛනික පිවිසීම්, කාර්ය යාවත්කාලීන, නියමිත වේලාවට ඉදිරිපත් කිරීම් සහ තවත්',
   'Overdue · Due soon · Pending approvals · Sitting longest · By officer · By department & more': 'ප්‍රමාද වූ · ළඟදීම නියමිත · අනුමැතිය බලාපොරොත්තුවෙන් · දිගුම කාලයක් · නිලධාරී අනුව · අංශය අනුව සහ තවත්',

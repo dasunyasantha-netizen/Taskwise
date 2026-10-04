@@ -51,7 +51,7 @@ export default function MobileUserMenu({ user, roleLabel, onProfile, onSettings,
         <Icon name="chevronDown" className={`w-3.5 h-3.5 text-tw-text-secondary transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-72 max-w-[calc(100vw-1.5rem)] max-h-[calc(100dvh-6rem)] overflow-y-auto bg-tw-surface rounded-2xl shadow-panel border border-tw-border z-50 animate-pop-in">
+        <div className="absolute right-0 top-full mt-2 w-80 max-w-[calc(100vw-1.5rem)] max-h-[calc(100dvh-6rem)] overflow-y-auto bg-tw-surface rounded-2xl shadow-panel border border-tw-border z-50 animate-pop-in">
           <div className="px-4 py-3.5 flex items-center gap-3 border-b border-tw-border">
             {user.avatarUrl
               ? <img src={user.avatarUrl} alt="" className="w-9 h-9 rounded-full object-cover" />
