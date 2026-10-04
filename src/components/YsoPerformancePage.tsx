@@ -783,6 +783,19 @@ function Analytics({
       return `${s.color} ${begin}deg ${angle}deg`
     })
     .join(', ')
+  const taskGroups = groupTasks(dashboard.tasks)
+  const taskPoints = (personId: string, taskId: number) => selected
+    .filter((l) => l.personnelId === personId && l.task === taskId)
+    .reduce((sum, l) => sum + l.points, 0)
+  const evaluationGroups = Array.from(new Set(dashboard.assessments
+    .filter((a) => a.period === period && ids.includes(a.personnelId))
+    .map((a) => a.adId)))
+    .map((ad) => ({
+      id: ad,
+      name: dashboard.ads.find((a) => a.id === ad)?.name ?? tr('Previous AD'),
+      assessments: dashboard.assessments.filter((a) =>
+        a.adId === ad && a.period === period && ids.includes(a.personnelId)),
+    }))
   return (
     <div className="space-y-5">
       <div className="grid lg:grid-cols-2 gap-5">
@@ -885,9 +898,42 @@ function Analytics({
           <p className="text-sm text-slate-500">{tr("No YSOs in this scope.")}</p>
         )}
       </section>
-      <section className={panel}>
+      <section className={`${panel} yso-task-points`}>
         <h3 className="font-semibold tracking-tight mb-4">{tr("Task-by-task points")}</h3>
-        <div className="overflow-x-auto">
+        <div className="sm:hidden space-y-3">
+          {!ranking.length && <p className="text-sm text-tw-text-secondary">{tr('No YSOs in this scope.')}</p>}
+          {ranking.map((p, personIndex) => (
+            <details key={`${period}:${p.id}`} open={personIndex === 0} className="group rounded-xl border border-tw-border bg-tw-surface overflow-hidden">
+              <summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 p-3 [&::-webkit-details-marker]:hidden">
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-semibold break-words">{p.name}</div>
+                  <div className="mt-1 text-xs text-tw-text-secondary">{tr('Total')} · {monthYear(period, languageOf(locale))}</div>
+                </div>
+                <strong className={`shrink-0 text-xl tabular-nums ${p.total < 0 ? 'text-rose-600' : 'text-teal-600'}`}>{signed(p.total)}</strong>
+                <Icon name="chevronDown" className="h-4 w-4 shrink-0 text-tw-text-secondary transition-transform group-open:rotate-180" />
+              </summary>
+              <div className="border-t border-tw-border px-3 pb-2">
+                {!taskGroups.length && <p className="py-3 text-sm text-tw-text-secondary">{tr('No tasks available.')}</p>}
+                {taskGroups.map((g) => (
+                  <div key={g.key} className="pt-3">
+                    <h4 className="mb-1 flex items-center gap-2 text-xs font-semibold text-tw-text-secondary">
+                      <Icon name={g.icon} className="h-4 w-4 shrink-0" />{tr(g.title)}
+                    </h4>
+                    {g.tasks.map((t, i) => {
+                      const points = taskPoints(p.id, t.id)
+                      return <div key={t.id} className="flex items-center gap-2.5 py-2.5 border-b border-tw-border last:border-0">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-tw-hover text-xs text-tw-text-secondary tabular-nums">{i + 1}</span>
+                        <span className="min-w-0 flex-1 text-sm leading-5 break-words">{tr(t.title)}</span>
+                        <strong className={`shrink-0 text-sm tabular-nums ${points < 0 ? 'text-rose-600' : points > 0 ? 'text-teal-600' : 'text-tw-text-secondary'}`}>{signed(points)}</strong>
+                      </div>
+                    })}
+                  </div>
+                ))}
+              </div>
+            </details>
+          ))}
+        </div>
+        <div className="hidden sm:block overflow-x-auto">
           <table className="w-full text-sm text-right">
             <thead>
               <tr>
@@ -927,11 +973,45 @@ function Analytics({
           </table>
         </div>
       </section>
-      <section className={panel}>
+      <section className={`${panel} yso-ad-distribution`}>
         <h3 className="font-bold mb-1">{tr("AD evaluation distribution")}</h3>
         <p className="text-xs text-slate-500 mb-4">
           {tr("Compare criterion averages and the number evaluated. A missing evaluation is not a zero score.")}</p>
-        <div className="overflow-x-auto">
+        <div className="sm:hidden space-y-3">
+          {!evaluationGroups.length && (
+            <div className="rounded-xl bg-tw-hover p-4 text-sm text-tw-text-secondary flex items-start gap-3">
+              <Icon name="star" className="h-5 w-5 shrink-0" />
+              {tr('No evaluations this month.')}
+            </div>
+          )}
+          {evaluationGroups.map((ad) => (
+            <article key={ad.id} className="rounded-xl border border-tw-border overflow-hidden">
+              <header className="bg-tw-hover px-3 py-3">
+                <div className="text-xs text-tw-text-secondary mb-1">{tr('Grading AD')}</div>
+                <h4 className="text-sm font-semibold break-words">{ad.name}</h4>
+                <div className="mt-2 text-xs text-tw-text-secondary">{tr('Evaluated')} <strong className="text-tw-text tabular-nums">{ad.assessments.length}</strong></div>
+              </header>
+              <div className="divide-y divide-tw-border px-3">
+                {dashboard.criteria.map((c) => {
+                  const scores = ad.assessments.map((a) => a.scores[c.key]).filter((v) => Number.isFinite(v))
+                  const average = scores.length ? scores.reduce((sum, v) => sum + v, 0) / scores.length : null
+                  return <div key={c.key} className="py-3">
+                    <div className="flex items-start justify-between gap-3 text-sm">
+                      <span className="min-w-0 leading-5 break-words">{tr(c.label)}</span>
+                      <span className="shrink-0 tabular-nums text-tw-text-secondary">
+                        {average === null ? '—' : <><strong className="text-tw-text">{average.toFixed(1)}</strong> / {c.max}</>}
+                      </span>
+                    </div>
+                    <div className="mt-2 h-1.5 rounded-full bg-tw-hover overflow-hidden" aria-hidden="true">
+                      <div className="h-full rounded-full bg-teal-500" style={{ width: `${average === null || c.max <= 0 ? 0 : Math.max(0, Math.min(100, average / c.max * 100))}%` }} />
+                    </div>
+                  </div>
+                })}
+              </div>
+            </article>
+          ))}
+        </div>
+        <div className="hidden sm:block overflow-x-auto">
           <table className="table-modern">
             <thead>
               <tr>
