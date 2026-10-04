@@ -30,6 +30,7 @@ function FingerprintIcon({ className }: { className?: string }) {
 }
 
 export default function Auth({ onLogin }: Props) {
+  const testing = new URLSearchParams(window.location.search).has('testing')
   const [phone, setPhone]         = useState('')
   const [password, setPassword]   = useState('')
   const [error, setError]         = useState('')
@@ -124,7 +125,7 @@ export default function Auth({ onLogin }: Props) {
       <div className="bg-tw-surface/90 backdrop-blur-xl border border-tw-border rounded-3xl p-6 md:p-8 w-full max-w-sm shadow-panel relative z-10 animate-pop-in">
         {!showBiometric ? (
           <>
-            <h2 className="text-lg font-bold text-tw-text mb-5 text-center tracking-tight">Sign in to your account</h2>
+            <h2 className="text-lg font-bold text-tw-text mb-5 text-center tracking-tight">{testing ? 'Company role testing' : 'Sign in to your account'}</h2>
 
             <a href={sharedIdentityUrl('login')} className="btn-primary w-full py-3 mb-3">
               <Icon name="key" className="w-4 h-4" /> Sign in with Syswise
@@ -136,6 +137,15 @@ export default function Auth({ onLogin }: Props) {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
+              {testing && <label className="block label">Test role
+                <select className="input mt-1" value={phone} onChange={e => setPhone(e.target.value)}>
+                  <option value="">Select a role</option>
+                  {[['TESTCHAIRMAN', 'Chairman'], ['TESTDIRECTOR', 'Director'], ['TESTDD', 'Deputy Director'],
+                    ['TESTPD', 'Provincial Director'], ['TESTADHO', 'AD - Head Office'], ['TESTAD', 'AD - Provincial'],
+                    ['TESTYSO', 'YSO'], ['TESTYSO2', 'YSO 2'], ['TESTLOGGER', 'Letter Logger'], ['TESTASSIGNER', 'Letter Assigner']]
+                    .map(([id, label]) => <option key={id} value={id}>{label} ({id})</option>)}
+                </select>
+              </label>}
               <div>
                 <label className="label">Login ID</label>
                 <input

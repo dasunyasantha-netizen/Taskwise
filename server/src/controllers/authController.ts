@@ -7,6 +7,8 @@ import { getEnabledFeatures } from '../helpers/features'
 import { ysoRole } from '../helpers/ysoAccess'
 import { SUPPORT_PROOF_PREFIX, SUPPORT_PURPOSE } from './supportVerificationController'
 import { usesFixedRoles, fixedRoleMetadata, isRoleAlias } from '../helpers/fixedRoles'
+import { TEST_WORKSPACE, testSandboxState, resetTestSandbox } from '../helpers/testSandbox'
+import { localDate } from '../helpers/ysoRules'
 
 function signToken(
   actorId: string,
@@ -61,7 +63,13 @@ export async function unifiedLogin(req: Request, res: Response): Promise<void> {
       return
     }
     const invalid = () => res.status(401).json({ error: 'Invalid login ID or password.' })
-    const { loginId, lookupPhone, selector } = resolveLoginLookup(phone)
+    const input = /^TEST[A-Z0-9]+$/i.test(String(phone).trim()) ? String(phone).trim().toUpperCase() : phone
+    const { loginId, lookupPhone, selector } = resolveLoginLookup(input)
+    if (/^TEST[A-Z0-9]+$/.test(loginId)) {
+      const state = await testSandboxState(TEST_WORKSPACE)
+      if (!state?.enabled) { invalid(); return }
+      if (localDate(state.lastResetAt) !== localDate()) await resetTestSandbox()
+    }
 
     // 1. Try Director
     const directorCandidates = await prisma.director.findMany({

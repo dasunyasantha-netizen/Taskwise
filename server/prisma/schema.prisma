@@ -3,6 +3,31 @@ generator client {
   binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
 }
 
+model TestSandbox {
+  workspaceId String @id
+  lastResetAt DateTime @default(now())
+  enabled Boolean @default(true)
+}
+
+model TestFeedback {
+  id String @id @default(uuid())
+  workspaceId String
+  role String
+  screen String
+  expected String
+  actual String
+  suggestion String
+  createdAt DateTime @default(now())
+  @@index([workspaceId, createdAt])
+}
+
+model TestSandboxFile {
+  id String @id @default(uuid())
+  workspaceId String
+  bytes Bytes
+  @@index([workspaceId])
+}
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")

@@ -20,6 +20,8 @@ import letterRoutes from './routes/letterRoutes'
 import { startLetterWorker } from './helpers/letterWorker'
 import ysoRoutes              from './routes/ysoRoutes'
 import { retryPendingMigrationContacts } from './controllers/migrationContactController'
+import testSandboxRoutes from './routes/testSandboxRoutes'
+import { startTestSandboxWorker } from './helpers/testSandbox'
 
 const app  = express()
 const PORT = process.env.PORT || 4300
@@ -54,6 +56,7 @@ app.use('/api/company',            companyRequestRoutes)
 app.use('/api/insurance',          insuranceRoutes)
 app.use('/api/admin',              adminRoutes)
 app.use('/api/yso',                ysoRoutes)
+app.use('/api/test-sandbox', testSandboxRoutes)
 
 // Health check
 app.get('/api/health', (_req, res) => {
@@ -63,6 +66,7 @@ app.get('/api/health', (_req, res) => {
 app.listen(PORT, () => {
   console.log(`TaskWise backend running on port ${PORT}`)
   startLetterWorker()
+  startTestSandboxWorker()
   if (process.env.SYSWISE_BASE_URL && process.env.SYSWISE_TASKWISE_SERVICE_KEY) {
     retryPendingMigrationContacts().catch(() => {})
     setInterval(() => retryPendingMigrationContacts().catch(() => {}), 5 * 60 * 1000).unref()

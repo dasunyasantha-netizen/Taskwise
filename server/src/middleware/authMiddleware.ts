@@ -2,6 +2,8 @@ import { Request, Response, NextFunction } from 'express'
 import jwt from 'jsonwebtoken'
 import prisma from '../prisma'
 import { fixedRoleMetadata, usesFixedRoles, isRoleAlias } from '../helpers/fixedRoles'
+import { TEST_WORKSPACE, testSandboxState, resetTestSandbox } from '../helpers/testSandbox'
+import { localDate } from '../helpers/ysoRules'
 
 export interface AuthPayload {
   roleBasedIdentity?: boolean
@@ -60,6 +62,22 @@ export async function authenticateToken(req: Request, res: Response, next: NextF
     if (!payload.iat || payload.iat * 1000 < startOfTodayInSriLankaUtcMs()) {
       res.status(401).json({ error: 'Session expired. Please sign in again.' })
       return
+    }
+    if (payload.workspaceId === TEST_WORKSPACE) {
+      const state = await testSandboxState(payload.workspaceId)
+      if (!state?.enabled) { res.status(403).json({ error: 'Test company is disabled' }); return }
+      if (localDate(state.lastResetAt) !== localDate()) {
+        try { await resetTestSandbox() }
+        catch { res.status(503).json({ error: 'Test company reset pending. Please try again shortly.' }); return }
+        res.status(401).json({ error: 'Test company reset. Please sign in again.' }); return
+      }
+      if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) &&
+          (/\/letters\/(drive|settings)/.test(req.originalUrl) ||
+           /\/auth\/(migration-contact|role-contacts|change-password|webauthn\/register)/.test(req.originalUrl) ||
+           /\/workspace\/profile|\/reset-password(?:\?|$)/.test(req.originalUrl) ||
+           /\/workspace\/.*(contact|role)/.test(req.originalUrl))) {
+        res.status(403).json({ error: 'Real integrations and identity changes are disabled in the test company.' }); return
+      }
     }
     const actor = payload.actorType === 'director'
       ? await prisma.director.findFirst({ where: { id: payload.actorId, workspaceId: payload.workspaceId, isActive: true }, select: { company: { select: { status: true } } } })

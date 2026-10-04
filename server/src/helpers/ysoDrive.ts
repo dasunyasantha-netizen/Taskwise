@@ -1,6 +1,7 @@
 import { randomBytes } from 'crypto'
 import prisma from '../prisma'
 import { createFolder, driveRequest, oauth } from './letterDrive'
+import { TEST_WORKSPACE } from './testSandbox'
 
 // YSO qualification certificates are stored only in the workspace's Google
 // Drive (a "YSO Certificates" folder inside the Letters folder). The server
@@ -53,6 +54,7 @@ async function connectedSettings(workspaceId: string) {
 }
 
 export async function isDriveConnected(workspaceId: string) {
+  if (workspaceId === TEST_WORKSPACE) return true
   const config = await prisma.letterSettings.findUnique({
     where: { workspaceId },
     select: { connected: true, folderId: true },
@@ -98,6 +100,10 @@ export async function uploadCertificate(
   file: CertificateFile,
   label: { person: string; task: string; date: string }
 ) {
+  if (workspaceId === TEST_WORKSPACE) {
+    const stored = await prisma.testSandboxFile.create({ data: { workspaceId, bytes: file.bytes } })
+    return stored.id
+  }
   const config = await connectedSettings(workspaceId)
   const parent = await certificateFolder(config)
   const base = `${label.person} - ${label.task} - ${label.date}`.replace(/[\r\n\\/:*?"<>|]/g, '_').slice(0, 200)
@@ -135,6 +141,11 @@ export async function uploadCertificate(
 
 /** Fetches a certificate from Drive for a one-off download (not cached on the server). */
 export async function downloadCertificate(workspaceId: string, driveFileId: string) {
+  if (workspaceId === TEST_WORKSPACE) {
+    const stored = await prisma.testSandboxFile.findFirst({ where: { id: driveFileId, workspaceId } })
+    if (!stored) throw new CertificateError(404, 'Test certificate not found')
+    return stored.bytes
+  }
   const config = await connectedSettings(workspaceId)
   const token = await oauth(config).getAccessToken()
   if (!token.token) throw new CertificateError(502, 'Reconnect Google Drive in settings')
@@ -151,6 +162,10 @@ export async function downloadCertificate(workspaceId: string, driveFileId: stri
 
 /** Best-effort cleanup when a submission fails after its scan was uploaded. */
 export async function deleteCertificate(workspaceId: string, driveFileId: string) {
+  if (workspaceId === TEST_WORKSPACE) {
+    await prisma.testSandboxFile.deleteMany({ where: { id: driveFileId, workspaceId } })
+    return
+  }
   try {
     const config = await connectedSettings(workspaceId)
     await driveRequest(config, `files/${encodeURIComponent(driveFileId)}?supportsAllDrives=true`, {

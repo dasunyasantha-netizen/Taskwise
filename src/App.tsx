@@ -15,6 +15,7 @@ import { captureLaunchSource, sharedIdentityUrl, type LaunchSource } from './ser
 import { LanguageProvider, viewingLanguage } from './i18n/Language'
 import { Icon } from './components/ui/Icon'
 import { LoadingBlock } from './components/ui/Primitives'
+import TestCompanyBanner, { isTestCompany } from './components/TestCompanyBanner'
 
 function NoticeBanner({ loggedIn }: { loggedIn: boolean }) {
   const [notices, setNotices] = useState<Notice[]>([])
@@ -82,6 +83,7 @@ export default function App() {
   }
 
   const maybeShowSetup = (actorId: string) => {
+    if (actorId.startsWith('taskwise-test-')) return
     if (!localStorage.getItem(`taskwise_setup_${actorId}`)) {
       setShowSetup(true)
     }
@@ -291,12 +293,13 @@ export default function App() {
 
   const isImpersonating = !!user.impersonation
   // Add top padding when impersonation banner is shown
-  const bannerPad = isImpersonating ? 'pt-[56px]' : ''
+  const bannerPad = isTestCompany(user) ? 'test-company-shell' : isImpersonating ? 'pt-[56px]' : ''
 
   if (user.actorType === 'director') {
     const requiresInsurancePolicyCompletion = user.features?.includes('insurance_management') === true && !user.impersonation
     return (
       <LanguageProvider language={viewingLanguage(user)}>
+        {isTestCompany(user) && <TestCompanyBanner user={user} view={view} />}
         {showMigration && !user.impersonation && <MigrationContactModal currentPhone={user.phone} onSaved={() => setShowMigration(false)} />}
         {requiresInsurancePolicyCompletion && <InsurancePolicyCompletionPrompt />}
         {showSetup && !showMigration && !user.impersonation && (
@@ -329,6 +332,7 @@ export default function App() {
 
   return (
     <LanguageProvider language={viewingLanguage(user)}>
+      {isTestCompany(user) && <TestCompanyBanner user={user} view={view} />}
       {showMigration && !user.impersonation && <MigrationContactModal currentPhone={user.phone} onSaved={() => setShowMigration(false)} />}
       {showSetup && !showMigration && !user.impersonation && (
         <SetupPrompt actorId={user.actorId} onDone={() => setShowSetup(false)} />

@@ -1,5 +1,13 @@
 const BASE_URL = import.meta.env.VITE_API_URL || '/api'
 
+export type TestFeedback = { id: string; role: string; screen: string; expected: string; actual: string; suggestion: string; createdAt: string }
+export const testSandboxApi = {
+  status: () => request<{ nextResetAt: string; canReset: boolean }>('GET', '/test-sandbox'),
+  reset: () => request('POST', '/test-sandbox/reset'),
+  feedback: (body: { screen: string; expected: string; actual: string; suggestion: string }) => request('POST', '/test-sandbox/feedback', body),
+  listFeedback: () => request<TestFeedback[]>('GET', '/test-sandbox/feedback'),
+}
+
 function getToken(): string | null {
   return localStorage.getItem('taskwise_token')
 }

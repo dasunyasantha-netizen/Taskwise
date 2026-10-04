@@ -1,6 +1,7 @@
 import { OAuth2Client } from 'google-auth-library'
 import { LetterSettings } from '@prisma/client'
 import { decrypt, ensure } from './letters'
+import { TEST_WORKSPACE } from './testSandbox'
 export const callbackUrl = () =>
   process.env.LETTER_OAUTH_CALLBACK ||
   'https://syswise.lk/taskwise-api/api/letters/drive/callback'
@@ -48,6 +49,7 @@ export async function driveRequest(
   options: RequestInit = {},
   upload = false
 ) {
+  ensure(config.workspaceId !== TEST_WORKSPACE, 403, 'Google Drive is disabled for the test company')
   const token = await oauth(config).getAccessToken()
   ensure(token.token, 502, 'Reconnect Google Drive in settings')
   const response = await fetch(

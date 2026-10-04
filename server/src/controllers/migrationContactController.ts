@@ -2,6 +2,7 @@ import { Request, Response } from 'express'
 import { isSupportedCountry, parsePhoneNumberFromString, type CountryCode } from 'libphonenumber-js/max'
 import prisma from '../prisma'
 import { usesFixedRoles, isRoleAlias } from '../helpers/fixedRoles'
+import { TEST_WORKSPACE } from '../helpers/testSandbox'
 
 type RoleContact = { id: string; actorType: string; actorId: string; workspaceId: string; companyId: string | null; country: string; phoneE164: string; email: string | null; assignmentVersion: number }
 
@@ -53,6 +54,7 @@ export async function retryPendingMigrationContacts(): Promise<void> {
 }
 
 export async function getMigrationContact(req: Request, res: Response): Promise<void> {
+  if (req.user!.workspaceId === TEST_WORKSPACE) { res.json({ required: false }); return }
   if (await usesFixedRoles(req.user!.workspaceId)) { res.json({ required: false }); return }
   if (req.user?.impersonationSessionId) {
     res.json({ required: false }); return

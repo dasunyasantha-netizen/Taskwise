@@ -3,6 +3,7 @@ import path from 'path'
 import { randomBytes } from 'crypto'
 import prisma from '../prisma'
 import { driveRequest } from './letterDrive'
+import { TEST_WORKSPACE } from './testSandbox'
 
 export function renderLetterPreview(
   original: Buffer,
@@ -111,6 +112,12 @@ export async function processLetterJob(kind: 'upload' | 'preview') {
         })
       })
     } else {
+      if (file.event.workspaceId === TEST_WORKSPACE) {
+        await prisma.letterAttachment.update({ where: { id: file.id }, data: {
+          uploadState: 'READY', uploadError: null, uploadLeaseUntil: null,
+        } })
+        return true
+      }
       const config = await prisma.letterSettings.findUnique({
         where: { workspaceId: file.event.workspaceId },
       })

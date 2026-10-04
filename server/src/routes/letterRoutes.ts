@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express'
 import { randomBytes } from 'crypto'
 import { Prisma } from '@prisma/client'
 import prisma from '../prisma'
+import { TEST_WORKSPACE } from '../helpers/testSandbox'
 import { authenticateToken } from '../middleware/authMiddleware'
 import {
   LetterError,
@@ -32,6 +33,7 @@ const PAGE_SIZE = 50
 // Documents are only accepted while Drive is connected; nothing is kept
 // on the server for a workspace without Drive.
 const requireDrive = async (workspaceId: string, count: number) => {
+  if (workspaceId === TEST_WORKSPACE) return
   if (!count) return
   const config = await prisma.letterSettings.findUnique({
     where: { workspaceId },
