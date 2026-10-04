@@ -6,6 +6,7 @@ import DatePicker from './DatePicker'
 import type { IconName } from './ui/Icon'
 import { PageHeader, LoadingBlock, EmptyState } from './ui/Primitives'
 import { Icon } from './ui/Icon'
+import PhoneField from './PhoneField'
 
 type RecordTab = 'quotations' | 'policies'
 type FormData = Record<string, string | boolean>
@@ -243,7 +244,10 @@ function RecordFormModal({ kind, initial, onClose, onSaved }: {
               />
             </Field>
             <Field label="Customer name" required><TextInput value={String(form.customerName)} onChange={v => set('customerName', v)} /></Field>
-            <Field label="Contact number" required><TextInput value={String(form.contactNumber)} onChange={v => set('contactNumber', v)} type="tel" /></Field>
+            <div>
+              <span className="block text-xs font-semibold text-tw-text-secondary mb-1.5">Contact number<span className="text-tw-danger"> *</span></span>
+              <PhoneField label="Contact number" value={String(form.contactNumber)} onChange={v => set('contactNumber', v)} />
+            </div>
             <Field label="Introducer"><TextInput value={String(form.introducer)} onChange={v => set('introducer', v)} placeholder="Person who introduced the business" /></Field>
             {kind === 'quotation' && <Field label="Partner"><TextInput value={String(form.partner)} onChange={v => set('partner', v)} placeholder="Partner name" /></Field>}
             {kind === 'policy' && (

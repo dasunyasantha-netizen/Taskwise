@@ -146,6 +146,9 @@ export default function BoardView({ project, isDirector, actorId }: Props) {
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dragOverCol, setDragOverCol] = useState<string | null>(null)
   const dragTaskRef = useRef<Task | null>(null)
+  // Phones show one status column at a time, picked from the tab strip or by swiping.
+  const [mobileCol, setMobileCol] = useState(COLUMNS[0].status)
+  const swipeRef = useRef<{ x: number; y: number } | null>(null)
 
   const [form, setForm] = useState({ title: '', description: '', priority: 'MEDIUM', deadline: '' })
   const [assignTarget, setAssignTarget] = useState<{ type: 'personnel' | 'department' | ''; id: string }>({ type: 'personnel', id: '' })
@@ -310,16 +313,44 @@ export default function BoardView({ project, isDirector, actorId }: Props) {
         onChange={setFilters}
       />
 
-      <div className="flex gap-4 overflow-x-auto pb-4 flex-1">
+      {/* Phone: status tabs instead of side-by-side columns */}
+      <div className="sm:hidden -mx-1 mb-3 flex gap-1.5 overflow-x-auto scrollbar-hide px-1 pb-1" role="tablist" aria-label="Task status">
+        {COLUMNS.map(col => {
+          const active = mobileCol === col.status
+          return (
+            <button key={col.status} type="button" role="tab" aria-selected={active}
+              onClick={() => setMobileCol(col.status)}
+              className={`flex-shrink-0 inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${active ? 'bg-tw-primary text-white border-tw-primary shadow-card' : 'bg-tw-surface text-tw-text-secondary border-tw-border'}`}>
+              <span className={`w-2 h-2 rounded-full ${col.color}`} />
+              {col.label}
+              <span className={`rounded-full px-1.5 text-[11px] ${active ? 'bg-white/25 text-white' : 'bg-tw-hover text-tw-text-secondary'}`}>{columnTasks(col).length}</span>
+            </button>
+          )
+        })}
+      </div>
+
+      <div className="flex gap-4 sm:overflow-x-auto pb-4 flex-1 min-w-0"
+        onTouchStart={e => { swipeRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY } }}
+        onTouchEnd={e => {
+          const start = swipeRef.current
+          swipeRef.current = null
+          if (!start || window.matchMedia('(min-width: 640px)').matches) return
+          const dx = e.changedTouches[0].clientX - start.x
+          const dy = e.changedTouches[0].clientY - start.y
+          if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return
+          const idx = COLUMNS.findIndex(c => c.status === mobileCol)
+          const next = COLUMNS[idx + (dx < 0 ? 1 : -1)]
+          if (next) setMobileCol(next.status)
+        }}>
         {COLUMNS.map(col => {
           const isDropTarget = dragOverCol === col.status && canDropInto(col.status)
           return (
-            <div key={col.status} className="flex-shrink-0 w-72 bg-tw-surface-2/70 border border-tw-border rounded-2xl p-2.5"
+            <div key={col.status} className={`${mobileCol === col.status ? 'flex-1 w-full' : 'hidden'} sm:block sm:flex-none flex-shrink-0 sm:w-72 bg-tw-surface-2/70 border border-tw-border rounded-2xl p-2.5`}
               onDragOver={e => { e.preventDefault(); setDragOverCol(col.status) }}
               onDragLeave={() => setDragOverCol(null)}
               onDrop={() => handleDrop(col.status)}
             >
-              <div className="flex items-center gap-2 mb-3 px-1.5 pt-1">
+              <div className="hidden sm:flex items-center gap-2 mb-3 px-1.5 pt-1">
                 <div className={`w-2 h-2 rounded-full ${col.color}`} />
                 <span className="text-xs font-semibold text-tw-text">{col.label}</span>
                 <span className="ml-auto bg-tw-surface border border-tw-border text-tw-text-secondary text-[11px] rounded-full px-2 py-0.5 font-semibold">

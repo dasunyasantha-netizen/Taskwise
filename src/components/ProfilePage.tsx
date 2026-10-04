@@ -6,6 +6,7 @@ import RoleAssignments from './RoleAssignments'
 import { PageHeader, ThemeToggle, SinhalaFontPicker } from './ui/Primitives'
 import { Icon } from './ui/Icon'
 import { useLanguage, LanguageToggle } from '../i18n/Language'
+import PhoneField, { localSriLankanPhone, samePhone } from './PhoneField'
 
 interface Props {
   user: AuthUser
@@ -280,10 +281,10 @@ export default function ProfilePage({ user, onUserUpdate }: Props) {
             </div>
             <div>
               <label className="label text-[13px] text-tw-text">Phone Number</label>
-              <input className="input" type="tel" disabled={!!user.syswiseUserId} value={phone} onChange={e => setPhone(e.target.value)} required />
-              {!user.syswiseUserId && phone.trim() !== (user.phone || '').trim() && (
+              <PhoneField lockCountry={user.syswiseUserId ? undefined : 'LK'} disabled={!!user.syswiseUserId} value={phone} onChange={setPhone} />
+              {!user.syswiseUserId && !samePhone(phone, user.phone) && (
                 <p className="mt-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 leading-snug">
-                  Your phone number is your login username. After saving, use <strong>{phone.trim()}</strong> to log in next time.
+                  Your phone number is your login username. After saving, use <strong>{localSriLankanPhone(phone) || phone.trim()}</strong> to log in next time.
                 </p>
               )}
             </div>

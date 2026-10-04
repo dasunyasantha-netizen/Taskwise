@@ -332,3 +332,7 @@ html.dark .tw-watermark { opacity: 0.07; mix-blend-mode: screen; filter: invert(
 .yso-calendar-reporting { --calendar-color: rgb(var(--tw-success)); }
 .yso-calendar-personal { --calendar-color: rgb(var(--tw-text-secondary)); }
 .yso-calendar-event { border: 1px solid rgb(var(--tw-border)); border-left: 3px solid var(--calendar-color); border-radius: 10px; padding: 8px 10px; background: rgb(var(--tw-surface-2)); }
+
+/* Horizontal strips (tabs, chips) that scroll without a visible scrollbar */
+.scrollbar-hide { scrollbar-width: none; -ms-overflow-style: none; }
+.scrollbar-hide::-webkit-scrollbar { display: none; }

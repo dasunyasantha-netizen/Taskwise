@@ -1,22 +1,15 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import {
-  getCountries, getCountryCallingCode, parsePhoneNumberFromString,
+  parsePhoneNumberFromString,
   type CountryCode,
 } from 'libphonenumber-js/max'
 import { authApi } from '../services/apiService'
-import Select from './Select'
+import PhoneField from './PhoneField'
 
 type Props = {
   currentPhone?: string
   onSaved: () => void
 }
-
-const countryNames = new Intl.DisplayNames(['en'], { type: 'region' })
-const countries = getCountries().map(code => ({
-  code,
-  label: countryNames.of(code) || code,
-  callingCode: getCountryCallingCode(code),
-})).sort((a, b) => a.label.localeCompare(b.label))
 
 export default function MigrationContactModal({ currentPhone, onSaved }: Props) {
   const initial = currentPhone ? parsePhoneNumberFromString(currentPhone) : undefined
@@ -25,7 +18,6 @@ export default function MigrationContactModal({ currentPhone, onSaved }: Props) 
   const [email, setEmail] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const selected = useMemo(() => countries.find(item => item.code === country), [country])
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -68,16 +60,9 @@ export default function MigrationContactModal({ currentPhone, onSaved }: Props) 
           Please enter your mobile number for our upcoming system migration. This will help us keep your account connected. We’ll let you know when the update is ready.
         </p>
         <form onSubmit={submit} className="mt-6 space-y-4">
-          <span className="block text-sm font-semibold text-slate-800" id="migration-country-label">Country</span>
-          <Select ariaLabel="Country" value={country} onChange={value => setCountry(value as CountryCode)}
-            options={countries.map(item => ({ value: item.code, label: `${item.label} (+${item.callingCode})` }))} />
           <label className="block text-sm font-semibold text-slate-800" htmlFor="migration-phone">Mobile number</label>
-          <div className="flex overflow-hidden rounded-xl border border-tw-border bg-tw-surface focus-within:border-tw-primary/60 focus-within:ring-4 focus-within:ring-tw-primary/15">
-            <span className="flex items-center border-r border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-600">+{selected?.callingCode}</span>
-            <input id="migration-phone" type="tel" inputMode="tel" autoComplete="tel-national" required
-              value={phone} onChange={event => setPhone(event.target.value)} placeholder="Mobile number"
-              className="min-w-0 flex-1 px-4 py-3 text-sm text-tw-text bg-transparent outline-none" />
-          </div>
+          <PhoneField id="migration-phone" label="Mobile number" country={country} onCountryChange={setCountry}
+            value={phone} onChange={setPhone} />
           {country !== 'LK' && <>
             <label className="block text-sm font-semibold text-slate-800" htmlFor="migration-email">Email address</label>
             <input id="migration-email" type="email" autoComplete="email" required value={email}

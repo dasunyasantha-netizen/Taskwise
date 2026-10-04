@@ -10,6 +10,7 @@ import FixedRoleManagement from './FixedRoleManagement'
 import { Icon } from './ui/Icon'
 import { PageHeader, LoadingBlock } from './ui/Primitives'
 import { useConfirm } from './ConfirmDialog'
+import PhoneField, { samePhone } from './PhoneField'
 
 export default function HierarchyPanel({ user }: { user: AuthUser }) {
   const { confirm, dialog } = useConfirm()
@@ -597,7 +598,7 @@ export default function HierarchyPanel({ user }: { user: AuthUser }) {
             </div>
             <div>
               <label className="label text-[13px] text-tw-text">Phone Number <span className="text-tw-danger">*</span></label>
-              <input className="input" type="tel" placeholder="07X XXXXXXX" value={personnelForm.phone} onChange={e => setPersonnelForm(f => ({ ...f, phone: e.target.value }))} />
+              <PhoneField lockCountry="LK" value={personnelForm.phone} onChange={phone => setPersonnelForm(f => ({ ...f, phone }))} />
               <p className="text-xs text-tw-text-secondary mt-0.5">Login ID preview: <span className="font-mono font-semibold text-tw-primary">{loginPreview}</span></p>
             </div>
             <div>
@@ -778,13 +779,13 @@ export default function HierarchyPanel({ user }: { user: AuthUser }) {
             </div>
             <div>
               <label className="label text-[13px] text-tw-text">Phone Number <span className="text-tw-danger">*</span></label>
-              <input className="input" type="tel" placeholder="07X XXXXXXX" value={editForm.phone} onChange={e => setEditForm(f => ({ ...f, phone: e.target.value }))} />
-              {editForm.phone !== (editingPersonnel.phone || '') && (
+              <PhoneField lockCountry="LK" value={editForm.phone} onChange={phone => setEditForm(f => ({ ...f, phone }))} />
+              {!samePhone(editForm.phone, editingPersonnel.phone) && (
                 <div className="mt-1.5 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5">
                   <p className="text-xs text-amber-700 inline-flex items-center gap-1"><Icon name="alert" className="w-3.5 h-3.5" /> Changing phone number will also update their login username.</p>
                 </div>
               )}
-              {editForm.phone === (editingPersonnel.phone || '') && (
+              {samePhone(editForm.phone, editingPersonnel.phone) && (
                 <p className="text-xs text-tw-text-secondary mt-0.5">This is also their login username.</p>
               )}
             </div>

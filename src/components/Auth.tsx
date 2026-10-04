@@ -5,6 +5,7 @@ import {
   startAuthentication,
 } from '@simplewebauthn/browser'
 import CompanyRequestModal from './CompanyRequestModal'
+import Select from './Select'
 import { launcherHomeUrl, launcherName, sharedIdentityUrl } from '../services/launchSource'
 import { Icon } from './ui/Icon'
 import { ThemeToggle } from './ui/Primitives'
@@ -137,15 +138,15 @@ export default function Auth({ onLogin }: Props) {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              {testing && <label className="block label">Test role
-                <select className="input mt-1" value={phone} onChange={e => setPhone(e.target.value)}>
-                  <option value="">Select a role</option>
-                  {[['TESTCHAIRMAN', 'Chairman'], ['TESTDIRECTOR', 'Director'], ['TESTDD', 'Deputy Director'],
-                    ['TESTPD', 'Provincial Director'], ['TESTADHO', 'AD - Head Office'], ['TESTAD', 'AD - Provincial'],
-                    ['TESTYSO', 'YSO'], ['TESTYSO2', 'YSO 2'], ['TESTLOGGER', 'Letter Logger'], ['TESTASSIGNER', 'Letter Assigner']]
-                    .map(([id, label]) => <option key={id} value={id}>{label} ({id})</option>)}
-                </select>
-              </label>}
+              {testing && <div className="block label">Test role
+                <div className="mt-1">
+                  <Select ariaLabel="Test role" placeholder="Select a role" value={phone} onChange={setPhone}
+                    options={[['TESTCHAIRMAN', 'Chairman'], ['TESTDIRECTOR', 'Director'], ['TESTDD', 'Deputy Director'],
+                      ['TESTPD', 'Provincial Director'], ['TESTADHO', 'AD - Head Office'], ['TESTAD', 'AD - Provincial'],
+                      ['TESTYSO', 'YSO'], ['TESTYSO2', 'YSO 2'], ['TESTLOGGER', 'Letter Logger'], ['TESTASSIGNER', 'Letter Assigner']]
+                      .map(([id, label]) => ({ value: id, label: `${label} (${id})` }))} />
+                </div>
+              </div>}
               <div>
                 <label className="label">Login ID</label>
                 <input
