@@ -1641,27 +1641,27 @@ export default function YsoPerformancePage({ user, onUserUpdate }: { user: AuthU
       )}
 
       {/* ── Score summary ────────────────────────────────────────────────── */}
-      <section className="card overflow-hidden">
-        <div className="grid grid-cols-3 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
-          <div className="col-span-3 md:col-span-1 p-5 bg-gradient-to-br from-teal-50 to-tw-surface border-b md:border-b-0 md:border-r border-tw-border">
-            <p className="text-xs font-medium text-teal-700">{tr("Official monthly score")} · {monthLabel}</p>
-            <p className={`text-4xl font-bold tracking-tight mt-1.5 tabular-nums ${total < 0 ? 'text-tw-danger' : 'text-tw-text'}`}>{signed(total)}</p>
-            <p className="text-xs text-tw-text-secondary mt-1.5">{tr("Approved submissions and confirmed penalties only.")}</p>
+      <section className="card overflow-hidden yso-score-summary" aria-label={tr("Official monthly score")}>
+        <div className="grid grid-cols-3 md:grid-cols-[1.4fr_1fr_1fr_1fr] yso-score-grid">
+          <div className="col-span-3 md:col-span-1 p-5 bg-gradient-to-br from-teal-50 to-tw-surface border-b md:border-b-0 md:border-r border-tw-border yso-score-total">
+            <p className="text-xs font-medium text-teal-700 yso-score-heading"><span>{tr("Official monthly score")}</span><span className="yso-score-separator"> · </span><span className="yso-score-month">{monthLabel}</span></p>
+            <p className={`text-4xl font-bold tracking-tight mt-1.5 tabular-nums yso-score-value ${total < 0 ? 'text-tw-danger' : 'text-tw-text'}`}>{signed(total)}</p>
+            <p className="text-xs text-tw-text-secondary mt-1.5 yso-score-description">{tr("Approved submissions and confirmed penalties only.")}</p>
           </div>
           {[
             { label: tr("Operational points"), value: signed(total - qualifications - evaluation), icon: 'activity' as IconName },
             { label: tr("Qualification awards"), value: signed(qualifications), icon: 'award' as IconName },
             { label: tr("AD evaluation"), value: `${evaluation}${people.length === 1 ? ' / 25' : ''}`, icon: 'star' as IconName },
           ].map((s, i) => (
-            <div key={s.label} className={`p-4 md:p-5 min-w-0 ${i > 0 ? 'border-l border-tw-border' : ''}`}>
-              <p className="text-[11px] sm:text-xs text-tw-text-secondary inline-flex items-center gap-1.5">
-                <Icon name={s.icon} className="w-3.5 h-3.5 hidden sm:block flex-shrink-0" />{s.label}
+            <div key={s.label} className={`p-4 md:p-5 min-w-0 yso-score-metric ${i > 0 ? 'border-l border-tw-border' : ''}`}>
+              <p className="text-[11px] sm:text-xs text-tw-text-secondary inline-flex items-center gap-1.5 yso-score-metric-label">
+                <span className="contents yso-score-icon"><Icon name={s.icon} className="w-3.5 h-3.5 hidden sm:block flex-shrink-0" /></span>{s.label}
               </p>
-              <p className="text-xl sm:text-2xl font-bold tracking-tight mt-1.5 tabular-nums">{s.value}</p>
+              <p className="text-xl sm:text-2xl font-bold tracking-tight mt-1.5 tabular-nums yso-score-metric-value">{s.value}</p>
             </div>
           ))}
         </div>
-        <div className="flex flex-wrap items-center gap-2 px-4 sm:px-5 py-2.5 border-t border-tw-border bg-tw-surface-2/60">
+        <div className="flex flex-wrap items-center gap-2 px-4 sm:px-5 py-2.5 border-t border-tw-border bg-tw-surface-2/60 yso-score-status">
           <span className={`badge ${queue.length ? 'badge-warning' : 'badge-gray'}`}>
             <Icon name="hourglass" className="w-3 h-3" />{queue.length} {tr(queue.length === 1 ? 'submission' : 'submissions')} {tr("awaiting AD review")}
           </span>
