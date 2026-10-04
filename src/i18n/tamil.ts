@@ -166,6 +166,7 @@ export const ta: Record<string, string> = {
   'Choose…': 'தேர்ந்தெடு…', '(optional)': '(விரும்பினால்)', '(required)': '(கட்டாயம்)',
 
   // ── YSO performance ──
+  'YSO Tasks': 'YSO பணிகள்',
   'YSO Task Hub': 'இளைஞர் சேவை அலுவலர் பணி மையம்', 'YSO Performance': 'இளைஞர் சேவை அலுவலர் செயலாற்றுகை',
   'YSO workspace tabs': 'இ.சே.அ பணியிடத் தாவல்கள்', 'Youth services ·': 'இளைஞர் சேவைகள் ·',
   'My performance': 'எனது செயலாற்றுகை', 'AD workspace': 'உதவிப் பணிப்பாளர் பணியிடம்', 'Director overview': 'பணிப்பாளர் கண்ணோட்டம்',

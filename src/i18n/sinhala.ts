@@ -94,6 +94,7 @@ export const si: Record<string, string> = {
   'January': 'ජනවාරි', 'February': 'පෙබරවාරි', 'March': 'මාර්තු', 'April': 'අප්‍රේල්',
   'May': 'මැයි', 'June': 'ජූනි', 'July': 'ජූලි', 'August': 'අගෝස්තු', 'September': 'සැප්තැම්බර්',
   'October': 'ඔක්තෝබර්', 'November': 'නොවැම්බර්', 'December': 'දෙසැම්බර්',
+  'YSO Tasks': 'YSO කාර්යයන්',
   'YSO Task Hub': 'තරුණ සේවා නිලධාරී කාර්ය මධ්‍යස්ථානය', 'YSO Performance': 'තරුණ සේවා නිලධාරී කාර්ය සාධනය',
   'YSO workspace tabs': 'තරුණ සේවා කාර්ය පිටු', 'Youth services ·': 'තරුණ සේවා ·',
   'My performance': 'මගේ කාර්ය සාධනය', 'AD workspace': 'සහකාර අධ්‍යක්ෂ කාර්ය අවකාශය',

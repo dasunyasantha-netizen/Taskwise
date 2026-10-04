@@ -847,11 +847,13 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
   const mobileNavItems: MobileNavItem[] = [
     { label: 'Tasks',     view: 'personnel_queue',          icon: 'queue',   badge: queue.length },
     { label: 'Approvals', view: 'personnel_approval_queue', icon: 'approve', badge: approvalTasks.length },
-    { label: 'Projects',  view: 'project_board',            icon: 'board' },
+    ...(ysoEnabled
+      ? [{ label: user.ysoRole === 'YSO' ? 'YSO Tasks' : 'YSO Performance', view: 'yso_performance' as ViewMode, icon: 'sprout' as const }]
+      : [{ label: 'Projects', view: 'project_board' as ViewMode, icon: 'board' as const }]),
     { label: 'Letters',   view: 'letters',                  icon: 'letter' },
   ]
   const mobileMoreItems: MobileNavItem[] = [
-    ...(ysoEnabled ? [{ label: user.ysoRole === 'YSO' ? 'YSO Hub' : 'YSO Performance', view: 'yso_performance' as ViewMode, icon: 'sprout' as const }] : []),
+    ...(ysoEnabled ? [{ label: 'Projects', view: 'project_board' as ViewMode, icon: 'board' as const }] : []),
     ...(insuranceEnabled ? [{ label: 'Insurance', view: 'insurance_management' as ViewMode, icon: 'shield' as const }] : []),
     { label: 'My Profile', view: 'profile', icon: 'user' },
   ]
