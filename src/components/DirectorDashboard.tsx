@@ -5,6 +5,7 @@ import { projectApi, taskApi, auditApi, workspaceApi, taskGroupApi } from '../se
 import DatePicker from './DatePicker'
 import Select from './Select'
 import NotificationsMenu from './NotificationsMenu'
+import MobilePickitiLink from './MobilePickitiLink'
 import MobileUserMenu from './MobileUserMenu'
 import { requestRefresh } from '../hooks/useRefresh'
 import Sidebar, { type SidebarSection } from './Sidebar'
@@ -1021,7 +1022,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
               </span>
             </div>
           </div>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 shrink-0">
             {currentView === 'project_board' && selectedProject && (
               <div className="hidden md:inline-flex seg">
                 <button onClick={() => setProjectSubView('board')}
@@ -1062,6 +1063,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
               <Icon name="refresh" className="w-[18px] h-[18px]" />
             </button>
             <ThemeToggle compact className="hidden md:inline-flex" />
+            <MobilePickitiLink />
             <a
               href={launcherHomeUrl(launchSource)}
               title={t(`Back to ${launcherName(launchSource)}`)}

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import type { AuthUser, ViewMode, Task, Project, Personnel, TaskProgressLog } from '../types'
 import { taskApi, projectApi, workspaceApi } from '../services/apiService'
 import NotificationsMenu from './NotificationsMenu'
+import MobilePickitiLink from './MobilePickitiLink'
 import MobileUserMenu from './MobileUserMenu'
 import { requestRefresh } from '../hooks/useRefresh'
 import MobileNav, { type MobileNavItem } from './MobileNav'
@@ -945,7 +946,7 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
               <div className="text-[11px] text-tw-text-secondary md:hidden truncate">{user.name}</div>
             </div>
           </div>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 shrink-0">
             <button onClick={refreshAll} title={t('Refresh')} aria-label={t('Refresh')} className="icon-btn hidden md:inline-flex">
               <Icon name="refresh" className="w-[18px] h-[18px]" />
             </button>
@@ -974,6 +975,7 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
               </div>
             )}
             <ThemeToggle compact className="hidden md:inline-flex" />
+            <MobilePickitiLink />
             <a
               href={launcherHomeUrl(launchSource)}
               title={t(`Back to ${launcherName(launchSource)}`)}

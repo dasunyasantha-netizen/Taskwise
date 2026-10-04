@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useLayoutEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import type { Notification } from '../types'
 import { notificationApi } from '../services/apiService'
 import type { IconName } from './ui/Icon'
@@ -17,6 +18,27 @@ export default function NotificationsMenu({ onOpenTask, onOpenCompanyRequests, o
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const [position, setPosition] = useState({ left: 12, top: 12, width: 352, maxHeight: 400 })
+  const updatePosition = useCallback(() => {
+    if (!buttonRef.current) return
+    const bounds = buttonRef.current.getBoundingClientRect()
+    const width = Math.min(352, window.innerWidth - 24)
+    const top = Math.max(12, Math.min(bounds.bottom + 8, window.innerHeight - 80))
+    const left = Math.max(12, Math.min(bounds.right - width, window.innerWidth - width - 12))
+    setPosition({ left, top, width, maxHeight: window.innerHeight - top - 12 })
+  }, [])
+  useLayoutEffect(() => {
+    if (!open) return
+    updatePosition()
+    window.addEventListener('resize', updatePosition)
+    window.addEventListener('scroll', updatePosition, true)
+    return () => {
+      window.removeEventListener('resize', updatePosition)
+      window.removeEventListener('scroll', updatePosition, true)
+    }
+  }, [open, updatePosition])
 
   const fetchNotifications = async () => {
     try {
@@ -35,11 +57,21 @@ export default function NotificationsMenu({ onOpenTask, onOpenCompanyRequests, o
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+      if (ref.current && !ref.current.contains(e.target as Node) && !panelRef.current?.contains(e.target as Node)) setOpen(false)
     }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && open) {
+        setOpen(false)
+        buttonRef.current?.focus()
+      }
+    }
+    document.addEventListener('pointerdown', handler)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', handler)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [open])
 
   const unread = notifications.filter(n => !n.isRead).length
 
@@ -89,9 +121,12 @@ export default function NotificationsMenu({ onOpenTask, onOpenCompanyRequests, o
   return (
     <div ref={ref} className="relative">
       <button
+        ref={buttonRef}
         onClick={() => setOpen(o => !o)}
         className={`relative icon-btn ${open ? 'bg-tw-hover text-tw-text' : ''}`}
         aria-label={t('Notifications')}
+        aria-expanded={open}
+        aria-haspopup="dialog"
       >
         <Icon name="bell" className="w-[18px] h-[18px]" />
         {unread > 0 && (
@@ -101,17 +136,23 @@ export default function NotificationsMenu({ onOpenTask, onOpenCompanyRequests, o
         )}
       </button>
 
-      {open && (
-        <div className="absolute right-0 top-11 w-[22rem] max-w-[calc(100vw-1.5rem)] bg-tw-surface rounded-2xl shadow-panel border border-tw-border z-50 overflow-hidden animate-pop-in">
-          <div className="flex items-center justify-between px-4 py-3.5 border-b border-tw-border">
-            <span className="font-semibold text-tw-text text-sm inline-flex items-center gap-2">{t('Notifications')} {unread > 0 && <span className="badge badge-primary">{t('{count} new', { count: unread })}</span>}</span>
+      {open && createPortal(
+        <div ref={panelRef} role="dialog" aria-label={t('Notifications')} style={position}
+          className="fixed flex flex-col bg-tw-surface rounded-2xl shadow-panel border border-tw-border z-[60] overflow-hidden animate-pop-in">
+          <div className="shrink-0 px-4 py-2.5 border-b border-tw-border">
+            <div className="flex items-center justify-between gap-2">
+              <span className="min-w-0 font-semibold text-tw-text text-sm inline-flex flex-wrap items-center gap-2">{t('Notifications')} {unread > 0 && <span className="badge badge-primary">{t('{count} new', { count: unread })}</span>}</span>
+              <button onClick={() => { setOpen(false); buttonRef.current?.focus() }} aria-label={t('Close dialog')} className="icon-btn shrink-0">
+                <Icon name="x" className="w-4 h-4" />
+              </button>
+            </div>
             {unread > 0 && (
-              <button onClick={markAll} className="text-xs font-semibold text-tw-primary-text hover:underline">
+              <button onClick={markAll} className="min-h-8 mt-1 text-xs font-semibold text-tw-primary-text hover:underline">
                 {t('Mark all read')}
               </button>
             )}
           </div>
-          <div className="max-h-96 overflow-y-auto">
+          <div className="min-h-0 max-h-96 overflow-y-auto overscroll-contain">
             {notifications.length === 0 ? (
               <div className="px-4 py-10 text-center text-tw-text-secondary text-sm">
                 <span className="icon-tile tile-gray mx-auto mb-3"><Icon name="bell" className="w-5 h-5" /></span>
@@ -129,8 +170,8 @@ export default function NotificationsMenu({ onOpenTask, onOpenCompanyRequests, o
                       <Icon name={typeIcon[n.type]?.icon ?? 'bell'} className="w-4 h-4" />
                     </span>
                     <div className="flex-1 min-w-0">
-                      <div className="text-xs font-semibold text-tw-text">{n.title}</div>
-                      <div className="text-xs text-tw-text-secondary mt-0.5 leading-relaxed">{n.message}</div>
+                      <div className="text-xs font-semibold text-tw-text break-words">{n.title}</div>
+                      <div className="text-xs text-tw-text-secondary mt-0.5 leading-relaxed break-words">{n.message}</div>
                       <div className="text-[11px] text-tw-text-muted mt-1">
                         {new Date(n.createdAt).toLocaleString()}
                       </div>
@@ -141,7 +182,8 @@ export default function NotificationsMenu({ onOpenTask, onOpenCompanyRequests, o
               ))
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )
