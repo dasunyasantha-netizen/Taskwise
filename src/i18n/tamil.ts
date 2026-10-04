@@ -173,6 +173,7 @@ export const ta: Record<string, string> = {
 
   // ── YSO performance ──
   'YSO Tasks': 'YSO பணிகள்',
+  'My YSOs': 'எனது YSOக்கள்',
   'YSO Task Hub': 'இளைஞர் சேவை அலுவலர் பணி மையம்', 'YSO Performance': 'இளைஞர் சேவை அலுவலர் செயலாற்றுகை',
   'YSO workspace tabs': 'இ.சே.அ பணியிடத் தாவல்கள்', 'Youth services ·': 'இளைஞர் சேவைகள் ·',
   'My performance': 'எனது செயலாற்றுகை', 'AD workspace': 'உதவிப் பணிப்பாளர் பணியிடம்', 'Director overview': 'பணிப்பாளர் கண்ணோட்டம்',

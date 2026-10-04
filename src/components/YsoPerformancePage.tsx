@@ -1196,7 +1196,12 @@ function SectionCard({ title, icon, meta, action, flush = false, children }: {
   )
 }
 
-export default function YsoPerformancePage({ user, onUserUpdate }: { user: AuthUser; onUserUpdate: (value: Partial<AuthUser>) => void }) {
+export default function YsoPerformancePage({ user, onUserUpdate, directoryResetKey = 0, onSelectionChange }: {
+  user: AuthUser
+  onUserUpdate: (value: Partial<AuthUser>) => void
+  directoryResetKey?: number
+  onSelectionChange?: (selected: boolean) => void
+}) {
   const { t: tr, locale } = useLanguage()
   const [dashboard, setDashboard] = useState<YsoDashboard | null>(null),
     [error, setError] = useState(''),
@@ -1208,6 +1213,15 @@ export default function YsoPerformancePage({ user, onUserUpdate }: { user: AuthU
     [selectedAd, setSelectedAd] = useState(''),
     [selectedPerson, setSelectedPerson] = useState(''),
     [selectedTask, setSelectedTask] = useState<number | null>(null)
+  useEffect(() => {
+    setSelectedPerson('')
+    setSelectedTask(null)
+    setTab('monitor')
+  }, [directoryResetKey])
+  useEffect(() => {
+    onSelectionChange?.(Boolean(selectedPerson))
+    return () => onSelectionChange?.(false)
+  }, [selectedPerson, onSelectionChange])
   const [entryForm, setEntryForm] = useState<{
       task: YsoTask
       previous?: YsoEntry
@@ -1839,7 +1853,10 @@ export default function YsoPerformancePage({ user, onUserUpdate }: { user: AuthU
                 aria-label={t.key === 'approvals' ? `Approvals (${queue.length} pending)` : t.label}
                 aria-pressed={tab === t.key}
                 key={t.key}
-                onClick={() => setTab(t.key)}
+                onClick={() => {
+                  if (t.key === 'monitor') setSelectedPerson('')
+                  setTab(t.key)
+                }}
               >
                 <Icon name={t.icon} className="w-4 h-4 hidden sm:block" />
                 {t.label}

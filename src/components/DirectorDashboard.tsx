@@ -747,6 +747,8 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
   const [projectSubView, setProjectSubView]   = useState<ProjectSubView>('board')
   const mainRef = useRef<HTMLDivElement>(null)
+  const [ysoHasSelection, setYsoHasSelection] = useState(false)
+  const [ysoDirectoryResetKey, setYsoDirectoryResetKey] = useState(0)
 
   // ── Lifted ProjectManager state (survives view switches) ─────────────────
   const [pmFilters, setPmFilters] = useState<import('./FilterBar').ActiveFilters>(
@@ -782,11 +784,19 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
   const [reportsState, setReportsState] = useState<ReportsState>(DEFAULT_REPORTS_STATE)
 
   const navigate = (v: ViewMode) => {
+    if (v === currentView && v === 'yso_performance') {
+      setYsoDirectoryResetKey(key => key + 1)
+      return
+    }
     const scrollTop = mainRef.current?.scrollTop ?? 0
     setViewHistory(h => [...h, { view: currentView, scrollTop }])
     setView(v)
   }
   const goBack = () => {
+    if (currentView === 'yso_performance' && ysoHasSelection) {
+      setYsoDirectoryResetKey(key => key + 1)
+      return
+    }
     const entry = viewHistory[viewHistory.length - 1]
     if (entry) {
       setViewHistory(h => h.slice(0, -1))
@@ -798,7 +808,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
       })
     }
   }
-  const canGoBack = viewHistory.length > 0 && currentView !== 'director_dashboard'
+  const canGoBack = (viewHistory.length > 0 && currentView !== 'director_dashboard') || (currentView === 'yso_performance' && ysoHasSelection)
   const [stats, setStats] = useState({ projects: 0, totalTasks: 0, overdue: 0, pending_approval: 0 })
   const [recentTasks, setRecentTasks] = useState<Task[]>([])
   const [overdueList, setOverdueTasks] = useState<Task[]>([])
@@ -1187,7 +1197,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
             <InsuranceManagementPage />
           )}
           {currentView === 'letters' && <LetterManagement user={user} onUserUpdate={onUserUpdate} />}
-          {currentView === 'yso_performance' && ysoEnabled && <YsoPerformancePage user={user} onUserUpdate={onUserUpdate} />}
+          {currentView === 'yso_performance' && ysoEnabled && <YsoPerformancePage user={user} onUserUpdate={onUserUpdate} directoryResetKey={ysoDirectoryResetKey} onSelectionChange={setYsoHasSelection} />}
 
           {/* PROJECTS */}
           {currentView === 'project_board' && !selectedProject && (

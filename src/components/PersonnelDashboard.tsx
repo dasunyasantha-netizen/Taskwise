@@ -766,13 +766,23 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
   // ── Navigation history ────────────────────────────────────────────────────
   const [viewHistory, setViewHistory] = useState<Array<{ view: typeof currentView; scrollTop: number }>>([])
   const mainRef = useRef<HTMLDivElement>(null)
+  const [ysoHasSelection, setYsoHasSelection] = useState(false)
+  const [ysoDirectoryResetKey, setYsoDirectoryResetKey] = useState(0)
 
   const navigate = (v: typeof currentView) => {
+    if (v === currentView && v === 'yso_performance') {
+      setYsoDirectoryResetKey(key => key + 1)
+      return
+    }
     const scrollTop = mainRef.current?.scrollTop ?? 0
     setViewHistory(h => [...h, { view: currentView, scrollTop }])
     setView(v)
   }
   const goBack = () => {
+    if (currentView === 'yso_performance' && ysoHasSelection) {
+      setYsoDirectoryResetKey(key => key + 1)
+      return
+    }
     const entry = viewHistory[viewHistory.length - 1]
     if (entry) {
       setViewHistory(h => h.slice(0, -1))
@@ -783,7 +793,7 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
       })
     }
   }
-  const canGoBack = viewHistory.length > 0 && currentView !== 'personnel_queue'
+  const canGoBack = (viewHistory.length > 0 && currentView !== 'personnel_queue') || (currentView === 'yso_performance' && ysoHasSelection)
 
   const load = async () => {
     setLoading(true)
@@ -850,7 +860,7 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
     { label: 'Tasks',     view: 'personnel_queue',          icon: 'queue',   badge: queue.length },
     { label: 'Approvals', view: 'personnel_approval_queue', icon: 'approve', badge: approvalTasks.length },
     ...(ysoEnabled
-      ? [{ label: user.ysoRole === 'YSO' ? 'YSO Tasks' : 'YSO Performance', view: 'yso_performance' as ViewMode, icon: 'sprout' as const }]
+      ? [{ label: user.ysoRole === 'YSO' ? 'YSO Tasks' : 'My YSOs', view: 'yso_performance' as ViewMode, icon: 'sprout' as const }]
       : [{ label: 'Projects', view: 'project_board' as ViewMode, icon: 'board' as const }]),
     { label: 'Letters',   view: 'letters',                  icon: 'letter' },
   ]
@@ -1207,7 +1217,7 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
             <InsuranceManagementPage />
           )}
           {currentView === 'letters' && <LetterManagement user={user} onUserUpdate={onUserUpdate} />}
-          {currentView === 'yso_performance' && ysoEnabled && <YsoPerformancePage user={user} onUserUpdate={onUserUpdate} />}
+          {currentView === 'yso_performance' && ysoEnabled && <YsoPerformancePage user={user} onUserUpdate={onUserUpdate} directoryResetKey={ysoDirectoryResetKey} onSelectionChange={setYsoHasSelection} />}
 
           {currentView === 'project_board' && !selectedProject && (
             <div className="page">
