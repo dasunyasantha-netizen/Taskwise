@@ -26,6 +26,18 @@ interface AccessTarget {
   companyPrefix?: string | null
 }
 
+const testingUrl = 'https://syswise.lk/taskwise/?legacy=1&testing=1'
+const testingMessage = `Please test Taskwise using this link:
+${testingUrl}
+
+Select a role from the Test role dropdown and sign in with password test@123.
+Accounts: TESTCHAIRMAN, TESTDIRECTOR, TESTDD, TESTPD, TESTADHO, TESTAD, TESTYSO, TESTYSO2, TESTLOGGER, TESTASSIGNER.
+
+Try creating, assigning, submitting, returning and approving tasks, and test letters and YSO activities. For example, submit as TESTYSO and review as TESTAD. Sign out to try another role. Please also test on your phone.
+
+Use Feedback in the top banner to record what happened, what you expected and what should change.
+This is a separate test company. Sample data is restored daily at midnight Sri Lanka time. Testing changes are temporary; feedback is retained.`
+
 export default function ImpersonationPage({ user, onSessionStarted }: Props) {
   const [activeTab, setActiveTab] = useState<'start' | 'history'>('start')
   const [targets, setTargets] = useState<AccessTarget[]>([])
@@ -38,6 +50,23 @@ export default function ImpersonationPage({ user, onSessionStarted }: Props) {
   const [sessions, setSessions] = useState<ImpersonationSession[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
   const [revokingId, setRevokingId] = useState<string | null>(null)
+  const [shareStatus, setShareStatus] = useState('')
+
+  const shareTesting = async (linkOnly = false) => {
+    setShareStatus('')
+    try {
+      if (!linkOnly && navigator.share) {
+        await navigator.share({ title: 'Taskwise Role Testing', text: testingMessage })
+        setShareStatus('Testing invitation shared.')
+      } else {
+        await navigator.clipboard.writeText(linkOnly ? testingUrl : testingMessage)
+        setShareStatus(linkOnly ? 'Testing link copied.' : 'Testing invitation copied.')
+      }
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') return
+      setShareStatus('Could not share automatically. Select and copy the testing link below.')
+    }
+  }
 
   useEffect(() => {
     authApi.listImpersonationTargets()
@@ -126,6 +155,20 @@ export default function ImpersonationPage({ user, onSessionStarted }: Props) {
     <div className="page max-w-4xl space-y-6">
       <PageHeader icon="lock" tone="amber" title="Support Access" className="!mb-0"
         subtitle="System Admin only. Sessions require a passkey, expire after 15 minutes, and are fully audited." />
+
+      {user.isSyswiseAdmin && !user.impersonation && <section className="border-y border-tw-border py-4 space-y-3" aria-labelledby="company-testing-heading">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 id="company-testing-heading" className="font-semibold text-tw-text text-sm">Company Role Testing</h2>
+          <div className="flex flex-wrap items-center gap-2">
+            <a href={testingUrl} target="_blank" rel="noopener noreferrer" className="btn-secondary text-sm"><Icon name="external" className="w-4 h-4" /> Open testing</a>
+            <button type="button" onClick={() => void shareTesting(true)} className="btn-secondary text-sm"><Icon name="link" className="w-4 h-4" /> Copy link</button>
+            <button type="button" onClick={() => void shareTesting()} className="btn-primary text-sm"><Icon name="copy" className="w-4 h-4" /> Share invitation</button>
+          </div>
+        </div>
+        <a href={testingUrl} className="block text-sm text-tw-primary break-all">{testingUrl}</a>
+        <p className="text-sm text-tw-text-secondary">All test roles: <code className="text-tw-text">test@123</code> · Sample data restored daily at midnight Sri Lanka time · Feedback retained</p>
+        {shareStatus && <p role="status" className="text-sm text-tw-text-secondary">{shareStatus}</p>}
+      </section>}
 
       <div className="seg flex w-full">
         {(['start', 'history'] as const).map(tab => (
