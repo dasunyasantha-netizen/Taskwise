@@ -733,6 +733,12 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
       setError((e as Error).message)
     }
   }
+  const statusTabs = list ? [
+    { key: 'all', label: tr("All"), value: list.metrics.open + list.metrics.closed, active: !status && !overdue, set: () => { setStatus(''); setOverdue(false) }, dot: '' },
+    { key: 'open', label: tr("Open"), value: list.metrics.open, active: status === 'OPEN' && !overdue, set: () => { setStatus('OPEN'); setOverdue(false) }, dot: 'bg-blue-500' },
+    { key: 'overdue', label: tr("Overdue"), value: list.metrics.overdue, active: overdue, set: () => { setStatus(''); setOverdue(true) }, dot: 'bg-red-500' },
+    { key: 'closed', label: tr("Closed"), value: list.metrics.closed, active: status === 'CLOSED' && !overdue, set: () => { setStatus('CLOSED'); setOverdue(false) }, dot: 'bg-slate-400' },
+  ] : []
   return (
     <div className={`w-full p-4 md:p-6 lg:p-8 space-y-6 mx-auto ${selected ? 'max-w-[1440px]' : 'max-w-7xl'}`} data-letter-workspace>
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -780,15 +786,31 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
       )}
       {!selected && list && (
         <>
-          <section className={box + ' space-y-4 !p-3 sm:!p-4'} aria-label={tr("Filters")}>
-            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-              <div role="tablist" className="seg w-full sm:w-auto overflow-x-auto">
-                {[
-                  { key: 'all', label: tr("All"), value: list.metrics.open + list.metrics.closed, active: !status && !overdue, set: () => { setStatus(''); setOverdue(false) }, dot: '' },
-                  { key: 'open', label: tr("Open"), value: list.metrics.open, active: status === 'OPEN' && !overdue, set: () => { setStatus('OPEN'); setOverdue(false) }, dot: 'bg-blue-500' },
-                  { key: 'overdue', label: tr("Overdue"), value: list.metrics.overdue, active: overdue, set: () => { setStatus(''); setOverdue(true) }, dot: 'bg-red-500' },
-                  { key: 'closed', label: tr("Closed"), value: list.metrics.closed, active: status === 'CLOSED' && !overdue, set: () => { setStatus('CLOSED'); setOverdue(false) }, dot: 'bg-slate-400' },
-                ].map((c) => (
+          <section className={box + ' space-y-3 sm:space-y-4 !p-3 sm:!p-4'} aria-label={tr("Filters")}>
+            {/* Phones: four equal status tiles — count first, label below; no sideways scrolling */}
+            <div role="tablist" aria-label={tr("Letter status")} className="grid grid-cols-4 gap-1.5 sm:hidden">
+              {statusTabs.map((c) => (
+                <button
+                  key={c.key}
+                  role="tab"
+                  aria-selected={c.active}
+                  onClick={() => {
+                    c.set()
+                    setPage(0)
+                  }}
+                  className={`flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl border px-1 py-2 transition-all ${c.active ? 'border-tw-primary/40 bg-tw-primary/10 shadow-card' : 'border-tw-border bg-tw-surface-2'}`}
+                >
+                  <span className="flex items-center gap-1">
+                    {c.dot && <span className={`h-1.5 w-1.5 flex-shrink-0 rounded-full ${c.dot}`} />}
+                    <span className={`text-lg font-bold leading-none tabular-nums ${c.key === 'overdue' && c.value > 0 ? 'text-red-600' : c.active ? 'text-tw-primary-text' : 'text-tw-text'}`}>{c.value}</span>
+                  </span>
+                  <span className={`max-w-full text-center text-[10.5px] leading-tight break-words ${c.active ? 'font-semibold text-tw-text' : 'text-tw-text-secondary'}`}>{c.label}</span>
+                </button>
+              ))}
+            </div>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+              <div role="tablist" className="seg hidden sm:inline-flex sm:w-auto">
+                {statusTabs.map((c) => (
                   <button
                     key={c.key}
                     role="tab"
@@ -797,7 +819,7 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
                       c.set()
                       setPage(0)
                     }}
-                    className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm whitespace-nowrap transition-all ${c.active ? 'bg-tw-surface text-tw-text font-semibold shadow-card' : 'text-tw-text-secondary hover:text-tw-text'}`}
+                    className={`inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm whitespace-nowrap transition-all ${c.active ? 'bg-tw-surface text-tw-text font-semibold shadow-card' : 'text-tw-text-secondary hover:text-tw-text'}`}
                   >
                     {c.dot && <span className={`h-2 w-2 rounded-full ${c.dot}`} />}
                     {c.label}
@@ -805,7 +827,7 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
                   </button>
                 ))}
               </div>
-              <div className="flex gap-2 sm:ml-auto">
+              <div className="grid grid-cols-2 gap-2 sm:flex sm:ml-auto">
                 {[
                   {
                     key: 'delay',
@@ -827,12 +849,12 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
                   <div
                     key={m.key}
                     title={m.hint}
-                    className={`flex items-center gap-2.5 rounded-xl border px-3 py-1.5 ${m.warn ? 'border-amber-200 bg-amber-50' : 'border-tw-border bg-tw-surface'}`}
+                    className={`flex min-w-0 items-center gap-2.5 rounded-xl border px-3 py-2 sm:py-1.5 ${m.warn ? 'border-amber-200 bg-amber-50' : 'border-tw-border bg-tw-surface'}`}
                   >
-                    <span className={`grid h-7 w-7 place-items-center rounded-lg ${m.warn ? 'bg-amber-100 text-amber-700' : 'bg-emerald-50 text-emerald-600'}`}>
+                    <span className={`grid h-7 w-7 flex-shrink-0 place-items-center rounded-lg ${m.warn ? 'bg-amber-100 text-amber-700' : 'bg-emerald-50 text-emerald-600'}`}>
                       <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">{m.icon}</svg>
                     </span>
-                    <span className="leading-tight">
+                    <span className="min-w-0 leading-tight">
                       <span className="block text-[11px] text-tw-text-secondary">{m.label}</span>
                       <span className={`block text-sm font-semibold tabular-nums ${m.warn ? 'text-amber-800' : 'text-tw-text'}`}>{m.value}</span>
                     </span>
@@ -852,11 +874,11 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
                   setPage(0)
                 }}
               />
-              <div className="flex gap-2 items-center">
+              <div className="flex gap-2 items-center min-w-0">
                 <DatePicker
                   ariaLabel={tr("Received from")}
                   placeholder={tr("From date")}
-                  className="w-full lg:w-40"
+                  className="min-w-0 flex-1 lg:flex-none lg:w-40"
                   value={from}
                   maxDate={to || undefined}
                   onChange={(v) => {
@@ -868,7 +890,7 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
                 <DatePicker
                   ariaLabel={tr("Received to")}
                   placeholder={tr("To date")}
-                  className="w-full lg:w-40"
+                  className="min-w-0 flex-1 lg:flex-none lg:w-40"
                   value={to}
                   minDate={from || undefined}
                   onChange={(v) => {
