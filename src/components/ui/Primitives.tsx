@@ -119,9 +119,21 @@ export function ThemeToggle({ compact = false, className = '' }: { compact?: boo
 const SINHALA_SAMPLE = 'ශ්‍රී ලංකා ජාතික තරුණ සේවා සභාව'
 
 /** Lets the user choose the typeface used for all Sinhala text (incl. inputs). */
-export function SinhalaFontPicker({ className = '' }: { className?: string }) {
+export function SinhalaFontPicker({ className = '', compact = false }: { className?: string; compact?: boolean }) {
   const { t } = useLanguage()
   const { font, setFont } = useSinhalaFont()
+  if (compact) return (
+    <div className={`seg w-full ${className}`} role="radiogroup" aria-label={t('Sinhala font')}>
+      {SINHALA_FONTS.map(f => (
+        <button key={f.value} type="button" role="radio" aria-checked={font === f.value} title={f.label} aria-label={f.label}
+          onClick={() => setFont(f.value)}
+          className={`seg-item flex-1 flex flex-col items-center gap-0.5 py-1.5 ${font === f.value ? 'seg-item-active' : ''}`}>
+          <span lang="si" className="text-[15px] leading-tight" style={{ fontFamily: `${f.family}, sans-serif` }}>සිංහල</span>
+          <span className="text-[9.5px] font-medium opacity-70 leading-none">{f.label.replace(' Sinhala', '').replace('Noto ', '')}</span>
+        </button>
+      ))}
+    </div>
+  )
   return (
     <div className={`grid gap-2 sm:grid-cols-3 ${className}`} role="radiogroup" aria-label={t('Sinhala font')}>
       {SINHALA_FONTS.map(f => {

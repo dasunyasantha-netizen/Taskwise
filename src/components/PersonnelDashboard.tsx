@@ -857,7 +857,6 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
   const mobileMoreItems: MobileNavItem[] = [
     ...(ysoEnabled ? [{ label: 'Projects', view: 'project_board' as ViewMode, icon: 'board' as const }] : []),
     ...(insuranceEnabled ? [{ label: 'Insurance', view: 'insurance_management' as ViewMode, icon: 'shield' as const }] : []),
-    { label: 'My Profile', view: 'profile', icon: 'user' },
   ]
   const pendingAccept = queue.filter(t =>
     t.assignments?.some(a => a.departmentId === user.departmentId) &&
@@ -985,7 +984,7 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
                 }
               }}
             />
-            <MobileUserMenu user={user} roleLabel="Personnel" onProfile={() => navigate('profile' as ViewMode)} onLogout={onLogout} onRefresh={refreshAll} launcher={{ href: launcherHomeUrl(launchSource), label: `Back to ${launcherName(launchSource)}` }} onInstall={canInstall ? (isIOS ? () => setShowIOSGuide(true) : installApp) : undefined} push={pushState} onEnablePush={enablePush} />
+            <MobileUserMenu user={user} roleLabel="Personnel" onProfile={() => navigate('profile' as ViewMode)} onLogout={onLogout} onUserUpdate={onUserUpdate} links={mobileMoreItems} onNavigate={item => { navigate(item.view); setSelectedProject(null) }} onRefresh={refreshAll} launcher={{ href: launcherHomeUrl(launchSource), label: `Back to ${launcherName(launchSource)}` }} onInstall={canInstall ? (isIOS ? () => setShowIOSGuide(true) : installApp) : undefined} push={pushState} onEnablePush={enablePush} />
           </div>
         </header>
 
@@ -1251,7 +1250,7 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
       {/* ── Mobile bottom bar ──────────────────────────────────────────── */}
       <MobileNav
         primary={mobileNavItems}
-        more={mobileMoreItems}
+        more={[]}
         activeView={currentView}
         onSelect={v => { navigate(v); setSelectedProject(null) }}
       />

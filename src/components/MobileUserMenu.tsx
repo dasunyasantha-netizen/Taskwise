@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import type { AuthUser } from '../types'
 import type { PushState } from '../hooks/usePWA'
-import { useLanguage } from '../i18n/Language'
+import { useLanguage, LanguageToggle } from '../i18n/Language'
 import { Icon } from './ui/Icon'
-import { ThemeToggle } from './ui/Primitives'
+import { ThemeToggle, SinhalaFontPicker } from './ui/Primitives'
+import type { MobileNavItem } from './MobileNav'
 
 // ─── Avatar menu in the mobile header ───
 // Everything that is not needed at a glance lives here so the header keeps
 // only the notifications bell and this menu.
-export default function MobileUserMenu({ user, roleLabel, onProfile, onSettings, onLogout, onRefresh, launcher, onInstall, push, onEnablePush }: {
+export default function MobileUserMenu({ user, roleLabel, onProfile, onSettings, onLogout, onRefresh, launcher, onInstall, push, onEnablePush, onUserUpdate, links = [], onNavigate }: {
   user: AuthUser
   roleLabel: string
   onProfile: () => void
@@ -19,6 +20,10 @@ export default function MobileUserMenu({ user, roleLabel, onProfile, onSettings,
   onInstall?: () => void
   push?: PushState
   onEnablePush?: () => void
+  onUserUpdate?: (value: Partial<AuthUser>) => void
+  /** Extra pages reachable from this menu (instead of a "More" tab) */
+  links?: MobileNavItem[]
+  onNavigate?: (item: MobileNavItem) => void
 }) {
   const { t } = useLanguage()
   const [open, setOpen] = useState(false)
@@ -58,9 +63,15 @@ export default function MobileUserMenu({ user, roleLabel, onProfile, onSettings,
           </div>
           <button onClick={act(onProfile)} className={row}>
             <Icon name="user" className="w-4 h-4 text-tw-text-secondary" />
-            <span className="flex-1 text-left">{t('My Profile')}</span>
-            <span className="text-[11px] text-tw-text-secondary">{t('Language')}</span>
+            {t('My Profile')}
           </button>
+          {links.map(item => (
+            <button key={item.view} onClick={act(() => onNavigate?.(item))} className={row}>
+              <Icon name={item.icon} className="w-4 h-4 text-tw-text-secondary" />
+              <span className="flex-1 text-left">{t(item.label)}</span>
+              {!!item.badge && <span className="badge badge-danger">{item.badge}</span>}
+            </button>
+          ))}
           {onSettings && (
             <button onClick={act(onSettings)} className={row}>
               <Icon name="settings" className="w-4 h-4 text-tw-text-secondary" />
@@ -94,8 +105,19 @@ export default function MobileUserMenu({ user, roleLabel, onProfile, onSettings,
               {t(launcher.label)}
             </a>
           )}
-          <div className="px-3 py-2.5 border-t border-tw-border">
+          <div className="px-3 pt-3 pb-3.5 border-t border-tw-border space-y-3">
+            <div className="section-label px-1">{t('Appearance')}</div>
             <ThemeToggle />
+            {onUserUpdate && (
+              <div>
+                <div className="text-[11px] font-medium text-tw-text-secondary px-1 mb-1.5">{t('Language')}</div>
+                <LanguageToggle user={user} onUserUpdate={onUserUpdate} full />
+              </div>
+            )}
+            <div>
+              <div className="text-[11px] font-medium text-tw-text-secondary px-1 mb-1.5">{t('Sinhala font')}</div>
+              <SinhalaFontPicker compact />
+            </div>
           </div>
           <button onClick={act(onLogout)}
             className="w-full flex items-center gap-3 px-4 py-3 text-sm text-tw-danger hover:bg-tw-danger-light transition-colors border-t border-tw-border">

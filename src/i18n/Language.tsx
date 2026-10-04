@@ -120,7 +120,7 @@ export function useLanguage() {
   }
 }
 
-export function LanguageToggle({ user, onUserUpdate }: { user: AuthUser; onUserUpdate: (value: Partial<AuthUser>) => void }) {
+export function LanguageToggle({ user, onUserUpdate, full = false }: { user: AuthUser; onUserUpdate: (value: Partial<AuthUser>) => void; full?: boolean }) {
   const { language, t } = useLanguage()
   const [saving, setSaving] = React.useState(false)
   const [error, setError] = React.useState('')
@@ -138,9 +138,9 @@ export function LanguageToggle({ user, onUserUpdate }: { user: AuthUser; onUserU
     } catch { setError(t('Could not save language. Please retry.')) }
     finally { setSaving(false) }
   }
-  return <div className="flex flex-col items-end gap-1 flex-shrink-0">
-    <div role="group" aria-label={t('Language')} title={user.impersonation ? t('Support access: changes the language for you only.') : undefined} className="seg">
-      {LANGUAGES.map(l => <button key={l.value} type="button" lang={l.value} disabled={saving} aria-pressed={language === l.value} onClick={() => select(l.value)} className={`seg-item min-h-8 px-2.5 sm:px-3 ${language === l.value ? 'seg-item-active' : ''}`}>{l.label}</button>)}
+  return <div className={`flex flex-col gap-1 flex-shrink-0 ${full ? 'items-stretch' : 'items-end'}`}>
+    <div role="group" aria-label={t('Language')} title={user.impersonation ? t('Support access: changes the language for you only.') : undefined} className={`seg ${full ? 'w-full' : ''}`}>
+      {LANGUAGES.map(l => <button key={l.value} type="button" lang={l.value} disabled={saving} aria-pressed={language === l.value} onClick={() => select(l.value)} className={`seg-item min-h-8 px-2.5 sm:px-3 ${full ? 'flex-1' : ''} ${language === l.value ? 'seg-item-active' : ''}`}>{l.label}</button>)}
     </div>
     {error && <span role="alert" className="text-xs text-rose-700">{error}</span>}
   </div>

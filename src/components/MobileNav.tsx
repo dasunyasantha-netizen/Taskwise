@@ -2,7 +2,6 @@ import { useState } from 'react'
 import type { ViewMode } from '../types'
 import { useLanguage } from '../i18n/Language'
 import { Icon, type IconName } from './ui/Icon'
-import { ThemeToggle } from './ui/Primitives'
 
 export interface MobileNavItem {
   label: string
@@ -51,10 +50,6 @@ export default function MobileNav({ primary, more, activeView, onSelect }: Props
                   </button>
                 )
               })}
-            </div>
-            <div className="px-4 mt-4">
-              <div className="section-label mb-2 px-1">{t('Theme')}</div>
-              <ThemeToggle />
             </div>
           </div>
         </div>

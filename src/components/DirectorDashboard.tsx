@@ -924,10 +924,8 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
     { label: 'Audit Log',       view: 'audit_log',         icon: 'audit' },
     { label: 'User Analytics',  view: 'user_analytics',    icon: 'analytics' },
     ...(user.isSyswiseAdmin ? [{ label: 'Support Access', view: 'impersonation' as ViewMode, icon: 'lock' as const }] : []),
-    { label: 'Settings',        view: 'settings',          icon: 'settings' },
     ...(user.isSyswiseAdmin ? [{ label: 'Company Requests', view: 'company_requests' as ViewMode, icon: 'building' as const }] : []),
     ...(user.isSyswiseAdmin ? [{ label: 'Company Features', view: 'company_features' as ViewMode, icon: 'puzzle' as const }] : []),
-    { label: 'My Profile',      view: 'profile',           icon: 'user' },
   ]
 
   return (
@@ -1075,7 +1073,7 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
               onOpenCompanyRequests={() => navigate('company_requests')}
             />
             {/* Mobile user menu */}
-            <MobileUserMenu user={user} roleLabel="Director" onProfile={() => setView('profile' as ViewMode)} onSettings={() => setView('settings' as ViewMode)} onLogout={onLogout} onRefresh={refreshAll} launcher={{ href: launcherHomeUrl(launchSource), label: `Back to ${launcherName(launchSource)}` }} onInstall={canInstall ? (isIOS ? () => setShowIOSGuide(true) : installApp) : undefined} push={pushState} onEnablePush={enablePush} />
+            <MobileUserMenu user={user} roleLabel="Director" onProfile={() => setView('profile' as ViewMode)} onSettings={() => setView('settings' as ViewMode)} onLogout={onLogout} onUserUpdate={onUserUpdate} onRefresh={refreshAll} launcher={{ href: launcherHomeUrl(launchSource), label: `Back to ${launcherName(launchSource)}` }} onInstall={canInstall ? (isIOS ? () => setShowIOSGuide(true) : installApp) : undefined} push={pushState} onEnablePush={enablePush} />
           </div>
         </header>
 
