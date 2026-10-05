@@ -13,9 +13,14 @@ export function phoneDigitLimits(country: CountryCode) {
 export function nationalPhoneDigits(value: string, country: CountryCode) {
   const parsed = parsePhoneNumberFromString(value, country);
   if (value.trim().startsWith('+')) {
+    const callingCode = getCountryCallingCode(country);
+    const limit = phoneDigitLimits(country).maximum;
     // A pasted dial code is never mistaken for national digits.
-    if (!parsed || parsed.countryCallingCode !== getCountryCallingCode(country)) return '';
-    return parsed.nationalNumber.slice(0, phoneDigitLimits(country).maximum);
+    if (parsed) return parsed.countryCallingCode === callingCode ? parsed.nationalNumber.slice(0, limit) : '';
+    // Too short to parse yet (e.g. "+947" while typing): keep the digits after
+    // this country's code instead of dropping them.
+    const digits = parseDigits(value);
+    return digits.startsWith(callingCode) ? digits.slice(callingCode.length, callingCode.length + limit) : '';
   }
   if (parsed?.isValid() && parsed.country === country) return parsed.nationalNumber;
   let digits = parseDigits(value);

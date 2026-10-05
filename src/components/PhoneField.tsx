@@ -26,8 +26,12 @@ export function nationalDigits(value: string, country: CountryCode) {
   const { maximum } = digitLimits(country)
   const parsed = parsePhoneNumberFromString(raw, country)
   if (raw.startsWith('+')) {
-    if (!parsed || parsed.countryCallingCode !== getCountryCallingCode(country)) return ''
-    return parsed.nationalNumber.slice(0, maximum)
+    const dial = getCountryCallingCode(country)
+    if (parsed) return parsed.countryCallingCode === dial ? parsed.nationalNumber.slice(0, maximum) : ''
+    // Too short to parse yet (e.g. "+947" while typing): keep the digits after
+    // this country's code instead of dropping them.
+    const all = parseDigits(raw)
+    return all.startsWith(dial) ? all.slice(dial.length, dial.length + maximum) : ''
   }
   if (parsed?.isValid() && parsed.country === country) return parsed.nationalNumber
   let digits = parseDigits(raw)
