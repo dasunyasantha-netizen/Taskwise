@@ -12,6 +12,9 @@ export default function FixedRoleManagement({ user, createRequest = 0, onChanged
   const [editing, setEditing] = useState<string | null>(null)
   const [assignmentRevision, setAssignmentRevision] = useState(0)
   const [assigning, setAssigning] = useState<FixedRole | null>(null)
+  const [status, setStatus] = useState<'all' | RoleStatus>('all')
+  const [limit, setLimit] = useState(PAGE)
+  useEffect(() => { setLimit(PAGE) }, [search, status])
   const emptyForm = { name: '', departmentId: '', supervisorId: '', isLetterAssigner: false }
   const [form, setForm] = useState(emptyForm)
   const [error, setError] = useState(''), [busy, setBusy] = useState(false)
@@ -38,11 +41,19 @@ export default function FixedRoleManagement({ user, createRequest = 0, onChanged
     } catch (e) { setError(e instanceof Error ? e.message : 'Could not save role.') }
     finally { setBusy(false) }
   }
-  const filtered = roles.filter(r => [r.name, r.departmentName, r.phone].some(s => s?.toLowerCase().includes(search.toLowerCase())))
+  const searched = roles.filter(r => [r.name, r.departmentName, r.phone].some(s => s?.toLowerCase().includes(search.toLowerCase())))
+  const counts = { all: searched.length, unassigned: 0, awaiting: 0, connected: 0 }
+  searched.forEach(r => { counts[roleStatus(r)] += 1 })
+  const filtered = status === 'all' ? searched : searched.filter(r => roleStatus(r) === status)
+  const visible = filtered.slice(0, limit)
+  const supervisorName = (r: FixedRole) => roles.find(s => s.personnelId === r.supervisorId)?.name || 'Director'
+  const openEdit = (r: FixedRole) => { setError(''); setEditing(r.id); setForm({ name: r.name, departmentId: r.departmentId || '', supervisorId: r.supervisorId || '', isLetterAssigner: r.isLetterAssigner === true }) }
   const writable = user.actorType === 'director'
   return <div className="space-y-4">
-    <div><h2 className="text-lg font-semibold tracking-tight inline-flex items-center gap-2"><span className="icon-tile tile-indigo w-8 h-8 rounded-lg"><Icon name="users" className="w-4 h-4" /></span>Roles</h2><p className="text-sm text-tw-text-secondary">{roles.length} fixed roles. Tasks, reporting relationships and history stay with each role when its phone assignment changes.</p></div>
-    {writable && <button type="button" className="btn-secondary" onClick={() => { setEditing('new'); setForm(emptyForm) }}>Create role</button>}
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="min-w-0"><h2 className="text-lg font-semibold tracking-tight inline-flex items-center gap-2"><span className="icon-tile tile-indigo w-8 h-8 rounded-lg"><Icon name="users" className="w-4 h-4" /></span>Roles</h2><p className="text-sm text-tw-text-secondary">{roles.length} fixed roles. Tasks, reporting relationships and history stay with each role when its phone assignment changes.</p></div>
+      {writable && <button type="button" className="btn-primary" onClick={() => { setError(''); setEditing('new'); setForm(emptyForm) }}><Icon name="plus" className="w-4 h-4" /> Create role</button>}
+    </div>
     {error && <p role="alert" className="text-red-700">{error}</p>}
     {editing !== null && writable && <Modal title={editing === 'new' ? 'Create role' : 'Edit role'} onClose={() => !busy && setEditing(null)}>
     <form onSubmit={save} className="space-y-4">
@@ -61,22 +72,58 @@ export default function FixedRoleManagement({ user, createRequest = 0, onChanged
       {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
       <div className="flex gap-3"><button disabled={busy} className="btn-primary">{busy ? 'Saving…' : 'Save role'}</button><button type="button" className="btn-secondary" disabled={busy} onClick={() => setEditing(null)}>Cancel</button></div>
     </form></Modal>}
-    <input className="input" aria-label="Search roles" placeholder="Search role, department or assigned phone" value={search} onChange={e => setSearch(e.target.value)} />
-    <div className="grid gap-3 sm:grid-cols-2">{filtered.map(r => <div key={r.id} className="card p-4">
-      <div className="font-semibold">{r.name}{r.companyManagement && <span className="text-xs font-normal ml-2">Company management</span>}</div>
-      <p className="text-sm text-tw-text-secondary">{r.departmentName || 'Company management'}</p>
-      {r.isLetterAssigner && <p className="text-xs text-tw-primary mt-1">Manages company letters</p>}
-      <p className="text-sm mt-2">{r.phone || 'No phone number assigned'}{r.phone && <span className="ml-2 text-xs text-tw-text-secondary">{r.accountConnected ? 'Account connected' : 'Awaiting verification'}</span>}</p>
-      <p className="text-xs text-tw-text-secondary">Reports to: {roles.find(s => s.personnelId === r.supervisorId)?.name || 'Director'}</p>
-      {writable && <div className="flex flex-wrap gap-2 mt-3">
-        <button type="button" className="btn-secondary btn-sm" onClick={() => { setError(''); setEditing(r.id); setForm({ name: r.name, departmentId: r.departmentId || '', supervisorId: r.supervisorId || '', isLetterAssigner: r.isLetterAssigner === true }) }}>
-          <Icon name="edit" className="w-3.5 h-3.5" /> Edit role
-        </button>
-        <button type="button" className="btn-primary btn-sm" onClick={() => setAssigning(r)}>
-          <Icon name="phone" className="w-3.5 h-3.5" /> {r.phone ? 'Change phone' : 'Assign phone'}
-        </button>
-      </div>}
-    </div>)}</div>
+    <div className="flex flex-col lg:flex-row lg:items-center gap-3">
+      <div className="relative flex-1">
+        <Icon name="search" className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-tw-text-secondary pointer-events-none" />
+        <input className="input pl-9" type="search" aria-label="Search roles" placeholder="Search role, department or phone" value={search} onChange={e => setSearch(e.target.value)} />
+      </div>
+      <div className="seg overflow-x-auto scrollbar-hide" role="group" aria-label="Filter by phone status">
+        {STATUS_FILTERS.map(f => <button key={f.key} type="button" aria-pressed={status === f.key} onClick={() => setStatus(f.key)}
+          className={`seg-item shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 ${status === f.key ? 'seg-item-active' : ''}`}>
+          {f.label}<span className="rounded-full bg-tw-hover px-1.5 text-[11px] tabular-nums">{counts[f.key]}</span>
+        </button>)}
+      </div>
+    </div>
+
+    <div className="card overflow-hidden">
+      {/* Column headings (desktop) */}
+      <div className={`hidden md:grid ${ROW_COLS} gap-4 px-4 py-2.5 border-b border-tw-border bg-tw-surface-2/60 text-[11px] font-semibold uppercase tracking-[0.08em] text-tw-text-secondary`}>
+        <span>Role</span><span>Phone</span><span>Reports to</span><span className="w-[13.5rem]" />
+      </div>
+      {!visible.length && <p className="px-4 py-10 text-center text-sm text-tw-text-secondary">{roles.length ? 'No roles match this search or filter.' : 'Loading roles…'}</p>}
+      <ul className="divide-y divide-tw-border">{visible.map(r => {
+        const st = roleStatus(r)
+        return <li key={r.id} className={`grid grid-cols-1 ${ROW_COLS} gap-x-4 gap-y-1.5 px-4 py-3 md:items-center hover:bg-tw-hover/50 transition-colors`}>
+          <div className="min-w-0">
+            <div className="font-semibold text-sm text-tw-text truncate">{r.name}</div>
+            <div className="text-xs text-tw-text-secondary truncate">
+              {r.departmentName || 'Company management'}
+              {r.isLetterAssigner && <span className="ml-1 text-tw-primary-text">· Manages letters</span>}
+            </div>
+          </div>
+          <div className="min-w-0 flex flex-wrap items-center gap-2">
+            {r.phone && <span className="text-sm tabular-nums text-tw-text">{r.phone}</span>}
+            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUS_STYLE[st].className}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${STATUS_STYLE[st].dot}`} />{STATUS_STYLE[st].label}
+            </span>
+          </div>
+          <div className="text-xs md:text-sm text-tw-text-secondary truncate"><span className="md:hidden">Reports to </span>{supervisorName(r)}</div>
+          {writable && <div className="flex items-center gap-2 md:w-[13.5rem] md:justify-end pt-1 md:pt-0">
+            <button type="button" className="btn-secondary btn-sm whitespace-nowrap" onClick={() => openEdit(r)} aria-label={`Edit ${r.name}`}>
+              <Icon name="edit" className="w-3.5 h-3.5" /> Edit
+            </button>
+            <button type="button" className={`${r.phone ? 'btn-secondary' : 'btn-primary'} btn-sm whitespace-nowrap`} onClick={() => setAssigning(r)}>
+              <Icon name="phone" className="w-3.5 h-3.5" /> {r.phone ? 'Change phone' : 'Assign phone'}
+            </button>
+          </div>}
+        </li>
+      })}</ul>
+      {filtered.length > visible.length && <button type="button" onClick={() => setLimit(n => n + PAGE * 2)}
+        className="w-full flex items-center justify-center gap-1.5 px-4 py-2.5 border-t border-tw-border bg-tw-surface-2/60 text-sm font-semibold text-tw-primary-text hover:bg-tw-hover transition-colors">
+        Show more <span className="font-normal text-tw-text-secondary tabular-nums">({visible.length} of {filtered.length})</span>
+        <Icon name="chevronDown" className="w-4 h-4" />
+      </button>}
+    </div>
     {writable && assigning && <Modal title={`${assigning.phone ? 'Change phone' : 'Assign phone'} — ${assigning.name}`} onClose={() => setAssigning(null)}>
       <RoleAssignments only={`${assigning.actorType}:${assigning.actorId}`} refreshKey={assignmentRevision}
         onClose={() => setAssigning(null)} onSaved={() => { void load(); onChanged?.() }} />
@@ -84,6 +131,21 @@ export default function FixedRoleManagement({ user, createRequest = 0, onChanged
     {/* Roles without a card here (e.g. extra Director accounts) are still assignable below. */}
     {writable && <RoleAssignments exclude={new Set(roles.map(r => `${r.actorType}:${r.actorId}`))} refreshKey={assignmentRevision} onSaved={() => { void load(); onChanged?.() }} />}
   </div>
+}
+
+type RoleStatus = 'unassigned' | 'awaiting' | 'connected'
+const PAGE = 25
+// One literal string so Tailwind generates it; shared by the heading row and every role row.
+const ROW_COLS = 'md:grid-cols-[minmax(0,2fr)_minmax(0,1.6fr)_minmax(0,1.2fr)_auto]'
+const roleStatus = (r: FixedRole): RoleStatus => !r.phone ? 'unassigned' : r.accountConnected ? 'connected' : 'awaiting'
+const STATUS_FILTERS: { key: 'all' | RoleStatus; label: string }[] = [
+  { key: 'all', label: 'All' }, { key: 'unassigned', label: 'Unassigned' },
+  { key: 'awaiting', label: 'Awaiting verification' }, { key: 'connected', label: 'Connected' },
+]
+const STATUS_STYLE: Record<RoleStatus, { label: string; className: string; dot: string }> = {
+  unassigned: { label: 'No phone', className: 'bg-tw-hover text-tw-text-secondary', dot: 'bg-gray-400' },
+  awaiting: { label: 'Awaiting verification', className: 'bg-amber-500/15 text-amber-700', dot: 'bg-amber-500' },
+  connected: { label: 'Connected', className: 'bg-emerald-500/15 text-emerald-700', dot: 'bg-emerald-500' },
 }
 
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
