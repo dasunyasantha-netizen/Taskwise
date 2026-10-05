@@ -943,20 +943,26 @@ function Analytics({
           ))}
         </div>
         <div className={`hidden sm:block overflow-x-auto ${pointsList.scrollClass}`}>
-          <table className="w-full text-sm text-right">
+          {/* Fixed layout: every task column gets the same width, whatever its group's title length. */}
+          <table className="w-full min-w-[46rem] table-fixed text-sm text-right">
+            <colgroup>
+              <col className="w-52" />
+              {taskGroups.flatMap((g) => g.tasks).map((t) => <col key={t.id} />)}
+              <col className="w-16" />
+            </colgroup>
             <thead className="sticky top-0 z-10 bg-tw-surface">
               <tr>
-                <th className="text-left p-2" rowSpan={2}>{tr("YSO")}</th>
-                {groupTasks(dashboard.tasks).map((g) => (
-                  <th className="p-2 text-center border-l border-tw-border whitespace-nowrap" colSpan={g.tasks.length} key={g.key}>
+                <th className="text-left p-2 align-bottom" rowSpan={2}>{tr("YSO")}</th>
+                {taskGroups.map((g) => (
+                  <th lang="en" className="px-1.5 py-2 text-center text-xs font-semibold leading-tight border-l border-tw-border [hyphens:auto] break-words align-bottom" colSpan={g.tasks.length} key={g.key} title={tr(g.title)}>
                     {tr(g.title)}
                   </th>
                 ))}
-                <th className="p-2 border-l border-tw-border" rowSpan={2}>{tr("Total")}</th>
+                <th className="p-2 border-l border-tw-border align-bottom" rowSpan={2}>{tr("Total")}</th>
               </tr>
-              <tr>
-                {groupTasks(dashboard.tasks).flatMap((g) => g.tasks.map((t, i) => (
-                  <th className={`p-2 text-center ${i === 0 ? 'border-l border-tw-border' : ''}`} title={tr(t.title)} key={t.id}>
+              <tr className="border-b border-tw-border">
+                {taskGroups.flatMap((g) => g.tasks.map((t, i) => (
+                  <th className={`py-1.5 text-center text-xs font-medium text-tw-text-secondary tabular-nums ${i === 0 ? 'border-l border-tw-border' : ''}`} title={tr(t.title)} key={t.id}>
                     {i + 1}
                   </th>
                 )))}
@@ -965,17 +971,16 @@ function Analytics({
             <tbody>
               {pointsList.items.map((p) => (
                 <tr className="border-t" key={p.id}>
-                  <th className="text-left p-2 whitespace-nowrap"><span className="text-tw-text-secondary font-normal tabular-nums mr-1.5">{p.rank}.</span>{p.name}</th>
-                  {groupTasks(dashboard.tasks).flatMap((g) => g.tasks).map((t) => (
-                    <td className="p-2 text-center" key={t.id}>
-                      {selected
-                        .filter(
-                          (l) => l.personnelId === p.id && l.task === t.id
-                        )
-                        .reduce((a, b) => a + b.points, 0)}
-                    </td>
-                  ))}
-                  <td className="font-bold p-2">{p.total}</td>
+                  <th className="text-left p-2 truncate" title={p.name}><span className="text-tw-text-secondary font-normal tabular-nums mr-1.5">{p.rank}.</span>{p.name}</th>
+                  {taskGroups.flatMap((g) => g.tasks.map((t, i) => {
+                    const points = taskPoints(p.id, t.id)
+                    return (
+                      <td className={`py-2 text-center tabular-nums ${i === 0 ? 'border-l border-tw-border' : ''} ${points < 0 ? 'text-rose-600' : points > 0 ? 'text-teal-700 font-semibold' : 'text-tw-text-secondary'}`} key={t.id}>
+                        {points}
+                      </td>
+                    )
+                  }))}
+                  <td className="font-bold p-2 border-l border-tw-border tabular-nums">{p.total}</td>
                 </tr>
               ))}
             </tbody>
