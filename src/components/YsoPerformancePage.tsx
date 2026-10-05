@@ -783,6 +783,10 @@ function Analytics({
       return `${s.color} ${begin}deg ${angle}deg`
     })
     .join(', ')
+  const ranked = ranking.map((p, i) => ({ ...p, rank: i + 1 }))
+  const leaderList = useLongList(ranked)
+  const pointsList = useLongList(ranked)
+  const maxAbs = Math.max(1, ...ranking.map((r) => Math.abs(r.total)))
   const taskGroups = groupTasks(dashboard.tasks)
   const taskPoints = (personId: string, taskId: number) => selected
     .filter((l) => l.personnelId === personId && l.task === taskId)
@@ -874,19 +878,21 @@ function Analytics({
         <h3 className="font-semibold tracking-tight mb-4">{tr("Comparative YSO leaderboard")}</h3>
         <p className="text-xs text-slate-500 mb-4">
           {period} {tr("· Approved awards and confirmed deductions. Qualification awards appear only in their credited month.")}</p>
-        {ranking.map((p, i) => (
+        <LongListControls list={leaderList} />
+        <div className={leaderList.scrollClass}>
+        {leaderList.items.map((p) => (
           <div
-            className="grid grid-cols-[1.5rem_1fr_4rem] items-center gap-3 mb-3"
+            className="grid grid-cols-[2rem_1fr_4rem] items-center gap-3 mb-3"
             key={p.id}
           >
-            <span className="text-sm text-slate-400">{i + 1}</span>
+            <span className="text-sm text-slate-400 tabular-nums">{p.rank}</span>
             <div>
               <div className="text-sm mb-1">{p.name}</div>
               <div className="h-2 bg-slate-100 rounded">
                 <div
                   className={`h-2 rounded ${p.total < 0 ? 'bg-rose-500' : 'bg-teal-600'}`}
                   style={{
-                    width: `${(Math.abs(p.total) / Math.max(1, ...ranking.map((r) => Math.abs(r.total)))) * 100}%`,
+                    width: `${(Math.abs(p.total) / maxAbs) * 100}%`,
                   }}
                 />
               </div>
@@ -894,19 +900,22 @@ function Analytics({
             <strong className="text-right text-sm">{signed(p.total)}</strong>
           </div>
         ))}
+        </div>
+        <LongListNoMatch list={leaderList} />
         {!ranking.length && (
           <p className="text-sm text-slate-500">{tr("No YSOs in this scope.")}</p>
         )}
       </section>
       <section className={`${panel} yso-task-points`}>
         <h3 className="font-semibold tracking-tight mb-4">{tr("Task-by-task points")}</h3>
-        <div className="sm:hidden space-y-3">
+        <LongListControls list={pointsList} />
+        <div className={`sm:hidden space-y-3 ${pointsList.scrollClass}`}>
           {!ranking.length && <p className="text-sm text-tw-text-secondary">{tr('No YSOs in this scope.')}</p>}
-          {ranking.map((p, personIndex) => (
-            <details key={`${period}:${p.id}`} open={personIndex === 0} className="group rounded-xl border border-tw-border bg-tw-surface overflow-hidden">
+          {pointsList.items.map((p, personIndex) => (
+            <details key={`${period}:${p.id}`} open={personIndex === 0 && !pointsList.query} className="group rounded-xl border border-tw-border bg-tw-surface overflow-hidden">
               <summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 p-3 [&::-webkit-details-marker]:hidden">
                 <div className="min-w-0 flex-1">
-                  <div className="text-sm font-semibold break-words">{p.name}</div>
+                  <div className="text-sm font-semibold break-words"><span className="text-tw-text-secondary tabular-nums mr-1.5">{p.rank}.</span>{p.name}</div>
                   <div className="mt-1 text-xs text-tw-text-secondary">{tr('Total')} · {monthYear(period, languageOf(locale))}</div>
                 </div>
                 <strong className={`shrink-0 text-xl tabular-nums ${p.total < 0 ? 'text-rose-600' : 'text-teal-600'}`}>{signed(p.total)}</strong>
@@ -933,9 +942,9 @@ function Analytics({
             </details>
           ))}
         </div>
-        <div className="hidden sm:block overflow-x-auto">
+        <div className={`hidden sm:block overflow-x-auto ${pointsList.scrollClass}`}>
           <table className="w-full text-sm text-right">
-            <thead>
+            <thead className="sticky top-0 z-10 bg-tw-surface">
               <tr>
                 <th className="text-left p-2" rowSpan={2}>{tr("YSO")}</th>
                 {groupTasks(dashboard.tasks).map((g) => (
@@ -954,9 +963,9 @@ function Analytics({
               </tr>
             </thead>
             <tbody>
-              {ranking.map((p) => (
+              {pointsList.items.map((p) => (
                 <tr className="border-t" key={p.id}>
-                  <th className="text-left p-2 whitespace-nowrap">{p.name}</th>
+                  <th className="text-left p-2 whitespace-nowrap"><span className="text-tw-text-secondary font-normal tabular-nums mr-1.5">{p.rank}.</span>{p.name}</th>
                   {groupTasks(dashboard.tasks).flatMap((g) => g.tasks).map((t) => (
                     <td className="p-2 text-center" key={t.id}>
                       {selected
@@ -972,6 +981,7 @@ function Analytics({
             </tbody>
           </table>
         </div>
+        <LongListNoMatch list={pointsList} />
       </section>
       <section className={`${panel} yso-ad-distribution`}>
         <h3 className="font-bold mb-1">{tr("AD evaluation distribution")}</h3>
@@ -1066,6 +1076,55 @@ function Analytics({
       </section>
     </div>
   )
+}
+
+// ─── Long lists (every YSO in scope) ──────────────────────────────────────────
+// Cards show the top 10 by default. Searching or "Show all" reveals the rest
+// inside a scroll box, so one card never pushes the next one hundreds of rows away.
+const LONG_LIST_TOP = 10
+
+function useLongList<T extends { name: string }>(all: T[]) {
+  const [query, setQuery] = useState('')
+  const [expanded, setExpanded] = useState(false)
+  const q = query.trim().toLowerCase()
+  const matches = q ? all.filter((item) => item.name.toLowerCase().includes(q)) : all
+  const open = expanded || !!q
+  return {
+    query, setQuery, expanded, setExpanded,
+    total: all.length,
+    matchCount: matches.length,
+    items: open ? matches : matches.slice(0, LONG_LIST_TOP),
+    long: all.length > LONG_LIST_TOP,
+    scrollClass: open && matches.length > LONG_LIST_TOP ? 'max-h-[28rem] overflow-y-auto overscroll-contain pr-1' : '',
+  }
+}
+
+function LongListControls({ list }: { list: ReturnType<typeof useLongList> }) {
+  const { t: tr } = useLanguage()
+  if (!list.long) return null
+  return (
+    <div className="flex flex-wrap items-center gap-2 mb-4">
+      <div className="relative flex-1 min-w-[12rem]">
+        <Icon name="search" className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-tw-text-secondary pointer-events-none" />
+        <input className="input pl-9 py-2" type="search" value={list.query} onChange={(e) => list.setQuery(e.target.value)}
+          placeholder={tr('Search YSO by name')} aria-label={tr('Search YSO by name')} />
+      </div>
+      <span className="text-xs text-tw-text-secondary tabular-nums">
+        {tr('Showing {shown} of {total}', { shown: list.items.length, total: list.query ? list.matchCount : list.total })}
+      </span>
+      {!list.query && (
+        <button type="button" className="btn-secondary btn-sm" onClick={() => list.setExpanded(!list.expanded)}>
+          {list.expanded ? tr('Show top 10') : tr('Show all {total}', { total: list.total })}
+        </button>
+      )}
+    </div>
+  )
+}
+
+function LongListNoMatch({ list }: { list: ReturnType<typeof useLongList> }) {
+  const { t: tr } = useLanguage()
+  if (!list.query || list.matchCount) return null
+  return <p className="text-sm text-tw-text-secondary">{tr('No YSO matches “{query}”.', { query: list.query.trim() })}</p>
 }
 
 // ─── Task Hub layout helpers ──────────────────────────────────────────────────
