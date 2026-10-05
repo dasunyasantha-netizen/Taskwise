@@ -7,11 +7,13 @@
 .test-company-banner { height: 88px; }
 .test-company-shell { padding-top: 88px; }
 .test-company-shell header.sticky { top: 88px !important; }
+.test-company-shell .header-mask { top: 76px !important; }
 .test-company-shell aside.sticky { top: 100px !important; height: calc(100vh - 112px) !important; }
 @media (min-width: 640px) {
   .test-company-banner { height: 56px; }
   .test-company-shell { padding-top: 56px; }
   .test-company-shell header.sticky { top: 68px !important; }
+  .test-company-shell .header-mask { top: 56px !important; }
   .test-company-shell aside.sticky { top: 68px !important; height: calc(100vh - 80px) !important; }
 }
 

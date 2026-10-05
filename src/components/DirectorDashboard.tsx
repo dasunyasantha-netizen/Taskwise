@@ -969,7 +969,9 @@ export default function DirectorDashboard({ user, currentView, setView, onLogout
       {/* ── Main ────────────────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-w-0 relative">
         {/* Top bar */}
-        <header className={`sticky z-20 ${user.impersonation ? 'top-[56px] md:top-[68px]' : 'top-0 md:top-3'} bg-tw-surface/85 backdrop-blur-xl border-b border-tw-border md:border md:rounded-2xl md:mx-3 md:mt-3 md:shadow-card px-3 md:px-4 py-2.5 flex items-center justify-between gap-2 flex-shrink-0`}>
+        {/* Page-coloured strip behind the floating header so content never shows through the gap above it. */}
+        <div aria-hidden="true" className={`header-mask hidden md:block sticky z-10 h-7 bg-tw-bg ${user.impersonation ? 'top-[56px]' : 'top-0'}`} />
+        <header className={`sticky z-20 ${user.impersonation ? 'top-[56px] md:top-[68px]' : 'top-0 md:top-3'} bg-tw-surface/85 backdrop-blur-xl border-b border-tw-border md:border md:rounded-2xl md:mx-3 md:-mt-4 md:shadow-card px-3 md:px-4 py-2.5 flex items-center justify-between gap-2 flex-shrink-0`}>
           <div className="flex items-center gap-2 min-w-0">
             {user.companyLogo ? (
               <img src={user.companyLogo} alt="Logo" className="w-8 h-8 rounded-xl object-contain bg-white p-0.5 ring-1 ring-tw-border md:hidden" />

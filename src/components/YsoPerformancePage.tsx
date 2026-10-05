@@ -1083,7 +1083,7 @@ function Analytics({
 // inside a scroll box, so one card never pushes the next one hundreds of rows away.
 const LONG_LIST_TOP = 10
 
-function useLongList<T extends { name: string }>(all: T[]) {
+function useLongList<T extends { name: string }>(all: T[], top = LONG_LIST_TOP) {
   const [query, setQuery] = useState('')
   const [expanded, setExpanded] = useState(false)
   const q = query.trim().toLowerCase()
@@ -1093,38 +1093,41 @@ function useLongList<T extends { name: string }>(all: T[]) {
     query, setQuery, expanded, setExpanded,
     total: all.length,
     matchCount: matches.length,
-    items: open ? matches : matches.slice(0, LONG_LIST_TOP),
-    long: all.length > LONG_LIST_TOP,
-    scrollClass: open && matches.length > LONG_LIST_TOP ? 'max-h-[28rem] overflow-y-auto overscroll-contain pr-1' : '',
+    top,
+    items: open ? matches : matches.slice(0, top),
+    long: all.length > top,
+    scrollClass: open && matches.length > top ? 'max-h-[28rem] overflow-y-auto overscroll-contain pr-1' : '',
   }
 }
 
-function LongListControls({ list }: { list: ReturnType<typeof useLongList> }) {
+function LongListControls({ list, placeholder = 'Search YSO by name', className = 'mb-4' }: {
+  list: ReturnType<typeof useLongList>; placeholder?: string; className?: string
+}) {
   const { t: tr } = useLanguage()
   if (!list.long) return null
   return (
-    <div className="flex flex-wrap items-center gap-2 mb-4">
+    <div className={`flex flex-wrap items-center gap-2 ${className}`}>
       <div className="relative flex-1 min-w-[12rem]">
         <Icon name="search" className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-tw-text-secondary pointer-events-none" />
         <input className="input pl-9 py-2" type="search" value={list.query} onChange={(e) => list.setQuery(e.target.value)}
-          placeholder={tr('Search YSO by name')} aria-label={tr('Search YSO by name')} />
+          placeholder={tr(placeholder)} aria-label={tr(placeholder)} />
       </div>
       <span className="text-xs text-tw-text-secondary tabular-nums">
         {tr('Showing {shown} of {total}', { shown: list.items.length, total: list.query ? list.matchCount : list.total })}
       </span>
       {!list.query && (
         <button type="button" className="btn-secondary btn-sm" onClick={() => list.setExpanded(!list.expanded)}>
-          {list.expanded ? tr('Show top 10') : tr('Show all {total}', { total: list.total })}
+          {list.expanded ? tr('Show fewer') : tr('Show all {total}', { total: list.total })}
         </button>
       )}
     </div>
   )
 }
 
-function LongListNoMatch({ list }: { list: ReturnType<typeof useLongList> }) {
+function LongListNoMatch({ list, className = '' }: { list: ReturnType<typeof useLongList>; className?: string }) {
   const { t: tr } = useLanguage()
   if (!list.query || list.matchCount) return null
-  return <p className="text-sm text-tw-text-secondary">{tr('No YSO matches “{query}”.', { query: list.query.trim() })}</p>
+  return <p className={`text-sm text-tw-text-secondary ${className}`}>{tr('No matches for “{query}”.', { query: list.query.trim() })}</p>
 }
 
 // ─── Task Hub layout helpers ──────────────────────────────────────────────────
@@ -1350,6 +1353,8 @@ export default function YsoPerformancePage({ user, onUserUpdate, directoryResetK
       ) ?? [],
     [dashboard, selectedAd, selectedPerson, period]
   )
+  const adList = useLongList(dashboard?.ads ?? [], 9)
+  const directoryList = useLongList(people)
   if (loading)
     return (
       <div className={panel} role="status">
@@ -1930,8 +1935,10 @@ export default function YsoPerformancePage({ user, onUserUpdate, directoryResetK
           {tab === 'monitor' && (
             <>
               {d.role === 'DIRECTOR' && !selectedAd && (
-                <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
-                  {d.ads.map((adInfo) => {
+                <div>
+                <LongListControls list={adList} placeholder="Search AD" className="mb-3" />
+                <div className={`grid sm:grid-cols-2 xl:grid-cols-3 gap-3 ${adList.scrollClass}`}>
+                  {adList.items.map((adInfo) => {
                     const ad = adInfo.id
                     const team = d.people.filter((p) => p.adId === ad),
                       teamIds = team.map((p) => p.id),
@@ -1944,41 +1951,34 @@ export default function YsoPerformancePage({ user, onUserUpdate, directoryResetK
                     const avg = teamScore / Math.max(1, new Set([...teamIds, ...d.ledger.filter((l) => l.period === period && l.adId === ad).map((l) => l.personnelId)]).size)
                     return (
                       <button
-                        className="card card-hover p-0 text-left overflow-hidden group"
+                        className="card card-hover px-3.5 py-3 text-left group flex items-center gap-3"
                         key={ad}
                         onClick={() => {
                           setSelectedAd(ad)
                           setTab('analytics')
                         }}
                       >
-                        <div className="flex items-center gap-3 px-4 py-3.5 border-b border-tw-border">
-                          <span className="icon-tile tile-teal w-9 h-9"><Icon name="user" className="w-4 h-4" /></span>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-sm text-tw-text truncate">{adInfo.name}</p>
-                            <p className="text-xs text-tw-text-secondary truncate">{adInfo.district}</p>
-                          </div>
-                          <Icon name="chevronRight" className="w-4 h-4 text-tw-text-muted group-hover:translate-x-0.5 transition-transform" />
-                        </div>
-                        <dl className="grid grid-cols-3 divide-x divide-tw-border">
-                          {[
-                            [tr("YSOs"), String(team.length)],
-                            [tr("Avg score"), avg.toFixed(1)],
-                            [tr("Pending"), String(waiting.length)],
-                          ].map(([label, value]) => (
-                            <div key={label} className="px-4 py-3">
-                              <dt className="text-xs text-tw-text-secondary">{label}</dt>
-                              <dd className="text-lg font-bold tabular-nums mt-0.5">{value}</dd>
-                            </div>
-                          ))}
-                        </dl>
-                        <p className="px-4 py-2.5 border-t border-tw-border bg-tw-surface-2/60 text-xs text-tw-text-secondary">
-                          {waiting.length
+                        <span className="icon-tile tile-teal w-8 h-8 shrink-0"><Icon name="user" className="w-4 h-4" /></span>
+                        <span className="flex-1 min-w-0">
+                          <span className="block font-semibold text-sm text-tw-text truncate">{adInfo.name}</span>
+                          <span className="block text-xs text-tw-text-secondary truncate tabular-nums">
+                            {tr('{count} YSOs', { count: team.length })} · {tr('Avg {score}', { score: avg.toFixed(1) })}
+                          </span>
+                        </span>
+                        <span
+                          className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums ${waiting.length ? 'bg-amber-500/15 text-amber-700' : 'bg-tw-hover text-tw-text-secondary'}`}
+                          title={waiting.length
                             ? tr('Oldest waiting {days} days', { days: Math.max(0, Math.floor((Date.now() - Math.min(...waiting.map((e) => Date.parse(e.submittedAt)))) / 86400000)) })
                             : tr("Queue clear")}
-                        </p>
+                        >
+                          {waiting.length ? tr('{count} pending', { count: waiting.length }) : tr('Queue clear')}
+                        </span>
+                        <Icon name="chevronRight" className="w-4 h-4 shrink-0 text-tw-text-muted group-hover:translate-x-0.5 transition-transform" />
                       </button>
                     )
                   })}
+                </div>
+                <LongListNoMatch list={adList} className="mt-2" />
                 </div>
               )}
               <div className="grid lg:grid-cols-[minmax(0,1fr)_360px] gap-5 items-start">
@@ -1986,8 +1986,10 @@ export default function YsoPerformancePage({ user, onUserUpdate, directoryResetK
                   {!people.length ? (
                     <p className="px-5 py-8 text-center text-sm text-tw-text-secondary">{tr("No YSOs assigned to this team.")}</p>
                   ) : (
-                    <ul className="divide-y divide-tw-border">
-                      {people.map((p) => {
+                    <>
+                    {directoryList.long && <div className="px-4 sm:px-5 pt-4"><LongListControls list={directoryList} className="mb-2" /></div>}
+                    <ul className={`divide-y divide-tw-border ${directoryList.scrollClass}`}>
+                      {directoryList.items.map((p) => {
                         const pts = d.ledger.filter((l) => l.personnelId === p.id && l.period === period).reduce((a, b) => a + b.points, 0)
                         const waitingCount = d.entries.filter((e) => e.personnelId === p.id && pending(e)).length
                         return (
@@ -2028,6 +2030,8 @@ export default function YsoPerformancePage({ user, onUserUpdate, directoryResetK
                         )
                       })}
                     </ul>
+                    <LongListNoMatch list={directoryList} className="px-5 pb-4" />
+                    </>
                   )}
                 </SectionCard>
                 <aside className="space-y-5 min-w-0">
