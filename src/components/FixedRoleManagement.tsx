@@ -11,6 +11,7 @@ export default function FixedRoleManagement({ user, createRequest = 0, onChanged
   const [search, setSearch] = useState('')
   const [editing, setEditing] = useState<string | null>(null)
   const [assignmentRevision, setAssignmentRevision] = useState(0)
+  const [assigning, setAssigning] = useState<FixedRole | null>(null)
   const emptyForm = { name: '', departmentId: '', supervisorId: '', isLetterAssigner: false }
   const [form, setForm] = useState(emptyForm)
   const [error, setError] = useState(''), [busy, setBusy] = useState(false)
@@ -43,8 +44,8 @@ export default function FixedRoleManagement({ user, createRequest = 0, onChanged
     <div><h2 className="text-lg font-semibold tracking-tight inline-flex items-center gap-2"><span className="icon-tile tile-indigo w-8 h-8 rounded-lg"><Icon name="users" className="w-4 h-4" /></span>Roles</h2><p className="text-sm text-tw-text-secondary">{roles.length} fixed roles. Tasks, reporting relationships and history stay with each role when its phone assignment changes.</p></div>
     {writable && <button type="button" className="btn-secondary" onClick={() => { setEditing('new'); setForm(emptyForm) }}>Create role</button>}
     {error && <p role="alert" className="text-red-700">{error}</p>}
-    {editing !== null && writable && <form onSubmit={save} className="card p-5 space-y-4">
-      <h3 className="font-semibold">{editing === 'new' ? 'Create role' : 'Edit role'}</h3>
+    {editing !== null && writable && <Modal title={editing === 'new' ? 'Create role' : 'Edit role'} onClose={() => !busy && setEditing(null)}>
+    <form onSubmit={save} className="space-y-4">
       <label className="block text-sm">Role name<input className="input mt-1" required maxLength={150} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></label>
       <div className="block text-sm">Department<Select className="mt-1" ariaLabel="Department" placeholder="Select department" value={form.departmentId}
         options={departments.map(d => ({ value: d.id, label: `${d.layer?.name ?? ''} — ${d.name}` }))}
@@ -56,18 +57,43 @@ export default function FixedRoleManagement({ user, createRequest = 0, onChanged
         <input type="checkbox" className="mt-1" checked={form.isLetterAssigner} onChange={e => setForm(f => ({ ...f, isLetterAssigner: e.target.checked }))} />
         <span><span className="block font-medium">Manage company letters</span><span className="block text-tw-text-secondary mt-1">Log and assign letters, record replies in existing chains and reopen threads when new correspondence arrives.</span></span>
       </label>
-      <p className="text-sm text-tw-text-secondary">Create the position first. The Director can assign a verified account’s mobile number below.</p>
+      <p className="text-sm text-tw-text-secondary">{editing === 'new' ? 'Create the position first, then use Assign phone on its card to give it a mobile number.' : 'To change who holds this role, use Assign phone on its card.'}</p>
+      {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
       <div className="flex gap-3"><button disabled={busy} className="btn-primary">{busy ? 'Saving…' : 'Save role'}</button><button type="button" className="btn-secondary" disabled={busy} onClick={() => setEditing(null)}>Cancel</button></div>
-    </form>}
+    </form></Modal>}
     <input className="input" aria-label="Search roles" placeholder="Search role, department or assigned phone" value={search} onChange={e => setSearch(e.target.value)} />
     <div className="grid gap-3 sm:grid-cols-2">{filtered.map(r => <div key={r.id} className="card p-4">
       <div className="font-semibold">{r.name}{r.companyManagement && <span className="text-xs font-normal ml-2">Company management</span>}</div>
       <p className="text-sm text-tw-text-secondary">{r.departmentName || 'Company management'}</p>
       {r.isLetterAssigner && <p className="text-xs text-tw-primary mt-1">Manages company letters</p>}
-      <p className="text-sm mt-2">{r.phone || 'No phone number assigned'}</p>
+      <p className="text-sm mt-2">{r.phone || 'No phone number assigned'}{r.phone && <span className="ml-2 text-xs text-tw-text-secondary">{r.accountConnected ? 'Account connected' : 'Awaiting verification'}</span>}</p>
       <p className="text-xs text-tw-text-secondary">Reports to: {roles.find(s => s.personnelId === r.supervisorId)?.name || 'Director'}</p>
-      {writable && <button className="text-sm text-tw-primary mt-3" onClick={() => { setEditing(r.id); setForm({ name: r.name, departmentId: r.departmentId || '', supervisorId: r.supervisorId || '', isLetterAssigner: r.isLetterAssigner === true }) }}>Edit role</button>}
+      {writable && <div className="flex flex-wrap gap-2 mt-3">
+        <button type="button" className="btn-secondary btn-sm" onClick={() => { setError(''); setEditing(r.id); setForm({ name: r.name, departmentId: r.departmentId || '', supervisorId: r.supervisorId || '', isLetterAssigner: r.isLetterAssigner === true }) }}>
+          <Icon name="edit" className="w-3.5 h-3.5" /> Edit role
+        </button>
+        <button type="button" className="btn-primary btn-sm" onClick={() => setAssigning(r)}>
+          <Icon name="phone" className="w-3.5 h-3.5" /> {r.phone ? 'Change phone' : 'Assign phone'}
+        </button>
+      </div>}
     </div>)}</div>
-    {writable && <RoleAssignments refreshKey={assignmentRevision} onSaved={() => { void load(); onChanged?.() }} />}
+    {writable && assigning && <Modal title={`${assigning.phone ? 'Change phone' : 'Assign phone'} — ${assigning.name}`} onClose={() => setAssigning(null)}>
+      <RoleAssignments only={`${assigning.actorType}:${assigning.actorId}`} refreshKey={assignmentRevision}
+        onClose={() => setAssigning(null)} onSaved={() => { void load(); onChanged?.() }} />
+    </Modal>}
+    {/* Roles without a card here (e.g. extra Director accounts) are still assignable below. */}
+    {writable && <RoleAssignments exclude={new Set(roles.map(r => `${r.actorType}:${r.actorId}`))} refreshKey={assignmentRevision} onSaved={() => { void load(); onChanged?.() }} />}
+  </div>
+}
+
+function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  return <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0b1220]/50 backdrop-blur-[3px] animate-fade-in" onClick={onClose}>
+    <div role="dialog" aria-modal="true" aria-label={title} className="modal-panel w-full max-w-lg max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+      <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-tw-border">
+        <h3 className="font-semibold text-tw-text">{title}</h3>
+        <button type="button" onClick={onClose} className="icon-btn w-8 h-8" aria-label="Close"><Icon name="x" className="w-4 h-4" /></button>
+      </div>
+      <div className="px-5 py-4 overflow-y-auto">{children}</div>
+    </div>
   </div>
 }
