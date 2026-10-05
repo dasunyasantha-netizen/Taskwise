@@ -92,3 +92,33 @@ export function sharedIdentityUrl(action: 'login' | 'logout', source: LaunchSour
   if (action === 'logout') target.searchParams.set('source', source)
   return target.toString()
 }
+
+const HANDOFF_STORAGE_KEY = 'taskwise_last_handoff';
+
+/** The Syswise hand-off page: it reuses a live Pickiti session without a
+ *  password and shows the Pickiti login only when Pickiti is signed out. */
+export function taskwiseHandoffUrl(): string {
+  const local = ['localhost', '127.0.0.1'].includes(window.location.hostname)
+  const origin = currentLauncherOrigin() || (local ? (import.meta.env.VITE_SYSWISE_FRONTEND_URL || 'http://localhost:3100') : window.location.origin)
+  return new URL('/sso/taskwise?source=pickiti', origin).toString()
+}
+
+/** Where to send someone whose TaskWise session ended. A second bounce within
+ *  a minute means TaskWise keeps refusing the new session, so stop at the
+ *  Pickiti login page instead of looping through the hand-off. */
+let reconnectTarget: string | null = null
+
+export function reconnectUrl(): string {
+  // Several handlers can notice the same expired session at once; decide once per page.
+  if (reconnectTarget) return reconnectTarget
+  let recent = false
+  try {
+    recent = Date.now() - Number(sessionStorage.getItem(HANDOFF_STORAGE_KEY) || 0) < 60_000
+    sessionStorage.setItem(HANDOFF_STORAGE_KEY, String(Date.now()))
+  } catch {
+    // Without storage, fall back to the login page, which cannot loop.
+    recent = true
+  }
+  reconnectTarget = recent ? sharedIdentityUrl('login', 'pickiti') : taskwiseHandoffUrl()
+  return reconnectTarget
+}

@@ -3,7 +3,7 @@ import type { AuthUser } from '../types'
 import { authApi } from '../services/apiService'
 import CompanyRequestModal from './CompanyRequestModal'
 import Select from './Select'
-import { launcherHomeUrl, launcherName, sharedIdentityUrl } from '../services/launchSource'
+import { launcherHomeUrl, launcherName, reconnectUrl, taskwiseHandoffUrl } from '../services/launchSource'
 import { Icon } from './ui/Icon'
 import { ThemeToggle } from './ui/Primitives'
 
@@ -17,8 +17,8 @@ export default function Auth({ onLogin }: Props) {
   // form stays public. Everyone else signs in on the Pickiti login page.
   const testing = params.has('testing')
   const companyRequest = params.has('company-request')
-  const pickitiLogin = sharedIdentityUrl('login', 'pickiti')
-  useEffect(() => { if (!testing && !companyRequest) window.location.replace(pickitiLogin) }, [testing, companyRequest, pickitiLogin])
+  const pickitiLogin = taskwiseHandoffUrl()
+  useEffect(() => { if (!testing && !companyRequest) window.location.replace(reconnectUrl()) }, [testing, companyRequest])
 
   const [phone, setPhone]         = useState('')
   const [password, setPassword]   = useState('')

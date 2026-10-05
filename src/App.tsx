@@ -11,7 +11,7 @@ import MigrationContactModal from './components/MigrationContactModal'
 import SyswiseCompanySelection from './components/SyswiseCompanySelection'
 import InsurancePolicyCompletionPrompt from './components/InsurancePolicyCompletionPrompt'
 import { authApi, noticeApi, type Notice } from './services/apiService'
-import { captureLaunchSource, sharedIdentityUrl, type LaunchSource } from './services/launchSource'
+import { captureLaunchSource, reconnectUrl, sharedIdentityUrl, type LaunchSource } from './services/launchSource'
 import { LanguageProvider, viewingLanguage } from './i18n/Language'
 import { Icon } from './components/ui/Icon'
 import { LoadingBlock } from './components/ui/Primitives'
@@ -136,7 +136,7 @@ export default function App() {
           localStorage.removeItem(USER_KEY)
           setUser(null)
           setView('login')
-          if (parsed.syswiseUserId) window.location.replace(sharedIdentityUrl('login', 'pickiti'))
+          if (parsed.syswiseUserId) window.location.replace(reconnectUrl())
         })
       } catch {
         localStorage.removeItem(TOKEN_KEY)
@@ -169,7 +169,7 @@ export default function App() {
       localStorage.removeItem(REAL_USER_KEY)
       setUser(null)
       setView('login')
-      if ((event as CustomEvent).detail?.syswise) window.location.replace(sharedIdentityUrl('login', 'pickiti'))
+      if ((event as CustomEvent).detail?.syswise) window.location.replace(reconnectUrl())
     }
     const handleSharedSignOut = (event: StorageEvent) => {
       if (event.newValue === null && (event.key === 'syswise_token' || event.key === TOKEN_KEY)) {
