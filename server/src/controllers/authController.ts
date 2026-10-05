@@ -87,7 +87,7 @@ export async function unifiedLogin(req: Request, res: Response): Promise<void> {
       if (!(await bcrypt.compare(password, director.password))) {
         invalid(); return
       }
-      const assignment = await prisma.migrationRoleContact.findUnique({ where: { actorType_actorId: { actorType: 'director', actorId: director.id } } })
+      const assignment = await prisma.migrationRoleContact.findUnique({ where: { actorType_actorId_holderKey: { actorType: 'director', actorId: director.id, holderKey: '' } } })
       if (assignment?.syswiseUserId || assignment?.legacyAccessRevokedAt || await usesFixedRoles(director.workspaceId)) {
         res.status(401).json({ error: 'This account has migrated. Sign in through Syswise.', code: 'syswise_signin_required' }); return
       }
@@ -151,7 +151,7 @@ export async function unifiedLogin(req: Request, res: Response): Promise<void> {
       if (!(await bcrypt.compare(password, personnel.password))) {
         invalid(); return
       }
-      const assignment = await prisma.migrationRoleContact.findUnique({ where: { actorType_actorId: { actorType: 'personnel', actorId: personnel.id } } })
+      const assignment = await prisma.migrationRoleContact.findUnique({ where: { actorType_actorId_holderKey: { actorType: 'personnel', actorId: personnel.id, holderKey: '' } } })
       if (assignment?.syswiseUserId || assignment?.legacyAccessRevokedAt || await usesFixedRoles(personnel.workspaceId)) {
         res.status(401).json({ error: 'This account has migrated. Sign in through Syswise.', code: 'syswise_signin_required' }); return
       }
@@ -345,8 +345,8 @@ export async function getMe(req: Request, res: Response): Promise<void> {
     const { actorId, actorType, workspaceId } = req.user!
     const features = await getEnabledFeatures(workspaceId)
     const assignedContact = req.user!.authenticationMethod === 'syswise'
-      ? await prisma.migrationRoleContact.findUnique({ where: { actorType_actorId: { actorType, actorId } } }) : null
-    const identityContact = { ...await fixedRoleMetadata(actorType, actorId, workspaceId), ...(assignedContact ? { syswiseUserId: req.user!.syswiseUserId, phone: assignedContact.phoneE164, email: assignedContact.email, mustChangePassword: false } : {}) }
+      ? await prisma.migrationRoleContact.findUnique({ where: { actorType_actorId_holderKey: { actorType, actorId, holderKey: req.user!.holderKey || '' } } }) : null
+    const identityContact = { ...await fixedRoleMetadata(actorType, actorId, workspaceId), ...(assignedContact ? { syswiseUserId: req.user!.syswiseUserId, holderName: assignedContact.holderName || undefined, phone: assignedContact.phoneE164, email: assignedContact.email, mustChangePassword: false } : {}) }
     if (actorType === 'director') {
       const director = await prisma.director.findUnique({
         where: { id: actorId },

@@ -337,10 +337,14 @@ model MigrationRoleContact {
   syncStatus     String    @default("PENDING")
   syncedAt       DateTime?
   legacyAccessRevokedAt DateTime?
+  // '' is the role's main holder. The company-management (Chairman) role can
+  // have extra named holders who share its access; each signs in separately.
+  holderKey      String    @default("")
+  holderName     String?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  @@unique([actorType, actorId])
+  @@unique([actorType, actorId, holderKey])
   @@index([syncStatus, updatedAt])
   @@index([phoneE164])
   @@index([email])
@@ -910,6 +914,7 @@ model AuditLog {
   actorPersonnelId String?
   actorPersonnel   Personnel? @relation("AuditActorPersonnel", fields: [actorPersonnelId], references: [id])
   actorType        String // "director" | "personnel"
+  actorHolderName  String? // the named person acting for a shared Chairman role
   payload          Json?
   createdAt        DateTime   @default(now())
 

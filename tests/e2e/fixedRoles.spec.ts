@@ -62,3 +62,16 @@ test('assignment form uses country selection and digit boxes with stable typing 
   await page.getByRole('button', { name: 'Save assignment', exact: true }).click()
   await expect(page.getByRole('alert')).toContainText('Enter a valid mobile number')
 })
+
+test('Director adds, lists and removes a named holder of the Chairman role', async ({ page }) => {
+  await page.getByRole('button', { name: '+ Add another holder to Chairman', exact: true }).click()
+  await page.getByLabel('Holder name', { exact: true }).fill('Chairman Delegate')
+  await page.getByLabel('Mobile number', { exact: true }).fill('771234520')
+  await page.getByRole('button', { name: 'Add holder', exact: true }).click()
+  await expect(page.getByRole('status')).toContainText('Holder added')
+  await expect(page.getByRole('button', { name: /Chairman Delegate.*Same access as Chairman.*94771234520/ })).toBeVisible()
+  await page.getByRole('button', { name: 'Remove', exact: true }).click()
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Remove', exact: true }).click()
+  await expect(page.getByRole('status')).toContainText('Holder removed')
+  await expect(page.getByText('Chairman Delegate', { exact: true })).toHaveCount(0)
+})

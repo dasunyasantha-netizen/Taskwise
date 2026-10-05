@@ -16,7 +16,7 @@ export async function listFixedRoles(req: Request, res: Response): Promise<void>
   res.json(roles.filter(r => r.director ? r.director.isActive : r.personnel?.isActive && !r.personnel.deletedAt).map(r => {
     const actor = r.director || r.personnel!
     const actorType = r.director ? 'director' : 'personnel'
-    const contact = contacts.find(c => c.actorId === actor.id && c.actorType === actorType)
+    const contact = contacts.find(c => c.actorId === actor.id && c.actorType === actorType && !c.holderKey)
     return { id: r.id, name: actor.name, actorType, actorId: actor.id, personnelId: r.personnelId,
       departmentId: r.personnel?.departmentId, departmentName: r.personnel?.department.name,
       layerNumber: r.personnel?.department.layer.number, supervisorId: r.personnel?.supervisorId,
@@ -66,10 +66,10 @@ export async function saveFixedRole(req: Request, res: Response): Promise<void> 
         event: existing ? 'ROLE_UPDATED' : 'ROLE_CREATED', payload: { roleId: role.id, name, departmentId, supervisorId: supervisor.value, isLetterAssigner } } })
       return role
     })
-    const contact = await prisma.migrationRoleContact.findUnique({ where: { actorType_actorId: {
+    const contacts = await prisma.migrationRoleContact.findMany({ where: {
       actorType: role.directorId ? 'director' : 'personnel', actorId: role.directorId || role.personnelId!,
-    } } })
-    if (contact) await syncMigrationContact(contact)
+    } })
+    for (const contact of contacts) await syncMigrationContact(contact)
     res.status(existing ? 200 : 201).json({ id: role.id, saved: true })
   } catch (error) { console.error(error); res.status(500).json({ error: 'Could not save the role.' }) }
 }

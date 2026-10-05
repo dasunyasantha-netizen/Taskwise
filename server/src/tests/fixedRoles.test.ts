@@ -164,6 +164,57 @@ async function main() {
     assert.equal((await db.taskAssignment.findUniqueOrThrow({ where: { id: assignment.id } })).personnelId, chairman.id)
     await roles.saveFixedRole(req({ name: 'Chairman', departmentId: department.id }, who, { id: chairman.id }), res())
   })
+  await test('Chairman role takes extra named holders; only the Director can add them, only to the management role', async () => {
+    const chairParams = { actorType: 'director', actorId: director.id }
+    for (const holderName of ['Chairman Secretary', 'Chairman Delegate']) {
+      const phone = holderName === 'Chairman Secretary' ? '+94771234510' : '+94771234511'
+      const r = res(); await contacts.addRoleHolder(req({ holderName, country: 'LK', phone }, who, chairParams), r); assert.equal(r.statusCode, 201)
+    }
+    const dupName = res(); await contacts.addRoleHolder(req({ holderName: 'chairman secretary', country: 'LK', phone: '+94771234512' }, who, chairParams), dupName); assert.equal(dupName.statusCode, 400)
+    const mainPhone = res(); await contacts.addRoleHolder(req({ holderName: 'Third', country: 'LK', phone: '+94771234500' }, who, chairParams), mainPhone); assert.equal(mainPhone.statusCode, 409)
+    const onPersonnel = res(); await contacts.addRoleHolder(req({ holderName: 'Deputy', country: 'LK', phone: '+94771234513' }, who, { actorType: 'personnel', actorId: secretary.id }), onPersonnel); assert.equal(onPersonnel.statusCode, 400)
+    const byPersonnel = res(); await contacts.addRoleHolder(req({ holderName: 'Deputy', country: 'LK', phone: '+94771234513' }, personnelWho, chairParams), byPersonnel); assert.equal(byPersonnel.statusCode, 403)
+    const list = res(); await contacts.getManagedMigrationContacts(req({}, who), list)
+    const chair = list.body.find((r: any) => r.actorType === 'director')
+    assert.equal(chair.contact.phoneE164, '+94771234500')
+    assert.deepEqual(chair.holders.map((h: any) => h.holderName), ['Chairman Secretary', 'Chairman Delegate'])
+  })
+  await test('each holder signs in separately with full Chairman access and is named in the audit log', async () => {
+    const holder = await db.migrationRoleContact.findFirstOrThrow({ where: { actorId: director.id, holderName: 'Chairman Secretary' } })
+    await db.migrationRoleContact.update({ where: { id: holder.id }, data: { syswiseUserId: 3000 } })
+    const assignment = { actorId: director.id, actorType: 'director', workspaceId: workspace.id, assignmentVersion: 1, holderKey: holder.holderKey }
+    const wrong = jwt.sign({ purpose: 'taskwise-role-choice', syswiseUserId: 3000, assignments: [{ ...assignment, holderKey: '' }] }, process.env.JWT_SECRET!)
+    const denied = res(); await sso.selectSyswiseRole(req({ selectionToken: wrong, contactId: holder.id }), denied); assert.equal(denied.statusCode, 403)
+    const proof = jwt.sign({ purpose: 'taskwise-role-choice', syswiseUserId: 3000, assignments: [assignment] }, process.env.JWT_SECRET!)
+    const r = res(); await sso.selectSyswiseRole(req({ selectionToken: proof, contactId: holder.id }), r)
+    assert.equal(r.statusCode, 200); assert.equal(r.body.user.actorId, director.id); assert.equal(r.body.user.isChairman, true); assert.equal(r.body.user.holderName, 'Chairman Secretary')
+    const token = r.body.token
+    const request = req(); request.headers.authorization = 'Bearer ' + token
+    let write: Promise<unknown> | undefined
+    // Controllers write inside interactive transactions too, so cover that path.
+    await authenticateToken(request, res(), () => { write = db.$transaction(tx => tx.auditLog.create({ data: { workspaceId: workspace.id, event: 'HOLDER_TEST', actorType: 'director', actorDirectorId: director.id } })) })
+    assert.ok(write); const log: any = await write
+    assert.equal(log.actorHolderName, 'Chairman Secretary'); assert.equal(request.user.holderName, 'Chairman Secretary')
+    const me = res(); await auth.getMe(request, me); assert.equal(me.body.isChairman, true); assert.equal(me.body.holderName, 'Chairman Secretary')
+    const main = await authorize(who); assert.equal(main.allowed, true); assert.equal(main.request.user.holderName, undefined)
+    let mainWrite: Promise<unknown> | undefined
+    await authenticateToken(main.request, res(), () => { mainWrite = db.auditLog.create({ data: { workspaceId: workspace.id, event: 'HOLDER_TEST', actorType: 'director', actorDirectorId: director.id } }).then(l => l) })
+    assert.equal(((await mainWrite) as any).actorHolderName, null)
+    ;(globalThis as any).holderToken = token
+  })
+  await test('changing or removing a holder ends only that holder\'s sessions', async () => {
+    const token = (globalThis as any).holderToken
+    const holder = await db.migrationRoleContact.findFirstOrThrow({ where: { actorId: director.id, holderName: 'Chairman Secretary' } })
+    const renamed = res(); await contacts.assignMigrationContact(req({ holderKey: holder.holderKey, holderName: 'Chairman Secretary', country: 'LK', phone: '+94771234514' }, who, { actorType: 'director', actorId: director.id }), renamed)
+    assert.equal(renamed.statusCode, 200)
+    assert.equal((await authorize(token)).allowed, false)
+    assert.equal((await authorize(who)).allowed, true)
+    const removed = res(); await contacts.removeRoleHolder(req({}, who, { actorType: 'director', actorId: director.id, holderKey: holder.holderKey }), removed)
+    assert.equal(removed.statusCode, 200)
+    assert.equal(await db.migrationRoleContact.count({ where: { actorId: director.id } }), 2)
+    assert.equal((await authorize(who)).allowed, true)
+    const again = res(); await contacts.removeRoleHolder(req({}, who, { actorType: 'director', actorId: director.id, holderKey: '' }), again); assert.equal(again.statusCode, 404)
+  })
   await test('other companies keep their existing access model', async () => {
     const w = await db.workspace.create({ data: { name: 'Other company' } }); const d = await db.director.create({ data: { name: 'Other director', phone: '0770000099', password: hash, workspaceId: w.id } })
     assert.equal((await authorize({ actorId: d.id, actorType: 'director', workspaceId: w.id })).allowed, true)

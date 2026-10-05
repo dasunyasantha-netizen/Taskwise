@@ -21,8 +21,12 @@ export async function listAuditLogs(req: Request, res: Response): Promise<void> 
     if (from || to) {
       where.createdAt = { ...(from ? { gte: new Date(from) } : {}), ...(to ? { lte: new Date(to) } : {}) }
     }
-    const logs = await prisma.auditLog.findMany({ where, orderBy: { createdAt: 'desc' }, take: 200 })
-    res.json(logs)
+    const logs = await prisma.auditLog.findMany({ where, orderBy: { createdAt: 'desc' }, take: 200,
+      include: { actorDirector: { select: { name: true } }, actorPersonnel: { select: { name: true } } } })
+    res.json(logs.map(({ actorDirector, actorPersonnel, ...log }) => {
+      const name = actorDirector?.name || actorPersonnel?.name
+      return { ...log, actorName: name && log.actorHolderName ? `${name} (${log.actorHolderName})` : name }
+    }))
   } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
 }
 

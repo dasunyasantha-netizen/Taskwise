@@ -1088,8 +1088,14 @@ export async function getTaskHistory(req: Request, res: Response): Promise<void>
       },
       orderBy: { createdAt: 'asc' }
     })
-    res.json(logs)
+    res.json(logs.map(withHolderName))
   } catch (err) { console.error(err); res.status(500).json({ error: 'Internal server error' }) }
+}
+
+// A shared Chairman role shows which named holder acted, e.g. "Chairman (Chairman Secretary)".
+function withHolderName<T extends { actorHolderName: string | null; actorDirector: { id: string; name: string } | null }>(log: T): T {
+  return log.actorHolderName && log.actorDirector
+    ? { ...log, actorDirector: { ...log.actorDirector, name: `${log.actorDirector.name} (${log.actorHolderName})` } } : log
 }
 
 // GET /api/tasks/:id/progress-logs
@@ -1588,7 +1594,7 @@ export async function getPreviousHistory(req: Request, res: Response): Promise<v
     res.json({
       parentTask,
       progressLogs: enrichedLogs,
-      history,
+      history: history.map(withHolderName),
       handoverNote: chainLink.handoverNote,
       chainStepNumber: chainLink.chainStepNumber,
     })

@@ -4,6 +4,7 @@ import prisma from '../prisma'
 import { fixedRoleMetadata, usesFixedRoles, isRoleAlias } from '../helpers/fixedRoles'
 import { TEST_WORKSPACE, testSandboxState, resetTestSandbox } from '../helpers/testSandbox'
 import { localDate } from '../helpers/ysoRules'
+import { requestContext } from '../helpers/requestContext'
 
 export interface AuthPayload {
   roleBasedIdentity?: boolean
@@ -23,6 +24,8 @@ export interface AuthPayload {
   authenticationMethod?: 'password' | 'webauthn' | 'syswise'
   syswiseUserId?: number
   assignmentVersion?: number
+  holderKey?: string    // which holder of a shared role signed in ('' = main holder)
+  holderName?: string
 }
 
 declare global {
@@ -85,7 +88,8 @@ export async function authenticateToken(req: Request, res: Response, next: NextF
     if (!actor || (actor.company && actor.company.status !== 'ACTIVE')) {
       res.status(401).json({ error: 'This role is no longer active.' }); return
     }
-    const contact = await prisma.migrationRoleContact.findUnique({ where: { actorType_actorId: { actorType: payload.actorType, actorId: payload.actorId } } })
+    const contact = await prisma.migrationRoleContact.findUnique({ where: { actorType_actorId_holderKey: {
+      actorType: payload.actorType, actorId: payload.actorId, holderKey: payload.authenticationMethod === 'syswise' ? payload.holderKey || '' : '' } } })
     if (await isRoleAlias(payload.actorType, payload.actorId)) {
       res.status(401).json({ error: 'Open the unified Chairman role through Syswise.', code: 'syswise_signin_required' }); return
     }
@@ -146,8 +150,9 @@ export async function authenticateToken(req: Request, res: Response, next: NextF
         })
       }
     }
-    req.user = { ...payload, ...await fixedRoleMetadata(payload.actorType, payload.actorId, payload.workspaceId) }
-    next()
+    const holderName = payload.authenticationMethod === 'syswise' ? contact?.holderName || undefined : undefined
+    req.user = { ...payload, holderName, ...await fixedRoleMetadata(payload.actorType, payload.actorId, payload.workspaceId) }
+    requestContext.run({ holderName }, next)
   } catch {
     res.status(401).json({ error: 'Invalid or expired token' })
   }

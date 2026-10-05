@@ -21,6 +21,7 @@ export interface AuthUser {
   workspaceId: string
   name: string
   syswiseUserId?: number
+  holderName?: string   // named holder of a shared Chairman role
   phone?: string
   email?: string
   nic?: string

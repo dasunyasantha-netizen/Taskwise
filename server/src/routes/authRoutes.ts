@@ -10,7 +10,7 @@ import {
   listCredentials, deleteCredential,
 } from '../controllers/webAuthnController'
 import { authenticateToken, requireSyswiseAdmin } from '../middleware/authMiddleware'
-import { getMigrationContact, saveMigrationContact, getManagedMigrationContacts, assignMigrationContact } from '../controllers/migrationContactController'
+import { getMigrationContact, saveMigrationContact, getManagedMigrationContacts, assignMigrationContact, addRoleHolder, removeRoleHolder } from '../controllers/migrationContactController'
 import { exchangeSyswiseCode, selectSyswiseRole } from '../controllers/syswiseController'
 import { supportVerificationOptions, supportVerificationVerify } from '../controllers/supportVerificationController'
 
@@ -19,6 +19,8 @@ router.post('/syswise/exchange', exchangeSyswiseCode)
 router.post('/syswise/select', selectSyswiseRole)
 router.get('/role-contacts', authenticateToken, getManagedMigrationContacts)
 router.put('/role-contacts/:actorType/:actorId', authenticateToken, assignMigrationContact)
+router.post('/role-contacts/:actorType/:actorId/holders', authenticateToken, addRoleHolder)
+router.delete('/role-contacts/:actorType/:actorId/holders/:holderKey', authenticateToken, removeRoleHolder)
 
 router.post('/login',                   unifiedLogin)
 router.post('/director/register',       directorRegister)

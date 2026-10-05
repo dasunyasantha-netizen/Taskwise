@@ -68,7 +68,9 @@ export const authApi = {
   exchangeSyswise: (code: string) => api.post<{ selectionToken: string; roles: Array<{ contactId: string; companyId: string; companyName: string; roleName: string }> }>('/auth/syswise/exchange', { code }),
   selectSyswiseRole: (selectionToken: string, contactId: string) => api.post<{ token: string; user: import('../types').AuthUser }>('/auth/syswise/select', { selectionToken, contactId }),
   managedRoleContacts: () => api.get<ManagedRoleContact[]>('/auth/role-contacts'),
-  assignRoleContact: (actorType: string, actorId: string, data: { country: string; phone: string; email?: string }) => api.put('/auth/role-contacts/' + actorType + '/' + actorId, data),
+  assignRoleContact: (actorType: string, actorId: string, data: { country: string; phone: string; email?: string; holderKey?: string; holderName?: string }) => api.put('/auth/role-contacts/' + actorType + '/' + actorId, data),
+  addRoleHolder: (actorType: string, actorId: string, data: { holderName: string; country: string; phone: string; email?: string }) => api.post('/auth/role-contacts/' + actorType + '/' + actorId + '/holders', data),
+  removeRoleHolder: (actorType: string, actorId: string, holderKey: string) => api.delete('/auth/role-contacts/' + actorType + '/' + actorId + '/holders/' + holderKey),
   login: (phone: string, password: string) =>
     api.post<{ token: string; user: unknown }>('/auth/login', { phone, password }),
   directorRegister: (data: { phone: string; password: string; name: string; workspaceName?: string }) =>
@@ -99,8 +101,10 @@ export const authApi = {
     api.post(`/auth/impersonation/sessions/${id}/revoke`),
 }
 
+type RoleContactDetails = { country: string; phoneE164: string; email: string | null; syswiseUserId: number | null }
+export type RoleHolder = { holderKey: string; holderName: string; contact: RoleContactDetails }
 export type ManagedRoleContact = { actorType: string; actorId: string; name: string; roleName: string;
-  contact: { country: string; phoneE164: string; email: string | null; syswiseUserId: number | null } | null }
+  contact: RoleContactDetails | null; holders?: RoleHolder[] }
 
 // ─── Workspace ───────────────────────────────────────────────────────────────
 export const workspaceApi = {
