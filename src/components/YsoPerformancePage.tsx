@@ -723,16 +723,21 @@ function MeetingForm({
     </Modal>
   )
 }
+type AnalyticsView = 'trends' | 'yso' | 'ad'
+
 function Analytics({
   dashboard,
   people,
   period,
   adId,
+  view,
 }: {
   dashboard: YsoDashboard
   people: YsoPerson[]
   period: string
   adId?: string
+  /** Which tab is showing: Trends, YSO analytics or AD analytics. */
+  view: AnalyticsView
 }) {
   const { t: tr, locale } = useLanguage()
   const ids = people.map((p) => p.id),
@@ -802,7 +807,7 @@ function Analytics({
     }))
   return (
     <div className="space-y-5">
-      <div className="grid lg:grid-cols-2 gap-5">
+      {view === 'trends' && <div className="grid lg:grid-cols-2 gap-5">
         <section className={panel}>
           <h3 className="font-semibold tracking-tight mb-5">{tr("Monthly score trend")}</h3>
           <svg
@@ -873,7 +878,8 @@ function Analytics({
             </div>
           </div>
         </section>
-      </div>
+      </div>}
+      {view === 'yso' && <>
       <section className={panel}>
         <h3 className="font-semibold tracking-tight mb-4">{tr("Comparative YSO leaderboard")}</h3>
         <p className="text-xs text-slate-500 mb-4">
@@ -988,7 +994,8 @@ function Analytics({
         </div>
         <LongListNoMatch list={pointsList} />
       </section>
-      <section className={`${panel} yso-ad-distribution`}>
+      </>}
+      {view === 'ad' && <section className={`${panel} yso-ad-distribution`}>
         <h3 className="font-bold mb-1">{tr("AD evaluation distribution")}</h3>
         <p className="text-xs text-slate-500 mb-4">
           {tr("Compare criterion averages and the number evaluated. A missing evaluation is not a zero score.")}</p>
@@ -1078,7 +1085,7 @@ function Analytics({
             </tbody>
           </table>
         </div>
-      </section>
+      </section>}
     </div>
   )
 }
@@ -1926,14 +1933,16 @@ export default function YsoPerformancePage({ user, onUserUpdate, directoryResetK
         </>
       ) : (
         <>
-          <nav className="seg w-full sm:w-auto" aria-label={tr("YSO workspace tabs")}>
+          <nav className="seg w-full sm:w-auto overflow-x-auto scrollbar-hide" aria-label={tr("YSO workspace tabs")}>
             {[
               { key: 'monitor', label: tr("Overview"), icon: 'grid' as IconName },
               ...(isAd ? [{ key: 'approvals', label: tr("Approvals"), icon: 'approve' as IconName }] : []),
-              { key: 'analytics', label: tr("Analytics"), icon: 'analytics' as IconName },
+              { key: 'trends', label: tr("Trends"), icon: 'analytics' as IconName },
+              { key: 'yso', label: tr("YSO analytics"), icon: 'users' as IconName },
+              { key: 'ad', label: tr("AD analytics"), icon: 'star' as IconName },
             ].map((t) => (
               <button
-                className={`seg-item flex-1 sm:flex-none min-h-10 px-4 inline-flex items-center justify-center gap-1.5 text-sm ${tab === t.key ? 'seg-item-active' : ''}`}
+                className={`seg-item flex-1 sm:flex-none shrink-0 whitespace-nowrap min-h-10 px-4 inline-flex items-center justify-center gap-1.5 text-sm ${tab === t.key ? 'seg-item-active' : ''}`}
                 aria-label={t.key === 'approvals' ? `Approvals (${queue.length} pending)` : t.label}
                 aria-pressed={tab === t.key}
                 key={t.key}
@@ -1974,7 +1983,7 @@ export default function YsoPerformancePage({ user, onUserUpdate, directoryResetK
                         key={ad}
                         onClick={() => {
                           setSelectedAd(ad)
-                          setTab('analytics')
+                          setTab('yso')
                         }}
                       >
                         <div className="flex items-center gap-3 px-4 py-3.5 border-b border-tw-border">
@@ -2041,7 +2050,7 @@ export default function YsoPerformancePage({ user, onUserUpdate, directoryResetK
                             <div className="flex items-center gap-2 flex-wrap sm:justify-end">
                               <PointsPill value={pts} />
                               {waitingCount > 0 && <span className="badge badge-warning">{waitingCount} {tr("pending")}</span>}
-                              <button className="btn-secondary btn-sm" onClick={() => { setSelectedPerson(p.id); setTab('analytics') }}>
+                              <button className="btn-secondary btn-sm" onClick={() => { setSelectedPerson(p.id); setTab('trends') }}>
                                 {tr("View performance")}</button>
                               {isAd && !p.startDate && p.managerValid && p.active && (
                                 <button
@@ -2105,12 +2114,13 @@ export default function YsoPerformancePage({ user, onUserUpdate, directoryResetK
               {requirements}
             </>
           )}
-          {tab === 'analytics' && (
+          {(tab === 'trends' || tab === 'yso' || tab === 'ad') && (
             <Analytics
               dashboard={d}
               people={people}
               period={period}
               adId={d.role === 'DIRECTOR' ? selectedAd || undefined : undefined}
+              view={tab}
             />
           )}
         </>
