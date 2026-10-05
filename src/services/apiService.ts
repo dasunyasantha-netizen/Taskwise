@@ -325,10 +325,6 @@ export const webAuthnApi = {
   getRegistrationOptions:  () => api.get<unknown>('/auth/webauthn/register/options'),
   verifyRegistration:      (response: unknown, deviceName?: string) =>
     api.post<{ verified: boolean }>('/auth/webauthn/register/verify', { response, deviceName }),
-  getAuthOptions:          (phone: string) =>
-    api.post<unknown>('/auth/webauthn/auth/options', { phone }),
-  verifyAuthentication:    (actorId: string, actorType: string, response: unknown) =>
-    api.post<{ token: string; user: unknown; mustChangePassword?: boolean }>('/auth/webauthn/auth/verify', { actorId, actorType, response }),
   listCredentials:         () =>
     api.get<Array<{ id: string; deviceName?: string; deviceType: string; backedUp: boolean; createdAt: string; lastUsedAt?: string }>>('/auth/webauthn/credentials'),
   deleteCredential:        (id: string) => api.delete(`/auth/webauthn/credentials/${id}`),

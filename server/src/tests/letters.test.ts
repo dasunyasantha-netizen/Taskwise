@@ -116,35 +116,23 @@ async function main() {
       password: 'not-a-login-hash',
     },
   })
+  // Sessions come from Pickiti (Syswise) sign-in, which needs each role's linked contact.
+  let nextUserId = Number(run.slice(-6))
+  const session = async (actor: { id: string; workspaceId: string | null }, actorType: 'director' | 'personnel') => {
+    const syswiseUserId = nextUserId++
+    await db.migrationRoleContact.create({ data: { actorType, actorId: actor.id, workspaceId: actor.workspaceId!,
+      country: 'LK', phoneE164: '+9477' + String(syswiseUserId).padStart(7, '0'), syswiseUserId } })
+    return jwt.sign({ actorId: actor.id, actorType, workspaceId: actor.workspaceId, authenticationMethod: 'syswise',
+      syswiseUserId, assignmentVersion: 1 }, process.env.JWT_SECRET!)
+  }
   const tokens = {
-    assigner: jwt.sign(
-      { actorId: assigner.id, actorType: 'personnel', workspaceId: ws.id },
-      process.env.JWT_SECRET!
-    ),
-    logger: jwt.sign(
-      { actorId: logger.id, actorType: 'personnel', workspaceId: ws.id },
-      process.env.JWT_SECRET!
-    ),
-    assignee: jwt.sign(
-      { actorId: assignee.id, actorType: 'personnel', workspaceId: ws.id },
-      process.env.JWT_SECRET!
-    ),
-    other: jwt.sign(
-      { actorId: other.id, actorType: 'personnel', workspaceId: ws.id },
-      process.env.JWT_SECRET!
-    ),
-    second: jwt.sign(
-      { actorId: secondLogger.id, actorType: 'personnel', workspaceId: ws.id },
-      process.env.JWT_SECRET!
-    ),
-    director: jwt.sign(
-      { actorId: director.id, actorType: 'director', workspaceId: ws.id },
-      process.env.JWT_SECRET!
-    ),
-    foreign: jwt.sign(
-      { actorId: foreign.id, actorType: 'director', workspaceId: otherWS.id },
-      process.env.JWT_SECRET!
-    ),
+    assigner: await session(assigner, 'personnel'),
+    logger: await session(logger, 'personnel'),
+    assignee: await session(assignee, 'personnel'),
+    other: await session(other, 'personnel'),
+    second: await session(secondLogger, 'personnel'),
+    director: await session(director, 'director'),
+    foreign: await session(foreign, 'director'),
   }
   async function call(
     who: keyof typeof tokens,

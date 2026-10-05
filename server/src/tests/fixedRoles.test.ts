@@ -215,9 +215,9 @@ async function main() {
     assert.equal((await authorize(who)).allowed, true)
     const again = res(); await contacts.removeRoleHolder(req({}, who, { actorType: 'director', actorId: director.id, holderKey: '' }), again); assert.equal(again.statusCode, 404)
   })
-  await test('other companies keep their existing access model', async () => {
+  await test('other companies also refuse old password sessions', async () => {
     const w = await db.workspace.create({ data: { name: 'Other company' } }); const d = await db.director.create({ data: { name: 'Other director', phone: '0770000099', password: hash, workspaceId: w.id } })
-    assert.equal((await authorize({ actorId: d.id, actorType: 'director', workspaceId: w.id })).allowed, true)
+    assert.equal((await authorize({ actorId: d.id, actorType: 'director', workspaceId: w.id })).allowed, false)
   })
   await test('conflicting Chairman contacts stop conversion without data loss', async () => {
     await db.migrationRoleContact.create({ data: { actorType: 'personnel', actorId: chairman.id, workspaceId: workspace.id, country: 'LK', phoneE164: '+94779999999' } })

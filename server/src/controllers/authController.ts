@@ -2,11 +2,11 @@ import { Request, Response } from 'express'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import prisma from '../prisma'
-import { companyLoginPrefix, normalizeSriLankanPhone, resolveLoginLookup } from '../helpers/phone'
+import { companyLoginPrefix, resolveLoginLookup } from '../helpers/phone'
 import { getEnabledFeatures } from '../helpers/features'
 import { ysoRole } from '../helpers/ysoAccess'
 import { SUPPORT_PROOF_PREFIX, SUPPORT_PURPOSE } from './supportVerificationController'
-import { usesFixedRoles, fixedRoleMetadata, isRoleAlias } from '../helpers/fixedRoles'
+import { fixedRoleMetadata, isRoleAlias } from '../helpers/fixedRoles'
 import { TEST_WORKSPACE, testSandboxState, resetTestSandbox } from '../helpers/testSandbox'
 import { localDate } from '../helpers/ysoRules'
 
@@ -88,8 +88,9 @@ export async function unifiedLogin(req: Request, res: Response): Promise<void> {
         invalid(); return
       }
       const assignment = await prisma.migrationRoleContact.findUnique({ where: { actorType_actorId_holderKey: { actorType: 'director', actorId: director.id, holderKey: '' } } })
-      if (assignment?.syswiseUserId || assignment?.legacyAccessRevokedAt || await usesFixedRoles(director.workspaceId)) {
-        res.status(401).json({ error: 'This account has migrated. Sign in through Syswise.', code: 'syswise_signin_required' }); return
+      // Only the role-testing sandbox keeps password sign-in; every real company signs in through Pickiti.
+      if (director.workspaceId !== TEST_WORKSPACE || assignment?.syswiseUserId || assignment?.legacyAccessRevokedAt) {
+        res.status(401).json({ error: 'TaskWise sign-in has moved to Pickiti. Sign in with your Pickiti account.', code: 'syswise_signin_required' }); return
       }
       const token = signToken(director.id, 'director', director.workspaceId!)
 
@@ -152,8 +153,8 @@ export async function unifiedLogin(req: Request, res: Response): Promise<void> {
         invalid(); return
       }
       const assignment = await prisma.migrationRoleContact.findUnique({ where: { actorType_actorId_holderKey: { actorType: 'personnel', actorId: personnel.id, holderKey: '' } } })
-      if (assignment?.syswiseUserId || assignment?.legacyAccessRevokedAt || await usesFixedRoles(personnel.workspaceId)) {
-        res.status(401).json({ error: 'This account has migrated. Sign in through Syswise.', code: 'syswise_signin_required' }); return
+      if (personnel.workspaceId !== TEST_WORKSPACE || assignment?.syswiseUserId || assignment?.legacyAccessRevokedAt) {
+        res.status(401).json({ error: 'TaskWise sign-in has moved to Pickiti. Sign in with your Pickiti account.', code: 'syswise_signin_required' }); return
       }
       const layerNumber = personnel.department.layer.number
       const token = signToken(personnel.id, 'personnel', personnel.workspaceId, {
@@ -212,55 +213,11 @@ export async function unifiedLogin(req: Request, res: Response): Promise<void> {
 }
 
 // POST /api/auth/director/register  — Director creates their workspace (blocked in production UI)
-export async function directorRegister(req: Request, res: Response): Promise<void> {
-  try {
-    const { phone, password, name, workspaceName } = req.body
-    if (!phone || !password || !name) {
-      res.status(400).json({ error: 'phone, password, and name are required' })
-      return
-    }
-    const normalized = normalizeSriLankanPhone(phone)
-    const existing = await prisma.director.findFirst({ where: { OR: [{ loginId: normalized.local }, { phone: normalized.local }] } })
-    if (existing) {
-      res.status(409).json({ error: 'Phone already registered' })
-      return
-    }
-    const hashed = await bcrypt.hash(password, 12)
-    const director = await prisma.$transaction(async tx => {
-      const workspace = await tx.workspace.create({
-        data: { name: workspaceName || `${name}'s Workspace` }
-      })
-      await tx.layer.createMany({
-        data: [
-          { workspaceId: workspace.id, number: 1, name: 'Layer 1' },
-          { workspaceId: workspace.id, number: 2, name: 'Layer 2' },
-          { workspaceId: workspace.id, number: 3, name: 'Layer 3' },
-        ]
-      })
-      const dir = await tx.director.create({
-        data: { phone: normalized.local, normalizedPhone: normalized.canonical, loginId: normalized.local, password: hashed, name, workspaceId: workspace.id }
-      })
-      return dir
-    })
-    const token = signToken(director.id, 'director', director.workspaceId!)
-    res.status(201).json({
-      token,
-      user: {
-        actorId: director.id,
-        actorType: 'director',
-        workspaceId: director.workspaceId,
-        name: director.name,
-        phone: director.phone,
-      }
-    })
-  } catch (err: unknown) {
-    if ((err as { code?: string }).code === 'P2002') { res.status(409).json({ error: 'Phone already registered' }); return }
-    console.error(err)
-    res.status(500).json({ error: 'Internal server error' })
-  }
+export async function directorRegister(_req: Request, res: Response): Promise<void> {
+  // New companies are requested through Syswise approval; self-registration is closed.
+  res.status(410).json({ error: 'Create a company through a company request instead.' })
 }
 
-// POST /api/auth/change-password
 export async function changePassword(req: Request, res: Response): Promise<void> {
   try {
     const { actorId, actorType } = req.user!

@@ -99,9 +99,9 @@ export default function App() {
       setLoading(false)
       return
     }
-    // A direct app/PWA launch also uses the shared platform account. Explicit
-    // legacy access stays available to people completing the migration.
-    if (!launchUrl.searchParams.has('legacy') && localStorage.getItem('syswise_token') && !localStorage.getItem(REAL_TOKEN_KEY)) {
+    // A direct app/PWA launch also uses the shared platform account. The
+    // role-testing sandbox and the public company request form are exempt.
+    if (!['testing', 'company-request'].some(p => launchUrl.searchParams.has(p)) && localStorage.getItem('syswise_token') && !localStorage.getItem(REAL_TOKEN_KEY)) {
       const origin = window.location.hostname === 'localhost' ? 'http://localhost:3100' : window.location.origin
       window.location.replace(`${origin}/sso/taskwise?source=${launchSource}`)
       return
@@ -136,7 +136,7 @@ export default function App() {
           localStorage.removeItem(USER_KEY)
           setUser(null)
           setView('login')
-          if (parsed.syswiseUserId) window.location.replace(sharedIdentityUrl('login', launchSource))
+          if (parsed.syswiseUserId) window.location.replace(sharedIdentityUrl('login', 'pickiti'))
         })
       } catch {
         localStorage.removeItem(TOKEN_KEY)
@@ -169,7 +169,7 @@ export default function App() {
       localStorage.removeItem(REAL_USER_KEY)
       setUser(null)
       setView('login')
-      if ((event as CustomEvent).detail?.syswise) window.location.replace(sharedIdentityUrl('login', launchSource))
+      if ((event as CustomEvent).detail?.syswise) window.location.replace(sharedIdentityUrl('login', 'pickiti'))
     }
     const handleSharedSignOut = (event: StorageEvent) => {
       if (event.newValue === null && (event.key === 'syswise_token' || event.key === TOKEN_KEY)) {
@@ -282,8 +282,7 @@ export default function App() {
   }
 
   if (!user) {
-    if (ssoCode) return <SyswiseCompanySelection code={ssoCode} onLogin={(token, selected) => { setSsoCode(''); handleLogin(token, selected) }}
-      onLegacy={() => { setSsoCode(''); const url = new URL(window.location.href); url.searchParams.set('legacy', '1'); window.history.replaceState({}, '', url); }} />
+    if (ssoCode) return <SyswiseCompanySelection code={ssoCode} onLogin={(token, selected) => { setSsoCode(''); handleLogin(token, selected) }} />
     return <Auth onLogin={handleLogin} />
   }
 

@@ -305,32 +305,14 @@ async function main() {
     return authCtrl.unifiedLogin(mockReq({ body: { phone, password } }), res).then(() => res)
   }
 
-  await test('Existing Youth Council login still works (unprefixed)', async () => {
-    const res = await login('0712345678', 'User@123')
-    assert.equal(res.statusCode, 200)
-    assert.equal(res.body.user.actorType, 'personnel')
-    assert.equal(res.body.user.actorId, ycUser.id)
-  })
-
-  await test('Existing short-code (non-mobile) login still works', async () => {
-    // Guards against locking out NYSC users whose login IDs are internal codes like 07208.
-    const res = await login('07208', 'Legacy@123')
-    assert.equal(res.statusCode, 200)
-    assert.equal(res.body.user.actorId, ycLegacyCode.id)
-  })
-
-  await test('Fair First login works using FF0712345678', async () => {
-    const res = await login('FF0712345678', 'FairPass123')
-    assert.equal(res.statusCode, 200)
-    assert.equal(res.body.user.actorId, ffAdminId)
-    assert.equal(res.body.user.companyPrefix, 'FF')
-    assert.deepEqual(res.body.user.features, [FEATURES.INSURANCE_MANAGEMENT])
-  })
-
-  await test('Lowercase prefixes are handled consistently', async () => {
-    const res = await login('ff0712345678', 'FairPass123')
-    assert.equal(res.statusCode, 200)
-    assert.equal(res.body.user.actorId, ffAdminId)
+  await test('Correct old TaskWise passwords no longer open any company; everyone is sent to Pickiti', async () => {
+    // Unprefixed, short-code, prefixed and lowercase-prefixed login IDs with their right passwords.
+    for (const [id, password] of [['0712345678', 'User@123'], ['07208', 'Legacy@123'], ['FF0712345678', 'FairPass123'], ['ff0712345678', 'FairPass123']]) {
+      const res = await login(id, password)
+      assert.equal(res.statusCode, 401, id)
+      assert.equal(res.body.code, 'syswise_signin_required', id)
+      assert.equal(res.body.token, undefined, id)
+    }
   })
 
   await test('Fair First users cannot log in using only 0712345678', async () => {
@@ -476,8 +458,8 @@ async function main() {
     assert.equal(await bcrypt.compare('Youth@123', stored.password), true)
 
     const loginRes = await login('0712345678', 'Youth@123')
-    assert.equal(loginRes.statusCode, 200)
-    assert.equal(loginRes.body.user.mustChangePassword, true)
+    assert.equal(loginRes.statusCode, 401)
+    assert.equal(loginRes.body.code, 'syswise_signin_required')
 
     const reuseRes = mockRes()
     await authCtrl.completeForcedPasswordChange(mockReq({

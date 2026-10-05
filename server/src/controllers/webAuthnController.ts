@@ -2,32 +2,16 @@ import { Request, Response } from 'express'
 import {
   generateRegistrationOptions,
   verifyRegistrationResponse,
-  generateAuthenticationOptions,
-  verifyAuthenticationResponse,
 } from '@simplewebauthn/server'
 import type {
   RegistrationResponseJSON,
-  AuthenticationResponseJSON,
 } from '@simplewebauthn/server'
-import jwt from 'jsonwebtoken'
 import prisma from '../prisma'
-import { resolveLoginLookup } from '../helpers/phone'
-import { getEnabledFeatures } from '../helpers/features'
-import { ysoRole } from '../helpers/ysoAccess'
-import { usesFixedRoles } from '../helpers/fixedRoles'
 
 const RP_NAME = 'TaskWise'
 // On production this must be the actual domain; locally it's localhost
 const RP_ID   = process.env.WEBAUTHN_RP_ID   || 'localhost'
 const ORIGIN  = process.env.WEBAUTHN_ORIGIN  || 'http://localhost:3500'
-
-function signToken(actorId: string, actorType: 'director' | 'personnel', workspaceId: string, extra?: object) {
-  return jwt.sign(
-    { actorId, actorType, workspaceId, ...extra },
-    process.env.JWT_SECRET!,
-    { expiresIn: '7d' }
-  )
-}
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -153,177 +137,16 @@ export async function registrationVerify(req: Request, res: Response): Promise<v
 
 // ─── AUTHENTICATION ───────────────────────────────────────────────────────────
 
-// POST /api/auth/webauthn/auth/options  (public — phone sent in body to identify user)
-export async function authenticationOptions(req: Request, res: Response): Promise<void> {
-  try {
-    const { phone } = req.body
-    if (!phone) { res.status(400).json({ error: 'phone is required' }); return }
-
-    const { loginId, lookupPhone } = resolveLoginLookup(phone)
-
-    // Find actor by login ID (legacy raw codes and prefixed mobile logins both supported)
-    let actorId: string, actorType: string
-    const director = await prisma.director.findFirst({ where: { OR: [{ loginId }, { phone: lookupPhone }], isActive: true }, include: { company: true } })
-    if (director) {
-      if (director.company && director.company.status !== 'ACTIVE') {
-        res.status(404).json({ error: 'User not found' }); return
-      }
-      actorId = director.id; actorType = 'director'
-    } else {
-      const personnel = await prisma.personnel.findFirst({ where: { OR: [{ loginId }, { phone: lookupPhone }], isActive: true }, include: { company: true } })
-      if (!personnel || personnel.deletedAt) {
-        res.status(404).json({ error: 'User not found' }); return
-      }
-      if (personnel.company && personnel.company.status !== 'ACTIVE') {
-        res.status(404).json({ error: 'User not found' }); return
-      }
-      actorId = personnel.id; actorType = 'personnel'
-    }
-
-    const assignment = await prisma.migrationRoleContact.findUnique({ where: { actorType_actorId_holderKey: { actorType, actorId, holderKey: '' } } })
-    const identified = await getActor(actorId, actorType)
-    if (assignment?.syswiseUserId || assignment?.legacyAccessRevokedAt || await usesFixedRoles(identified?.workspaceId)) {
-      res.status(401).json({ error: 'Sign in through Syswise to open this role.', code: 'syswise_signin_required' }); return
-    }
-    const creds = await prisma.webAuthnCredential.findMany({
-      where: { actorId, actorType },
-      select: { credentialId: true, transports: true },
-    })
-
-    if (creds.length === 0) {
-      res.status(404).json({ error: 'No passkeys registered for this account' }); return
-    }
-
-    const options = await generateAuthenticationOptions({
-      rpID: RP_ID,
-      userVerification: 'required',
-      allowCredentials: creds.map(c => ({
-        id: c.credentialId,
-        transports: c.transports ? JSON.parse(c.transports) : undefined,
-      })),
-    })
-
-    await saveChallenge(actorId, actorType, options.challenge)
-    res.json({ ...options, _actorId: actorId, _actorType: actorType })
-  } catch (err) {
-    console.error(err)
-    res.status(500).json({ error: 'Internal server error' })
-  }
+// POST /api/auth/webauthn/auth/options and /auth/verify (public)
+// Passkey sign-in to TaskWise is closed: everyone signs in through Pickiti,
+// which holds its own passkeys.
+export async function authenticationOptions(_req: Request, res: Response): Promise<void> {
+  res.status(401).json({ error: 'TaskWise sign-in has moved to Pickiti. Sign in with your Pickiti account.', code: 'syswise_signin_required' })
 }
 
-// POST /api/auth/webauthn/auth/verify  (public)
-export async function authenticationVerify(req: Request, res: Response): Promise<void> {
-  try {
-    const { actorId, actorType, response } = req.body as {
-      actorId: string
-      actorType: string
-      response: AuthenticationResponseJSON
-    }
-    if (!actorId || !actorType || !response) {
-      res.status(400).json({ error: 'actorId, actorType and response are required' }); return
-    }
-
-    const actor = await getActor(actorId, actorType) as Record<string, unknown> | null
-    if (!actor) { res.status(404).json({ error: 'User not found' }); return }
-    const assignment = await prisma.migrationRoleContact.findUnique({ where: { actorType_actorId_holderKey: { actorType, actorId, holderKey: '' } } })
-    if (assignment?.syswiseUserId || assignment?.legacyAccessRevokedAt || !actor.isActive || actor.deletedAt || await usesFixedRoles(actor.workspaceId as string)) {
-      res.status(401).json({ error: 'Sign in through Syswise to open this role.', code: 'syswise_signin_required' }); return
-    }
-
-    const challenge = (actor as { webAuthnChallenge?: string | null }).webAuthnChallenge
-    if (!challenge) { res.status(400).json({ error: 'No pending challenge' }); return }
-
-    const credRecord = await prisma.webAuthnCredential.findUnique({
-      where: { credentialId: response.id },
-    })
-    if (!credRecord || credRecord.actorId !== actorId || credRecord.actorType !== actorType) {
-      await clearChallenge(actorId, actorType)
-      res.status(400).json({ error: 'Credential not found' }); return
-    }
-
-    let verification
-    try {
-      verification = await verifyAuthenticationResponse({
-        response,
-        expectedChallenge: challenge,
-        expectedOrigin: ORIGIN,
-        expectedRPID: RP_ID,
-        credential: {
-          id:         credRecord.credentialId,
-          publicKey:  Buffer.from(credRecord.publicKey, 'base64url'),
-          counter:    Number(credRecord.counter),
-          transports: credRecord.transports ? JSON.parse(credRecord.transports) : undefined,
-        },
-        requireUserVerification: true,
-      })
-    } catch (err) {
-      await clearChallenge(actorId, actorType)
-      res.status(400).json({ error: (err as Error).message }); return
-    }
-
-    if (!verification.verified) {
-      await clearChallenge(actorId, actorType)
-      res.status(400).json({ error: 'Verification failed' }); return
-    }
-
-    // Update counter to guard against cloned authenticators
-    await prisma.webAuthnCredential.update({
-      where: { credentialId: credRecord.credentialId },
-      data: {
-        counter:    BigInt(verification.authenticationInfo.newCounter),
-        lastUsedAt: new Date(),
-      },
-    })
-    await clearChallenge(actorId, actorType)
-
-    // Issue a full session token — same shape as password login
-    if (actorType === 'director') {
-      const dir = actor as { id: string; workspaceId?: string; name: string; phone: string; email?: string | null; avatarUrl?: string | null; preferredLanguage: string; loginId?: string | null; companyId?: string | null; isChairman: boolean; isSyswiseAdmin: boolean; isCompanyAdmin: boolean }
-      const workspace = dir.workspaceId
-        ? await prisma.workspace.findUnique({ where: { id: dir.workspaceId }, select: { companyName: true, companyLogo: true } })
-        : null
-      const features = await getEnabledFeatures(dir.workspaceId!)
-      const token = signToken(dir.id, 'director', dir.workspaceId!, { authenticationMethod: 'webauthn' })
-      res.json({
-        token,
-        user: {
-          actorId: dir.id, actorType: 'director', workspaceId: dir.workspaceId,
-          name: dir.name, phone: dir.phone, email: dir.email, avatarUrl: dir.avatarUrl, preferredLanguage: dir.preferredLanguage,
-          isChairman: dir.isChairman,
-          isSyswiseAdmin: dir.isSyswiseAdmin,
-          isCompanyAdmin: dir.isCompanyAdmin,
-          loginId: dir.loginId || dir.phone,
-          companyId: dir.companyId,
-          companyName: workspace?.companyName, companyLogo: workspace?.companyLogo,
-          features,
-        },
-      })
-    } else {
-      const per = actor as { id: string; workspaceId: string; name: string; phone: string; email?: string | null; avatarUrl?: string | null; preferredLanguage: string; mustChangePassword: boolean; departmentId: string; department: { name: string; officeCategory: string | null; layer: { number: number } } }
-      const layerNumber = per.department.layer.number
-      const workspace = await prisma.workspace.findUnique({ where: { id: per.workspaceId }, select: { companyName: true, companyLogo: true } })
-      const features = await getEnabledFeatures(per.workspaceId)
-      const token = signToken(per.id, 'personnel', per.workspaceId, { layerNumber, departmentId: per.departmentId, authenticationMethod: 'webauthn' })
-      res.json({
-        token,
-        mustChangePassword: per.mustChangePassword,
-        user: {
-          actorId: per.id, actorType: 'personnel', workspaceId: per.workspaceId,
-          name: per.name, phone: per.phone, email: per.email, avatarUrl: per.avatarUrl, preferredLanguage: per.preferredLanguage,
-          layerNumber, departmentId: per.departmentId, ysoRole: ysoRole(per.department),
-          companyName: workspace?.companyName, companyLogo: workspace?.companyLogo,
-          mustChangePassword: per.mustChangePassword,
-          features,
-        },
-      })
-    }
-  } catch (err) {
-    console.error(err)
-    res.status(500).json({ error: 'Internal server error' })
-  }
+export async function authenticationVerify(_req: Request, res: Response): Promise<void> {
+  res.status(401).json({ error: 'TaskWise sign-in has moved to Pickiti. Sign in with your Pickiti account.', code: 'syswise_signin_required' })
 }
-
-// ─── LIST / DELETE credentials ────────────────────────────────────────────────
 
 // GET /api/auth/webauthn/credentials  (requires JWT)
 export async function listCredentials(req: Request, res: Response): Promise<void> {

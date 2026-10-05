@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express'
 import jwt from 'jsonwebtoken'
 import prisma from '../prisma'
-import { fixedRoleMetadata, usesFixedRoles, isRoleAlias } from '../helpers/fixedRoles'
+import { fixedRoleMetadata, isRoleAlias } from '../helpers/fixedRoles'
 import { TEST_WORKSPACE, testSandboxState, resetTestSandbox } from '../helpers/testSandbox'
 import { localDate } from '../helpers/ysoRules'
 import { requestContext } from '../helpers/requestContext'
@@ -98,8 +98,9 @@ export async function authenticateToken(req: Request, res: Response, next: NextF
           !payload.syswiseUserId || contact.syswiseUserId !== payload.syswiseUserId) {
         res.status(401).json({ error: 'Your role assignment changed. Open Taskwise from Syswise again.' }); return
       }
-    } else if (!payload.impersonationSessionId && (contact?.syswiseUserId || contact?.legacyAccessRevokedAt || await usesFixedRoles(payload.workspaceId))) {
-      res.status(401).json({ error: 'Sign in through Syswise to open this role.', code: 'syswise_signin_required' }); return
+    } else if (!payload.impersonationSessionId && payload.workspaceId !== TEST_WORKSPACE) {
+      // Old password and passkey sessions end here: every real company signs in through Pickiti.
+      res.status(401).json({ error: 'TaskWise sign-in has moved to Pickiti. Sign in with your Pickiti account.', code: 'syswise_signin_required' }); return
     }
     if (payload.impersonationSessionId) {
       if (!payload.adminId) {

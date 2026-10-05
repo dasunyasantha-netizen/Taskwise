@@ -150,10 +150,11 @@ async function main() {
   await test('old role chooser cannot reopen a reassigned position', async () => {
     const r = res(); await sso.selectSyswiseRole(req({ selectionToken: choice.selectionToken, contactId: cb.id }), r); assert.equal(r.statusCode, 403)
   })
-  await test('unmigrated users keep their legacy login for phone collection', async () => {
+  await test('unmigrated users are sent to Pickiti; old password sessions are refused', async () => {
     const legacyActor = await db.director.create({ data: { name: 'Pending migration', phone: '0771234599', loginId: 'IDB0771234599', password: hash, workspaceId: workspaceB.id, companyId: companyB.id } })
     const r = res(); await auth.unifiedLogin(req({ phone: legacyActor.loginId, password: 'Legacy-Test!123' }), r)
-    assert.equal(r.statusCode, 200); assert.ok(r.body.token); assert.equal((await authorize(r.body.token)).allowed, true)
+    assert.equal(r.statusCode, 401); assert.equal(r.body.code, 'syswise_signin_required'); assert.equal(r.body.token, undefined)
+    assert.equal((await authorize(jwt.sign({ actorId: legacyActor.id, actorType: 'director', workspaceId: workspaceB.id }, process.env.JWT_SECRET!))).allowed, false)
   })
   await test('service outages do not issue a session or alter an assignment', async () => {
     globalThis.fetch = async () => { throw new Error('fixture outage') }

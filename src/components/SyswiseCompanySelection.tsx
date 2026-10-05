@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { authApi } from '../services/apiService'
 import type { AuthUser } from '../types'
-import { launcherHomeUrl } from '../services/launchSource'
+import { launcherHomeUrl, sharedIdentityUrl } from '../services/launchSource'
 import { Icon } from './ui/Icon'
 
-export default function SyswiseCompanySelection({ code, onLogin, onLegacy }: {
-  code: string; onLogin: (token: string, user: AuthUser) => void; onLegacy: () => void;
+export default function SyswiseCompanySelection({ code, onLogin }: {
+  code: string; onLogin: (token: string, user: AuthUser) => void;
 }) {
   const started = useRef(false)
   const [identity, setIdentity] = useState<Awaited<ReturnType<typeof authApi.exchangeSyswise>> | null>(null)
@@ -48,7 +48,7 @@ export default function SyswiseCompanySelection({ code, onLogin, onLegacy }: {
       {error && <p role="alert" className="alert-error mb-4">{error}</p>}
       {error && identity?.roles.length === 1 && <button disabled={busy} onClick={() => void choose(identity.roles[0].contactId)} className="btn-primary block mb-4">Try again</button>}
       <a href={launcherHomeUrl()} className="text-sm text-tw-primary font-semibold">Back to your apps</a>
-      {error && <button className="block mt-4 text-sm text-tw-text-secondary underline" onClick={onLegacy}>Use existing Taskwise login</button>}
+      {error && <a href={sharedIdentityUrl('logout', 'pickiti')} className="block mt-4 text-sm text-tw-text-secondary underline">Sign in with a different Pickiti account</a>}
     </section>
   </main>
 }
