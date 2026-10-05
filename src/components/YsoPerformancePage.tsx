@@ -1105,8 +1105,10 @@ function useLongList<T extends { name: string }>(all: T[], top = LONG_LIST_TOP) 
   }
 }
 
-function LongListControls({ list, placeholder = 'Search YSO by name', className = 'mb-4' }: {
+function LongListControls({ list, placeholder = 'Search YSO by name', className = 'mb-4', toggle = true }: {
   list: ReturnType<typeof useLongList>; placeholder?: string; className?: string
+  /** false when the card has an ExpandToggle footer instead. */
+  toggle?: boolean
 }) {
   const { t: tr } = useLanguage()
   if (!list.long) return null
@@ -1120,12 +1122,25 @@ function LongListControls({ list, placeholder = 'Search YSO by name', className 
       <span className="text-xs text-tw-text-secondary tabular-nums">
         {tr('Showing {shown} of {total}', { shown: list.items.length, total: list.query ? list.matchCount : list.total })}
       </span>
-      {!list.query && (
+      {toggle && !list.query && (
         <button type="button" className="btn-secondary btn-sm" onClick={() => list.setExpanded(!list.expanded)}>
           {list.expanded ? tr('Show fewer') : tr('Show all {total}', { total: list.total })}
         </button>
       )}
     </div>
+  )
+}
+
+/** Card footer that expands a long list in place ("Show all 28" / "Show fewer"). */
+function ExpandToggle({ list }: { list: ReturnType<typeof useLongList> }) {
+  const { t: tr } = useLanguage()
+  if (!list.long || list.query) return null
+  return (
+    <button type="button" onClick={() => list.setExpanded(!list.expanded)} aria-expanded={list.expanded}
+      className="w-full flex items-center justify-center gap-1.5 px-4 py-2.5 border-t border-tw-border bg-tw-surface-2/60 text-sm font-semibold text-tw-primary-text hover:bg-tw-hover transition-colors">
+      {list.expanded ? tr('Show fewer') : tr('Show all {total}', { total: list.total })}
+      <Icon name="chevronDown" className={`w-4 h-4 transition-transform ${list.expanded ? 'rotate-180' : ''}`} />
+    </button>
   )
 }
 
@@ -1358,7 +1373,7 @@ export default function YsoPerformancePage({ user, onUserUpdate, directoryResetK
       ) ?? [],
     [dashboard, selectedAd, selectedPerson, period]
   )
-  const adList = useLongList(dashboard?.ads ?? [], 9)
+  const adList = useLongList(dashboard?.ads ?? [], 12)
   const directoryList = useLongList(people)
   if (loading)
     return (
@@ -1940,9 +1955,8 @@ export default function YsoPerformancePage({ user, onUserUpdate, directoryResetK
           {tab === 'monitor' && (
             <>
               {d.role === 'DIRECTOR' && !selectedAd && (
-                <div>
-                <LongListControls list={adList} placeholder="Search AD" className="mb-3" />
-                <div className={`grid sm:grid-cols-2 xl:grid-cols-3 gap-3 ${adList.scrollClass}`}>
+                <SectionCard title={tr('Assistant Directors')} icon="user" meta={`${d.ads.length}`} flush>
+                <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4 p-4 sm:p-5">
                   {adList.items.map((adInfo) => {
                     const ad = adInfo.id
                     const team = d.people.filter((p) => p.adId === ad),
@@ -1956,35 +1970,44 @@ export default function YsoPerformancePage({ user, onUserUpdate, directoryResetK
                     const avg = teamScore / Math.max(1, new Set([...teamIds, ...d.ledger.filter((l) => l.period === period && l.adId === ad).map((l) => l.personnelId)]).size)
                     return (
                       <button
-                        className="card card-hover px-3.5 py-3 text-left group flex items-center gap-3"
+                        className="card card-hover p-0 text-left overflow-hidden group"
                         key={ad}
                         onClick={() => {
                           setSelectedAd(ad)
                           setTab('analytics')
                         }}
                       >
-                        <span className="icon-tile tile-teal w-8 h-8 shrink-0"><Icon name="user" className="w-4 h-4" /></span>
-                        <span className="flex-1 min-w-0">
-                          <span className="block font-semibold text-sm text-tw-text truncate">{adInfo.name}</span>
-                          <span className="block text-xs text-tw-text-secondary truncate tabular-nums">
-                            {tr('{count} YSOs', { count: team.length })} · {tr('Avg {score}', { score: avg.toFixed(1) })}
-                          </span>
-                        </span>
-                        <span
-                          className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums ${waiting.length ? 'bg-amber-500/15 text-amber-700' : 'bg-tw-hover text-tw-text-secondary'}`}
-                          title={waiting.length
+                        <div className="flex items-center gap-3 px-4 py-3.5 border-b border-tw-border">
+                          <span className="icon-tile tile-teal w-9 h-9"><Icon name="user" className="w-4 h-4" /></span>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-sm text-tw-text truncate">{adInfo.name}</p>
+                            <p className="text-xs text-tw-text-secondary truncate">{adInfo.district}</p>
+                          </div>
+                          <Icon name="chevronRight" className="w-4 h-4 text-tw-text-muted group-hover:translate-x-0.5 transition-transform" />
+                        </div>
+                        <dl className="grid grid-cols-3 divide-x divide-tw-border">
+                          {[
+                            [tr("YSOs"), String(team.length)],
+                            [tr("Avg score"), avg.toFixed(1)],
+                            [tr("Pending"), String(waiting.length)],
+                          ].map(([label, value]) => (
+                            <div key={label} className="px-4 py-3">
+                              <dt className="text-xs text-tw-text-secondary">{label}</dt>
+                              <dd className="text-lg font-bold tabular-nums mt-0.5">{value}</dd>
+                            </div>
+                          ))}
+                        </dl>
+                        <p className="px-4 py-2.5 border-t border-tw-border bg-tw-surface-2/60 text-xs text-tw-text-secondary">
+                          {waiting.length
                             ? tr('Oldest waiting {days} days', { days: Math.max(0, Math.floor((Date.now() - Math.min(...waiting.map((e) => Date.parse(e.submittedAt)))) / 86400000)) })
                             : tr("Queue clear")}
-                        >
-                          {waiting.length ? tr('{count} pending', { count: waiting.length }) : tr('Queue clear')}
-                        </span>
-                        <Icon name="chevronRight" className="w-4 h-4 shrink-0 text-tw-text-muted group-hover:translate-x-0.5 transition-transform" />
+                        </p>
                       </button>
                     )
                   })}
                 </div>
-                <LongListNoMatch list={adList} className="mt-2" />
-                </div>
+                <ExpandToggle list={adList} />
+                </SectionCard>
               )}
               <div className="grid lg:grid-cols-[minmax(0,1fr)_360px] gap-5 items-start">
                 <SectionCard title={tr("YSO directory")} icon="users" meta={`${people.length}`} flush>
@@ -1992,8 +2015,8 @@ export default function YsoPerformancePage({ user, onUserUpdate, directoryResetK
                     <p className="px-5 py-8 text-center text-sm text-tw-text-secondary">{tr("No YSOs assigned to this team.")}</p>
                   ) : (
                     <>
-                    {directoryList.long && <div className="px-4 sm:px-5 pt-4"><LongListControls list={directoryList} className="mb-2" /></div>}
-                    <ul className={`divide-y divide-tw-border ${directoryList.scrollClass}`}>
+                    {directoryList.long && <div className="px-4 sm:px-5 pt-4"><LongListControls list={directoryList} className="mb-2" toggle={false} /></div>}
+                    <ul className="divide-y divide-tw-border">
                       {directoryList.items.map((p) => {
                         const pts = d.ledger.filter((l) => l.personnelId === p.id && l.period === period).reduce((a, b) => a + b.points, 0)
                         const waitingCount = d.entries.filter((e) => e.personnelId === p.id && pending(e)).length
@@ -2036,6 +2059,7 @@ export default function YsoPerformancePage({ user, onUserUpdate, directoryResetK
                       })}
                     </ul>
                     <LongListNoMatch list={directoryList} className="px-5 pb-4" />
+                    <ExpandToggle list={directoryList} />
                     </>
                   )}
                 </SectionCard>
