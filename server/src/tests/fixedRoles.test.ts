@@ -143,9 +143,7 @@ async function main() {
     const layer2 = await db.layer.create({ data: { workspaceId: workspace.id, number: 2, name: 'Head Office' } })
     const letters = await db.department.create({ data: { workspaceId: workspace.id, layerId: layer2.id, name: 'Correspondence', officeCategory: 'HEAD_OFFICE' } })
     const body = { name: 'Letter Assigner', departmentId: letters.id, supervisorId: chairman.id, isLetterAssigner: true }
-    for (const denied of [personnelWho, { ...who, impersonationSessionId: 'support-session' }]) {
-      const r = res(); await roles.saveFixedRole(req(body, denied), r); assert.equal(r.statusCode, 403)
-    }
+    const denied = res(); await roles.saveFixedRole(req(body, personnelWho), denied); assert.equal(denied.statusCode, 403)
     const invalid = res(); await roles.saveFixedRole(req({ ...body, isLetterAssigner: 'true' }, who), invalid); assert.equal(invalid.statusCode, 400)
     const r = res(); await roles.saveFixedRole(req(body, who), r); assert.equal(r.statusCode, 201)
     const position = await db.personnel.findUniqueOrThrow({ where: { id: r.body.id } })
@@ -153,6 +151,9 @@ async function main() {
     const listing = res(); await roles.listFixedRoles(req({}, who), listing); assert.equal(listing.body.find((v: any) => v.id === position.id).isLetterAssigner, true)
     const updated = res(); await roles.saveFixedRole(req({ name: position.name, departmentId: letters.id }, who, { id: position.id }), updated)
     assert.equal(updated.statusCode, 200); assert.equal((await db.personnel.findUniqueOrThrow({ where: { id: position.id } })).isLetterAssigner, true)
+    const viaSupport = res(); await roles.saveFixedRole(req({ name: position.name, departmentId: letters.id }, { ...who, impersonationSessionId: 'support-session', adminId: 'platform-admin' }, { id: position.id }), viaSupport)
+    assert.equal(viaSupport.statusCode, 200)
+    assert.ok(await db.auditLog.findFirst({ where: { event: 'ROLE_UPDATED', payload: { path: ['supportSessionId'], equals: 'support-session' } } }))
     await roles.saveFixedRole(req({ ...body, isLetterAssigner: false }, who, { id: position.id }), res())
     assert.equal((await db.personnel.findUniqueOrThrow({ where: { id: position.id } })).isLetterAssigner, false)
     assert.ok(await db.auditLog.findFirst({ where: { workspaceId: workspace.id, event: 'ROLE_CREATED', payload: { path: ['roleId'], equals: position.id } } }))

@@ -38,7 +38,7 @@ export default function FixedRoleManagement({ user, createRequest = 0, onChanged
     finally { setBusy(false) }
   }
   const filtered = roles.filter(r => [r.name, r.departmentName, r.phone].some(s => s?.toLowerCase().includes(search.toLowerCase())))
-  const writable = user.actorType === 'director' && !user.impersonation
+  const writable = user.actorType === 'director'
   return <div className="space-y-4">
     <div><h2 className="text-lg font-semibold tracking-tight inline-flex items-center gap-2"><span className="icon-tile tile-indigo w-8 h-8 rounded-lg"><Icon name="users" className="w-4 h-4" /></span>Roles</h2><p className="text-sm text-tw-text-secondary">{roles.length} fixed roles. Tasks, reporting relationships and history stay with each role when its phone assignment changes.</p></div>
     {writable && <button type="button" className="btn-secondary" onClick={() => { setEditing('new'); setForm(emptyForm) }}>Create role</button>}

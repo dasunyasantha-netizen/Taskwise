@@ -141,7 +141,6 @@ export async function saveMigrationContact(req: Request, res: Response): Promise
 }
 
 export async function getManagedMigrationContacts(req: Request, res: Response): Promise<void> {
-  if (req.user?.impersonationSessionId) { res.status(403).json({ error: 'Unavailable during support access.' }); return }
   const { actorType, actorId, workspaceId } = req.user!
   const fixedRoles = await usesFixedRoles(workspaceId)
   if (fixedRoles && actorType !== 'director') { res.status(403).json({ error: 'Only the Director can manage role assignments.' }); return }
@@ -170,13 +169,14 @@ export async function getManagedMigrationContacts(req: Request, res: Response): 
   ])
 }
 
-type Target = { workspaceId: string; managerType: 'director' | 'personnel'; managerId: string; targetType: string; targetId: string; companyId: string | null }
+type Target = { workspaceId: string; managerType: 'director' | 'personnel'; managerId: string; targetType: string; targetId: string; companyId: string | null; support: Record<string, unknown> }
 
 // Resolves the role in the URL and checks the caller may assign it. Fixed-role
 // companies allow only the Director; elsewhere a supervisor may assign reports.
 async function resolveTarget(req: Request, res: Response): Promise<Target | null> {
-  if (req.user?.impersonationSessionId) { res.status(403).json({ error: 'Unavailable during support access.' }); return null }
-  const { actorType: managerType, actorId: managerId, workspaceId } = req.user!
+  const { actorType: managerType, actorId: managerId, workspaceId, adminId, adminName, impersonationSessionId } = req.user!
+  // Support Access may assign numbers; audit payloads name the admin behind the change.
+  const support = impersonationSessionId ? { supportSessionId: impersonationSessionId, impersonatedBy: adminName ?? adminId } : {}
   if (await usesFixedRoles(workspaceId) && managerType !== 'director') { res.status(403).json({ error: 'Only the Director can assign phone numbers.' }); return null }
   const targetType = req.params.actorType
   const targetId = req.params.actorId
@@ -189,7 +189,7 @@ async function resolveTarget(req: Request, res: Response): Promise<Target | null
       !('supervisorId' in target) || target.supervisorId !== managerId))) {
     res.status(403).json({ error: 'You can assign only roles you supervise.' }); return null
   }
-  return { workspaceId, managerType, managerId, targetType, targetId, companyId: target.companyId }
+  return { workspaceId, managerType, managerId, targetType, targetId, companyId: target.companyId, support }
 }
 
 function parseContact(req: Request, res: Response): { country: string; phone: string; email: string | null } | null {
@@ -263,7 +263,7 @@ export async function assignMigrationContact(req: Request, res: Response): Promi
       workspaceId: t.workspaceId, event: 'ROLE_CONTACT_ASSIGNED', actorType: t.managerType,
       ...(t.managerType === 'director' ? { actorDirectorId: t.managerId } : { actorPersonnelId: t.managerId }),
       payload: { targetType: t.targetType, targetId: t.targetId, country: parsed.country, phoneLast4: parsed.phone.slice(-4),
-        ...(holderKey ? { holderKey, holderName } : {}) },
+        ...(holderKey ? { holderKey, holderName } : {}), ...t.support },
     } })
     const synced = await syncMigrationContact(contact)
     res.json({ saved: true, syncStatus: synced ? 'SYNCED' : 'PENDING' })
@@ -291,7 +291,7 @@ export async function addRoleHolder(req: Request, res: Response): Promise<void> 
     } })
     await prisma.auditLog.create({ data: {
       workspaceId: t.workspaceId, event: 'ROLE_HOLDER_ADDED', actorType: 'director', actorDirectorId: t.managerId,
-      payload: { targetType: t.targetType, targetId: t.targetId, holderKey: contact.holderKey, holderName, country: parsed.country, phoneLast4: parsed.phone.slice(-4) },
+      payload: { targetType: t.targetType, targetId: t.targetId, holderKey: contact.holderKey, holderName, country: parsed.country, phoneLast4: parsed.phone.slice(-4), ...t.support },
     } })
     const synced = await syncMigrationContact(contact)
     res.status(201).json({ saved: true, holderKey: contact.holderKey, syncStatus: synced ? 'SYNCED' : 'PENDING' })
@@ -313,7 +313,7 @@ export async function removeRoleHolder(req: Request, res: Response): Promise<voi
     await prisma.migrationRoleContact.delete({ where: { id: contact.id } })
     await prisma.auditLog.create({ data: {
       workspaceId: t.workspaceId, event: 'ROLE_HOLDER_REMOVED', actorType: 'director', actorDirectorId: t.managerId,
-      payload: { targetType: t.targetType, targetId: t.targetId, holderKey, holderName: contact.holderName, phoneLast4: contact.phoneE164.slice(-4) },
+      payload: { targetType: t.targetType, targetId: t.targetId, holderKey, holderName: contact.holderName, phoneLast4: contact.phoneE164.slice(-4), ...t.support },
     } })
     // Sessions need this row, so access already ended; this also drops the role from the Syswise launcher.
     await syncMigrationContact(contact, true)

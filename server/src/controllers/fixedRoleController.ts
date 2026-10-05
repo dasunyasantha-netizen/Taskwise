@@ -26,8 +26,10 @@ export async function listFixedRoles(req: Request, res: Response): Promise<void>
 }
 
 export async function saveFixedRole(req: Request, res: Response): Promise<void> {
-  const { workspaceId, actorId, actorType, impersonationSessionId } = req.user!
-  if (actorType !== 'director' || impersonationSessionId) { res.status(403).json({ error: 'Only the Director can manage roles.' }); return }
+  const { workspaceId, actorId, actorType, adminId, adminName, impersonationSessionId } = req.user!
+  if (actorType !== 'director') { res.status(403).json({ error: 'Only the Director can manage roles.' }); return }
+  // Support Access may manage roles; the audit trail records the admin behind the change.
+  const support = impersonationSessionId ? { supportSessionId: impersonationSessionId, impersonatedBy: adminName ?? adminId } : {}
   if (!await usesFixedRoles(workspaceId)) { res.status(404).json({ error: 'Fixed roles are not enabled.' }); return }
   try {
     const name = String(req.body?.name || '').trim(), departmentId = String(req.body?.departmentId || '')
@@ -63,7 +65,7 @@ export async function saveFixedRole(req: Request, res: Response): Promise<void> 
         role = await tx.workspaceRole.create({ data: { id, workspaceId, personnelId: position.id } })
       }
       await tx.auditLog.create({ data: { workspaceId, actorType: 'director', actorDirectorId: actorId,
-        event: existing ? 'ROLE_UPDATED' : 'ROLE_CREATED', payload: { roleId: role.id, name, departmentId, supervisorId: supervisor.value, isLetterAssigner } } })
+        event: existing ? 'ROLE_UPDATED' : 'ROLE_CREATED', payload: { roleId: role.id, name, departmentId, supervisorId: supervisor.value, isLetterAssigner, ...support } } })
       return role
     })
     const contacts = await prisma.migrationRoleContact.findMany({ where: {

@@ -401,7 +401,7 @@ export default function ProfilePage({ user, onUserUpdate }: Props) {
       )}
 
       {/* Role info */}
-      {(!user.roleBasedIdentity || user.actorType === 'director') && !user.impersonation && <RoleAssignments />}
+      {(!user.roleBasedIdentity || user.actorType === 'director') && <RoleAssignments />}
       <div className="card p-4 flex items-center gap-3">
         <div className="w-8 h-8 rounded-lg bg-tw-primary/10 flex items-center justify-center flex-shrink-0">
           <span className="text-tw-primary text-sm font-bold">{user.actorType === 'director' ? 'D' : 'P'}</span>
