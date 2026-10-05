@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { notificationApi } from '../services/apiService'
+import { currentLaunchSource } from '../services/launchSource'
 
 interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>
@@ -111,7 +112,8 @@ export function usePWA({ autoPush = true }: { autoPush?: boolean } = {}) {
     return () => window.removeEventListener('pointerup', onFirstTap)
   }, [autoPush]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const canInstall = !isInstalled && (installPrompt !== null || isIOS)
+  // Opened from Pickiti: Pickiti is the app to install, so TaskWise does not offer itself.
+  const canInstall = !isInstalled && currentLaunchSource() !== 'pickiti' && (installPrompt !== null || isIOS)
 
   return { installPrompt, isInstalled, isIOS, canInstall, installApp, pushEnabled, pushState, enablePush }
 }
