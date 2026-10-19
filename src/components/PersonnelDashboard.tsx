@@ -58,6 +58,26 @@ const subtaskStatusDot: Record<string, string> = {
   CANCELLED:   'bg-gray-300',
 }
 
+// My Queue sections, in display order. Live work (in progress, assigned and
+// not-yet-accepted) shares one section, which is the only one open by default.
+const QUEUE_GROUPS = [
+  { key: 'ACTIVE',      label: 'In Progress & Assigned', short: 'Active',    dot: 'bg-yellow-500' },
+  { key: 'RETURNED',    label: 'Returned',    short: 'Returned',  dot: 'bg-orange-400' },
+  { key: 'BLOCKED',     label: 'Blocked',     short: 'Blocked',   dot: 'bg-teal-500' },
+  { key: 'SUBMITTED',   label: 'Submitted',   short: 'Submitted', dot: 'bg-purple-500' },
+  { key: 'REJECTED',    label: 'Rejected',    short: 'Rejected',  dot: 'bg-red-500' },
+  { key: 'OTHER',       label: 'Other',       short: 'Other',     dot: 'bg-gray-400' },
+]
+// Tab grid columns by tab count — every tab fits on screen, no sideways scroll.
+const TAB_COLS: Record<number, string> = {
+  1: 'grid-cols-1', 2: 'grid-cols-2', 3: 'grid-cols-3', 4: 'grid-cols-4',
+  5: 'grid-cols-3 sm:grid-cols-5', 6: 'grid-cols-3 sm:grid-cols-6', 7: 'grid-cols-4 sm:grid-cols-7',
+}
+const ACTIVE_STATUSES = ['IN_PROGRESS', 'ASSIGNED', 'PENDING']
+const queueGroupKey = (status: string) =>
+  ACTIVE_STATUSES.includes(status) ? 'ACTIVE'
+    : QUEUE_GROUPS.some(g => g.key === status) ? status : 'OTHER'
+
 function daysLeftLabel(deadline?: string) {
   if (!deadline) return null
   const d = Math.ceil((new Date(deadline).setHours(0,0,0,0) - new Date().setHours(0,0,0,0)) / 86400000)
@@ -881,6 +901,137 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
 
   const COL_COUNT = 8   // total <th> columns including the expand chevron
 
+  // My Queue is split into status tabs; the active (in progress + assigned) tab opens first.
+  const [queueTab, setQueueTab] = useState('ACTIVE')
+  const queueGroups = QUEUE_GROUPS
+    .map(g => {
+      // In the active section, in-progress work lists ahead of assigned/pending.
+      const tasks = queue.filter(t => queueGroupKey(t.status) === g.key)
+        .sort((a, b) => g.key === 'ACTIVE' ? ACTIVE_STATUSES.indexOf(a.status) - ACTIVE_STATUSES.indexOf(b.status) : 0)
+      return { ...g, tasks }
+    })
+    .filter(g => g.tasks.length > 0)
+  // Fall back to the first non-empty tab if the chosen one has emptied out.
+  const currentGroup = queueGroups.find(g => g.key === queueTab) ?? queueGroups[0]
+
+  const renderMobileCard = (t: Task) => {
+    const isExpanded = expandedId === t.id
+    const isDeptPending = t.assignments?.some(a => a.departmentId === user.departmentId) && !t.assignments?.some(a => a.personnelId)
+    const isOverdue = t.deadline && new Date(t.deadline) < new Date()
+    const priorityColors: Record<string, string> = { CRITICAL: 'bg-red-500', HIGH: 'bg-orange-400', MEDIUM: 'bg-yellow-400', LOW: 'bg-gray-300' }
+    return (
+      <React.Fragment key={t.id}>
+        <div
+          onClick={() => setExpandedId(isExpanded ? null : t.id)}
+          className="card relative overflow-hidden transition-all active:scale-[0.99]"
+        >
+          <span className={`absolute left-0 top-3 bottom-3 w-1 rounded-r-full ${priorityColors[t.priority]}`} />
+          <div className="px-4 py-3.5">
+            <div className="flex items-start justify-between gap-2 mb-2">
+              <div className="flex-1 min-w-0">
+                <div className="font-semibold text-tw-text text-sm leading-snug">{t.title}</div>
+                {t.parentTaskId && <span className="text-xs text-purple-600 font-medium inline-flex items-center gap-1"><Icon name="cornerDownRight" className="w-3 h-3" /> subtask</span>}
+              </div>
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                {isDeptPending && <span className="badge bg-amber-500 text-white ring-amber-500">Accept</span>}
+                <Icon name="chevronDown" className={`w-4 h-4 text-tw-text-secondary transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+              </div>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className={`badge text-xs ${statusBadge[t.status] || 'badge-gray'}`}>{displayStatus(t.status)}</span>
+              {t.startedAt && !['APPROVED','CANCELLED','REJECTED'].includes(t.status) && <ElapsedDays startedAt={t.startedAt} />}
+              {t.parentTaskId
+                ? <span className="text-xs text-purple-500 font-medium truncate max-w-[120px] inline-flex items-center gap-1"><Icon name="cornerDownRight" className="w-3 h-3 flex-shrink-0" /> {t.parent?.title}</span>
+                : t.project?.name && <span className="text-xs text-tw-text-secondary truncate max-w-[120px] inline-flex items-center gap-1"><Icon name="project" className="w-3 h-3 flex-shrink-0" /> {t.project.name}</span>}
+              {t.deadline && <span className={`text-xs font-medium inline-flex items-center gap-1 ${isOverdue ? 'text-red-500' : 'text-tw-text-secondary'}`}><Icon name="calendar" className="w-3 h-3" /> {new Date(t.deadline).toLocaleDateString('en-GB',{day:'numeric',month:'short'})}</span>}
+              {daysLeftLabel(t.deadline ?? undefined)}
+            </div>
+          </div>
+        </div>
+        {isExpanded && (
+          <div className="bg-tw-primary/[0.03] rounded-2xl border border-tw-primary/20 overflow-hidden -mt-1 mb-1 mx-0.5">
+            <MobileExpandedCard
+              task={t}
+              actorId={user.actorId}
+              departmentId={user.departmentId}
+              onOpen={() => { setTaskStack([]); setSelectedTask(t) }}
+              onSubtaskClick={async s => {
+                setTaskStack(prev => t ? [...prev, t] : prev)
+                try { setSelectedTask(await taskApi.get(s.id) as Task) } catch { setSelectedTask(s) }
+              }}
+              onRefresh={load}
+            />
+          </div>
+        )}
+      </React.Fragment>
+    )
+  }
+
+  const renderDesktopRow = (t: Task) => {
+    const isExpanded  = expandedId === t.id
+    const isDeptPending = t.assignments?.some(a => a.departmentId === user.departmentId) && !t.assignments?.some(a => a.personnelId)
+    const isOverdue = t.deadline && new Date(t.deadline) < new Date()
+    const assigneeName = t.assignments?.[0]
+      ? (t.assignments[0].personnel?.name || t.assignments[0].department?.name || '—')
+      : '—'
+    return (
+      <React.Fragment key={t.id}>
+        <tr onClick={() => setExpandedId(isExpanded ? null : t.id)}
+          className={`cursor-pointer transition-colors border-b border-tw-border ${isExpanded ? 'bg-tw-primary/[0.05]' : 'hover:bg-tw-hover'}`}>
+          <td className="pl-3 pr-0 py-3.5">
+            <div className={`w-1.5 h-9 rounded-full ${priorityBar[t.priority]}`} />
+          </td>
+          <td className="px-4 py-3.5">
+            <div className="font-semibold text-tw-text text-sm">{t.title}</div>
+            <div className="flex items-center gap-2 mt-0.5">
+              {t.parentTaskId && <span className="text-xs text-purple-600 font-medium inline-flex items-center gap-1"><Icon name="cornerDownRight" className="w-3 h-3" /> subtask</span>}
+              {(t._count?.subtasks ?? 0) > 0 && <span className="text-xs text-tw-indigo font-medium inline-flex items-center gap-1"><Icon name="layers" className="w-3 h-3" /> {t._count!.subtasks} subtask{t._count!.subtasks !== 1 ? 's' : ''}</span>}
+            </div>
+          </td>
+          <td className="px-4 py-3.5 text-sm text-tw-text-secondary">
+            {t.parentTaskId
+              ? <span className="inline-flex items-center gap-1 text-purple-600"><span className="w-2 h-2 rounded-full bg-purple-400 inline-block flex-shrink-0" />{t.parent?.title ?? 'Subtask'}</span>
+              : t.project?.name
+                ? <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-tw-teal inline-block flex-shrink-0" />{t.project.name}</span>
+                : '—'}
+          </td>
+          <td className="px-4 py-3.5 whitespace-nowrap">
+            <div className="flex flex-col gap-1">
+              <span className={`badge ${statusBadge[t.status] || 'badge-gray'}`}>{displayStatus(t.status)}</span>
+              {t.startedAt && !['APPROVED','CANCELLED','REJECTED'].includes(t.status) && <ElapsedDays startedAt={t.startedAt} />}
+            </div>
+          </td>
+          <td className="px-4 py-3.5 whitespace-nowrap">
+            <span className={`badge ${priorityBadge[t.priority]}`}>{t.priority}</span>
+          </td>
+          <td className="px-4 py-3.5 text-sm whitespace-nowrap">
+            {t.deadline
+              ? <span className={`inline-flex items-center gap-1 ${isOverdue ? 'text-tw-danger font-semibold' : 'text-tw-text-secondary'}`}><Icon name="calendar" className="w-3.5 h-3.5" /> {new Date(t.deadline).toLocaleDateString()}</span>
+              : <span className="text-tw-text-secondary">—</span>}
+          </td>
+          <td className="px-4 py-3.5 whitespace-nowrap">{daysLeftLabel(t.deadline ?? undefined)}</td>
+          <td className="px-3 py-3.5 whitespace-nowrap">
+            <div className="flex items-center justify-end gap-2">
+              {isDeptPending && <span className="badge bg-tw-warning text-white ring-tw-warning">Accept</span>}
+              <Icon name="chevronDown" className={`w-4 h-4 text-tw-text-secondary transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
+            </div>
+          </td>
+        </tr>
+        {isExpanded && (
+          <ExpandedRow task={t} colSpan={COL_COUNT} actorId={user.actorId} departmentId={user.departmentId}
+            onOpen={() => { setTaskStack([]); setSelectedTask(t) }}
+            onSubtaskClick={async s => {
+              setTaskStack(prev => t ? [...prev, t] : prev)
+              try { setSelectedTask(await taskApi.get(s.id) as Task) } catch { setSelectedTask(s) }
+            }}
+            onRefresh={load}
+          />
+        )}
+      </React.Fragment>
+    )
+  }
+
+
   return (
     <div className="min-h-screen bg-tw-bg flex relative overflow-x-clip">
 
@@ -1026,146 +1177,51 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
                   <EmptyState icon="party" tone="green" title="All clear!" text="No tasks assigned to you right now." />
                 </div>
               ) : (
-                <>
-                  {/* ── Mobile card list ── */}
-                  <div className="md:hidden space-y-3">
-                    {queue.map(t => {
-                      const isExpanded = expandedId === t.id
-                      const isDeptPending = t.assignments?.some(a => a.departmentId === user.departmentId) && !t.assignments?.some(a => a.personnelId)
-                      const isOverdue = t.deadline && new Date(t.deadline) < new Date()
-                      const priorityColors: Record<string, string> = { CRITICAL: 'bg-red-500', HIGH: 'bg-orange-400', MEDIUM: 'bg-yellow-400', LOW: 'bg-gray-300' }
+                <div>
+                  {/* Status tabs — an equal-width grid so all tabs fit without scrolling */}
+                  <div className={`grid ${TAB_COLS[queueGroups.length] ?? 'grid-cols-4'} gap-1 p-1 mb-3 rounded-xl bg-tw-hover border border-tw-border`} role="tablist" aria-label="Tasks by status">
+                    {queueGroups.map(g => {
+                      const active = g.key === currentGroup?.key
                       return (
-                        <React.Fragment key={t.id}>
-                          <div
-                            onClick={() => setExpandedId(isExpanded ? null : t.id)}
-                            className="card relative overflow-hidden transition-all active:scale-[0.99]"
-                          >
-                            <span className={`absolute left-0 top-3 bottom-3 w-1 rounded-r-full ${priorityColors[t.priority]}`} />
-                            <div className="px-4 py-3.5">
-                              <div className="flex items-start justify-between gap-2 mb-2">
-                                <div className="flex-1 min-w-0">
-                                  <div className="font-semibold text-tw-text text-sm leading-snug">{t.title}</div>
-                                  {t.parentTaskId && <span className="text-xs text-purple-600 font-medium inline-flex items-center gap-1"><Icon name="cornerDownRight" className="w-3 h-3" /> subtask</span>}
-                                </div>
-                                <div className="flex items-center gap-1.5 flex-shrink-0">
-                                  {isDeptPending && <span className="badge bg-amber-500 text-white ring-amber-500">Accept</span>}
-                                  <Icon name="chevronDown" className={`w-4 h-4 text-tw-text-secondary transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className={`badge text-xs ${statusBadge[t.status] || 'badge-gray'}`}>{displayStatus(t.status)}</span>
-                                {t.startedAt && !['APPROVED','CANCELLED','REJECTED'].includes(t.status) && <ElapsedDays startedAt={t.startedAt} />}
-                                {t.parentTaskId
-                                  ? <span className="text-xs text-purple-500 font-medium truncate max-w-[120px] inline-flex items-center gap-1"><Icon name="cornerDownRight" className="w-3 h-3 flex-shrink-0" /> {t.parent?.title}</span>
-                                  : t.project?.name && <span className="text-xs text-tw-text-secondary truncate max-w-[120px] inline-flex items-center gap-1"><Icon name="project" className="w-3 h-3 flex-shrink-0" /> {t.project.name}</span>}
-                                {t.deadline && <span className={`text-xs font-medium inline-flex items-center gap-1 ${isOverdue ? 'text-red-500' : 'text-tw-text-secondary'}`}><Icon name="calendar" className="w-3 h-3" /> {new Date(t.deadline).toLocaleDateString('en-GB',{day:'numeric',month:'short'})}</span>}
-                                {daysLeftLabel(t.deadline ?? undefined)}
-                              </div>
-                            </div>
-                          </div>
-                          {isExpanded && (
-                            <div className="bg-tw-primary/[0.03] rounded-2xl border border-tw-primary/20 overflow-hidden -mt-1 mb-1 mx-0.5">
-                              <MobileExpandedCard
-                                task={t}
-                                actorId={user.actorId}
-                                departmentId={user.departmentId}
-                                onOpen={() => { setTaskStack([]); setSelectedTask(t) }}
-                                onSubtaskClick={async s => {
-                                  setTaskStack(prev => t ? [...prev, t] : prev)
-                                  try { setSelectedTask(await taskApi.get(s.id) as Task) } catch { setSelectedTask(s) }
-                                }}
-                                onRefresh={load}
-                              />
-                            </div>
-                          )}
-                        </React.Fragment>
+                        <button key={g.key} type="button" role="tab" aria-selected={active} onClick={() => setQueueTab(g.key)}
+                          title={g.label}
+                          className={`min-w-0 flex flex-col items-center justify-center gap-0.5 px-1.5 py-2 rounded-lg transition-colors ${active ? 'bg-tw-surface shadow-card' : 'hover:bg-tw-surface/60'}`}>
+                                            <span className={`text-lg leading-none font-bold tabular-nums ${active ? 'text-tw-text' : 'text-tw-text-secondary'}`}>{g.tasks.length}</span>
+                          <span className={`flex items-center gap-1 max-w-full text-[11px] font-semibold ${active ? 'text-tw-primary-text' : 'text-tw-text-secondary'}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${g.dot}`} />
+                            <span className="truncate"><span className="lg:hidden">{g.short}</span><span className="hidden lg:inline">{g.label}</span></span>
+                          </span>
+                        </button>
                       )
                     })}
                   </div>
 
-                  {/* ── Desktop table ── */}
-                  <div className="hidden md:block card overflow-hidden">
-                    <table className="table-modern">
-                      <thead>
-                        <tr className="bg-tw-surface-2 border-b border-tw-border">
-                          <th className="w-px px-3 py-3"></th>
-                          <th className="text-left px-4 py-3 text-[11px] font-semibold text-tw-text-secondary uppercase tracking-[0.08em] w-[50%]">Task</th>
-                          <th className="text-left px-4 py-3 text-[11px] font-semibold text-tw-text-secondary uppercase tracking-[0.08em] w-[30%]">Project</th>
-                          <th className="text-left px-4 py-3 text-[11px] font-semibold text-tw-text-secondary uppercase tracking-[0.08em] whitespace-nowrap">Status</th>
-                          <th className="text-left px-4 py-3 text-[11px] font-semibold text-tw-text-secondary uppercase tracking-[0.08em] whitespace-nowrap">Priority</th>
-                          <th className="text-left px-4 py-3 text-[11px] font-semibold text-tw-text-secondary uppercase tracking-[0.08em] whitespace-nowrap">Deadline</th>
-                          <th className="text-left px-4 py-3 text-[11px] font-semibold text-tw-text-secondary uppercase tracking-[0.08em] whitespace-nowrap">Days Left</th>
-                          <th className="w-8 px-2 py-3"></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {queue.map(t => {
-                          const isExpanded  = expandedId === t.id
-                          const isDeptPending = t.assignments?.some(a => a.departmentId === user.departmentId) && !t.assignments?.some(a => a.personnelId)
-                          const isOverdue = t.deadline && new Date(t.deadline) < new Date()
-                          const assigneeName = t.assignments?.[0]
-                            ? (t.assignments[0].personnel?.name || t.assignments[0].department?.name || '—')
-                            : '—'
-                          return (
-                            <React.Fragment key={t.id}>
-                              <tr onClick={() => setExpandedId(isExpanded ? null : t.id)}
-                                className={`cursor-pointer transition-colors border-b border-tw-border ${isExpanded ? 'bg-tw-primary/[0.05]' : 'hover:bg-tw-hover'}`}>
-                                <td className="pl-3 pr-0 py-3.5">
-                                  <div className={`w-1.5 h-9 rounded-full ${priorityBar[t.priority]}`} />
-                                </td>
-                                <td className="px-4 py-3.5">
-                                  <div className="font-semibold text-tw-text text-sm">{t.title}</div>
-                                  <div className="flex items-center gap-2 mt-0.5">
-                                    {t.parentTaskId && <span className="text-xs text-purple-600 font-medium inline-flex items-center gap-1"><Icon name="cornerDownRight" className="w-3 h-3" /> subtask</span>}
-                                    {(t._count?.subtasks ?? 0) > 0 && <span className="text-xs text-tw-indigo font-medium inline-flex items-center gap-1"><Icon name="layers" className="w-3 h-3" /> {t._count!.subtasks} subtask{t._count!.subtasks !== 1 ? 's' : ''}</span>}
-                                  </div>
-                                </td>
-                                <td className="px-4 py-3.5 text-sm text-tw-text-secondary">
-                                  {t.parentTaskId
-                                    ? <span className="inline-flex items-center gap-1 text-purple-600"><span className="w-2 h-2 rounded-full bg-purple-400 inline-block flex-shrink-0" />{t.parent?.title ?? 'Subtask'}</span>
-                                    : t.project?.name
-                                      ? <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-tw-teal inline-block flex-shrink-0" />{t.project.name}</span>
-                                      : '—'}
-                                </td>
-                                <td className="px-4 py-3.5 whitespace-nowrap">
-                                  <div className="flex flex-col gap-1">
-                                    <span className={`badge ${statusBadge[t.status] || 'badge-gray'}`}>{displayStatus(t.status)}</span>
-                                    {t.startedAt && !['APPROVED','CANCELLED','REJECTED'].includes(t.status) && <ElapsedDays startedAt={t.startedAt} />}
-                                  </div>
-                                </td>
-                                <td className="px-4 py-3.5 whitespace-nowrap">
-                                  <span className={`badge ${priorityBadge[t.priority]}`}>{t.priority}</span>
-                                </td>
-                                <td className="px-4 py-3.5 text-sm whitespace-nowrap">
-                                  {t.deadline
-                                    ? <span className={`inline-flex items-center gap-1 ${isOverdue ? 'text-tw-danger font-semibold' : 'text-tw-text-secondary'}`}><Icon name="calendar" className="w-3.5 h-3.5" /> {new Date(t.deadline).toLocaleDateString()}</span>
-                                    : <span className="text-tw-text-secondary">—</span>}
-                                </td>
-                                <td className="px-4 py-3.5 whitespace-nowrap">{daysLeftLabel(t.deadline ?? undefined)}</td>
-                                <td className="px-3 py-3.5 whitespace-nowrap">
-                                  <div className="flex items-center justify-end gap-2">
-                                    {isDeptPending && <span className="badge bg-tw-warning text-white ring-tw-warning">Accept</span>}
-                                    <Icon name="chevronDown" className={`w-4 h-4 text-tw-text-secondary transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
-                                  </div>
-                                </td>
-                              </tr>
-                              {isExpanded && (
-                                <ExpandedRow task={t} colSpan={COL_COUNT} actorId={user.actorId} departmentId={user.departmentId}
-                                  onOpen={() => { setTaskStack([]); setSelectedTask(t) }}
-                                  onSubtaskClick={async s => {
-                                    setTaskStack(prev => t ? [...prev, t] : prev)
-                                    try { setSelectedTask(await taskApi.get(s.id) as Task) } catch { setSelectedTask(s) }
-                                  }}
-                                  onRefresh={load}
-                                />
-                              )}
-                            </React.Fragment>
-                          )
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </>
+                  {currentGroup && <>
+                    {/* ── Mobile card list ── */}
+                    <div className="md:hidden space-y-3">{currentGroup.tasks.map(renderMobileCard)}</div>
+
+                    {/* ── Desktop table ── */}
+                    <div className="hidden md:block card overflow-hidden">
+                      <table className="table-modern">
+                        <thead>
+                          <tr className="bg-tw-surface-2 border-b border-tw-border">
+                            <th className="w-px px-3 py-3"></th>
+                            <th className="text-left px-4 py-3 text-[11px] font-semibold text-tw-text-secondary uppercase tracking-[0.08em] w-[50%]">Task</th>
+                            <th className="text-left px-4 py-3 text-[11px] font-semibold text-tw-text-secondary uppercase tracking-[0.08em] w-[30%]">Project</th>
+                            <th className="text-left px-4 py-3 text-[11px] font-semibold text-tw-text-secondary uppercase tracking-[0.08em] whitespace-nowrap">Status</th>
+                            <th className="text-left px-4 py-3 text-[11px] font-semibold text-tw-text-secondary uppercase tracking-[0.08em] whitespace-nowrap">Priority</th>
+                            <th className="text-left px-4 py-3 text-[11px] font-semibold text-tw-text-secondary uppercase tracking-[0.08em] whitespace-nowrap">Deadline</th>
+                            <th className="text-left px-4 py-3 text-[11px] font-semibold text-tw-text-secondary uppercase tracking-[0.08em] whitespace-nowrap">Days Left</th>
+                            <th className="w-8 px-2 py-3"></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {currentGroup.tasks.map(renderDesktopRow)}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>}
+                </div>
               )}
             </div>
           )}
