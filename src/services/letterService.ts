@@ -74,6 +74,7 @@ export type LetterList = {
     holders: { name: string; open: number; overdue: number; maxDays: number }[]
   }
   thresholds: { entryDelayDays: number; assigneeDays: number }
+  roles?: { key: string; name: string; count: number }[]
 }
 export type DriveSettings = {
   folderId: string

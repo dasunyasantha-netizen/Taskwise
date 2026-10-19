@@ -39,6 +39,113 @@ function Field({
     </label>
   )
 }
+// Multi-select role filter with search. Options are the roles letters are currently with.
+function RoleFilter({
+  options,
+  value,
+  onChange,
+}: {
+  options: { key: string; name: string; count: number }[]
+  value: string[]
+  onChange: (keys: string[]) => void
+}) {
+  const { t: tr } = useLanguage()
+  const [open, setOpen] = useState(false),
+    [search, setSearch] = useState('')
+  const root = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const close = (e: MouseEvent) => {
+      if (!root.current?.contains(e.target as Node)) setOpen(false)
+    }
+    const esc = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false)
+    document.addEventListener('mousedown', close)
+    document.addEventListener('keydown', esc)
+    return () => {
+      document.removeEventListener('mousedown', close)
+      document.removeEventListener('keydown', esc)
+    }
+  }, [open])
+  const nameOf = (k: string) => options.find((o) => o.key === k)?.name ?? tr('Unknown role')
+  const needle = search.trim().toLowerCase()
+  const shown = options.filter((o) => !needle || o.name.toLowerCase().includes(needle))
+  const toggle = (k: string) =>
+    onChange(value.includes(k) ? value.filter((v) => v !== k) : [...value, k])
+  const label = !value.length
+    ? tr('All roles')
+    : value.length === 1
+      ? nameOf(value[0])
+      : tr('{n} roles', { n: value.length })
+  return (
+    <div ref={root} className="relative min-w-0">
+      <button
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        className={`${secondary} w-full lg:w-52 justify-between whitespace-nowrap ${value.length ? '!border-tw-primary/40 !bg-tw-primary/10 !text-tw-primary-text' : ''}`}
+      >
+        <span className="inline-flex items-center gap-2 min-w-0">
+          <Icon name="users" className="w-4 h-4 flex-shrink-0" />
+          <span className="truncate">{label}</span>
+        </span>
+        <Icon name="chevronDown" className={`w-4 h-4 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className="absolute right-0 z-30 mt-1.5 w-full min-w-[17rem] lg:w-72 rounded-xl border border-tw-border bg-tw-surface shadow-panel">
+          <div className="p-2 border-b border-tw-border">
+            <div className="relative">
+              <Icon name="search" className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-tw-text-secondary" />
+              <input
+                autoFocus
+                type="search"
+                aria-label={tr('Search roles')}
+                placeholder={tr('Search roles…')}
+                className="input !pl-8 !py-2 text-sm w-full"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+          </div>
+          <ul role="listbox" aria-multiselectable="true" className="max-h-72 overflow-y-auto py-1">
+            {shown.map((o) => {
+              const on = value.includes(o.key)
+              return (
+                <li key={o.key}>
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={on}
+                    onClick={() => toggle(o.key)}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-left text-sm hover:bg-tw-hover"
+                  >
+                    <span className={`grid h-4 w-4 flex-shrink-0 place-items-center rounded border ${on ? 'border-tw-primary bg-tw-primary text-white' : 'border-tw-border-strong'}`}>
+                      {on && <Icon name="check" className="w-3 h-3" />}
+                    </span>
+                    <span className="flex-1 min-w-0 truncate text-tw-text">{o.name}</span>
+                    <span className="text-xs tabular-nums text-tw-text-secondary">{o.count}</span>
+                  </button>
+                </li>
+              )
+            })}
+            {!shown.length && (
+              <li className="px-3 py-4 text-center text-sm text-tw-text-secondary">{tr('No roles match.')}</li>
+            )}
+          </ul>
+          {value.length > 0 && (
+            <div className="flex items-center justify-between gap-2 px-3 py-2 border-t border-tw-border text-xs">
+              <span className="text-tw-text-secondary">{tr('{n} selected', { n: value.length })}</span>
+              <button type="button" className="font-semibold text-tw-primary-text hover:underline" onClick={() => onChange([])}>
+                {tr('Clear')}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function Status({ closed }: { closed: boolean }) {
   const { t: tr, locale } = useLanguage()
   return (
@@ -637,6 +744,7 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
     [q, setQ] = useState(''),
     [status, setStatus] = useState(''),
     [mine, setMine] = useState(false),
+    [roles, setRoles] = useState<string[]>([]),
     [overdue, setOverdue] = useState(false),
     [sort, setSort] = useState<{ key: string; dir: 'asc' | 'desc' }>({ key: '', dir: 'desc' }),
     [from, setFrom] = useState(''),
@@ -659,6 +767,7 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
             q,
             status,
             mine: String(mine),
+            with: roles.join(','),
             overdue: String(overdue),
             sort: sort.key,
             dir: sort.dir,
@@ -689,7 +798,7 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
       clearTimeout(timer)
       serial.current++
     }
-  }, [selected, q, status, mine, overdue, sort, from, to, page])
+  }, [selected, q, status, mine, roles, overdue, sort, from, to, page])
   useEffect(() => {
     const open = (event: Event) => {
       setThread(null)
@@ -904,7 +1013,15 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
               >
                 {mine && <Icon name="check" className="w-4 h-4" />}{tr("Assigned to me")}
               </button>
-              {(q || from || to || mine || status || overdue) && (
+              <RoleFilter
+                options={list.roles ?? []}
+                value={roles}
+                onChange={(keys) => {
+                  setRoles(keys)
+                  setPage(0)
+                }}
+              />
+              {(q || from || to || mine || roles.length || status || overdue) && (
                 <button
                   className="text-sm font-semibold text-tw-primary-text hover:underline whitespace-nowrap px-2"
                   onClick={() => {
@@ -912,6 +1029,7 @@ export default function LetterManagement({ user, onUserUpdate }: { user: AuthUse
                     setFrom('')
                     setTo('')
                     setMine(false)
+                    setRoles([])
                     setStatus('')
                     setOverdue(false)
                     setPage(0)

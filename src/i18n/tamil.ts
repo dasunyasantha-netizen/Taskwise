@@ -381,4 +381,12 @@ export const ta: Record<string, string> = {
   'Archive this project?': 'இந்தத் திட்டத்தைக் காப்பகப்படுத்தவா?',
   'Archive category “{name}”?': '“{name}” வகையைக் காப்பகப்படுத்தவா?',
   'Projects in this category will remain accessible but cannot be assigned to archived categories.': 'இந்த வகையிலுள்ள திட்டங்கள் தொடர்ந்து அணுகக்கூடியவை, ஆனால் காப்பகப்படுத்தப்பட்ட வகைகளுக்கு ஒதுக்க முடியாது.',
+  // Letter register role filter
+  'All roles': 'அனைத்துப் பதவிகளும்',
+  '{n} roles': '{n} பதவிகள்',
+  'Unknown role': 'அறியப்படாத பதவி',
+  'Search roles': 'பதவிகளைத் தேடு',
+  'Search roles…': 'பதவிகளைத் தேடு…',
+  'No roles match.': 'பொருந்தும் பதவிகள் இல்லை.',
+  '{n} selected': '{n} தேர்ந்தெடுக்கப்பட்டது',
 }

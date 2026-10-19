@@ -487,6 +487,11 @@ router.get(
       typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : ''
     const from = isDate(req.query.from),
       to = isDate(req.query.to)
+    // Role filter: comma-separated holder keys ("personnel:<id>" / "director:<id>").
+    const withKeys = String(req.query.with || '')
+      .split(',')
+      .filter((k) => /^(personnel|director):[\w-]{1,64}$/.test(k))
+      .slice(0, 200)
     // Overdue = open and with the current assignee for `limit`+ Sri Lanka days.
     const overdueBefore = new Date(
       Date.parse(dateNow + 'T00:00:00Z') - (limit - 1) * 86400000 - 19800000
@@ -513,6 +518,7 @@ router.get(
         base,
         ...(['OPEN', 'CLOSED'].includes(status) ? [{ status }] : []),
         ...(req.query.mine === 'true' ? [{ assignedTo: s.key }] : []),
+        ...(withKeys.length ? [{ assignedTo: { in: withKeys } }] : []),
         ...(req.query.overdue === 'true'
           ? [{ status: 'OPEN', assignedAt: { lt: overdueBefore } }]
           : []),
@@ -593,6 +599,17 @@ router.get(
           : 0,
         holders: Object.values(holders).sort((a, b) => b.maxDays - a.maxDays),
       },
+      // Every role that currently holds a visible letter, for the role filter.
+      roles: Object.values(
+        all.reduce<Record<string, { key: string; name: string; count: number }>>(
+          (m, t) => {
+            const r = (m[t.assignedTo] ??= { key: t.assignedTo, name: t.assignedToName, count: 0 })
+            r.count++
+            return m
+          },
+          {}
+        )
+      ).sort((a, b) => a.name.localeCompare(b.name)),
       thresholds: { entryDelayDays: entryLimit, assigneeDays: limit },
     })
   })

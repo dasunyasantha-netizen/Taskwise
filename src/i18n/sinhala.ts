@@ -413,4 +413,12 @@ export const si: Record<string, string> = {
   'Archive this project?': 'මෙම ව්\u200dයාපෘතිය සංරක්ෂණය කරන්නද?',
   'Archive category “{name}”?': '“{name}” කාණ්ඩය සංරක්ෂණය කරන්නද?',
   'Projects in this category will remain accessible but cannot be assigned to archived categories.': 'මෙම කාණ්ඩයේ ව්\u200dයාපෘති තවදුරටත් ලබා ගත හැකි නමුත් සංරක්ෂිත කාණ්ඩවලට පැවරිය නොහැක.',
+  // Letter register role filter
+  'All roles': 'සියලු භූමිකා',
+  '{n} roles': 'භූමිකා {n}',
+  'Unknown role': 'නොදන්නා භූමිකාව',
+  'Search roles': 'භූමිකා සොයන්න',
+  'Search roles…': 'භූමිකා සොයන්න…',
+  'No roles match.': 'ගැළපෙන භූමිකා නැත.',
+  '{n} selected': '{n}ක් තෝරා ඇත',
 }
