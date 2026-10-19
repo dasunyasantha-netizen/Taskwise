@@ -79,6 +79,22 @@ const STATUS_DOTS: Record<string, string> = {
   REJECTED: 'bg-red-500', CANCELLED: 'bg-gray-300',
 }
 
+// Card tint per status: left strip + soft surface + border. Full class literals so
+// Tailwind keeps them; the 50–300 shades remap to dark tints in dark mode.
+const CARD_TONES: Record<string, { strip: string; card: string }> = {
+  PENDING:     { strip: 'bg-gray-500',   card: 'bg-gray-50/70 border-gray-200' },
+  ASSIGNED:    { strip: 'bg-blue-500',   card: 'bg-blue-50/70 border-blue-200' },
+  IN_PROGRESS: { strip: 'bg-yellow-500', card: 'bg-yellow-50/70 border-yellow-200' },
+  BLOCKED:     { strip: 'bg-teal-500',   card: 'bg-teal-50/70 border-teal-200' },
+  SUBMITTED:   { strip: 'bg-purple-500', card: 'bg-purple-50/70 border-purple-200' },
+  APPROVED:    { strip: 'bg-green-500',  card: 'bg-green-50/70 border-green-200' },
+  RETURNED:    { strip: 'bg-orange-400', card: 'bg-orange-50/70 border-orange-200' },
+  REJECTED:    { strip: 'bg-red-500',    card: 'bg-red-50/70 border-red-200' },
+  CANCELLED:   { strip: 'bg-gray-400',   card: 'bg-gray-50/40 border-gray-200 opacity-70' },
+}
+
+const LEGEND_ORDER = ['PENDING', 'ASSIGNED', 'IN_PROGRESS', 'BLOCKED', 'SUBMITTED', 'RETURNED', 'REJECTED', 'APPROVED', 'CANCELLED']
+
 const PRIORITY_STYLES: Record<string, string> = {
   CRITICAL: 'text-red-600', HIGH: 'text-orange-500', MEDIUM: 'text-yellow-600', LOW: 'text-gray-400',
 }
@@ -86,8 +102,6 @@ const PRIORITY_STYLES: Record<string, string> = {
 const PRIORITY_MARK: Record<string, string> = {
   CRITICAL: '!!', HIGH: '!', MEDIUM: '·', LOW: '–',
 }
-
-const NO_PROJECT_COLOR = '#c9ccd6'
 
 const shortDate = (v: string) => new Date(v).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
 
@@ -140,6 +154,7 @@ function TaskCard({ task, instances, onSelect }: { task: Task; instances: Task[]
   const childCount   = subtaskCount + instances.length
   const overdue      = isOverdue(task)
   const assignee     = assigneeLabel(task)
+  const tone         = CARD_TONES[task.status] ?? CARD_TONES.PENDING
 
   const toggle = async () => {
     const next = !expanded
@@ -153,13 +168,12 @@ function TaskCard({ task, instances, onSelect }: { task: Task; instances: Task[]
   }
 
   return (
-    <div className="card overflow-hidden hover:border-tw-border-strong transition-colors">
+    <div className={`card overflow-hidden hover:border-tw-border-strong transition-colors ${tone.card}`}>
       <div className="flex items-stretch">
-        {/* Project colour strip */}
+        {/* Status colour strip (see legend above the list) */}
         <div
-          className="w-1.5 flex-shrink-0"
-          style={{ backgroundColor: task.project?.color ?? NO_PROJECT_COLOR }}
-          title={task.project?.name ?? 'No project'}
+          className={`w-1.5 flex-shrink-0 ${tone.strip}`}
+          title={STATUS_LABELS[task.status] ?? task.status}
         />
         <div className="flex-1 min-w-0">
           {/* Card face — title only; everything else lives in the expansion */}
@@ -320,6 +334,8 @@ export default function TasksPage({ filters, onFiltersChange, sort, onSortChange
     filtered.filter(t => !t.groupTaskId || !matchedIds.has(t.groupTaskId)),
     sort
   )
+  const statusCounts: Record<string, number> = {}
+  for (const t of visible) statusCounts[t.status] = (statusCounts[t.status] ?? 0) + 1
 
   return (
     <div className="page">
@@ -373,6 +389,24 @@ export default function TasksPage({ filters, onFiltersChange, sort, onSortChange
         <span className="text-[11px] text-tw-text-muted hidden sm:inline">
           Hidden by default
         </span>
+      </div>
+
+      {/* Status colour legend — counts reflect the tasks currently listed. */}
+      <div className="flex items-center gap-x-3 gap-y-1.5 flex-wrap mb-3">
+        <span className="section-label">Status</span>
+        {LEGEND_ORDER
+          .filter(s => (s !== 'APPROVED' || includeApproved || filters.extra.status === 'APPROVED')
+                    && (s !== 'CANCELLED' || includeCancelled || filters.extra.status === 'CANCELLED'))
+          .map(s => {
+            const count = loading ? 0 : statusCounts[s] ?? 0
+            return (
+              <span key={s} className={`inline-flex items-center gap-1.5 text-[11px] text-tw-text-secondary ${count === 0 ? 'opacity-50' : ''}`}>
+                <span className={`w-2.5 h-2.5 rounded-sm ${CARD_TONES[s].strip}`} />
+                {STATUS_LABELS[s]}
+                {!loading && <span className="text-tw-text-muted tabular-nums">{count}</span>}
+              </span>
+            )
+          })}
       </div>
 
       {loading ? (
