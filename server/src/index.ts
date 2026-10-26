@@ -21,6 +21,7 @@ import { startLetterWorker } from './helpers/letterWorker'
 import ysoRoutes              from './routes/ysoRoutes'
 import { retryPendingMigrationContacts } from './controllers/migrationContactController'
 import testSandboxRoutes from './routes/testSandboxRoutes'
+import syswiseRoutes from './routes/syswiseRoutes'
 import { startTestSandboxWorker } from './helpers/testSandbox'
 
 const app  = express()
@@ -57,6 +58,7 @@ app.use('/api/insurance',          insuranceRoutes)
 app.use('/api/admin',              adminRoutes)
 app.use('/api/yso',                ysoRoutes)
 app.use('/api/test-sandbox', testSandboxRoutes)
+app.use('/api/syswise', syswiseRoutes)
 
 // Health check
 app.get('/api/health', (_req, res) => {

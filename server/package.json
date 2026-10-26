@@ -10,7 +10,7 @@
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
     "db:studio": "prisma studio",
-    "test": "tsx src/tests/companyHelpers.test.ts && tsx src/tests/taskFilters.test.ts && tsx src/tests/deduction.test.ts && tsx src/tests/companyOnboarding.test.ts && tsx src/tests/fourLevelHierarchy.test.ts",
+    "test": "tsx src/tests/companyHelpers.test.ts && tsx src/tests/taskFilters.test.ts && tsx src/tests/deduction.test.ts && tsx src/tests/companyOnboarding.test.ts && tsx src/tests/fourLevelHierarchy.test.ts && tsx src/tests/accountDeletion.test.ts",
     "test:helpers": "tsx src/tests/companyHelpers.test.ts",
     "test:support": "tsx src/tests/supportAccess.test.ts",
     "test:roles": "tsx src/tests/fixedRoles.test.ts",
