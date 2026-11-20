@@ -35,4 +35,23 @@ export async function sendPushToActor(
       })
     )
   } catch { /* silent — push is best-effort */ }
+  void sendToPickitiApp(actorId, actorType, title, message)
+}
+
+/**
+ * The same notice on the Pickiti phone app: SysWise knows which accounts hold this
+ * position and sends to their phones (only those that turned notifications on).
+ */
+async function sendToPickitiApp(actorId: string, actorType: string, title: string, message: string) {
+  const base = process.env.SYSWISE_BASE_URL?.replace(/\/$/, '')
+  const key = process.env.SYSWISE_TASKWISE_SERVICE_KEY
+  if (!base || !key || !['director', 'personnel'].includes(actorType)) return
+  try {
+    await fetch(`${base}/api/notifications/taskwise/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Service-Key': key },
+      body: JSON.stringify({ actorType, actorId, title, body: message }),
+      signal: AbortSignal.timeout(10000),
+    })
+  } catch { /* best-effort, like web push */ }
 }
