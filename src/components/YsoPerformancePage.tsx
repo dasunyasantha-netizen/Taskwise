@@ -36,7 +36,9 @@ const addDays = (date: string, days: number) =>
 const weekEnd = (date: string) =>
   addDays(date, (7 - new Date(date + 'T00:00:00Z').getUTCDay()) % 7)
 function weeklyProgress(dashboard: YsoDashboard, period: string) {
-  const start = dashboard.people[0]?.startDate
+  const start = dashboard.people[0]?.startPending
+    ? undefined
+    : dashboard.people[0]?.startDate
   const expected: string[] = []
   if (start)
     for (
@@ -46,7 +48,7 @@ function weeklyProgress(dashboard: YsoDashboard, period: string) {
     ) {
       if (
         new Date(day + 'T00:00:00Z').getUTCDay() === 0 &&
-        addDays(day, -6) >= start
+        day >= start
       )
         expected.push(day)
     }
@@ -2040,7 +2042,7 @@ export default function YsoPerformancePage({ user, onUserUpdate, directoryResetK
                                   {p.name}{!p.active && <span className="badge badge-gray ml-2">{tr("Inactive")}</span>}
                                 </p>
                                 <p className="text-xs text-tw-text-secondary truncate">
-                                  {p.startDate ? `${tr('Reporting since')} ${p.startDate}` : tr("Reporting not activated")} · {p.adName ?? tr("AD not assigned")}
+                                  {p.startPending ? tr("Reporting starts at first submission") : p.startDate ? `${tr('Reporting since')} ${p.startDate}` : tr("Reporting not activated")} · {p.adName ?? tr("AD not assigned")}
                                 </p>
                                 {!p.managerValid && (
                                   <p className="text-xs text-rose-600 mt-0.5">{tr("Active Provincial AD assignment required")}</p>

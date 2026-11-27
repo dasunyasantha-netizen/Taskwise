@@ -75,7 +75,7 @@ export const getYsoCalendar = safe(async (req, res) => {
         title: TASKS.find(t => t.id === submission.task)?.title || 'YSO activity', detail: key === 'dueDate' ? 'Settlement due' : 'YSO activity', notes: typeof data.reference === 'string' ? data.reference : '' })
     }
   }
-  if (person.ysoProfile) {
+  if (person.ysoProfile && !person.ysoProfile.startsOnFirstSubmission) {
     // Monthly plan/report deadlines are policy dates, not invented project dates.
     for (const month of [from.slice(0, 7), req.query.period as string, to.slice(0, 7)]) {
       for (const [date, task, reportingPeriod] of [[month + '-25', 3, monthShift(month, 1)], [month + '-05', 4, monthShift(month, -1)]] as const) {

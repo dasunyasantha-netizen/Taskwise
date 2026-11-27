@@ -6,6 +6,7 @@ import { makeLoginId, normalizeSriLankanPhone, companyLoginPrefix } from '../hel
 import { isFourLevelWorkspace, resolveDepartmentCategory, resolveSupervisor } from '../helpers/hierarchy'
 import { usesFixedRoles } from '../helpers/fixedRoles'
 import { saveFixedRole } from './fixedRoleController'
+import { ensureYsoProfile } from '../helpers/ysoProfile'
 
 // GET /api/workspace
 export async function getWorkspace(req: Request, res: Response): Promise<void> {
@@ -291,6 +292,7 @@ export async function createPersonnel(req: Request, res: Response): Promise<void
         isActive: isActive ?? true,
       }
     })
+    await ensureYsoProfile(prisma, person.id)
     const { password: _p, ...safe } = person
     res.status(201).json({ ...safe, temporaryPassword })
   } catch (err: unknown) {
@@ -479,6 +481,7 @@ export async function updatePersonnel(req: Request, res: Response): Promise<void
         ...deptUpdate,
       }
     })
+    if (deptUpdate.departmentId) await ensureYsoProfile(prisma, updated.id)
     const { password: _p, ...safe } = updated
     res.json(safe)
   } catch (err: unknown) {
@@ -602,6 +605,7 @@ export async function movePersonnel(req: Request, res: Response): Promise<void> 
     const updated = await prisma.$transaction(async tx => {
       const p = await tx.personnel.update({ where: { id: req.params.id }, data: { departmentId, supervisorId: supervisor.value } })
       await tx.auditLog.create({ data: { workspaceId: req.user!.workspaceId, event: 'PERSONNEL_MOVED', actorDirectorId: req.user!.actorId, actorType: 'director', payload: { personnelId: p.id, from: person.departmentId, to: departmentId } } })
+      await ensureYsoProfile(tx, p.id)
       return p
     })
     const { password: _p, ...safe } = updated

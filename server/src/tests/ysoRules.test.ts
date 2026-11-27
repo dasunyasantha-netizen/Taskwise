@@ -418,3 +418,11 @@ test('next-month plan becomes missing immediately after the five-day late window
   const r = score([], { today: '2026-10-31' })
   assert.ok(r.obligations.some(o => o.task === 3 && o.period === '2026-11'))
 })
+test('a start that waits for the first submission accrues no obligations', () => {
+  const meeting = { id: 'm', date: '2026-09-10', cancelled: false, invitees: ['yso'] } as any
+  assert.ok(score([], { meetings: [meeting], today: '2026-12-15' }).obligations.length > 0)
+  assert.equal(
+    score([], { meetings: [meeting], today: '2026-12-15', startPending: true }).obligations.length,
+    0
+  )
+})

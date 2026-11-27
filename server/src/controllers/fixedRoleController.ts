@@ -5,6 +5,7 @@ import prisma from '../prisma'
 import { usesFixedRoles } from '../helpers/fixedRoles'
 import { isFourLevelWorkspace, resolveSupervisor } from '../helpers/hierarchy'
 import { syncMigrationContact } from './migrationContactController'
+import { ensureYsoProfile } from '../helpers/ysoProfile'
 
 export async function listFixedRoles(req: Request, res: Response): Promise<void> {
   const { workspaceId } = req.user!
@@ -64,6 +65,7 @@ export async function saveFixedRole(req: Request, res: Response): Promise<void> 
           workspaceId, companyId: company?.id, phone: '', loginId: 'role:' + id, password: hash, mustChangePassword: false, isLetterAssigner } })
         role = await tx.workspaceRole.create({ data: { id, workspaceId, personnelId: position.id } })
       }
+      if (role.personnelId) await ensureYsoProfile(tx, role.personnelId)
       await tx.auditLog.create({ data: { workspaceId, actorType: 'director', actorDirectorId: actorId,
         event: existing ? 'ROLE_UPDATED' : 'ROLE_CREATED', payload: { roleId: role.id, name, departmentId, supervisorId: supervisor.value, isLetterAssigner, ...support } } })
       return role

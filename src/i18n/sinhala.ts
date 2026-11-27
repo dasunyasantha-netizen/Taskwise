@@ -109,6 +109,7 @@ export const si: Record<string, string> = {
   'Loading YSO performance…': 'තරුණ සේවා කාර්ය සාධනය පූරණය වෙමින්…',
   'Unable to load YSO performance.': 'තරුණ සේවා කාර්ය සාධනය පූරණය කළ නොහැක.',
   'Reporting month': 'වාර්තා මාසය', 'Reporting start date': 'වාර්තා ආරම්භක දිනය',
+  'Reporting starts at first submission': 'පළමු ඉදිරිපත් කිරීමෙන් වාර්තාකරණය ආරම්භ වේ',
   'Activate reporting': 'වාර්තාකරණය සක්‍රිය කරන්න', 'Reporting not activated': 'වාර්තාකරණය සක්‍රිය කර නැත',
   'Activate reporting for your YSOs first.': 'මුලින් ඔබේ තරුණ සේවා නිලධාරීන්ගේ වාර්තාකරණය සක්‍රිය කරන්න.',
   'Your AD needs to activate reporting before you can submit.': 'ඔබට ඉදිරිපත් කිරීමට පෙර සහකාර අධ්‍යක්ෂවරයා වාර්තාකරණය සක්‍රිය කළ යුතුය.',

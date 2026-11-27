@@ -360,6 +360,8 @@ export function projectScores(input: {
   startDate: string
   today: string
   personnelId: string
+  /** Start not fixed yet (waits for the first submission): no obligations. */
+  startPending?: boolean
 }) {
   const {
     entries,
@@ -369,6 +371,7 @@ export function projectScores(input: {
     startDate,
     today,
     personnelId,
+    startPending,
   } = input
   const active = entries.filter((e) => !e.supersededAt)
   const approved = active.filter((e) => e.status === 'APPROVED')
@@ -457,6 +460,7 @@ export function projectScores(input: {
   for (const week of weeks) add(week.slice(0, 7), 9, 1)
   for (const meeting of meetings.filter(
     (m) =>
+      !startPending &&
       !m.cancelled &&
       m.date >= startDate &&
       m.date.slice(0, 7) < today.slice(0, 7) &&
@@ -477,7 +481,7 @@ export function projectScores(input: {
   // Bound enrollment history to valid 20xx periods; never manufacture pre-enrollment duties.
   for (
     let p = startDate.slice(0, 7);
-    p <= monthShift(today.slice(0, 7), 1);
+    !startPending && p <= monthShift(today.slice(0, 7), 1);
     p = monthShift(p, 1)
   ) {
     for (const task of [3, 4]) {

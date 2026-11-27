@@ -22,6 +22,7 @@ export type YsoPerson = {
   district: string
   active: boolean
   startDate?: string
+  startPending?: boolean
   managerValid: boolean
 }
 export type YsoEntry = {

@@ -357,6 +357,9 @@ model YsoProfile {
   personnelId String @unique
   personnel   Personnel @relation(fields: [personnelId], references: [id], onDelete: Restrict)
   startDate   String
+  // Bulk-opened profiles: startDate is only a floor until the YSO's first
+  // submission fixes the real start date. No obligations accrue meanwhile.
+  startsOnFirstSubmission Boolean @default(false)
   createdAt   DateTime @default(now())
   @@index([workspaceId])
 }

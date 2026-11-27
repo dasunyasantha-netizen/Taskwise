@@ -185,6 +185,7 @@ export const ta: Record<string, string> = {
   'Read-only oversight of Provincial AD teams and grading. Historical points retain their original AD attribution.': 'மாகாண உதவிப் பணிப்பாளர் குழுக்களையும் மதிப்பீட்டையும் வாசிக்க மட்டுமான கண்காணிப்பு. பழைய புள்ளிகள் அவற்றின் மூல உதவிப் பணிப்பாளருக்கே உரியவை.',
   'Loading YSO performance…': 'இ.சே.அ செயலாற்றுகை ஏற்றப்படுகிறது…', 'Unable to load YSO performance.': 'இ.சே.அ செயலாற்றுகையை ஏற்ற முடியவில்லை.',
   'Reporting month': 'அறிக்கை மாதம்', 'Reporting start date': 'அறிக்கையிடல் தொடக்கத் திகதி',
+  'Reporting starts at first submission': 'முதல் சமர்ப்பிப்புடன் அறிக்கையிடல் தொடங்கும்',
   'Activate reporting': 'அறிக்கையிடலைச் செயற்படுத்து', 'Reporting not activated': 'அறிக்கையிடல் செயற்படுத்தப்படவில்லை',
   'Activate reporting for your YSOs first.': 'முதலில் உங்கள் இளைஞர் சேவை அலுவலர்களுக்கு அறிக்கையிடலைச் செயற்படுத்தவும்.',
   'Your AD needs to activate reporting before you can submit.': 'நீங்கள் சமர்ப்பிக்கும் முன் உங்கள் உதவிப் பணிப்பாளர் அறிக்கையிடலைச் செயற்படுத்த வேண்டும்.',

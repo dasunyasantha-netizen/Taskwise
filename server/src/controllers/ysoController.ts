@@ -175,7 +175,7 @@ async function reconcile(
   person: {
     id: string
     supervisorId: string | null
-    ysoProfile: { startDate: string } | null
+    ysoProfile: { startDate: string; startsOnFirstSubmission: boolean } | null
   },
   reason: string
 ) {
@@ -185,6 +185,7 @@ async function reconcile(
     ...records,
     personnelId: person.id,
     startDate: person.ysoProfile.startDate,
+    startPending: person.ysoProfile.startsOnFirstSubmission,
     today: localDate(),
   })
   const old = await db.ysoScoreEntry.findMany({
@@ -323,6 +324,7 @@ export const getYsoDashboard = handler(async (req, res) => {
           decisions: decisions.filter((d) => d.personnelId === p.id),
           assessments: assessments.filter((a) => a.personnelId === p.id),
           startDate: p.ysoProfile.startDate,
+          startPending: p.ysoProfile.startsOnFirstSubmission,
           personnelId: p.id,
           today: localDate(),
         }).obligations.map((o) => ({ ...o, personnelId: p.id }))
@@ -349,6 +351,7 @@ export const getYsoDashboard = handler(async (req, res) => {
       adName: p.supervisor?.name,
       district: p.supervisor?.department.name,
       startDate: p.ysoProfile?.startDate,
+      startPending: !!p.ysoProfile?.startsOnFirstSubmission,
       managerValid:
         !!p.supervisor &&
         p.supervisor.isActive &&
@@ -449,6 +452,38 @@ export const submitYso = handler(async (req, res) => {
       data = validateData(task, req.body.data)
     } catch (e) {
       return fail(400, (e as Error).message)
+    }
+    if (person.ysoProfile.startsOnFirstSubmission) {
+      // The first submission fixes the reporting start: the date of the
+      // activity it reports, never before reporting was opened nor after today.
+      let activity: string = localDate()
+      if (task === 3 || task === 4) activity = data.month + '-01'
+      else if (task === 2) {
+        const meeting = await db.ysoMeeting.findFirst({
+          where: { id: data.meetingId, workspaceId: actor.workspaceId },
+          select: { date: true },
+        })
+        if (meeting) activity = meeting.date
+      } else if (task < 12 && validDate(data.settlementDate))
+        activity = data.settlementDate
+      else if (task < 12 && validDate(data.date)) activity = data.date
+      const floor = person.ysoProfile.startDate,
+        today = localDate()
+      const startDate =
+        activity < floor ? floor : activity > today ? today : activity
+      await db.ysoProfile.update({
+        where: { personnelId: person.id },
+        data: { startDate, startsOnFirstSubmission: false },
+      })
+      person.ysoProfile.startDate = startDate
+      person.ysoProfile.startsOnFirstSubmission = false
+      await audit(
+        db,
+        actor,
+        'REPORTING_START_FIXED',
+        { startDate, firstTask: task },
+        person.id
+      )
     }
     if (task < 12 && data.date && data.date < person.ysoProfile.startDate)
       return fail(400, 'Activity precedes your reporting start date')
@@ -888,6 +923,7 @@ export const decideYsoPenalty = handler(async (req, res) => {
     const projection = projectScores({
       ...records,
       startDate: person.ysoProfile.startDate,
+      startPending: person.ysoProfile.startsOnFirstSubmission,
       personnelId: person.id,
       today: localDate(),
     })
