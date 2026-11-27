@@ -868,10 +868,14 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
 
   const [approvalTasks, setApprovalTasks] = useState<Task[]>([])
 
+  // YSOs are the lowest level, so nothing is normally submitted to them for
+  // approval; show the queue only if something actually is.
+  const showApprovals = user.ysoRole !== 'YSO' || approvalTasks.length > 0
+
   const sidebarSections: SidebarSection[] = [
     { title: 'My Work', items: [
       { label: 'My Queue',       view: 'personnel_queue',          icon: 'queue', badge: queue.length, badgeTone: 'warning' },
-      { label: 'Approval Queue', view: 'personnel_approval_queue', icon: 'approve', badge: approvalTasks.length, badgeTone: 'warning' },
+      ...(showApprovals ? [{ label: 'Approval Queue', view: 'personnel_approval_queue' as ViewMode, icon: 'approve' as const, badge: approvalTasks.length, badgeTone: 'warning' as const }] : []),
       { label: 'Board View',     view: 'project_board',            icon: 'board' },
     ] },
     { title: 'Workspace', items: [
@@ -884,7 +888,7 @@ export default function PersonnelDashboard({ user, currentView, setView, onLogou
   // Mobile: primary destinations in the floating bar, the rest in "More"
   const mobileNavItems: MobileNavItem[] = [
     { label: 'Tasks',     view: 'personnel_queue',          icon: 'queue',   badge: queue.length },
-    { label: 'Approvals', view: 'personnel_approval_queue', icon: 'approve', badge: approvalTasks.length },
+    ...(showApprovals ? [{ label: 'Approvals', view: 'personnel_approval_queue' as ViewMode, icon: 'approve' as const, badge: approvalTasks.length }] : []),
     ...(ysoEnabled
       ? [{ label: user.ysoRole === 'YSO' ? 'YSO Tasks' : 'My YSOs', view: 'yso_performance' as ViewMode, icon: 'sprout' as const }]
       : [{ label: 'Projects', view: 'project_board' as ViewMode, icon: 'board' as const }]),
