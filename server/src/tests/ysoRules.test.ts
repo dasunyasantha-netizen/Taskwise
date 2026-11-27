@@ -119,8 +119,9 @@ test('a week belongs to its Sunday month including year boundaries', () => {
   assert.equal(weekEnd('2026-09-27'), '2026-09-27')
   assert.equal(weekEnd('2026-12-31'), '2027-01-03')
 })
-test('full weeks only are required after joining, including five-Sunday months', () => {
+test('the part-week at joining counts as a full required week, including five-Sunday months', () => {
   assert.deepEqual(requiredWeeks('2026-09', '2026-09-01'), [
+    '2026-09-06',
     '2026-09-13',
     '2026-09-20',
     '2026-09-27',

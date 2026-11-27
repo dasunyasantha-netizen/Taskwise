@@ -36,7 +36,7 @@ export function requiredWeeks(period: string, startDate: string) {
   ) {
     if (
       new Date(dateMs(day)).getUTCDay() === 0 &&
-      addDays(day, -6) >= startDate
+      day >= startDate // a part-week at joining is a full required week
     )
       result.push(day)
   }
@@ -170,7 +170,7 @@ export const TASKS: {
   {
     id: 9,
     title: 'Divisional Secretariat reporting',
-    rule: '+1 per covered Monday–Sunday week. Weeks belong to the month of their Sunday. Any missed required week causes one −5 monthly deduction after AD confirmation. Partial joining weeks are exempt.',
+    rule: '+1 per covered Monday–Sunday week. Weeks belong to the month of their Sunday. Any missed required week causes one −5 monthly deduction after AD confirmation. The joining week counts as a full week.',
     fields: [date],
   },
   {

@@ -2350,7 +2350,7 @@ export default function YsoPerformancePage({ user, onUserUpdate, directoryResetK
             }}
           >
             <p className="text-sm text-slate-600">
-              {tr("Choose when reporting obligations begin. This date is fixed once activated. Partial joining weeks are exempt.")}</p>
+              {tr("Choose when reporting obligations begin. This date is fixed once activated. The joining week counts as a full week.")}</p>
             <label className="block text-sm">
               {tr("Reporting start date")}<DatePicker
                 compact
